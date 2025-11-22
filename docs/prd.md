@@ -2,30 +2,33 @@
 
 **Author:** Luca
 **Date:** 2025-11-21
-**Version:** 1.0
+**Version:** 1.1 (MVP)
 
 ---
 
 ## Executive Summary
 
-RealityCam is a mobile camera app providing cryptographically-attested, physics-verified media provenance. It shows viewers not just "this came from a camera" but "here's the strength of evidence that this came from THIS environment at THIS moment."
+RealityCam is an iOS camera app providing cryptographically-attested, LiDAR-verified photo provenance for iPhone Pro devices. It shows viewers not just "this came from a camera" but "here's the strength of evidence that this was a real 3D scene captured by a genuine device."
 
-The core insight: Provenance claims are only as strong as their weakest assumption. A software-only hash proves nothing if the software layer is compromised. Hardware attestation must be the foundation, not a later enhancement.
+The core insight: Provenance claims are only as strong as their weakest assumption. A software-only hash proves nothing if the software layer is compromised. Hardware attestation must be the foundation, not a later enhancement. LiDAR depth analysis provides the "real scene" signal that's prohibitively expensive to fake.
 
 **What this is NOT:**
 - Not an "AI detector" or "deepfake detector"
 - Not a claim of absolute truth—we provide *evidence strength*, not binary verification
 - Not a social platform
+- Not cross-platform (MVP is iPhone Pro only)
 
 **Standards alignment:** C2PA / Content Credentials for interoperability with ecosystem tools (Adobe, Google Photos, news organizations).
 
 ### What Makes This Special
 
-**Graduated Evidence, Not Binary Trust.** Unlike competitors offering simple "verified/not verified" stamps, RealityCam provides a layered evidence hierarchy—from hardware-rooted attestation down to metadata consistency. Users see exactly WHY they should trust content and at what confidence level.
+**LiDAR as Authenticity Signal.** Real 3D scenes have depth variance, multiple layers, and edge coherence. Flat images (screenshots, screens, prints) have uniform depth at ~0.3-0.5m. This is captured simultaneously with the photo and is prohibitively expensive to fake.
 
-**Physics as Proof.** We don't just sign files; we cross-check sun angles against GPS/timestamp, verify 3D scene depth with LiDAR, and correlate sensor data with optical flow. Faking our evidence requires manipulating physical reality, not just software.
+**Hardware-Rooted Trust.** Every capture is attested by iOS Secure Enclave via DCAppAttest. The device identity key is generated in hardware, never extractable. Spoofing requires custom silicon.
 
 **Transparency Over Security Theater.** We explicitly show what we CAN'T detect. When a check is unavailable, we say so. When evidence is weak, we communicate that. This honesty builds genuine trust.
+
+**Why iPhone Pro Only (MVP):** LiDAR sensor is only on Pro models. Consistent hardware eliminates Android fragmentation. 50% less native code means faster iteration to a working demo.
 
 ---
 
@@ -34,95 +37,99 @@ The core insight: Provenance claims are only as strong as their weakest assumpti
 **Technical Type:** mobile_app
 **Domain:** general (security/cryptography focus)
 **Complexity:** medium
+**Platform:** iPhone Pro only (MVP)
 
 This is a multi-component system:
-- **Mobile App** (React Native/Expo): Secure capture with hardware attestation
+- **iOS App** (Expo/React Native): Photo capture with LiDAR depth and hardware attestation
 - **Backend** (Rust/Axum): Evidence processing, C2PA manifest generation
-- **Verification Web** (Next.js): Public verification interface
+- **Verification Web** (Next.js 16): Public verification interface
 
-The system requires deep integration with platform-specific security features (Android StrongBox, iOS Secure Enclave) and implements novel physics-based verification algorithms.
+The system requires deep integration with iOS Secure Enclave (DCAppAttest) and ARKit LiDAR APIs for depth-based authenticity verification.
 
 ---
 
 ## Success Criteria
 
-### Primary Success Indicators
+### MVP Success Indicators
 
-1. **Hardware attestation adoption** - >80% of captures from hardware-attested devices
-2. **Evidence completeness** - >50% of captures include environment scan (360° pan)
+1. **Hardware attestation adoption** - 100% of captures from Secure Enclave-attested devices (iPhone Pro only)
+2. **Depth analysis completion** - >95% of captures have LiDAR depth data
 3. **Verification engagement** - Verification page bounce rate <30%
 4. **Evidence panel exploration** - >20% of viewers expand detailed evidence view
-5. **Expert adoption** - >1% download raw evidence packages
+5. **"Real scene" detection accuracy** - >95% true positive rate for real 3D scenes vs flat images
 
-### Phase 0 (Hackathon) Success
+### MVP (Demo-Ready) Success
 
-- [ ] Hardware attestation working on Pixel 6+
-- [ ] End-to-end flow: capture → verify URL → view evidence
-- [ ] Verification page clearly shows attestation status
-- [ ] Demo-able in 5 minutes
+- [ ] DCAppAttest hardware attestation working on iPhone Pro
+- [ ] LiDAR depth capture and "real scene" analysis functional
+- [ ] End-to-end flow: capture → verify URL → view evidence with depth visualization
+- [ ] Demo-able in 5 minutes on real iPhone Pro device
 
 ### Long-term Success
 
 - Adoption by at least one newsroom for verification workflow
 - Cited in at least one published investigation
 - C2PA conformance certification achieved
+- Android expansion post-MVP validation
 
 ---
 
 ## Product Scope
 
-### MVP - Minimum Viable Product
+### MVP - iPhone Pro Photo Capture
 
-**Mobile App (Phase 0):**
-- Basic camera capture (single photo)
+**iOS App (MVP):**
+- Photo capture with simultaneous LiDAR depth map
+- DCAppAttest hardware attestation (Secure Enclave)
+- Depth overlay visualization during capture
 - SHA-256 hash computation
-- Android Key Attestation for Pixel 6+ (native module)
-- Upload with attestation data
+- Upload: photo + depth_map (gzipped float32) + metadata
 - Receive and display verify URL
+- Local encrypted storage for offline captures
 
-**Backend (Phase 0):**
-- `POST /captures`: receive upload, verify attestation, store
+**Backend (MVP):**
+- `POST /devices`: device registration with DCAppAttest verification
+- `POST /captures`: receive upload, verify attestation, analyze depth, store
 - `GET /captures/:id`: return capture data and evidence
 - `POST /verify-file`: hash lookup
-- Basic evidence package with Tier 1 (attestation) + Tier 4 (EXIF)
-- JWS-signed certificate
+- Evidence package: Hardware Attestation + Depth Analysis + Metadata
+- C2PA manifest generation via c2pa-rs
 
-**Verification Web (Phase 0):**
-- Summary view with confidence level
-- Basic evidence panel
+**Verification Web (MVP):**
+- Summary view with confidence level (HIGH/MEDIUM/LOW/SUSPICIOUS)
+- Depth analysis visualization (depth map preview)
 - Hardware attestation status display
+- Expandable evidence panel with per-check details
+- File upload for hash verification
 
-**Explicit Phase 0 Limitations:**
-- "Phase 0 prototype—limited evidence checks"
-- "No environment scan—3D verification unavailable"
+**MVP Scope Constraints:**
+- iPhone Pro only (12 Pro through 17 Pro)
+- Photo only (no video)
+- Device-based auth (no user accounts)
+- LiDAR required (no fallback for non-Pro devices)
 
-### Growth Features (Post-MVP)
+### Deferred Features (Post-MVP)
 
-**Phase 0.5 Additions:**
-- iOS DCAppAttest support
-- Scan mode UX (360° pan)
-- Gyro × optical flow consistency check (Tier 3)
-- Sun angle verification (Tier 2)
-- Context video storage and viewer
-- Full confidence level logic
-
-**Phase 1 Additions:**
-- LiDAR depth analysis (iPhone Pro)
-- Multi-camera lighting consistency
-- Full C2PA manifest embedding via c2pa-rs
-- Expert panel with raw data download
-- User accounts and capture management
-- Barometric pressure check
-- Certificate pinning in mobile app
+| Feature | Reason for Deferral |
+|---------|---------------------|
+| Android support | Adds 50% native code, StrongBox fragmentation |
+| Video capture | Complex gyro/optical-flow analysis |
+| 360° environment scan | Complex UX, parallax computation |
+| Sun angle verification | Requires solar position API integration |
+| Barometric pressure | Requires weather/altitude correlation |
+| Gyro × optical flow | Needs video, cross-modal correlation |
+| User accounts | Device-only auth sufficient for MVP |
+| Multi-camera lighting | Complexity vs. value for photos |
+| Expert raw data download | Nice-to-have, not core value prop |
 
 ### Vision (Future)
 
-**Phase 2 - Ecosystem & Hardening:**
+**Post-MVP Expansion:**
+- Android support (Pixel 8+ with StrongBox)
+- Video capture with motion correlation checks
 - Open source release (transparency)
-- Third-party verification tool (independent hash/signature check)
 - Browser extension for inline verification
 - Integration with news org verification workflows
-- Advanced ML-based checks (active research)
 - Formal security audit
 
 ### Out of Scope
@@ -140,14 +147,10 @@ The following are explicitly **not** part of this product:
 - Cloud storage/backup service (we store evidence, not user media libraries)
 - Editing tools (post-capture editing invalidates provenance)
 
-**Enterprise/B2B:**
-- White-label licensing (Phase 2+ consideration)
-- Self-hosted backend deployment
-- SLA-backed enterprise support tiers
-
-**Hardware:**
-- Custom hardware devices or camera modules
-- Support for devices without TEE/Secure Enclave (software-only attestation is allowed but flagged)
+**MVP Platform Constraints:**
+- Android devices (deferred to post-MVP)
+- Non-Pro iPhones (no LiDAR)
+- Video capture (photo only for MVP)
 
 ---
 
@@ -177,22 +180,23 @@ The following are explicitly **not** part of this product:
 
 ### Key Interactions
 
-**UC1: Capture with Environmental Context**
-1. User opens app, enters "capture mode"
-2. App prompts: "Scan your environment" — user does slow 360° pan (10-15s)
-3. User "locks" on subject, takes photo/video
-4. App computes: target capture + environment context + sensor traces
-5. Upload includes all evidence; user receives shareable link
+**UC1: Photo Capture with Depth**
+1. User opens app, enters capture mode
+2. App shows camera with depth overlay (LiDAR visualization)
+3. User frames subject, taps capture button
+4. App simultaneously captures: photo + LiDAR depth map + device attestation
+5. Upload includes all evidence; user receives shareable verify link
 
-**UC2: Quick Capture (Degraded Evidence)**
-1. User takes photo without environment scan
-2. Evidence tier reduced (no 3D-ness proof)
-3. Clear indication: "Environment scan: not performed"
+**UC2: View Capture Result**
+1. After capture, app shows preview with depth visualization
+2. User sees preliminary confidence indicator
+3. User can share verify link or capture another
 
 **UC3: Verify Received Media**
 1. Recipient opens verification link
-2. Sees confidence summary + expandable evidence panel
-3. Can download raw evidence package for independent analysis
+2. Sees confidence summary (HIGH/MEDIUM/LOW/SUSPICIOUS)
+3. Sees depth analysis visualization (proof of real 3D scene)
+4. Can expand detailed evidence panel
 
 **UC4: Upload External File for Hash Lookup**
 1. User uploads file to verification page
@@ -207,35 +211,47 @@ The following are explicitly **not** part of this product:
 
 ---
 
-## mobile_app Specific Requirements
+## iOS App Requirements
 
-### Platform Support
+### Platform Support (MVP)
 
-**iOS:**
-- iPhone SE 2+ for DCAppAttest support
-- iPhone Pro/iPad Pro for LiDAR depth analysis
-- Minimum iOS version: iOS 14.0 (DCAppAttest introduced August 2020)
+**iPhone Pro Only:**
 
-**Android:**
-- Pixel 6+ for StrongBox hardware attestation
-- Samsung Knox devices supported
-- Minimum Android API level: 28 (Android 9.0+, StrongBox introduced)
+| Model | Released | LiDAR | Secure Enclave | Status |
+|-------|----------|-------|----------------|--------|
+| iPhone 17 Pro / Pro Max | 2025 | ✅ | ✅ | Current |
+| iPhone 16 Pro / Pro Max | 2024 | ✅ | ✅ | Supported |
+| iPhone 15 Pro / Pro Max | 2023 | ✅ | ✅ | Supported |
+| iPhone 14 Pro / Pro Max | 2022 | ✅ | ✅ | Supported |
+| iPhone 13 Pro / Pro Max | 2021 | ✅ | ✅ | Supported |
+| iPhone 12 Pro / Pro Max | 2020 | ✅ | ✅ | Supported |
+
+- Minimum iOS version: iOS 14.0 (DCAppAttest introduced)
+- LiDAR required for MVP (primary evidence signal)
+- Non-Pro iPhones: Not supported in MVP (no LiDAR)
+
+**Why No Android (MVP):**
+- StrongBox availability varies by manufacturer
+- No LiDAR equivalent on Android devices
+- 50% less native code to maintain
+- Faster iteration to working demo
 
 ### Device Capabilities
 
-Required sensors and features:
-- Camera (back, front; wide/tele where available)
-- Gyroscope (100Hz minimum sampling)
-- Accelerometer (100Hz minimum sampling)
-- Magnetometer (compass)
-- GPS (optional, but enables physics checks)
-- Barometer (optional, enables altitude verification)
-- LiDAR (optional, iPhone Pro only)
+**Required:**
+- LiDAR sensor (depth capture)
+- Secure Enclave (DCAppAttest)
+- Camera (back camera, wide lens)
+- GPS (for location metadata)
+
+**Optional (captured if available):**
+- Gyroscope, accelerometer (for future video support)
+- Barometer (for future altitude verification)
 
 ### Offline Mode
 
-- Store media + metadata in encrypted local storage
-- Encryption key: hardware-backed if attestation available
+- Store photo + depth map in encrypted local storage
+- Encryption key: Secure Enclave backed
 - Mark as "Pending upload"
 - Auto-upload when connectivity returns
 - Display warning: "Evidence timestamping delayed—server receipt time will differ from capture time"
@@ -244,35 +260,41 @@ Required sensors and features:
 
 ## Innovation & Novel Patterns
 
-### The Evidence Hierarchy
+### Evidence Architecture (MVP)
 
-This is the core innovation—evidence tiers ordered by cost-to-spoof:
+The MVP focuses on two high-value evidence dimensions plus basic metadata:
 
-**Tier 1: Hardware-Rooted (highest)**
-- Device identity attested by TEE (Android StrongBox) or Secure Enclave (iOS)
-- Key generated in HSM
-- Spoofing cost: Custom silicon / firmware exploit
+**Primary Evidence: Hardware Attestation**
+- Device identity attested by iOS Secure Enclave via DCAppAttest
+- Key generated in hardware, never extractable
+- Proves: Photo originated from a real, uncompromised iPhone Pro
+- Spoofing cost: Custom silicon or firmware exploit (~impossible for attacker)
 
-**Tier 2: Physics-Constrained**
-- Sun angle consistency (computed vs observed shadow direction)
-- LiDAR depth (3D geometry vs flat surface)
-- Barometric pressure (matches GPS altitude)
-- Environment 3D-ness (360° scan parallax)
-- Spoofing cost: Building physical 3D scene, pressure chamber
+**Primary Evidence: LiDAR Depth Analysis**
+- Depth map captured simultaneously with photo using ARKit
+- Analyze: depth variance, edge coherence, 3D structure
+- Proves: Camera pointed at real 3D scene, not flat image/screen
+- Spoofing cost: Building physical 3D replica of scene
 
-**Tier 3: Cross-Modal Consistency**
-- Gyroscope × optical flow correlation
-- Multi-camera lighting consistency
-- Audio reverb × room geometry (video)
-- Accelerometer × motion blur
-- Spoofing cost: Coordinated synthetic data generation
+**Depth Analysis Algorithm:**
+```
+DepthAnalysis:
+  depth_variance: f32    // High = real scene, Low = flat
+  edge_coherence: f32    // Depth edges align with RGB edges
+  min_depth: f32         // Nearest point (screens are ~0.3-0.5m)
+  depth_layers: u32      // Distinct depth planes detected
 
-**Tier 4: Metadata Consistency (lowest)**
-- EXIF timestamp within tolerance
-- Device model string verification
-- Resolution/lens capability match
-- App integrity signature
-- Spoofing cost: EXIF editor, API hooking
+is_likely_real_scene:
+  depth_variance > 0.5 AND
+  depth_layers >= 3 AND
+  edge_coherence > 0.7
+```
+
+**Secondary Evidence: Metadata Consistency**
+- EXIF timestamp within tolerance of server time
+- Device model matches iPhone Pro (has LiDAR)
+- Resolution matches device capability
+- Spoofing cost: Low (EXIF editor), but adds friction
 
 ### Evidence Status Values
 
@@ -281,182 +303,183 @@ This is the core innovation—evidence tiers ordered by cost-to-spoof:
 | **PASS** | Check performed, evidence consistent | ✓ Green | Positive signal |
 | **FAIL** | Check performed, evidence inconsistent | ✗ Red | Red flag—possible manipulation |
 | **UNAVAILABLE** | Check not possible (device/conditions) | — Gray | Reduces confidence ceiling, not suspicious |
-| **SKIPPED** | User chose not to perform (e.g., no env scan) | ○ Yellow | User choice, noted in evidence |
 
-### Validation Approach
+### Confidence Calculation (MVP)
 
-Confidence level logic:
-- **HIGH**: Tier 1 pass + at least 2 Tier 2 passes + no fails
-- **MEDIUM**: Tier 1 pass OR 2+ Tier 2 passes, no fails
-- **LOW**: Only Tier 3-4 passes, no Tier 1-2
-- **INSUFFICIENT**: Major checks failed or almost all unavailable
-- **SUSPICIOUS**: Any check FAILED (not unavailable—actually inconsistent)
+```
+if any_check_failed:
+    return SUSPICIOUS
+
+match (hardware_pass, depth_pass):
+    (true, true)  => HIGH      // Both pass = strong
+    (true, false) => MEDIUM    // Hardware only
+    (false, true) => MEDIUM    // Depth only (shouldn't happen on Pro)
+    (false, false) => LOW
+```
+
+### Deferred Evidence Checks (Post-MVP)
+
+These add value but require more implementation effort:
+- **Sun angle:** Compare computed solar position to shadow direction
+- **Barometric pressure:** Match reported pressure to GPS altitude
+- **Gyro × optical flow:** Correlate device rotation with image motion (video)
+- **360° environment scan:** Require user to pan device for parallax proof
 
 ---
 
 ## Functional Requirements
 
-### Device & Attestation
+### Device & Attestation (MVP)
 
-- FR1 `[Phase 0]`: App can detect device hardware attestation capability (StrongBox/Secure Enclave/none)
-- FR2 `[Phase 0]`: App can generate cryptographic keys in hardware-backed storage
-- FR3 `[Phase 0]`: App can request attestation certificate chain from platform
-- FR4 `[Phase 0]`: Backend can verify Android Key Attestation certificate chains against Google's root
-- FR5 `[Phase 0.5]`: Backend can verify iOS DCAppAttest assertions against Apple's service
-- FR6 `[Phase 0]`: System assigns attestation level to each device (hardware_strongbox, hardware_secure_enclave, software_only, unknown)
+- FR1: App detects iPhone Pro device with LiDAR capability
+- FR2: App generates cryptographic keys in Secure Enclave
+- FR3: App requests DCAppAttest attestation from iOS
+- FR4: Backend verifies DCAppAttest assertions against Apple's service
+- FR5: System assigns attestation level: secure_enclave or unverified
 
-### Capture Flow
+### Capture Flow (MVP)
 
-- FR7 `[Phase 0.5]`: Users can enter scan mode to record 360° environmental context
-- FR8 `[Phase 0.5]`: App records video stream from all available cameras during scan
-- FR9 `[Phase 0.5]`: App records gyroscope trace at 100Hz minimum during scan
-- FR10 `[Phase 0.5]`: App records accelerometer trace at 100Hz minimum during scan
-- FR11 `[Phase 0.5]`: App records magnetometer readings during scan
-- FR12 `[Phase 0]`: App records GPS coordinates if permission granted
-- FR13 `[Phase 1]`: App records barometric pressure if sensor available
-- FR14 `[Phase 1]`: App records LiDAR depth frames if sensor available
-- FR15 `[Phase 0.5]`: Users can "lock" to end scan phase and frame target subject
-- FR16 `[Phase 0]`: Users can capture target photo or video after scan
-- FR17 `[Phase 0.5]`: App records sensor burst during target capture
-- FR18 `[Phase 0]`: Users can perform quick capture without environment scan (degraded evidence)
+- FR6: App displays camera view with LiDAR depth overlay
+- FR7: App captures photo via back camera
+- FR8: App simultaneously captures LiDAR depth map via ARKit
+- FR9: App records GPS coordinates if permission granted
+- FR10: App captures device attestation signature for the capture
 
-### Local Processing
+### Local Processing (MVP)
 
-- FR19 `[Phase 0]`: App computes SHA-256 hash of target media before upload
-- FR20 `[Phase 0.5]`: App computes SHA-256 hash of context package before upload
-- FR21 `[Phase 0.5]`: App computes local gyro × optical flow consistency estimate
-- FR22 `[Phase 1]`: App computes local LiDAR flatness analysis if available
-- FR23 `[Phase 0]`: App constructs structured capture request with device, capture, and local check data
+- FR11: App computes SHA-256 hash of photo before upload
+- FR12: App compresses depth map (gzip float32 array)
+- FR13: App constructs structured capture request with photo + depth + metadata
 
-### Upload & Sync
+### Upload & Sync (MVP)
 
-- FR24 `[Phase 0]`: App uploads capture via multipart POST (target media + context + JSON request)
-- FR25 `[Phase 0]`: App uses TLS 1.3 for all API communication
-- FR26 `[Phase 0]`: App implements retry with exponential backoff on upload failure
-- FR27 `[Phase 0]`: App stores captures in encrypted local storage when offline
-- FR28 `[Phase 0]`: App auto-uploads pending captures when connectivity returns
-- FR29 `[Phase 0]`: App displays pending upload status to user
+- FR14: App uploads capture via multipart POST (photo + depth_map + metadata JSON)
+- FR15: App uses TLS 1.3 for all API communication
+- FR16: App implements retry with exponential backoff on upload failure
+- FR17: App stores captures in encrypted local storage when offline (Secure Enclave key)
+- FR18: App auto-uploads pending captures when connectivity returns
+- FR19: App displays pending upload status to user
 
-### Evidence Generation (Backend)
+### Evidence Generation (MVP)
 
-- FR30 `[Phase 0]`: Backend verifies attestation claims and downgrades level if verification fails *(depends: FR3, FR4)*
-- FR31 `[Phase 0.5]`: Backend computes sun angle verification (expected vs observed shadow direction) *(depends: FR12)*
-- FR32 `[Phase 1]`: Backend performs LiDAR depth analysis for flatness detection *(depends: FR14)*
-- FR33 `[Phase 1]`: Backend performs barometric consistency check against GPS altitude *(depends: FR12, FR13)*
-- FR34 `[Phase 0.5]`: Backend analyzes 360° scan for parallax (environment 3D-ness) *(depends: FR7, FR8)*
-- FR35 `[Phase 0.5]`: Backend performs gyro × optical flow consistency check *(depends: FR9, FR21)*
-- FR36 `[Phase 1]`: Backend performs multi-camera lighting consistency check if multiple cameras used
-- FR37 `[Phase 0]`: Backend validates EXIF timestamp against server receipt time
-- FR38 `[Phase 0]`: Backend validates device model across EXIF, platform API, and capabilities
-- FR39 `[Phase 0]`: Backend generates comprehensive evidence package with all check results *(depends: FR30, FR37, FR38)*
+- FR20: Backend verifies DCAppAttest attestation and records level
+- FR21: Backend performs LiDAR depth analysis (variance, layers, edge coherence)
+- FR22: Backend determines "is_likely_real_scene" from depth analysis
+- FR23: Backend validates EXIF timestamp against server receipt time
+- FR24: Backend validates device model is iPhone Pro (has LiDAR)
+- FR25: Backend generates evidence package with all check results
+- FR26: Backend calculates confidence level (HIGH/MEDIUM/LOW/SUSPICIOUS)
 
-### C2PA Integration
+### C2PA Integration (MVP)
 
-- FR40 `[Phase 0]`: Backend creates C2PA manifest with claim generator, capture actions, evidence summary *(depends: FR39)*
-- FR41 `[Phase 0]`: Backend signs C2PA manifest with Ed25519 key (HSM-backed in production) *(depends: FR40)*
-- FR42 `[Phase 1]`: Backend embeds C2PA manifest in media file *(depends: FR41)*
-- FR43 `[Phase 0]`: System stores both original and C2PA-embedded versions
+- FR27: Backend creates C2PA manifest with evidence summary
+- FR28: Backend signs C2PA manifest with Ed25519 key (HSM-backed in production)
+- FR29: Backend embeds C2PA manifest in photo file
+- FR30: System stores both original and C2PA-embedded versions
 
-### Verification Interface
+### Verification Interface (MVP)
 
-- FR44 `[Phase 0]`: Users can view capture verification via shareable URL
-- FR45 `[Phase 0]`: Verification page displays confidence summary (HIGH/MEDIUM/LOW/INSUFFICIENT/SUSPICIOUS)
-- FR46 `[Phase 0]`: Verification page displays primary evidence type and captured metadata
-- FR47 `[Phase 0]`: Users can expand detailed evidence panel with per-check status
-- FR48 `[Phase 0]`: Each check displays pass/fail/unavailable/skipped with relevant metrics
-- FR49 `[Phase 1]`: Users can access expert panel for raw sensor data download
-- FR50 `[Phase 1]`: Users can download evidence computation logs and methodology documentation
-- FR51 `[Phase 1]`: Users can view raw C2PA manifest (JUMBF)
-- FR52 `[Phase 0.5]`: Users can scrub through 360° context video if environment scan performed *(depends: FR7)*
-- FR53 `[Phase 0.5]`: Context viewer shows parallax visualization highlighting depth cues *(depends: FR34)*
+- FR31: Users can view capture verification via shareable URL
+- FR32: Verification page displays confidence summary (HIGH/MEDIUM/LOW/SUSPICIOUS)
+- FR33: Verification page displays depth analysis visualization
+- FR34: Users can expand detailed evidence panel with per-check status
+- FR35: Each check displays pass/fail with relevant metrics
 
-### File Verification
+### File Verification (MVP)
 
-- FR54 `[Phase 0]`: Users can upload file to verification endpoint
-- FR55 `[Phase 0]`: System computes hash and searches for matching capture
-- FR56 `[Phase 0]`: If match found: display linked capture evidence
-- FR57 `[Phase 0]`: If no match but C2PA manifest present: display manifest info with note
-- FR58 `[Phase 0]`: If no match and no manifest: display "No provenance record found"
+- FR36: Users can upload file to verification endpoint
+- FR37: System computes hash and searches for matching capture
+- FR38: If match found: display linked capture evidence
+- FR39: If no match but C2PA manifest present: display manifest info with note
+- FR40: If no match and no manifest: display "No provenance record found"
 
-### User & Device Management
+### Device Management (MVP)
 
-- FR59 `[Phase 0]`: System generates device-level pseudonymous ID (hardware-attested or random UUID) *(depends: FR1, FR2)*
-- FR60 `[Phase 0]`: Users can capture and verify without account (anonymous by default)
-- FR61 `[Phase 1]`: Users can create optional account with passkey-based authentication *(depends: FR59)*
-- FR62 `[Phase 1]`: Users can link multiple devices to account *(depends: FR61)*
-- FR63 `[Phase 1]`: Users can view gallery of their captures *(depends: FR61)*
-- FR64 `[Phase 1]`: Users can revoke/withdraw captures *(depends: FR61)*
-- FR65 `[Phase 1]`: Withdrawn captures display revocation notice on verification page *(depends: FR64)*
+- FR41: System generates device-level pseudonymous ID (Secure Enclave backed)
+- FR42: Users can capture and verify without account (anonymous by default)
+- FR43: Device registration stores attestation key ID and capability flags
 
-### Privacy Controls
+### Privacy Controls (MVP)
 
-- FR66 `[Phase 0]`: GPS stored at coarse level (city) by default in public view
-- FR67 `[Phase 0]`: Users can opt-out of location (reduces confidence, not suspicious)
-- FR68 `[Phase 0]`: Environment context stored locally until explicit capture action
-- FR69 `[Phase 1]`: Users can export all their data *(depends: FR61)*
-- FR70 `[Phase 1]`: Users can delete account and all associated captures *(depends: FR61)*
+- FR44: GPS stored at coarse level (city) by default in public view
+- FR45: Users can opt-out of location (noted in evidence, not suspicious)
+- FR46: Depth map stored but not publicly downloadable (only visualization)
+
+### Deferred Functional Requirements (Post-MVP)
+
+| FR | Feature | Reason |
+|----|---------|--------|
+| D1 | Android Key Attestation verification | No Android in MVP |
+| D2 | 360° environment scan capture | Complex UX |
+| D3 | Gyro × optical flow analysis | Needs video |
+| D4 | Sun angle verification | Solar API integration |
+| D5 | Barometric pressure check | Weather API correlation |
+| D6 | User accounts (passkey auth) | Device auth sufficient |
+| D7 | Capture revocation | Needs user accounts |
+| D8 | Raw sensor data download | Nice-to-have |
 
 ---
 
 ## Non-Functional Requirements
 
-### Performance
+### Performance (MVP)
 
 | Metric | Target | Notes |
 |--------|--------|-------|
-| Capture → processing complete | < 30s | Includes evidence computation |
+| Capture → processing complete | < 15s | Photo + depth analysis |
 | Verification page load | < 1.5s FCP | Cached media via CDN |
-| Upload throughput | 10 MB/s minimum | Typical capture + context ~5-15 MB |
-| Evidence computation | < 10s | Parallelized across tiers |
+| Upload throughput | 10 MB/s minimum | Photo (~3MB) + depth map (~1MB compressed) |
+| Depth analysis computation | < 5s | Variance, layers, edge coherence |
 
 ### Security
 
 **Cryptographic Choices:**
 | Component | Algorithm | Rationale |
 |-----------|-----------|-----------|
-| Media hash | SHA-256 | Industry standard, collision-resistant |
-| Certificate signing | Ed25519 | Fast, small signatures, no ECDSA pitfalls |
+| Photo hash | SHA-256 | Industry standard, collision-resistant |
+| Device signing | Ed25519 | Fast, small signatures, Secure Enclave compatible |
 | C2PA manifest | Per C2PA spec | Interoperability |
 | Server key storage | HSM-backed | Private key never in memory |
-| Device attestation | Platform-native | Hardware root of trust |
+| Device attestation | DCAppAttest | iOS Secure Enclave root of trust |
 
-**Key Management:**
+**Key Management (MVP):**
 - Server signing key: Generate in HSM, never export, rotate yearly
-- Device attestation keys: Generated per-device in hardware, not extractable
+- Device attestation keys: Generated in iOS Secure Enclave, not extractable
 - Certificate revocation list maintained, embedded in C2PA manifest
 
 **Transport Security:**
 - TLS 1.3 required for all API endpoints
-- Certificate pinning in mobile app (Phase 1)
+- Certificate pinning in mobile app (post-MVP)
 - Signed URLs for media access, expire in 1 hour
 
-**Threat Model Summary:**
+**Threat Model Summary (MVP):**
 
-| Attack | Defense | Tier |
-|--------|---------|------|
-| Screenshot AI image | Only in-app captures accepted | App |
-| Frida/Xposed hook | Hardware attestation detects rooted/hooked | Tier 1 |
-| Physical replay | 360 scan reveals flat surface; LiDAR no depth | Tier 2 |
-| Time/location spoof | Sun angle + GPS + timestamp cross-check | Tier 2 |
-| Coordinated sensor spoof | Hardware attestation + cross-modal checks | Tier 1+3 |
-| MITM | TLS 1.3 + cert pinning + hash verification | Transport |
+| Attack | Defense | Evidence Type |
+|--------|---------|---------------|
+| Screenshot AI image | Only in-app captures accepted | App integrity |
+| Frida/jailbreak hook | DCAppAttest detects compromised devices | Hardware |
+| Photo of screen/print | LiDAR shows flat uniform depth | Depth Analysis |
+| Photo of flat image | LiDAR shows single depth layer | Depth Analysis |
+| EXIF manipulation | Server timestamp comparison | Metadata |
+| MITM | TLS 1.3 + hash verification | Transport |
 
 **Acknowledged Limitations:**
-- Cannot detect perfectly constructed physical scenes
+- Cannot detect perfectly constructed physical 3D scenes
 - Cannot defeat nation-state hardware attacks
 - Cannot prove semantic truth (what depicted actually happened)
-- Cannot detect pre-capture manipulation (staged scenes)
+- Cannot detect pre-capture manipulation (staged physical scenes)
+- LiDAR can be fooled by real 3D replicas (prohibitively expensive)
 
 ### Scalability
 
-- **Phase 0:** Single backend instance, vertical scaling
-- **Phase 1+:** Horizontal scaling, read replicas for Postgres, CDN for media
+- **MVP:** Single backend instance, vertical scaling
+- **Post-MVP:** Horizontal scaling, read replicas for Postgres, CDN for media
 
 ### Reliability
 
 | Metric | Target |
 |--------|--------|
-| API availability | 99.5% (hackathon), 99.9% (production) |
+| API availability | 99.5% (MVP), 99.9% (production) |
 | Data durability | 99.999999999% (11 nines, via S3) |
 | Offline capture | Must not lose captures |
 
@@ -471,117 +494,107 @@ Confidence level logic:
 
 ## Technical Reference
 
-### Data Model
+### Data Model (MVP)
 
 **Core Entities:**
-- `devices`: id, user_id, platform, model, attestation_level, attestation_key_id
-- `captures`: id, device_id, target_media_hash, context_package_key, evidence_package (JSONB), confidence_level, status
-- `users`: id, email, passkey_credential_id (optional, Phase 1)
+- `devices`: id, platform (ios), model, attestation_level, attestation_key_id, has_lidar
+- `captures`: id, device_id, photo_hash, depth_map_key, evidence_package (JSONB), confidence_level, status
 - `verification_logs`: capture_id, action, client_ip, timestamp (analytics)
 
-### API Endpoints
+**Note:** User accounts deferred to post-MVP.
 
-- `POST /api/v1/captures` - Create capture (multipart: media + context + JSON)
-- `GET /api/v1/captures/:id` - Get capture with evidence
+### API Endpoints (MVP)
+
+- `POST /api/v1/devices` - Register device with DCAppAttest
+- `POST /api/v1/captures` - Create capture (multipart: photo + depth_map + metadata JSON)
+- `GET /api/v1/captures/:id` - Get capture with evidence and depth visualization
 - `POST /api/v1/verify-file` - Hash lookup for uploaded file
-- `GET /api/v1/captures/:id/evidence/raw` - Download raw evidence package (ZIP)
 
-### Authentication Model
+### Authentication Model (MVP)
 
-**Phase 0: Device-Based Identity (Anonymous)**
-- Device generates hardware-attested keypair on first launch
-- All API requests signed with device key (JWT or similar)
+**Device-Based Identity (Anonymous)**
+- Device generates Secure Enclave-backed keypair on first launch
+- All API requests signed with device key (Ed25519)
 - No user accounts required; device ID is pseudonymous
 - Captures linked to device, not user identity
 - Rate limiting by device ID + IP
 
-**Phase 1: Optional User Accounts (Passkey-Based)**
-- WebAuthn/Passkey registration and authentication
-- No passwords stored; relies on platform authenticators (Face ID, fingerprint, security keys)
-- Account creation optional; users can continue anonymously
-- Account linking enables:
-  - Multi-device capture gallery
-  - Capture revocation
-  - Data export (GDPR compliance)
-  - Account deletion
+**API Authentication Flow (MVP):**
 
-**API Authentication Flow:**
-
-| Endpoint | Phase 0 Auth | Phase 1 Auth |
-|----------|--------------|--------------|
-| `POST /captures` | Device signature | Device signature |
-| `GET /captures/:id` | None (public) | None (public) |
-| `POST /verify-file` | None (public) | None (public) |
-| `GET /captures/:id/evidence/raw` | None (public) | None (public) |
-| `POST /auth/passkey/register` | N/A | Device signature + WebAuthn |
-| `POST /auth/passkey/authenticate` | N/A | WebAuthn assertion |
-| `GET /user/captures` | N/A | Session token |
-| `DELETE /user/captures/:id` | N/A | Session token |
+| Endpoint | Auth |
+|----------|------|
+| `POST /devices` | DCAppAttest attestation object |
+| `POST /captures` | Device signature (Ed25519) |
+| `GET /captures/:id` | None (public) |
+| `POST /verify-file` | None (public) |
 
 **Security Considerations:**
-- Device keys bound to hardware attestation level
-- Session tokens: short-lived (15 min), refresh via passkey re-auth
+- Device keys bound to Secure Enclave (hardware-backed)
+- No session tokens needed (stateless device auth)
 - No OAuth/social login (reduces attack surface, maintains privacy)
 - Rate limiting: 10 captures/hour/device, 100 verifications/hour/IP
 
+**Deferred (Post-MVP):** User accounts with passkey authentication for multi-device gallery, capture revocation, data export.
+
 ### Tech Stack
 
-**Mobile App:**
-- React Native (Expo prebuild)
-- react-native-vision-camera v4
-- expo-sensors, expo-crypto
-- Native modules for Key Attestation (Kotlin/Swift)
+**iOS App:**
+- Expo SDK 53 + React Native 0.79
+- expo-camera, expo-sensors, expo-crypto, expo-secure-store, expo-file-system
+- Custom Expo Module (Swift) for DCAppAttest + ARKit LiDAR
+- Zustand for state management
 
 **Backend:**
-- Rust + Axum 0.8
-- SQLx 0.8 + Postgres
-- c2pa-rs 0.35
-- Tokio, Serde
-- aws-sdk-s3 or rust-s3
+- Rust 1.82+ + Axum 0.8.x
+- SQLx 0.8 + PostgreSQL 16
+- c2pa-rs 0.51.x (official C2PA SDK)
+- Tokio, Serde, ed25519-dalek
+- aws-sdk-s3 for storage
 
 **Verification Frontend:**
-- Next.js 14 (App Router)
-- React, TailwindCSS, TypeScript
+- Next.js 16 (Turbopack, App Router, React 19)
+- TailwindCSS, TypeScript
 
 **Infrastructure:**
-- Postgres 16, Redis, S3-compatible storage
+- PostgreSQL 16, S3-compatible storage
 - AWS KMS or HashiCorp Vault (production keys)
-- Cloudflare CDN
+- CloudFront CDN
 
 ---
 
 ## Open Questions
 
-### Technical
-- Q1: Sun angle verification robustness for indoor/overcast scenes
-- Q2: LiDAR storage/bandwidth trade-off (subsample? compress?)
-- Q3: Gyro × optical flow false positive/negative rates
+### Technical (MVP)
+- Q1: LiDAR depth map storage format and compression (gzip float32 baseline, ~1MB compressed?)
+- Q2: Depth analysis thresholds tuning (variance > 0.5, layers >= 3, coherence > 0.7)
+- Q3: ARKit depth capture API specifics (AVDepthData vs ARFrame.sceneDepth)
 
-### Product
-- Q4: Acceptable UX friction for scan mode vs user abandonment
-- Q5: Gallery import with degraded confidence (v1: No)
+### Product (MVP)
+- Q4: Non-Pro iPhone user messaging ("This app requires iPhone Pro for LiDAR")
+- Q5: Depth visualization UX on verification page (heatmap? point cloud? overlay?)
 - Q6: Liability for "HIGH confidence" assessments (need legal review)
 
 ### Strategic
 - Q7: Become C2PA CA or rely on existing?
-- Q8: Open source timing and methodology transparency
+- Q8: When to expand to Android (post-MVP validation metrics?)
+- Q9: Open source timing and methodology transparency
 
 ---
 
-_This PRD captures the essence of RealityCam - cryptographically-attested, physics-verified media provenance that provides graduated evidence strength rather than false binary certainty._
+_This PRD captures the essence of RealityCam MVP - cryptographically-attested, LiDAR-verified photo provenance for iPhone Pro devices. Hardware trust + depth analysis provides graduated evidence strength rather than false binary certainty._
 
-_Created through collaborative discovery between Luca and AI facilitator._
+_Created through collaborative discovery between Luca and AI facilitator. Updated for MVP scope (iPhone Pro only, photo only, LiDAR depth as primary signal)._
 
 ---
 
 ## References
 
-### Platform Documentation
+### Platform Documentation (MVP Focus)
 
 1. **Apple DCAppAttest** - [Establishing Your App's Integrity](https://developer.apple.com/documentation/devicecheck/establishing-your-app-s-integrity) - iOS 14.0+ hardware attestation using Secure Enclave
 2. **Apple DeviceCheck Framework** - [DeviceCheck](https://developer.apple.com/documentation/devicecheck/) - Device integrity and app attestation services
-3. **Android Key Attestation** - [Verifying hardware-backed key pairs](https://developer.android.com/privacy-and-security/security-key-attestation) - Hardware-backed key attestation for Android
-4. **Android StrongBox Keymaster** - [Hardware Security Module](https://source.android.com/docs/security/best-practices/hardware) - Dedicated secure processor for key storage (API 28+)
+3. **ARKit Depth API** - [Capturing Depth Using the LiDAR Camera](https://developer.apple.com/documentation/arkit/arkit_in_ios/environmental_analysis/capturing_depth_using_the_lidar_camera) - LiDAR depth capture on iPhone Pro
+4. **AVDepthData** - [AVDepthData](https://developer.apple.com/documentation/avfoundation/avdepthdata) - Depth data from camera capture
 
 ### Standards & Specifications
 
@@ -592,10 +605,14 @@ _Created through collaborative discovery between Luca and AI facilitator._
 ### Security Research
 
 8. **OWASP Mobile Security** - [Mobile Application Security](https://owasp.org/www-project-mobile-app-security/) - Security best practices for mobile applications
-9. **Sun Position Algorithm** - [NOAA Solar Calculator](https://gml.noaa.gov/grad/solcalc/) - Reference for sun angle verification calculations
 
 ### Competitive Landscape
 
-10. **Truepic** - [Controlled Capture](https://truepic.com/) - Competitor in authenticated media capture space
-11. **ProofMode** - [Guardian Project](https://guardianproject.info/apps/org.witness.proofmode/) - Open-source provenance for human rights documentation
-12. **Serelay** - [Image Authentication](https://www.serelay.com/) - Enterprise media authentication platform
+9. **Truepic** - [Controlled Capture](https://truepic.com/) - Competitor in authenticated media capture space
+10. **ProofMode** - [Guardian Project](https://guardianproject.info/apps/org.witness.proofmode/) - Open-source provenance for human rights documentation
+11. **Serelay** - [Image Authentication](https://www.serelay.com/) - Enterprise media authentication platform
+
+### Deferred Platform Documentation (Post-MVP)
+
+12. **Android Key Attestation** - [Verifying hardware-backed key pairs](https://developer.android.com/privacy-and-security/security-key-attestation) - For Android expansion
+13. **Android StrongBox Keymaster** - [Hardware Security Module](https://source.android.com/docs/security/best-practices/hardware) - For Android expansion

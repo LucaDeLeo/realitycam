@@ -3,24 +3,30 @@
 **Author:** Luca
 **Architect:** Winston (BMAD)
 **Date:** 2025-11-21
-**Version:** 1.0
+**Version:** 1.1 (MVP)
 
 ---
 
 ## Executive Summary
 
-RealityCam is a multi-component system providing cryptographically-attested, physics-verified media provenance. The architecture prioritizes hardware-rooted trust, graduated evidence strength, and C2PA ecosystem interoperability.
+RealityCam is a focused MVP providing cryptographically-attested, LiDAR-verified photo provenance for iPhone Pro devices. The architecture prioritizes hardware-rooted trust and depth-based authenticity verification.
 
 **Core Components:**
-- **Mobile App** (React Native/Expo): Secure capture with hardware attestation
+- **iOS App** (Expo/React Native): Photo capture with LiDAR depth and hardware attestation
 - **Backend** (Rust/Axum): Evidence computation, C2PA manifest generation
 - **Verification Web** (Next.js 16): Public verification interface
 
 **Key Architectural Principles:**
-1. Hardware attestation as foundation, not enhancement
-2. Evidence tiers ordered by cost-to-spoof
-3. Transparency over security theater
-4. Offline-first with encrypted local storage
+1. Hardware attestation as foundation (Secure Enclave + DCAppAttest)
+2. LiDAR depth as primary authenticity signal
+3. iPhone Pro only — no cross-platform complexity
+4. Photo-first — video deferred to post-MVP
+
+**Why iPhone Pro Only:**
+- LiDAR sensor enables "real 3D scene" vs "flat image" detection
+- Consistent hardware: all Pro models have Secure Enclave + LiDAR
+- Eliminates Android fragmentation (StrongBox availability varies)
+- 50% less native code, faster iteration to working demo
 
 ---
 
@@ -28,13 +34,12 @@ RealityCam is a multi-component system providing cryptographically-attested, phy
 
 **First implementation story should execute these commands:**
 
-### Mobile App
+### iOS App
 ```bash
-npx create-expo-app@latest realitycam-mobile --template blank-typescript
+bunx create-expo-app@latest realitycam-mobile --template blank-typescript
 cd realitycam-mobile
-npx expo install expo-camera expo-sensors expo-crypto expo-secure-store
-npx expo install react-native-vision-camera
-npx expo prebuild  # Generate native projects for custom modules
+bunx expo install expo-camera expo-sensors expo-crypto expo-secure-store expo-file-system
+bunx expo prebuild --platform ios  # iOS only for MVP
 ```
 
 ### Verification Web
@@ -53,23 +58,23 @@ cd realitycam-api
 
 ## Decision Summary
 
-| Category | Decision | Version | Affects FRs | Rationale |
-|----------|----------|---------|-------------|-----------|
-| Mobile Framework | Expo + React Native | SDK 52+ | All mobile | TypeScript, prebuild for native modules |
-| Web Framework | Next.js | 16.0.x | FR44-58 | Turbopack, App Router, React 19 |
-| Backend Framework | Axum | 0.8.x | All backend | Type-safe, Tokio ecosystem, Tower middleware |
-| Database | PostgreSQL | 16 | All | JSONB for evidence, TIMESTAMPTZ, robust |
-| ORM | SQLx | 0.8.x | All backend | Compile-time checked queries |
-| C2PA SDK | c2pa-rs | 0.49.x | FR40-43 | Official CAI SDK |
-| State Management | Zustand | Latest | Mobile | Lightweight, persist middleware |
-| File Storage | S3 + CloudFront | - | FR43 | Presigned URLs, CDN delivery |
-| Attestation (iOS) | DCAppAttest | iOS 14+ | FR1-6 | Secure Enclave backed |
-| Attestation (Android) | Key Attestation | API 28+ | FR1-6 | StrongBox/TEE backed |
-| Auth Pattern | Device Signature | Ed25519 | FR59-60 | No tokens, hardware-bound |
-| Sensor Format | MessagePack | - | FR9-11 | 60% smaller than JSON |
-| Testing (Mobile) | Jest + Maestro | - | All | Unit + E2E on real devices |
-| Testing (Backend) | cargo test + testcontainers | - | All | Integration with real Postgres |
-| Testing (Web) | Vitest + Playwright | - | All | Fast unit + E2E |
+| Category | Decision | Version | Rationale |
+|----------|----------|---------|-----------|
+| Platform | iPhone Pro only | iOS 14+ | LiDAR required for depth verification |
+| Mobile Framework | Expo + React Native | SDK 53 | TypeScript, React Native 0.79, prebuild for native |
+| Web Framework | Next.js | 16 | Turbopack default, Cache Components, React 19.2 |
+| Backend Framework | Axum | 0.8.x | Type-safe, Tokio ecosystem, c2pa-rs native |
+| Database | PostgreSQL | 16 | JSONB for evidence, TIMESTAMPTZ |
+| ORM | SQLx | 0.8.x | Compile-time checked queries |
+| C2PA SDK | c2pa-rs | 0.51.x | Official CAI SDK, Rust 1.82+ |
+| State Management | Zustand | Latest | Lightweight, persist middleware |
+| File Storage | S3 + CloudFront | - | Presigned URLs, CDN delivery |
+| Attestation | DCAppAttest | iOS 14+ | Secure Enclave backed |
+| Depth Capture | ARKit/LiDAR | iOS 14+ | Native depth API |
+| Auth Pattern | Device Signature | Ed25519 | No tokens, hardware-bound |
+| Testing (Mobile) | Jest + Maestro | - | Unit + E2E on real devices |
+| Testing (Backend) | cargo test + testcontainers | - | Integration with real Postgres |
+| Testing (Web) | Vitest + Playwright | - | Fast unit + E2E |
 
 ---
 
@@ -78,42 +83,35 @@ cd realitycam-api
 ```
 realitycam/
 ├── apps/
-│   ├── mobile/                          # Expo React Native app
+│   ├── mobile/                          # iOS Expo app (iPhone Pro only)
 │   │   ├── app/                         # Expo Router file-based routing
 │   │   │   ├── (tabs)/
 │   │   │   │   ├── _layout.tsx
 │   │   │   │   ├── capture.tsx          # Main capture screen
 │   │   │   │   └── history.tsx          # Local capture history
-│   │   │   ├── capture/
-│   │   │   │   ├── scan.tsx             # 360° environment scan
-│   │   │   │   ├── preview.tsx          # Pre-upload preview
-│   │   │   │   └── result.tsx           # Post-upload verification link
+│   │   │   ├── preview.tsx              # Pre-upload preview with depth viz
+│   │   │   ├── result.tsx               # Post-upload verification link
 │   │   │   └── _layout.tsx
 │   │   ├── components/
 │   │   │   ├── Camera/
 │   │   │   │   ├── CaptureButton.tsx
-│   │   │   │   ├── ScanGuide.tsx
-│   │   │   │   └── SensorOverlay.tsx
+│   │   │   │   └── DepthOverlay.tsx     # LiDAR depth visualization
 │   │   │   └── Evidence/
 │   │   │       └── ConfidenceBadge.tsx
 │   │   ├── hooks/
-│   │   │   ├── useAttestation.ts
-│   │   │   ├── useCapture.ts
-│   │   │   ├── useSensors.ts
+│   │   │   ├── useAttestation.ts        # DCAppAttest integration
+│   │   │   ├── useCapture.ts            # Photo capture logic
+│   │   │   ├── useLiDAR.ts              # ARKit depth capture
 │   │   │   └── useUploadQueue.ts
 │   │   ├── modules/
-│   │   │   └── device-attestation/      # Custom Expo Module
+│   │   │   └── device-attestation/      # Custom Expo Module (iOS only)
 │   │   │       ├── index.ts
 │   │   │       ├── ios/
 │   │   │       │   ├── DeviceAttestationModule.swift
 │   │   │       │   └── SecureEnclaveManager.swift
-│   │   │       ├── android/
-│   │   │       │   ├── DeviceAttestationModule.kt
-│   │   │       │   └── KeyAttestationManager.kt
 │   │   │       └── expo-module.config.json
 │   │   ├── store/
-│   │   │   ├── captureStore.ts
-│   │   │   └── deviceStore.ts
+│   │   │   └── captureStore.ts
 │   │   ├── services/
 │   │   │   └── api.ts
 │   │   ├── app.config.ts
@@ -127,12 +125,10 @@ realitycam/
 │       ├── components/
 │       │   ├── Evidence/
 │       │   │   ├── EvidencePanel.tsx
-│       │   │   ├── TierCard.tsx
-│       │   │   ├── ConfidenceSummary.tsx
-│       │   │   └── StatusBadge.tsx
+│       │   │   ├── DepthAnalysis.tsx    # LiDAR depth visualization
+│       │   │   └── ConfidenceSummary.tsx
 │       │   ├── Media/
-│       │   │   ├── SecureImage.tsx
-│       │   │   └── ContextViewer.tsx
+│       │   │   └── SecureImage.tsx
 │       │   └── Upload/
 │       │       └── FileDropzone.tsx
 │       ├── lib/
@@ -158,15 +154,12 @@ realitycam/
 │   │   │   ├── device_auth.rs
 │   │   │   └── request_id.rs
 │   │   ├── services/
-│   │   │   ├── attestation/
-│   │   │   │   ├── android.rs
-│   │   │   │   └── ios.rs
+│   │   │   ├── attestation.rs           # iOS DCAppAttest verification
 │   │   │   ├── evidence/
-│   │   │   │   ├── pipeline.rs
-│   │   │   │   ├── tier1_hardware.rs
-│   │   │   │   ├── tier2_physics.rs
-│   │   │   │   ├── tier3_crossmodal.rs
-│   │   │   │   └── tier4_metadata.rs
+│   │   │   │   ├── mod.rs
+│   │   │   │   ├── hardware.rs          # Attestation checks
+│   │   │   │   ├── depth.rs             # LiDAR depth analysis
+│   │   │   │   └── metadata.rs          # EXIF/device checks
 │   │   │   ├── c2pa.rs
 │   │   │   └── storage.rs
 │   │   ├── models/
@@ -188,20 +181,19 @@ realitycam/
 
 ---
 
-## FR Category to Architecture Mapping
+## FR Category to Architecture Mapping (MVP)
 
-| FR Category | Primary Location | Supporting |
-|-------------|------------------|------------|
-| Device & Attestation (FR1-6) | `mobile/modules/device-attestation/` | `backend/services/attestation/` |
-| Capture Flow (FR7-18) | `mobile/app/capture/`, `mobile/hooks/` | - |
-| Local Processing (FR19-23) | `mobile/hooks/useCapture.ts` | - |
-| Upload & Sync (FR24-29) | `mobile/hooks/useUploadQueue.ts` | `backend/routes/captures.rs` |
-| Evidence Generation (FR30-39) | `backend/services/evidence/` | - |
-| C2PA Integration (FR40-43) | `backend/services/c2pa.rs` | - |
-| Verification Interface (FR44-53) | `web/app/verify/`, `web/components/` | `backend/routes/captures.rs` |
-| File Verification (FR54-58) | `web/components/Upload/` | `backend/routes/verify.rs` |
-| User & Device Mgmt (FR59-65) | `backend/routes/devices.rs` | `mobile/store/deviceStore.ts` |
-| Privacy Controls (FR66-70) | All components | - |
+| FR Category | Primary Location | Notes |
+|-------------|------------------|-------|
+| Device & Attestation | `mobile/modules/device-attestation/ios/` | DCAppAttest + Secure Enclave |
+| LiDAR Depth Capture | `mobile/hooks/useLiDAR.ts` | ARKit depth API |
+| Photo Capture | `mobile/app/capture.tsx`, `mobile/hooks/` | Photo only for MVP |
+| Upload & Sync | `mobile/hooks/useUploadQueue.ts` | `backend/routes/captures.rs` |
+| Evidence Generation | `backend/services/evidence/` | Hardware + Depth + Metadata |
+| C2PA Integration | `backend/services/c2pa.rs` | Manifest embedding |
+| Verification Interface | `web/app/verify/`, `web/components/` | Public verification page |
+| File Verification | `web/components/Upload/` | Hash-based lookup |
+| Device Management | `backend/routes/devices.rs` | No user accounts for MVP |
 
 ---
 
@@ -229,7 +221,7 @@ tokio = { version = "1", features = ["full"] }
 sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono", "json"] }
 
 # C2PA
-c2pa = { version = "0.49", features = ["file_io"] }
+c2pa = { version = "0.51", features = ["file_io"] }
 
 # Cryptography
 ed25519-dalek = "2"
@@ -258,68 +250,90 @@ dotenvy = "0.15"
 ```json
 {
   "dependencies": {
-    "expo": "~52.0.0",
-    "expo-camera": "~16.0.0",
-    "expo-sensors": "~14.0.0",
-    "expo-crypto": "~14.0.0",
-    "expo-secure-store": "~14.0.0",
-    "expo-file-system": "~18.0.0",
-    "react-native-vision-camera": "^4.0.0",
-    "zustand": "^5.0.0",
-    "@msgpack/msgpack": "^3.0.0"
+    "expo": "~53.0.0",
+    "expo-camera": "~17.0.0",
+    "expo-sensors": "~15.0.0",
+    "expo-crypto": "~15.0.0",
+    "expo-secure-store": "~15.0.0",
+    "expo-file-system": "~19.0.0",
+    "zustand": "^5.0.0"
   }
 }
 ```
 
+**Note:** LiDAR/ARKit depth capture is implemented via custom Expo Module (Swift), not a JS dependency.
+
 ---
 
-## Novel Pattern: Evidence Hierarchy
+## Evidence Architecture (MVP)
 
-This is the core innovation — evidence tiers ordered by cost-to-spoof:
+The MVP focuses on two high-value evidence dimensions plus basic metadata:
 
-### Tier 1: Hardware-Rooted (Highest)
-- Device identity attested by TEE (Android StrongBox) or Secure Enclave (iOS)
-- Key generated in HSM, never extractable
-- **Spoofing cost:** Custom silicon / firmware exploit
+### Primary Evidence: Hardware Attestation
+- **What:** Device identity attested by iOS Secure Enclave via DCAppAttest
+- **How:** Key generated in hardware, cert chain verified server-side
+- **Proves:** Photo originated from a real, uncompromised iPhone Pro
+- **Spoofing cost:** Custom silicon or firmware exploit (~impossible for attacker)
 
-### Tier 2: Physics-Constrained
-- Sun angle consistency (computed vs observed shadow direction)
-- LiDAR depth analysis (3D geometry vs flat surface)
-- Barometric pressure (matches GPS altitude)
-- Environment 3D-ness (360° scan parallax)
-- **Spoofing cost:** Building physical 3D scene, pressure chamber
+### Primary Evidence: LiDAR Depth Analysis
+- **What:** Depth map captured simultaneously with photo using ARKit
+- **How:** Analyze depth variance, edge coherence, 3D structure
+- **Proves:** Camera pointed at real 3D scene, not flat image/screen
+- **Spoofing cost:** Building physical 3D replica of scene
 
-### Tier 3: Cross-Modal Consistency
-- Gyroscope × optical flow correlation
-- Multi-camera lighting consistency
-- Accelerometer × motion blur
-- **Spoofing cost:** Coordinated synthetic data generation
+**Depth Analysis Algorithm:**
+```rust
+pub struct DepthAnalysis {
+    pub depth_variance: f32,      // High = real scene, Low = flat
+    pub edge_coherence: f32,      // Depth edges align with RGB edges
+    pub min_depth: f32,           // Nearest point (screens are ~0.3-0.5m)
+    pub depth_layers: u32,        // Distinct depth planes detected
+}
 
-### Tier 4: Metadata Consistency (Lowest)
-- EXIF timestamp within tolerance
-- Device model string verification
-- Resolution/lens capability match
-- **Spoofing cost:** EXIF editor, API hooking
+pub fn analyze_depth(depth_map: &[f32], rgb: &Image) -> DepthAnalysis {
+    // Real scenes: high variance, multiple layers, edges match
+    // Flat surfaces: low variance, 1-2 layers, no edge correlation
+}
 
-### Confidence Level Calculation
+pub fn is_likely_real_scene(analysis: &DepthAnalysis) -> bool {
+    analysis.depth_variance > 0.5
+        && analysis.depth_layers >= 3
+        && analysis.edge_coherence > 0.7
+}
+```
+
+### Secondary Evidence: Metadata Consistency
+- EXIF timestamp within tolerance of server time
+- Device model matches iPhone Pro (has LiDAR)
+- Resolution matches device capability
+- **Spoofing cost:** Low (EXIF editor), but adds friction
+
+### Confidence Calculation (Simplified)
 
 ```rust
 pub fn calculate_confidence(evidence: &Evidence) -> ConfidenceLevel {
-    let tier1_pass = evidence.tier1.attestation.status == Status::Pass;
-    let tier2_passes = evidence.tier2.checks.iter().filter(|c| c.status == Status::Pass).count();
-    let any_fail = evidence.all_checks().any(|c| c.status == Status::Fail);
+    let hw_pass = evidence.hardware_attestation.status == Status::Pass;
+    let depth_pass = evidence.depth_analysis.is_likely_real_scene;
+    let any_fail = evidence.has_any_failure();
 
     if any_fail {
         return ConfidenceLevel::Suspicious;
     }
 
-    match (tier1_pass, tier2_passes) {
-        (true, n) if n >= 2 => ConfidenceLevel::High,
-        (true, _) | (false, n) if n >= 2 => ConfidenceLevel::Medium,
-        (false, _) => ConfidenceLevel::Low,
+    match (hw_pass, depth_pass) {
+        (true, true) => ConfidenceLevel::High,      // Both pass = strong
+        (true, false) | (false, true) => ConfidenceLevel::Medium,
+        (false, false) => ConfidenceLevel::Low,
     }
 }
 ```
+
+### Deferred Evidence (Post-MVP)
+These checks add value but require more implementation effort:
+- **Sun angle:** Compare computed solar position to shadow direction
+- **Barometric pressure:** Match reported pressure to GPS altitude
+- **Gyro × optical flow:** Correlate device rotation with image motion (video)
+- **360° environment scan:** Require user to pan device for parallax proof
 
 ---
 
@@ -455,13 +469,11 @@ Content-Type: application/json
 
 Request:
 {
-  "platform": "android",
-  "model": "Pixel 8 Pro",
+  "platform": "ios",
+  "model": "iPhone 15 Pro",
   "attestation": {
-    "public_key": "base64...",
-    "cert_chain": ["base64...", "base64..."],
-    "challenge": "base64...",
-    "signed_challenge": "base64..."
+    "key_id": "base64...",           // DCAppAttest key ID
+    "attestation_object": "base64..."  // CBOR attestation from Apple
   }
 }
 
@@ -469,7 +481,8 @@ Response:
 {
   "data": {
     "device_id": "uuid",
-    "attestation_level": "hardware_strongbox"
+    "attestation_level": "secure_enclave",
+    "has_lidar": true
   }
 }
 ```
@@ -484,9 +497,9 @@ X-Device-Timestamp: {unix_ms}
 X-Device-Signature: {signature}
 
 Parts:
-- media: binary (JPEG/MP4)
-- context: binary (ZIP) [optional]
-- metadata: JSON
+- photo: binary (JPEG)
+- depth_map: binary (float32 array, gzipped)
+- metadata: JSON { captured_at, location?, device_model }
 
 Response:
 {
@@ -509,15 +522,27 @@ Response:
     "id": "uuid",
     "confidence_level": "high",
     "captured_at": "2025-11-21T10:30:00Z",
-    "capture_type": "photo",
     "media_url": "https://cdn.../signed-url",
     "evidence": {
-      "tier1_hardware": { "attestation": { "status": "pass", "level": "hardware_strongbox" } },
-      "tier2_physics": { "sun_angle": { "status": "pass" }, ... },
-      "tier3_crossmodal": { "gyro_optical_flow": { "status": "pass", "correlation": 0.94 } },
-      "tier4_metadata": { "exif_timestamp": { "status": "pass" }, ... }
+      "hardware_attestation": {
+        "status": "pass",
+        "level": "secure_enclave",
+        "device_model": "iPhone 15 Pro"
+      },
+      "depth_analysis": {
+        "status": "pass",
+        "depth_variance": 2.4,
+        "depth_layers": 5,
+        "edge_coherence": 0.87,
+        "is_likely_real_scene": true
+      },
+      "metadata": {
+        "timestamp_valid": true,
+        "model_has_lidar": true
+      }
     },
-    "c2pa_manifest_url": "https://cdn.../manifest.c2pa"
+    "c2pa_manifest_url": "https://cdn.../manifest.c2pa",
+    "depth_visualization_url": "https://cdn.../depth-preview.png"
   }
 }
 ```
@@ -549,7 +574,7 @@ Response:
 
 | Key | Storage | Rotation |
 |-----|---------|----------|
-| Device attestation key | Hardware (StrongBox/Secure Enclave) | Never (device-bound) |
+| Device attestation key | iOS Secure Enclave | Never (device-bound) |
 | C2PA signing key | AWS KMS (HSM-backed) | Yearly |
 | Database encryption | AWS RDS encryption | Managed |
 
@@ -598,11 +623,11 @@ Response:
 ### Prerequisites
 
 - Node.js 22+
-- Rust 1.86+ (for c2pa-rs)
+- Rust 1.82+ (for c2pa-rs 0.51)
 - PostgreSQL 16
 - Docker (for local dev)
 - Xcode 16+ (iOS development)
-- Android Studio (Android development)
+- iPhone Pro device (12 Pro or later) for LiDAR testing
 
 ### Setup Commands
 
@@ -612,18 +637,18 @@ git clone https://github.com/your-org/realitycam.git
 cd realitycam
 
 # Start local services
-docker-compose up -d  # Postgres, Redis, LocalStack (S3)
+docker-compose up -d  # Postgres, LocalStack (S3)
 
 # Backend
 cd backend
 cp .env.example .env
 cargo run
 
-# Mobile
+# Mobile (iOS only - requires Mac + Xcode)
 cd apps/mobile
 npm install
-npx expo prebuild
-npx expo run:ios  # or run:android
+npx expo prebuild --platform ios
+npx expo run:ios  # Requires iPhone Pro device for LiDAR
 
 # Web
 cd apps/web
@@ -631,29 +656,46 @@ npm install
 npm run dev
 ```
 
+**Note:** LiDAR features require a physical iPhone Pro device. Simulator can be used for non-LiDAR flows.
+
 ---
 
 ## Architecture Decision Records (ADRs)
 
-### ADR-001: Expo Modules API for Native Attestation
+### ADR-001: iPhone Pro Only (MVP)
 
-**Context:** Need hardware-backed key attestation on both platforms.
+**Context:** Cross-platform development doubles native code complexity.
 
-**Decision:** Use Expo Modules API to create custom Swift/Kotlin modules rather than raw React Native bridge or going fully native.
+**Decision:** Target iPhone Pro exclusively for MVP.
+
+**Rationale:**
+- LiDAR sensor is our primary authenticity signal
+- All iPhone Pro models (12+) have consistent hardware
+- Eliminates Android StrongBox fragmentation issues
+- 50% less native code to write and maintain
+
+**Consequences:** No Android users for MVP. Can expand post-validation.
+
+---
+
+### ADR-002: Expo Modules API for Native Attestation
+
+**Context:** Need hardware-backed key attestation on iOS.
+
+**Decision:** Use Expo Modules API to create custom Swift module.
 
 **Rationale:**
 - Type-safe bridge between JS and native
 - Better DX than raw native modules
-- Maintains single codebase advantage
 - Expo actively maintains the API
 
-**Consequences:** ~500-800 lines of native code per platform required.
+**Consequences:** ~400-600 lines of Swift code for attestation + LiDAR.
 
 ---
 
-### ADR-002: Rust Backend with Axum
+### ADR-003: Rust Backend with Axum
 
-**Context:** Backend needs to verify attestation chains, compute evidence, generate C2PA manifests.
+**Context:** Backend needs to verify attestation, analyze depth, generate C2PA.
 
 **Decision:** Rust with Axum framework.
 
@@ -661,29 +703,43 @@ npm run dev
 - c2pa-rs is the official C2PA SDK (Rust)
 - Memory safety critical for security-focused app
 - Excellent async performance with Tokio
-- Type system catches errors at compile time
 
 **Consequences:** Team needs Rust expertise.
 
 ---
 
-### ADR-003: Device-Based Authentication (No Tokens)
+### ADR-004: LiDAR Depth as Primary Evidence
 
-**Context:** Need to authenticate API requests without user accounts (Phase 0).
+**Context:** Need a signal that's hard to spoof for "real scene" verification.
 
-**Decision:** Sign every request with hardware-backed device key.
+**Decision:** Use LiDAR depth map analysis as primary authenticity check.
+
+**Rationale:**
+- Real 3D scenes have high depth variance, multiple layers
+- Flat images/screens have uniform depth (~0.3-0.5m)
+- Captured simultaneously with photo, hard to fake
+- iPhone Pro has consistent LiDAR implementation
+
+**Consequences:** Limits to iPhone Pro users. Worth it for signal quality.
+
+---
+
+### ADR-005: Device-Based Authentication (No Tokens)
+
+**Context:** Need to authenticate API requests without user accounts.
+
+**Decision:** Sign every request with Secure Enclave-backed key.
 
 **Rationale:**
 - No bearer tokens to steal
 - Authentication tied to hardware attestation
-- Simpler than JWT/session management
 - Each request independently verifiable
 
 **Consequences:** Slightly higher request overhead (signature computation).
 
 ---
 
-### ADR-004: JSONB for Evidence Storage
+### ADR-006: JSONB for Evidence Storage
 
 **Context:** Evidence structure will evolve as we add new checks.
 
@@ -691,30 +747,46 @@ npm run dev
 
 **Rationale:**
 - Flexible schema for evolving checks
-- Native PostgreSQL indexing and querying
-- Single column instead of normalized tables
-- Easy to serialize/deserialize
+- Native PostgreSQL indexing
+- Easy to add new evidence types
 
 **Consequences:** Must validate JSON structure in application code.
 
 ---
 
-### ADR-005: Next.js 16 for Verification Web
+## MVP Scope Summary
 
-**Context:** Public verification interface needs fast load times.
+### In Scope
+- iPhone Pro (12 Pro, 13 Pro, 14 Pro, 15 Pro, 16 Pro)
+- Photo capture only
+- Hardware attestation (DCAppAttest + Secure Enclave)
+- LiDAR depth analysis
+- Basic metadata checks
+- C2PA manifest generation
+- Verification web page
 
-**Decision:** Next.js 16 with App Router and Turbopack.
+### Explicitly Deferred (Post-MVP)
+| Feature | Reason for Deferral |
+|---------|---------------------|
+| Android support | Adds 50% native code, StrongBox fragmentation |
+| Video capture | Complex gyro/optical-flow analysis |
+| Sun angle computation | Requires solar position API integration |
+| Barometric pressure | Requires weather/altitude correlation |
+| 360° environment scan | Complex UX, parallax computation |
+| User accounts | Device-only auth sufficient for MVP |
 
-**Rationale:**
-- Turbopack provides 5-10x faster builds
-- Server components for evidence data fetching
-- Strong SEO capabilities
-- Vercel deployment simplicity
-
-**Consequences:** Must migrate if using Next.js 14 patterns.
+### Supported Devices
+| Model | Released | LiDAR | Secure Enclave |
+|-------|----------|-------|----------------|
+| iPhone 17 Pro / Pro Max | 2025 | ✅ | ✅ |
+| iPhone 16 Pro / Pro Max | 2024 | ✅ | ✅ |
+| iPhone 15 Pro / Pro Max | 2023 | ✅ | ✅ |
+| iPhone 14 Pro / Pro Max | 2022 | ✅ | ✅ |
+| iPhone 13 Pro / Pro Max | 2021 | ✅ | ✅ |
+| iPhone 12 Pro / Pro Max | 2020 | ✅ | ✅ |
 
 ---
 
-_Generated by BMAD Decision Architecture Workflow v1.0_
+_Generated by BMAD Decision Architecture Workflow v1.1 (MVP)_
 _Date: 2025-11-21_
 _For: Luca_
