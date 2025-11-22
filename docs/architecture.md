@@ -812,7 +812,7 @@ npm run dev
 - Reduces custom native code significantly
 - Fallback available: `react-native-attestation` if API is insufficient
 
-**Verification Required:** Confirm `@expo/app-integrity` exposes raw attestation objects (CBOR format) needed for server-side verification, not just boolean results.
+**Verified:** `@expo/app-integrity` returns attestation/assertion objects as base64 strings for server-side verification (not just booleans). The iOS methods `attestKeyAsync()` and `generateAssertionAsync()` return `Promise<string>` containing the attestation data to send to your server.
 
 **Consequences:**
 - No custom Swift code for attestation
