@@ -332,10 +332,14 @@ These add value but require more implementation effort:
 ### Device & Attestation (MVP)
 
 - FR1: App detects iPhone Pro device with LiDAR capability
-- FR2: App generates cryptographic keys in Secure Enclave
-- FR3: App requests DCAppAttest attestation from iOS
-- FR4: Backend verifies DCAppAttest assertions against Apple's service
+- FR2: App generates cryptographic keys in Secure Enclave via `@expo/app-integrity`
+- FR3: App requests DCAppAttest attestation from iOS (one-time device registration)
+- FR4: Backend verifies DCAppAttest attestation object against Apple's service
 - FR5: System assigns attestation level: secure_enclave or unverified
+
+**Implementation Note:** DCAppAttest has two operations:
+1. **Attestation** (one-time): `attestKeyAsync()` on first launch → registers device with backend
+2. **Assertion** (per-capture): `generateAssertionAsync()` for each photo → proves capture came from attested device
 
 ### Capture Flow (MVP)
 
@@ -540,9 +544,20 @@ These add value but require more implementation effort:
 
 **iOS App:**
 - Expo SDK 53 + React Native 0.79
-- expo-camera, expo-sensors, expo-crypto, expo-secure-store, expo-file-system
-- Custom Expo Module (Swift) for DCAppAttest + ARKit LiDAR
+- `@expo/app-integrity` for DCAppAttest hardware attestation
+- `expo-camera`, `expo-crypto`, `expo-secure-store`, `expo-file-system`
+- Custom Expo Module (Swift) for ARKit LiDAR depth capture only (~400 lines)
 - Zustand for state management
+
+**Note:** `expo-sensors` deferred to post-MVP (needed for video gyro×optical-flow analysis)
+
+**Mobile Library Decisions (Evaluated):**
+| Library | Status | Notes |
+|---------|--------|-------|
+| `@expo/app-integrity` | ✅ Use | Official Expo DCAppAttest wrapper |
+| `react-native-attestation` | ❌ Skip | Redundant, keep as fallback |
+| `react-native-secure-enclave-operations` | ❌ Skip | Redundant with @expo/app-integrity |
+| `ExifReader` | ❌ Skip | Backend handles EXIF validation |
 
 **Backend:**
 - Rust 1.82+ + Axum 0.8.x

@@ -69,8 +69,9 @@ cd realitycam-api
 | C2PA SDK | c2pa-rs | 0.51.x | Official CAI SDK, Rust 1.82+ |
 | State Management | Zustand | Latest | Lightweight, persist middleware |
 | File Storage | S3 + CloudFront | - | Presigned URLs, CDN delivery |
-| Attestation | DCAppAttest | iOS 14+ | Secure Enclave backed |
-| Depth Capture | ARKit/LiDAR | iOS 14+ | Native depth API |
+| Attestation Library | @expo/app-integrity | ~1.0.0 | Official Expo DCAppAttest wrapper |
+| Attestation API | DCAppAttest | iOS 14+ | Secure Enclave backed |
+| Depth Capture | Custom Expo Module | Swift | ARKit LiDAR (~400 lines) |
 | Auth Pattern | Device Signature | Ed25519 | No tokens, hardware-bound |
 | Testing (Mobile) | Jest + Maestro | - | Unit + E2E on real devices |
 | Testing (Backend) | cargo test + testcontainers | - | Integration with real Postgres |
@@ -99,16 +100,16 @@ realitycam/
 │   │   │   └── Evidence/
 │   │   │       └── ConfidenceBadge.tsx
 │   │   ├── hooks/
-│   │   │   ├── useAttestation.ts        # DCAppAttest integration
-│   │   │   ├── useCapture.ts            # Photo capture logic
-│   │   │   ├── useLiDAR.ts              # ARKit depth capture
+│   │   │   ├── useDeviceAttestation.ts  # @expo/app-integrity wrapper
+│   │   │   ├── useCapture.ts            # Photo + depth capture orchestration
+│   │   │   ├── useLiDAR.ts              # Custom LiDAR module wrapper
 │   │   │   └── useUploadQueue.ts
 │   │   ├── modules/
-│   │   │   └── device-attestation/      # Custom Expo Module (iOS only)
+│   │   │   └── lidar-depth/             # Custom Expo Module (iOS only, ~400 lines)
 │   │   │       ├── index.ts
 │   │   │       ├── ios/
-│   │   │       │   ├── DeviceAttestationModule.swift
-│   │   │       │   └── SecureEnclaveManager.swift
+│   │   │       │   ├── LiDARDepthModule.swift
+│   │   │       │   └── DepthCaptureSession.swift
 │   │   │       └── expo-module.config.json
 │   │   ├── store/
 │   │   │   └── captureStore.ts
@@ -185,8 +186,8 @@ realitycam/
 
 | FR Category | Primary Location | Notes |
 |-------------|------------------|-------|
-| Device & Attestation | `mobile/modules/device-attestation/ios/` | DCAppAttest + Secure Enclave |
-| LiDAR Depth Capture | `mobile/hooks/useLiDAR.ts` | ARKit depth API |
+| Device & Attestation | `mobile/hooks/useDeviceAttestation.ts` | @expo/app-integrity wrapper |
+| LiDAR Depth Capture | `mobile/modules/lidar-depth/ios/` | Custom ARKit depth module |
 | Photo Capture | `mobile/app/capture.tsx`, `mobile/hooks/` | Photo only for MVP |
 | Upload & Sync | `mobile/hooks/useUploadQueue.ts` | `backend/routes/captures.rs` |
 | Evidence Generation | `backend/services/evidence/` | Hardware + Depth + Metadata |
@@ -251,8 +252,8 @@ dotenvy = "0.15"
 {
   "dependencies": {
     "expo": "~53.0.0",
+    "@expo/app-integrity": "~1.0.0",
     "expo-camera": "~17.0.0",
-    "expo-sensors": "~15.0.0",
     "expo-crypto": "~15.0.0",
     "expo-secure-store": "~15.0.0",
     "expo-file-system": "~19.0.0",
@@ -261,7 +262,47 @@ dotenvy = "0.15"
 }
 ```
 
-**Note:** LiDAR/ARKit depth capture is implemented via custom Expo Module (Swift), not a JS dependency.
+**Notes:**
+- `@expo/app-integrity`: DCAppAttest integration (device registration + per-capture assertions)
+- LiDAR depth capture: Custom Expo Module in Swift (~400 lines), see `modules/lidar-depth/`
+- `expo-sensors`: Deferred to post-MVP (needed for video gyro×optical-flow analysis)
+
+### Mobile Library Decisions
+
+**Evaluated Libraries:**
+
+| Library | Decision | Rationale |
+|---------|----------|-----------|
+| `@expo/app-integrity` | ✅ Use | Official Expo DCAppAttest wrapper, maintained, TypeScript |
+| `expo-camera` | ✅ Use | Photo capture, official Expo |
+| `expo-crypto` | ✅ Use | SHA-256 hashing, official Expo |
+| `expo-secure-store` | ✅ Use | Encrypted offline storage |
+| `expo-sensors` | ⏸️ Defer | Gyro/accel only needed for video (post-MVP) |
+| `react-native-attestation` | ❌ Skip | Redundant with @expo/app-integrity |
+| `react-native-secure-enclave-operations` | ❌ Skip | Redundant with @expo/app-integrity |
+| `ExifReader` | ❌ Skip | Backend handles EXIF validation, not client |
+
+**Custom Module Required:**
+
+No existing library provides ARKit LiDAR depth capture. The `lidar-depth` Expo Module must implement:
+1. Start `ARSession` with `.sceneDepth` configuration
+2. Capture `ARFrame.sceneDepth.depthMap` synchronized with photo
+3. Extract `CVPixelBuffer` → `float32[]` array
+4. Real-time depth overlay for camera preview (FR6)
+
+**Attestation vs Assertion (Important Distinction):**
+
+```typescript
+// ONE-TIME: Device registration (on first launch)
+const keyId = await AppIntegrity.generateKeyAsync();
+const attestation = await AppIntegrity.attestKeyAsync(keyId, challenge);
+// → Send to POST /api/v1/devices/register
+
+// PER-CAPTURE: Assertion for each photo (proves this capture came from attested device)
+const clientDataHash = await Crypto.digestStringAsync(SHA256, captureMetadata);
+const assertion = await AppIntegrity.generateAssertionAsync(keyId, clientDataHash);
+// → Include in POST /api/v1/captures
+```
 
 ---
 
@@ -678,18 +719,19 @@ npm run dev
 
 ---
 
-### ADR-002: Expo Modules API for Native Attestation
+### ADR-002: Expo Modules API for LiDAR Depth Capture
 
-**Context:** Need hardware-backed key attestation on iOS.
+**Context:** Need ARKit LiDAR depth capture on iOS. No existing library provides this.
 
-**Decision:** Use Expo Modules API to create custom Swift module.
+**Decision:** Use Expo Modules API to create custom Swift module for LiDAR depth capture only. Use `@expo/app-integrity` for DCAppAttest (no custom attestation code needed).
 
 **Rationale:**
-- Type-safe bridge between JS and native
-- Better DX than raw native modules
+- `@expo/app-integrity` handles attestation — no need to reimplement DCAppAttest
+- Custom module focused solely on LiDAR depth extraction
+- Type-safe bridge between JS and native via Expo Modules API
 - Expo actively maintains the API
 
-**Consequences:** ~400-600 lines of Swift code for attestation + LiDAR.
+**Consequences:** ~400 lines of Swift code for LiDAR depth capture only (reduced from original estimate of 400-600 for attestation + LiDAR).
 
 ---
 
@@ -751,6 +793,31 @@ npm run dev
 - Easy to add new evidence types
 
 **Consequences:** Must validate JSON structure in application code.
+
+---
+
+### ADR-007: @expo/app-integrity for DCAppAttest
+
+**Context:** Need iOS DCAppAttest integration for hardware attestation. Options evaluated:
+- Custom Swift module (original plan)
+- `@expo/app-integrity` (official Expo package)
+- `react-native-attestation` (bifold-wallet project)
+- `react-native-secure-enclave-operations`
+
+**Decision:** Use `@expo/app-integrity` as primary attestation library.
+
+**Rationale:**
+- Official Expo package = better maintenance, TypeScript types
+- Handles both device attestation (one-time) and per-capture assertions
+- Reduces custom native code significantly
+- Fallback available: `react-native-attestation` if API is insufficient
+
+**Verification Required:** Confirm `@expo/app-integrity` exposes raw attestation objects (CBOR format) needed for server-side verification, not just boolean results.
+
+**Consequences:**
+- No custom Swift code for attestation
+- Custom module scope reduced to LiDAR depth capture only (~400 lines vs ~600)
+- Dependency on Expo maintaining the package
 
 ---
 
