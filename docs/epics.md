@@ -2,8 +2,8 @@
 
 **Author:** Luca
 **Date:** 2025-11-22
-**Project Level:** medium complexity
-**Target Scale:** Multi-component system (iOS App + Backend + Verification Web)
+**Project Level:** MVP
+**Target Scale:** iPhone Pro Only
 
 ---
 
@@ -11,1188 +11,1580 @@
 
 This document provides the complete epic and story breakdown for RealityCam, decomposing the requirements from the [PRD](./prd.md) into implementable stories.
 
-**Living Document Notice:** This is the initial version created from PRD v1.1 and Architecture v1.1. It will be updated after UX Design workflow adds interaction details to stories.
+**Living Document Notice:** This is the initial version. It will be updated after UX Design and Architecture workflows add interaction and technical details to stories.
 
-**Context Incorporated:**
-- PRD v1.1 (46 MVP FRs)
-- Architecture v1.1 (iPhone Pro only, LiDAR depth, DCAppAttest)
+## Epic Summary
 
-### Epic Summary
-
-| Epic | Title | Stories | FRs Covered | User Value |
-|------|-------|---------|-------------|------------|
-| 1 | Foundation & Project Setup | 5 | Infrastructure | Development environment ready |
-| 2 | Device Registration & Attestation | 6 | FR1-5, FR41-43 | Hardware trust established |
-| 3 | Photo Capture with LiDAR | 6 | FR6-13 | Users can capture attested photos |
-| 4 | Upload, Processing & Evidence | 8 | FR14-26, FR44-46 | Photos analyzed, evidence computed |
-| 5 | C2PA & Verification Interface | 8 | FR27-40 | End-to-end verification flow |
-
-**Total:** 33 stories covering all 46 FRs
+| Epic | Title | User Value | FRs Covered |
+|------|-------|------------|-------------|
+| 1 | Foundation & Project Setup | Development infrastructure ready | Setup for all FRs |
+| 2 | Device Registration & Attestation | Device can securely register with hardware attestation | FR1-FR5, FR41-FR43 |
+| 3 | Photo Capture with LiDAR Depth | User can capture attested photos with depth data | FR6-FR13 |
+| 4 | Upload & Evidence Processing | Captured photos are processed with full evidence pipeline | FR14-FR26, FR44-FR46 |
+| 5 | C2PA & Verification Experience | Users can verify photos via shareable links | FR27-FR40 |
 
 ---
 
 ## Functional Requirements Inventory
 
-### MVP Scope (46 FRs)
+### Device & Attestation (FR1-FR5)
+- **FR1:** App detects iPhone Pro device with LiDAR capability
+- **FR2:** App generates cryptographic keys in Secure Enclave via @expo/app-integrity
+- **FR3:** App requests DCAppAttest attestation from iOS (one-time device registration)
+- **FR4:** Backend verifies DCAppAttest attestation object against Apple's service
+- **FR5:** System assigns attestation level: secure_enclave or unverified
 
-| FR | Description | Category |
-|----|-------------|----------|
-| FR1 | App detects iPhone Pro device with LiDAR capability | Device & Attestation |
-| FR2 | App generates cryptographic keys in Secure Enclave | Device & Attestation |
-| FR3 | App requests DCAppAttest attestation from iOS | Device & Attestation |
-| FR4 | Backend verifies DCAppAttest assertions against Apple's service | Device & Attestation |
-| FR5 | System assigns attestation level: secure_enclave or unverified | Device & Attestation |
-| FR6 | App displays camera view with LiDAR depth overlay | Capture Flow |
-| FR7 | App captures photo via back camera | Capture Flow |
-| FR8 | App simultaneously captures LiDAR depth map via ARKit | Capture Flow |
-| FR9 | App records GPS coordinates if permission granted | Capture Flow |
-| FR10 | App captures device attestation signature for the capture | Capture Flow |
-| FR11 | App computes SHA-256 hash of photo before upload | Local Processing |
-| FR12 | App compresses depth map (gzip float32 array) | Local Processing |
-| FR13 | App constructs structured capture request with photo + depth + metadata | Local Processing |
-| FR14 | App uploads capture via multipart POST (photo + depth_map + metadata JSON) | Upload & Sync |
-| FR15 | App uses TLS 1.3 for all API communication | Upload & Sync |
-| FR16 | App implements retry with exponential backoff on upload failure | Upload & Sync |
-| FR17 | App stores captures in encrypted local storage when offline (Secure Enclave key) | Upload & Sync |
-| FR18 | App auto-uploads pending captures when connectivity returns | Upload & Sync |
-| FR19 | App displays pending upload status to user | Upload & Sync |
-| FR20 | Backend verifies DCAppAttest attestation and records level | Evidence Generation |
-| FR21 | Backend performs LiDAR depth analysis (variance, layers, edge coherence) | Evidence Generation |
-| FR22 | Backend determines "is_likely_real_scene" from depth analysis | Evidence Generation |
-| FR23 | Backend validates EXIF timestamp against server receipt time | Evidence Generation |
-| FR24 | Backend validates device model is iPhone Pro (has LiDAR) | Evidence Generation |
-| FR25 | Backend generates evidence package with all check results | Evidence Generation |
-| FR26 | Backend calculates confidence level (HIGH/MEDIUM/LOW/SUSPICIOUS) | Evidence Generation |
-| FR27 | Backend creates C2PA manifest with evidence summary | C2PA Integration |
-| FR28 | Backend signs C2PA manifest with Ed25519 key (HSM-backed in production) | C2PA Integration |
-| FR29 | Backend embeds C2PA manifest in photo file | C2PA Integration |
-| FR30 | System stores both original and C2PA-embedded versions | C2PA Integration |
-| FR31 | Users can view capture verification via shareable URL | Verification Interface |
-| FR32 | Verification page displays confidence summary (HIGH/MEDIUM/LOW/SUSPICIOUS) | Verification Interface |
-| FR33 | Verification page displays depth analysis visualization | Verification Interface |
-| FR34 | Users can expand detailed evidence panel with per-check status | Verification Interface |
-| FR35 | Each check displays pass/fail with relevant metrics | Verification Interface |
-| FR36 | Users can upload file to verification endpoint | File Verification |
-| FR37 | System computes hash and searches for matching capture | File Verification |
-| FR38 | If match found: display linked capture evidence | File Verification |
-| FR39 | If no match but C2PA manifest present: display manifest info with note | File Verification |
-| FR40 | If no match and no manifest: display "No provenance record found" | File Verification |
-| FR41 | System generates device-level pseudonymous ID (Secure Enclave backed) | Device Management |
-| FR42 | Users can capture and verify without account (anonymous by default) | Device Management |
-| FR43 | Device registration stores attestation key ID and capability flags | Device Management |
-| FR44 | GPS stored at coarse level (city) by default in public view | Privacy Controls |
-| FR45 | Users can opt-out of location (noted in evidence, not suspicious) | Privacy Controls |
-| FR46 | Depth map stored but not publicly downloadable (only visualization) | Privacy Controls |
+### Capture Flow (FR6-FR10)
+- **FR6:** App displays camera view with LiDAR depth overlay
+- **FR7:** App captures photo via back camera
+- **FR8:** App simultaneously captures LiDAR depth map via ARKit
+- **FR9:** App records GPS coordinates if permission granted
+- **FR10:** App captures device attestation signature for the capture
 
-### Summary
+### Local Processing (FR11-FR13)
+- **FR11:** App computes SHA-256 hash of photo before upload
+- **FR12:** App compresses depth map (gzip float32 array)
+- **FR13:** App constructs structured capture request with photo + depth + metadata
 
-- **Total:** 46 Functional Requirements (MVP)
-- **Device & Attestation:** FR1-FR5 (5)
-- **Capture Flow:** FR6-FR10 (5)
-- **Local Processing:** FR11-FR13 (3)
-- **Upload & Sync:** FR14-FR19 (6)
-- **Evidence Generation:** FR20-FR26 (7)
-- **C2PA Integration:** FR27-FR30 (4)
-- **Verification Interface:** FR31-FR35 (5)
-- **File Verification:** FR36-FR40 (5)
-- **Device Management:** FR41-FR43 (3)
-- **Privacy Controls:** FR44-FR46 (3)
+### Upload & Sync (FR14-FR19)
+- **FR14:** App uploads capture via multipart POST (photo + depth_map + metadata JSON)
+- **FR15:** App uses TLS 1.3 for all API communication
+- **FR16:** App implements retry with exponential backoff on upload failure
+- **FR17:** App stores captures in encrypted local storage when offline (Secure Enclave key)
+- **FR18:** App auto-uploads pending captures when connectivity returns
+- **FR19:** App displays pending upload status to user
 
----
+### Evidence Generation (FR20-FR26)
+- **FR20:** Backend verifies DCAppAttest attestation and records level
+- **FR21:** Backend performs LiDAR depth analysis (variance, layers, edge coherence)
+- **FR22:** Backend determines "is_likely_real_scene" from depth analysis
+- **FR23:** Backend validates EXIF timestamp against server receipt time
+- **FR24:** Backend validates device model is iPhone Pro (has LiDAR)
+- **FR25:** Backend generates evidence package with all check results
+- **FR26:** Backend calculates confidence level (HIGH/MEDIUM/LOW/SUSPICIOUS)
 
-## FR Coverage Map
+### C2PA Integration (FR27-FR30)
+- **FR27:** Backend creates C2PA manifest with evidence summary
+- **FR28:** Backend signs C2PA manifest with Ed25519 key (HSM-backed in production)
+- **FR29:** Backend embeds C2PA manifest in photo file
+- **FR30:** System stores both original and C2PA-embedded versions
 
-| FR | Epic | Story | Description |
-|----|------|-------|-------------|
-| FR1 | 2 | 2.1 | iPhone Pro detection |
-| FR2 | 2 | 2.2 | Secure Enclave key generation |
-| FR3 | 2 | 2.3 | DCAppAttest integration |
-| FR4 | 2 | 2.4, 2.5 | Backend attestation verification |
-| FR5 | 2 | 2.5 | Attestation level assignment |
-| FR6 | 3 | 3.1 | Camera with depth overlay |
-| FR7 | 3 | 3.2 | Photo capture |
-| FR8 | 3 | 3.2 | LiDAR depth capture |
-| FR9 | 3 | 3.3 | GPS recording |
-| FR10 | 3 | 3.4 | Capture attestation signature |
-| FR11 | 3 | 3.5 | SHA-256 hash |
-| FR12 | 3 | 3.5 | Depth map compression |
-| FR13 | 3 | 3.5 | Structured capture request |
-| FR14 | 4 | 4.1 | Multipart upload |
-| FR15 | 4 | 4.1 | TLS 1.3 |
-| FR16 | 4 | 4.2 | Retry with backoff |
-| FR17 | 4 | 4.3 | Encrypted offline storage |
-| FR18 | 4 | 4.3 | Auto-upload on reconnect |
-| FR19 | 4 | 4.2 | Pending status display |
-| FR20 | 4 | 4.4 | Attestation verification |
-| FR21 | 4 | 4.5 | Depth analysis |
-| FR22 | 4 | 4.5 | is_likely_real_scene |
-| FR23 | 4 | 4.6 | EXIF timestamp validation |
-| FR24 | 4 | 4.6 | Device model validation |
-| FR25 | 4 | 4.7 | Evidence package |
-| FR26 | 4 | 4.7 | Confidence calculation |
-| FR27 | 5 | 5.1 | C2PA manifest creation |
-| FR28 | 5 | 5.2 | Ed25519 signing |
-| FR29 | 5 | 5.3 | Manifest embedding |
-| FR30 | 5 | 5.3 | Original + C2PA storage |
-| FR31 | 5 | 5.4 | Verification URL |
-| FR32 | 5 | 5.4 | Confidence display |
-| FR33 | 5 | 5.4 | Depth visualization |
-| FR34 | 5 | 5.5 | Evidence panel |
-| FR35 | 5 | 5.5 | Per-check status |
-| FR36 | 5 | 5.6 | File upload |
-| FR37 | 5 | 5.6 | Hash search |
-| FR38 | 5 | 5.7 | Match → show evidence |
-| FR39 | 5 | 5.7 | No match + C2PA |
-| FR40 | 5 | 5.7 | No match → no record |
-| FR41 | 2 | 2.2 | Device pseudonymous ID |
-| FR42 | 2 | 2.6 | Anonymous capture/verify |
-| FR43 | 2 | 2.4 | Device registration storage |
-| FR44 | 4 | 4.8 | Coarse GPS |
-| FR45 | 4 | 4.8 | Location opt-out |
-| FR46 | 4 | 4.8 | Depth map privacy |
+### Verification Interface (FR31-FR35)
+- **FR31:** Users can view capture verification via shareable URL
+- **FR32:** Verification page displays confidence summary (HIGH/MEDIUM/LOW/SUSPICIOUS)
+- **FR33:** Verification page displays depth analysis visualization
+- **FR34:** Users can expand detailed evidence panel with per-check status
+- **FR35:** Each check displays pass/fail with relevant metrics
+
+### File Verification (FR36-FR40)
+- **FR36:** Users can upload file to verification endpoint
+- **FR37:** System computes hash and searches for matching capture
+- **FR38:** If match found: display linked capture evidence
+- **FR39:** If no match but C2PA manifest present: display manifest info with note
+- **FR40:** If no match and no manifest: display "No provenance record found"
+
+### Device Management (FR41-FR43)
+- **FR41:** System generates device-level pseudonymous ID (Secure Enclave backed)
+- **FR42:** Users can capture and verify without account (anonymous by default)
+- **FR43:** Device registration stores attestation key ID and capability flags
+
+### Privacy Controls (FR44-FR46)
+- **FR44:** GPS stored at coarse level (city) by default in public view
+- **FR45:** Users can opt-out of location (noted in evidence, not suspicious)
+- **FR46:** Depth map stored but not publicly downloadable (only visualization)
 
 ---
 
 ## Epic 1: Foundation & Project Setup
 
-**Goal:** Establish development infrastructure and project structure enabling all subsequent feature development.
+**Goal:** Establish development infrastructure enabling all subsequent work. Creates monorepo structure, local dev environment, and deployment pipeline basics.
 
-**User Value:** Development team can iterate quickly with proper tooling, CI, and local environment.
+**User Value:** Foundation epic (necessary exception) - enables development velocity for all subsequent epics.
 
-**FRs Covered:** Infrastructure foundation for all FRs (no direct FR coverage)
+**FRs Covered:** Infrastructure foundation for all FRs
 
----
-
-### Story 1.1: Monorepo Structure & Development Environment
+### Story 1.1: Initialize Monorepo Structure
 
 As a **developer**,
-I want **a properly structured monorepo with all three components**,
-So that **I can develop iOS app, backend, and web in a coordinated environment**.
+I want **the project scaffolded with all three components (mobile, web, backend)**,
+So that **I can begin implementing features across the stack**.
 
 **Acceptance Criteria:**
 
-**Given** a fresh clone of the repository
-**When** I run the setup commands
+**Given** a fresh development environment with Node.js 22+, Rust 1.82+, and Xcode 16+
+**When** I clone the repository and run setup commands
 **Then** I have:
-- `apps/mobile/` - Expo iOS app (SDK 53, TypeScript)
-- `apps/web/` - Next.js 16 verification site
-- `backend/` - Rust API server structure
-- `packages/shared/` - Shared TypeScript types
-- `infrastructure/docker-compose.yml` - Local services
+- Expo app created at `apps/mobile/` with TypeScript blank template
+- Next.js 16 app created at `apps/web/` with App Router, TypeScript, Tailwind
+- Rust project created at `backend/` with Axum dependencies configured
+- Shared types package at `packages/shared/`
+- Root-level scripts for running all services
 
-**And** `docker-compose up -d` starts PostgreSQL and LocalStack (S3)
-**And** each component has its own `package.json` or `Cargo.toml`
+**And** the folder structure matches the architecture document:
+```
+realitycam/
+├── apps/
+│   ├── mobile/          # Expo SDK 53 + React Native 0.79
+│   └── web/             # Next.js 16 + Turbopack
+├── packages/
+│   └── shared/          # TypeScript types
+├── backend/             # Rust/Axum
+├── infrastructure/
+│   └── docker-compose.yml
+└── docs/
+```
 
 **Prerequisites:** None (first story)
 
 **Technical Notes:**
-- Use commands from Architecture doc: `bunx create-expo-app`, `npx create-next-app`, `cargo new`
-- Expo prebuild for iOS only: `bunx expo prebuild --platform ios`
-- Node.js 22+, Rust 1.82+, PostgreSQL 16
+- Use `bunx create-expo-app@latest` for mobile
+- Use `npx create-next-app@latest` with `--turbopack` for web
+- Use `cargo new` for backend with Cargo.toml per architecture doc
+- Configure Expo for iOS-only prebuild (`npx expo prebuild --platform ios`)
 
 ---
 
-### Story 1.2: Database Schema & Migrations
+### Story 1.2: Configure Local Development Environment
 
 As a **developer**,
-I want **the core database schema defined with migrations**,
-So that **device and capture data can be persisted**.
+I want **local services (Postgres, S3-compatible storage) running via Docker**,
+So that **I can develop and test without external dependencies**.
 
 **Acceptance Criteria:**
 
-**Given** PostgreSQL is running via docker-compose
-**When** I run `sqlx migrate run`
+**Given** Docker is installed and running
+**When** I run `docker-compose up -d` from project root
+**Then** the following services are available:
+- PostgreSQL 16 on localhost:5432
+- LocalStack S3 on localhost:4566
+- Health checks pass for both services
+
+**And** environment files exist with local defaults:
+- `backend/.env.example` with `DATABASE_URL`, `S3_ENDPOINT`, `S3_BUCKET`
+- `apps/mobile/.env.example` with `API_URL`
+- `apps/web/.env.example` with `API_URL`
+
+**Prerequisites:** Story 1.1
+
+**Technical Notes:**
+- Use `docker-compose.yml` in `infrastructure/`
+- PostgreSQL should have `realitycam` database pre-created
+- LocalStack bucket `realitycam-media-dev` auto-created on startup
+- Document setup in README.md
+
+---
+
+### Story 1.3: Initialize Database Schema
+
+As a **developer**,
+I want **the database schema created with migrations**,
+So that **I can store devices, captures, and evidence**.
+
+**Acceptance Criteria:**
+
+**Given** PostgreSQL is running and accessible
+**When** I run `sqlx migrate run` from backend directory
 **Then** the following tables exist:
-- `devices` (id UUID, attestation_level TEXT, attestation_key_id TEXT UNIQUE, platform TEXT, model TEXT, has_lidar BOOLEAN, first_seen_at TIMESTAMPTZ, last_seen_at TIMESTAMPTZ)
-- `captures` (id UUID, device_id UUID FK, target_media_hash BYTEA UNIQUE, evidence JSONB, confidence_level TEXT, status TEXT, captured_at TIMESTAMPTZ, uploaded_at TIMESTAMPTZ)
+- `devices` table with columns: id (UUID), attestation_level, attestation_key_id, attestation_chain, platform, model, has_lidar, first_seen_at, last_seen_at
+- `captures` table with columns: id (UUID), device_id (FK), target_media_hash, evidence (JSONB), confidence_level, status, captured_at, uploaded_at
+- `verification_logs` table with columns: id, capture_id, action, client_ip, timestamp
 
-**And** hash index exists on `captures.target_media_hash`
-**And** foreign key constraint links captures to devices
+**And** indexes are created:
+- Hash index on `captures.target_media_hash` for O(1) lookups
+- B-tree index on `captures.device_id`
 
-**Prerequisites:** Story 1.1
+**Prerequisites:** Story 1.2
 
 **Technical Notes:**
-- SQLx 0.8 with compile-time checked queries
-- JSONB for flexible evidence schema (ADR-006)
-- TIMESTAMPTZ for all timestamps
+- Use SQLx migrations in `backend/migrations/`
+- Enable `uuid-ossp` extension for `gen_random_uuid()`
+- Use `TIMESTAMPTZ` for all timestamps
+- JSONB for evidence allows flexible schema evolution
 
 ---
 
-### Story 1.3: Backend API Skeleton
+### Story 1.4: Backend API Skeleton with Health Check
 
 As a **developer**,
-I want **a basic Axum server with routing structure and middleware**,
-So that **I have a foundation for implementing API endpoints**.
+I want **a running Axum server with basic routing and health endpoint**,
+So that **I can verify the backend is operational and start adding routes**.
 
 **Acceptance Criteria:**
 
-**Given** the backend directory with Cargo.toml configured
-**When** I run `cargo run`
-**Then** the server starts on port 3000
+**Given** the database is running and migrations applied
+**When** I run `cargo run` from backend directory
+**Then** the server starts on port 8080
 
-**And** `GET /health` returns `{"status": "ok"}`
-**And** all responses include `X-Request-Id` header
-**And** CORS is configured for development origins
-**And** tracing/logging is configured with JSON output
+**And** `GET /health` returns:
+```json
+{
+  "status": "ok",
+  "database": "connected",
+  "version": "0.1.0"
+}
+```
 
-**Prerequisites:** Story 1.1
+**And** the following route stubs exist (returning 501 Not Implemented):
+- `POST /api/v1/devices/register`
+- `POST /api/v1/captures`
+- `GET /api/v1/captures/{id}`
+- `POST /api/v1/verify-file`
+
+**And** request logging is enabled with tracing
+
+**Prerequisites:** Story 1.3
 
 **Technical Notes:**
-- Axum 0.8 with tower-http middleware
-- Request ID middleware for tracing
-- Error handling with thiserror
-- Config via dotenvy (.env)
+- Use `tower-http` for CORS, tracing, request-id middleware
+- Configure CORS to allow localhost origins for dev
+- Use `dotenvy` for environment variable loading
+- Structure routes in `src/routes/` per architecture
 
 ---
 
-### Story 1.4: iOS App Shell with Navigation
+### Story 1.5: Mobile App Skeleton with Navigation
 
 As a **developer**,
-I want **an Expo app with tab navigation and screen structure**,
-So that **I have screens ready for capture and history features**.
+I want **the Expo app running with tab navigation structure**,
+So that **I can start implementing capture and history screens**.
 
 **Acceptance Criteria:**
 
-**Given** the mobile app directory
-**When** I run `npx expo run:ios`
-**Then** the app launches on iOS simulator or device
+**Given** Xcode is installed and iOS simulator available
+**When** I run `npx expo start` and open in iOS simulator
+**Then** the app displays with two tabs:
+- "Capture" tab (placeholder screen)
+- "History" tab (placeholder screen)
 
-**And** bottom tab navigation shows "Capture" and "History" tabs
-**And** Capture tab shows placeholder camera view
-**And** History tab shows placeholder list
-**And** Expo Router file-based routing is configured
+**And** navigation works between tabs
+
+**And** the app can be prebuilt for iOS with `npx expo prebuild --platform ios`
 
 **Prerequisites:** Story 1.1
 
 **Technical Notes:**
-- Expo Router for navigation (`app/` directory)
+- Use Expo Router with file-based routing in `app/` directory
 - Tab layout in `app/(tabs)/_layout.tsx`
-- Zustand store scaffolding in `store/`
+- Install expo-camera, expo-crypto, expo-secure-store for later stories
+- Configure `app.config.ts` with bundle identifier for iOS
 
 ---
 
-### Story 1.5: Verification Web Shell
+### Story 1.6: Web App Skeleton with Verification Route
 
 As a **developer**,
-I want **a Next.js app with verification page structure**,
-So that **I have pages ready for verification features**.
+I want **the Next.js app running with verification page route**,
+So that **I can start implementing the verification UI**.
 
 **Acceptance Criteria:**
 
-**Given** the web app directory
-**When** I run `npm run dev`
-**Then** the site is accessible at localhost:3001
+**Given** Node.js 22+ is installed
+**When** I run `npm run dev` from apps/web directory
+**Then** the app starts with Turbopack on localhost:3000
 
-**And** `/` shows landing page placeholder
-**And** `/verify/[id]` shows verification page placeholder
-**And** Tailwind CSS is configured
-**And** TypeScript strict mode is enabled
+**And** the following routes exist:
+- `/` - Landing page (placeholder)
+- `/verify/[id]` - Verification page (placeholder showing "Verifying capture: {id}")
+
+**And** Tailwind CSS is configured and working
 
 **Prerequisites:** Story 1.1
 
 **Technical Notes:**
-- Next.js 16 with App Router and Turbopack
-- React 19 features available
-- API client in `lib/api.ts`
+- Use App Router (`app/` directory)
+- Configure Turbopack (default in Next.js 16)
+- Create API client stub in `lib/api.ts`
+- Set up TypeScript path aliases for imports
 
 ---
 
-## Epic 2: Device Registration & Hardware Attestation
+## Epic 2: Device Registration & Attestation
 
-**Goal:** Establish hardware-rooted trust by implementing DCAppAttest and device registration.
+**Goal:** Enable iPhone Pro devices to securely register with hardware-rooted trust via DCAppAttest and Secure Enclave.
 
-**User Value:** Every subsequent capture is cryptographically tied to a verified, uncompromised iPhone Pro device. This is the foundation of RealityCam's trust model.
+**User Value:** Device owner can register their iPhone Pro and receive cryptographic attestation that proves their device is genuine and uncompromised.
 
-**FRs Covered:** FR1, FR2, FR3, FR4, FR5, FR41, FR42, FR43
+**FRs Covered:** FR1-FR5, FR41-FR43
 
----
-
-### Story 2.1: iPhone Pro Detection & Capability Check
+### Story 2.1: Detect iPhone Pro and LiDAR Capability
 
 As a **user**,
-I want **the app to detect if my device is a supported iPhone Pro**,
-So that **I know whether I can use full attestation features**.
+I want **the app to verify my device is an iPhone Pro with LiDAR**,
+So that **I know whether I can use the full attestation features**.
 
 **Acceptance Criteria:**
 
-**Given** the app is launched on an iOS device
-**When** the app checks device capabilities
-**Then** it detects if device is iPhone Pro (12 Pro through 17 Pro)
+**Given** a user launches the app on an iOS device
+**When** the app initializes
+**Then** it detects:
+- Device model (e.g., "iPhone 15 Pro")
+- iOS version (must be 14.0+)
+- LiDAR availability (via ARKit `ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh)`)
+- Secure Enclave availability
 
-**And** it checks for LiDAR sensor availability via ARKit
-**And** it checks for Secure Enclave capability
-**And** non-Pro devices see "This app requires iPhone Pro with LiDAR" message
-**And** capability flags are stored: `has_lidar`, `has_secure_enclave`
+**And** if device is NOT iPhone Pro (no LiDAR):
+- Display clear message: "RealityCam requires iPhone Pro with LiDAR sensor"
+- Explain why: "LiDAR enables real 3D scene verification"
+- Block access to capture features
 
-**Prerequisites:** Story 1.4
+**And** if device IS iPhone Pro:
+- Proceed to device registration flow
+- Store device capabilities in local state
+
+**Prerequisites:** Story 1.5
 
 **Technical Notes:**
-- Use `UIDevice.current.model` and model identifier mapping
-- ARKit `ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh)` for LiDAR
-- SecureEnclave availability check via Security framework
-- Covers FR1
+- Use `expo-device` for model detection
+- Check ARKit configuration support for LiDAR
+- Store capabilities in Zustand store for later use
+- Device model list: iPhone 12/13/14/15/16/17 Pro and Pro Max
 
 ---
 
-### Story 2.2: Secure Enclave Key Generation (Expo Module)
+### Story 2.2: Generate Secure Enclave Key Pair
 
-As a **device**,
-I want **to generate a hardware-backed Ed25519 key pair**,
-So that **my identity is cryptographically tied to the Secure Enclave**.
+As a **user**,
+I want **my device to generate a hardware-backed cryptographic key**,
+So that **my captures can be cryptographically signed by my device**.
 
 **Acceptance Criteria:**
 
-**Given** a supported iPhone Pro device
-**When** the app initializes for the first time
-**Then** an Ed25519 key pair is generated in the Secure Enclave
+**Given** the app determines this is a first launch (no existing key)
+**When** the app requests key generation
+**Then** `@expo/app-integrity` generates a key pair in Secure Enclave:
+- Key ID is returned and stored in `expo-secure-store`
+- Key is Ed25519 compatible
+- Key is hardware-bound (cannot be extracted)
 
-**And** the private key is non-extractable (hardware-bound)
-**And** the public key can be exported for registration
-**And** a unique device ID (UUID) is derived from the key
-**And** key generation only happens once (persisted)
+**And** on subsequent launches:
+- Existing key ID is retrieved from secure storage
+- No new key generation occurs
+
+**And** key generation failure (e.g., jailbroken device) results in:
+- Clear error message to user
+- App remains functional but captures marked "unverified"
 
 **Prerequisites:** Story 2.1
 
 **Technical Notes:**
-- Create Expo Module: `modules/device-attestation/`
-- Swift implementation in `ios/DeviceAttestationModule.swift`
-- Use `SecKeyCreateRandomKey` with `kSecAttrTokenIDSecureEnclave`
-- Store key reference in Keychain with `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`
-- Covers FR2, FR41
+- Use `AppIntegrity.generateKeyAsync()` from `@expo/app-integrity`
+- Store key ID in `expo-secure-store` with key `attestation_key_id`
+- Key generation is one-time per device install
+- Handle jailbreak detection gracefully (attestation will fail but app should work)
 
 ---
 
-### Story 2.3: DCAppAttest Integration (Expo Module)
+### Story 2.3: Request DCAppAttest Attestation
 
-As a **device**,
-I want **to request attestation from iOS DCAppAttest**,
-So that **Apple can vouch for device integrity**.
+As a **user**,
+I want **my device to obtain an attestation certificate from Apple**,
+So that **the backend can verify my device is genuine**.
 
 **Acceptance Criteria:**
 
-**Given** the device key pair exists in Secure Enclave
-**When** attestation is requested
-**Then** the app calls `DCAppAttestService.shared.attestKey()`
+**Given** a key pair exists in Secure Enclave
+**When** the app requests attestation (on first registration)
+**Then** the following flow executes:
+1. App requests a challenge from backend (`GET /api/v1/devices/challenge`)
+2. Backend returns a random 32-byte challenge (nonce)
+3. App calls `AppIntegrity.attestKeyAsync(keyId, challenge)`
+4. iOS returns attestation object (base64 string) containing:
+   - Certificate chain (Secure Enclave → Apple CA)
+   - Device integrity assertion
+   - Challenge binding
 
-**And** receives CBOR attestation object from Apple
-**And** receives key ID for the attested key
-**And** attestation object contains certificate chain
-**And** errors are handled (network, unsupported device)
+**And** attestation object is ready to send to backend
 
-**Prerequisites:** Story 2.2
+**And** if attestation fails (compromised device):
+- User sees: "Device attestation failed - captures will be marked unverified"
+- App continues with degraded functionality
+
+**Prerequisites:** Story 2.2, Story 1.4
 
 **Technical Notes:**
-- Extend Expo Module with attestation methods
-- DCAppAttest requires iOS 14.0+
-- Attestation object is CBOR-encoded
-- Key ID is base64-encoded string
-- Covers FR3
+- Challenge must be fresh (single-use, expires in 5 minutes)
+- `attestKeyAsync()` returns base64 string for server verification
+- Attestation is ONE-TIME per key - don't re-attest unnecessarily
+- Store attestation status in device state
 
 ---
 
-### Story 2.4: Backend Device Registration Endpoint
+### Story 2.4: Backend Challenge Endpoint
 
-As a **device**,
-I want **to register with the backend using my attestation**,
-So that **the server knows my identity and can verify future requests**.
+As a **mobile app**,
+I want **to request a fresh challenge from the backend**,
+So that **the attestation is bound to a recent server interaction**.
 
 **Acceptance Criteria:**
 
-**Given** the device has attestation object and key ID
-**When** `POST /api/v1/devices/register` is called with:
+**Given** the backend is running
+**When** mobile app calls `GET /api/v1/devices/challenge`
+**Then** backend returns:
+```json
+{
+  "data": {
+    "challenge": "base64-encoded-32-bytes",
+    "expires_at": "2025-11-22T10:35:00Z"
+  }
+}
+```
+
+**And** challenge is:
+- Cryptographically random (32 bytes)
+- Stored server-side with 5-minute expiry
+- Single-use (invalidated after verification)
+
+**Prerequisites:** Story 1.4
+
+**Technical Notes:**
+- Use in-memory store for MVP (Redis for production)
+- Challenge format: base64-encoded 32 random bytes
+- Include rate limiting: 10 challenges/minute/IP
+- Clean up expired challenges periodically
+
+---
+
+### Story 2.5: Backend DCAppAttest Verification
+
+As a **backend service**,
+I want **to verify DCAppAttest attestation objects against Apple's servers**,
+So that **I can trust the device identity is hardware-backed**.
+
+**Acceptance Criteria:**
+
+**Given** a device sends attestation object with challenge
+**When** backend receives `POST /api/v1/devices/register`:
 ```json
 {
   "platform": "ios",
   "model": "iPhone 15 Pro",
+  "has_lidar": true,
   "attestation": {
     "key_id": "base64...",
     "attestation_object": "base64...",
-    "public_key": "base64..."
-  },
-  "capabilities": {
-    "has_lidar": true,
-    "has_secure_enclave": true
+    "challenge": "base64..."
   }
 }
 ```
-**Then** the server stores the device record
 
-**And** returns `{ "device_id": "uuid", "attestation_level": "...", "has_lidar": true }`
-**And** device ID is stored locally for future requests
-**And** duplicate registrations (same key_id) return existing device
+**Then** backend performs verification:
+1. Decode CBOR attestation object
+2. Extract certificate chain
+3. Verify chain roots to Apple's App Attest CA
+4. Verify challenge matches stored challenge
+5. Verify counter and app identity
 
-**Prerequisites:** Story 1.2, Story 1.3, Story 2.3
+**And** on successful verification:
+- Create device record with `attestation_level: "secure_enclave"`
+- Store `attestation_key_id` and certificate chain
+- Return device ID to app
 
-**Technical Notes:**
-- Route in `backend/src/routes/devices.rs`
-- Store public key for signature verification
-- Covers FR4 (partial), FR43
-
----
-
-### Story 2.5: DCAppAttest Verification (Backend)
-
-As a **backend service**,
-I want **to verify DCAppAttest attestation objects**,
-So that **I can confirm device integrity before trusting it**.
-
-**Acceptance Criteria:**
-
-**Given** a device registration request with attestation object
-**When** the backend verifies the attestation
-**Then** it parses the CBOR attestation object
-
-**And** extracts and validates the X.509 certificate chain
-**And** verifies chain roots to Apple's App Attest root CA
-**And** verifies the attestation was for this app's App ID
-**And** assigns attestation level: `secure_enclave` (verified) or `unverified` (failed)
-**And** logs verification result for audit
+**And** on failed verification:
+- Create device record with `attestation_level: "unverified"`
+- Log failure reason for debugging
+- Return device ID (device can still capture, but marked unverified)
 
 **Prerequisites:** Story 2.4
 
 **Technical Notes:**
 - Use `x509-parser` crate for certificate parsing
-- Apple App Attest root CA must be embedded or fetched
-- Verify `credCert` and intermediate certificates
-- Extract and verify `receipt` field
-- Covers FR4, FR5
+- Apple App Attest root cert embedded in binary
+- Verify app ID matches your Team ID + Bundle ID
+- Store attestation chain for audit purposes
+- Endpoint: `POST /api/v1/devices/register`
 
 ---
 
-### Story 2.6: Device Authentication Middleware
+### Story 2.6: Complete Device Registration Flow
 
-As a **backend service**,
-I want **to verify device signatures on every authenticated request**,
-So that **only registered devices can upload captures**.
+As a **user**,
+I want **to complete device registration and see my attestation status**,
+So that **I understand the trust level of my captures**.
 
 **Acceptance Criteria:**
 
-**Given** a request to a protected endpoint (e.g., POST /captures)
-**When** the middleware extracts authentication headers:
-- `X-Device-Id`: device UUID
-- `X-Device-Timestamp`: Unix milliseconds
-- `X-Device-Signature`: Ed25519 signature
+**Given** attestation has completed (success or failure)
+**When** the app receives the device registration response
+**Then** the app:
+1. Stores device ID in secure storage
+2. Stores attestation level in local state
+3. Shows registration success screen with:
+   - Device ID (truncated for display)
+   - Attestation level badge (✓ Secure Enclave / ⚠ Unverified)
+   - Explanation of what this means
 
-**Then** it verifies timestamp is within 5 minutes of server time
-**And** it looks up device public key by ID
-**And** it verifies signature over `timestamp + sha256(body)`
-**And** valid requests proceed; invalid return 401
+**And** the user can proceed to capture screen
 
-**Prerequisites:** Story 2.4
+**And** device ID persists across app restarts
+
+**Prerequisites:** Story 2.5
 
 **Technical Notes:**
-- Middleware in `backend/src/middleware/device_auth.rs`
-- Use `ed25519-dalek` for signature verification
-- No bearer tokens needed (ADR-005)
-- Covers FR42
+- Store `device_id` in `expo-secure-store`
+- Store `attestation_level` in Zustand (persisted)
+- Registration is one-time; skip on subsequent launches
+- If attestation_level is "unverified", show subtle warning on capture screen
+
+---
+
+### Story 2.7: Device Signature for API Requests
+
+As a **mobile app**,
+I want **to sign every API request with my device key**,
+So that **the backend can verify requests came from a registered device**.
+
+**Acceptance Criteria:**
+
+**Given** a device is registered and has a key in Secure Enclave
+**When** the app makes any authenticated API request
+**Then** the request includes:
+```
+X-Device-Id: {device_uuid}
+X-Device-Timestamp: {unix_ms}
+X-Device-Signature: {ed25519_signature}
+```
+
+**And** signature is computed over:
+```
+message = timestamp + "|" + sha256(request_body)
+signature = sign(message, device_key)
+```
+
+**And** backend verifies:
+1. Device ID exists in database
+2. Timestamp within 5-minute window
+3. Signature valid against stored public key
+
+**Prerequisites:** Story 2.6
+
+**Technical Notes:**
+- Use `AppIntegrity.generateAssertionAsync()` for per-request signing
+- Include assertion in request body or custom header
+- Backend middleware validates before route handlers
+- Cache device public key in memory for performance
 
 ---
 
 ## Epic 3: Photo Capture with LiDAR Depth
 
-**Goal:** Enable users to capture photos with simultaneous LiDAR depth data and device attestation signature.
+**Goal:** Enable users to capture photos with simultaneous LiDAR depth maps, providing the primary evidence signal for authenticity verification.
 
-**User Value:** Users can take photos that include depth proof, demonstrating the scene was real 3D space (not a flat screen or printed image).
+**User Value:** User can capture photos that include 3D depth data proving they photographed a real scene (not a screen or flat image).
 
-**FRs Covered:** FR6, FR7, FR8, FR9, FR10, FR11, FR12, FR13
+**FRs Covered:** FR6-FR13
 
----
+### Story 3.1: Create Custom LiDAR Depth Module (Swift)
 
-### Story 3.1: Camera View with LiDAR Depth Overlay
-
-As a **user**,
-I want **to see a camera preview with depth visualization**,
-So that **I can see the LiDAR is working before I capture**.
+As a **developer**,
+I want **a custom Expo Module that captures LiDAR depth data via ARKit**,
+So that **the app can simultaneously capture depth maps with photos**.
 
 **Acceptance Criteria:**
 
-**Given** I'm on the Capture screen
-**When** the camera view loads
-**Then** I see the back camera preview
+**Given** Xcode and the Expo prebuild environment
+**When** the custom module is built and installed
+**Then** the module provides the following TypeScript API:
+```typescript
+interface LiDARModule {
+  isLiDARAvailable(): Promise<boolean>;
+  startDepthCapture(): Promise<void>;
+  stopDepthCapture(): Promise<void>;
+  captureDepthFrame(): Promise<DepthFrame>;
+  getRealtimeDepthData(): Observable<DepthData>; // For overlay
+}
 
-**And** I see a depth overlay visualization (heatmap or gradient)
-**And** closer objects appear in warmer colors (red/orange)
-**And** farther objects appear in cooler colors (blue/green)
-**And** the overlay updates in real-time (~15-30 fps)
-**And** I can toggle the overlay on/off
-
-**Prerequisites:** Story 2.2 (device attestation module exists)
-
-**Technical Notes:**
-- Extend Expo Module with ARKit depth streaming
-- Use `ARSession` with `ARWorldTrackingConfiguration`
-- Access `ARFrame.sceneDepth` for LiDAR depth
-- Render depth as semi-transparent overlay on camera view
-- Covers FR6
-
----
-
-### Story 3.2: Photo Capture with Depth Map
-
-As a **user**,
-I want **to capture a photo with its corresponding depth map**,
-So that **I have proof of the 3D scene structure**.
-
-**Acceptance Criteria:**
-
-**Given** the camera view with depth overlay is active
-**When** I tap the capture button
-**Then** the app captures a high-resolution photo
-
-**And** simultaneously captures the LiDAR depth map
-**And** depth map is aligned with the photo
-**And** both are stored temporarily in memory
-**And** capture timestamp is recorded
-**And** haptic feedback confirms capture
-
-**Prerequisites:** Story 3.1
-
-**Technical Notes:**
-- Use `AVCaptureSession` for photo capture
-- Synchronize with ARKit frame for depth
-- Depth map format: float32 array (width × height)
-- Photo format: JPEG with EXIF
-- Covers FR7, FR8
-
----
-
-### Story 3.3: GPS and Metadata Collection
-
-As a **user**,
-I want **my location recorded with my capture (if I permit)**,
-So that **geographic context is part of the evidence**.
-
-**Acceptance Criteria:**
-
-**Given** a capture is being taken
-**When** location permission is granted
-**Then** GPS coordinates (lat/lon) are recorded
-
-**And** accuracy level is recorded
-**And** if permission denied, capture proceeds without location
-**And** device metadata is collected: model, OS version, capture time
-
-**Prerequisites:** Story 3.2
-
-**Technical Notes:**
-- Use `expo-location` for GPS
-- Request permission on first capture attempt
-- Store location with capture metadata
-- Covers FR9
-
----
-
-### Story 3.4: Capture Attestation Signature
-
-As a **device**,
-I want **to sign each capture with my Secure Enclave key**,
-So that **the capture is cryptographically bound to this device**.
-
-**Acceptance Criteria:**
-
-**Given** a capture has been taken (photo + depth + metadata)
-**When** preparing for upload
-**Then** the app computes SHA-256 hash of the photo
-
-**And** signs `capture_hash + timestamp` with device private key
-**And** signature is Ed25519 format
-**And** signature is included in capture request
-
-**Prerequisites:** Story 2.2, Story 3.3
-
-**Technical Notes:**
-- Signing happens in Expo Module (Swift)
-- Use Secure Enclave key created in Story 2.2
-- Signature proves this device created this capture
-- Covers FR10
-
----
-
-### Story 3.5: Local Processing Pipeline
-
-As a **device**,
-I want **to prepare the capture for upload**,
-So that **data is efficiently packaged for transmission**.
-
-**Acceptance Criteria:**
-
-**Given** a capture with photo, depth map, metadata, and signature
-**When** the processing pipeline runs
-**Then** SHA-256 hash of photo is computed
-
-**And** depth map is compressed (gzip of float32 array)
-**And** structured capture request is constructed:
-```json
-{
-  "photo_hash": "sha256...",
-  "captured_at": "ISO8601",
-  "location": { "lat": 0.0, "lon": 0.0 } | null,
-  "device_model": "iPhone 15 Pro",
-  "signature": "base64..."
+interface DepthFrame {
+  depthMap: Float32Array;  // Width × Height float32 values (meters)
+  width: number;
+  height: number;
+  timestamp: number;
+  intrinsics: CameraIntrinsics;
 }
 ```
-**And** estimated upload size is calculated (~3-4 MB total)
+
+**And** the Swift implementation:
+- Uses `ARSession` with `ARWorldTrackingConfiguration` and `.sceneDepth`
+- Extracts `ARFrame.sceneDepth.depthMap` as `CVPixelBuffer`
+- Converts to `Float32Array` for JavaScript consumption
+- Provides real-time depth updates for overlay at 30fps
+
+**Prerequisites:** Story 1.5
+
+**Technical Notes:**
+- Create module at `apps/mobile/modules/lidar-depth/`
+- Use Expo Modules API for Swift ↔ JS bridge
+- ~400 lines of Swift code
+- Handle ARSession lifecycle (pause on background, resume on foreground)
+- Depth map resolution typically 256×192 on iPhone Pro
+
+---
+
+### Story 3.2: Basic Camera View with Photo Capture
+
+As a **user**,
+I want **to see a camera viewfinder and take photos**,
+So that **I can capture images for attestation**.
+
+**Acceptance Criteria:**
+
+**Given** the user is on the Capture tab and has granted camera permission
+**When** the camera view loads
+**Then** the user sees:
+- Full-screen camera preview (back camera, wide lens)
+- Capture button at bottom center
+- Shutter animation on capture
+
+**And** when user taps capture button:
+- Photo is captured at full resolution
+- Haptic feedback confirms capture
+- Photo preview appears briefly
+
+**And** camera permission is requested if not granted
+
+**Prerequisites:** Story 1.5
+
+**Technical Notes:**
+- Use `expo-camera` with `Camera` component
+- Configure for back camera, photo mode
+- Use highest available resolution (4032×3024 on recent Pro models)
+- Store photo temporarily in app cache
+
+---
+
+### Story 3.3: LiDAR Depth Overlay on Camera View
+
+As a **user**,
+I want **to see a real-time depth visualization overlaid on the camera**,
+So that **I understand the LiDAR is capturing depth data**.
+
+**Acceptance Criteria:**
+
+**Given** the camera view is active and LiDAR is available
+**When** the depth overlay is enabled
+**Then** the user sees:
+- Semi-transparent depth heatmap overlaid on camera preview
+- Near objects appear in warm colors (red/orange)
+- Far objects appear in cool colors (blue/purple)
+- Overlay updates at ~30fps
+- Toggle button to show/hide depth overlay
+
+**And** depth visualization:
+- Uses colormap (e.g., viridis or plasma)
+- Scales depth values from 0-5 meters
+- Has transparency (~40%) to see underlying photo
+
+**Prerequisites:** Story 3.1, Story 3.2
+
+**Technical Notes:**
+- Use `getRealtimeDepthData()` from LiDAR module
+- Render depth as colored overlay using React Native canvas or GL view
+- Consider `react-native-skia` for performant rendering
+- Overlay should not significantly impact camera frame rate
+
+---
+
+### Story 3.4: Synchronized Photo + Depth Capture
+
+As a **user**,
+I want **my photo and depth map captured at the exact same moment**,
+So that **the depth data accurately represents the photo content**.
+
+**Acceptance Criteria:**
+
+**Given** the user is viewing camera with depth overlay active
+**When** the user taps the capture button
+**Then** the app simultaneously captures:
+1. Full-resolution photo from camera
+2. Depth map from LiDAR (closest frame to photo timestamp)
+3. Capture timestamp (device time, UTC)
+
+**And** both captures are:
+- Within 100ms of each other (synchronized)
+- Stored together as a capture unit
+- Ready for local processing
+
+**And** the preview screen shows:
+- The captured photo
+- Depth visualization overlay option
+- "Processing..." indicator
+
+**Prerequisites:** Story 3.3
+
+**Technical Notes:**
+- ARKit provides synchronized depth with video frames
+- Use ARFrame.capturedImage + ARFrame.sceneDepth for sync
+- May need to trigger ARKit capture directly rather than expo-camera
+- Store both in temporary directory pending upload
+
+---
+
+### Story 3.5: GPS Location Capture
+
+As a **user**,
+I want **my photo's location recorded (if I grant permission)**,
+So that **location can be part of the evidence package**.
+
+**Acceptance Criteria:**
+
+**Given** the user has granted location permission
+**When** a photo is captured
+**Then** GPS coordinates are recorded:
+- Latitude and longitude (6 decimal places, ~11cm precision)
+- Altitude (if available)
+- Accuracy estimate
+- Timestamp of GPS fix
+
+**And** if location permission is denied:
+- Capture proceeds without location
+- Evidence will note "location unavailable"
+- User is not blocked from capturing
+
+**And** location is stored with the capture metadata
 
 **Prerequisites:** Story 3.4
 
 **Technical Notes:**
-- Use `expo-crypto` for SHA-256
-- Gzip compression via native module or JS library
-- Typical sizes: photo ~3MB, depth ~1MB compressed
-- Covers FR11, FR12, FR13
+- Use `expo-location` for GPS access
+- Request permission on first capture (not app launch)
+- Store coordinates in capture metadata JSON
+- Privacy coarsening (to city level) happens server-side per FR44
 
 ---
 
-### Story 3.6: Capture Preview Screen
+### Story 3.6: Generate Capture Assertion (Per-Photo Signature)
 
 As a **user**,
-I want **to preview my capture before uploading**,
-So that **I can confirm it's the photo I want to submit**.
+I want **each photo signed by my device's hardware key**,
+So that **the backend can verify this specific capture came from my attested device**.
 
 **Acceptance Criteria:**
 
-**Given** a capture has been processed
-**When** I navigate to the preview screen
-**Then** I see the captured photo
+**Given** a photo + depth capture is complete
+**When** the capture is being prepared for upload
+**Then** the app generates an assertion:
+1. Compute SHA-256 hash of photo JPEG
+2. Create clientDataHash from capture metadata (timestamp, location, device model)
+3. Call `AppIntegrity.generateAssertionAsync(keyId, clientDataHash)`
+4. Receive assertion object (base64)
 
-**And** I see the depth map overlay (toggleable)
-**And** I see capture metadata (time, location if available)
-**And** I can tap "Upload" to proceed
-**And** I can tap "Retake" to discard and return to camera
-**And** if offline, "Upload" shows "Save for later"
+**And** the assertion is:
+- Bound to this specific capture's data
+- Signed by Secure Enclave key
+- Included in upload payload
 
-**Prerequisites:** Story 3.5
-
-**Technical Notes:**
-- Screen at `app/preview.tsx`
-- Store capture in Zustand before upload decision
-- Show depth overlay using same visualization as camera
-- No direct FR, but completes capture flow
-
----
-
-## Epic 4: Upload, Processing & Evidence Generation
-
-**Goal:** Upload captures to backend, verify attestation, analyze depth data, and generate evidence packages with confidence levels.
-
-**User Value:** Captures are professionally analyzed and assigned confidence levels based on hardware attestation and depth analysis. Users know how trustworthy their evidence is.
-
-**FRs Covered:** FR14, FR15, FR16, FR17, FR18, FR19, FR20, FR21, FR22, FR23, FR24, FR25, FR26, FR44, FR45, FR46
-
----
-
-### Story 4.1: Capture Upload Endpoint
-
-As a **device**,
-I want **to upload my capture to the backend**,
-So that **it can be processed and stored**.
-
-**Acceptance Criteria:**
-
-**Given** a prepared capture with photo, depth map, and metadata
-**When** `POST /api/v1/captures` is called with multipart form data:
-- Part `photo`: JPEG binary
-- Part `depth_map`: gzipped float32 binary
-- Part `metadata`: JSON with capture info
-
-**Then** the server receives and validates all parts
-**And** verifies device signature via middleware
-**And** stores photo and depth map to S3
-**And** creates capture record with `status: "processing"`
-**And** returns `{ "capture_id": "uuid", "status": "processing" }`
-
-**Prerequisites:** Story 2.6, Story 3.5
+**Prerequisites:** Story 3.4, Story 2.7
 
 **Technical Notes:**
-- Route in `backend/src/routes/captures.rs`
-- Use `axum::extract::Multipart` for parsing
-- S3 paths: `captures/{id}/original.jpg`, `captures/{id}/depth.gz`
-- TLS 1.3 enforced at infrastructure level
-- Covers FR14, FR15
+- `generateAssertionAsync()` is per-capture (unlike attestation which is one-time)
+- clientDataHash binds assertion to specific data
+- Backend will verify assertion against registered device key
+- Assertion proves capture came from THIS attested device
 
 ---
 
-### Story 4.2: Upload Queue with Retry
+### Story 3.7: Local Processing Pipeline
 
 As a **user**,
-I want **failed uploads to automatically retry**,
-So that **temporary network issues don't lose my captures**.
+I want **my capture processed locally before upload**,
+So that **the upload package is complete and efficient**.
 
 **Acceptance Criteria:**
 
-**Given** an upload fails due to network error
-**When** the retry logic activates
-**Then** it waits with exponential backoff (1s, 2s, 4s, 8s, max 60s)
+**Given** a synchronized photo + depth capture exists
+**When** local processing runs
+**Then** the following are computed:
+1. **Photo hash:** SHA-256 of JPEG bytes (32 bytes)
+2. **Compressed depth map:** gzip-compressed Float32Array (~1MB)
+3. **Capture metadata JSON:**
+   ```json
+   {
+     "captured_at": "2025-11-22T10:30:00.123Z",
+     "device_model": "iPhone 15 Pro",
+     "photo_hash": "base64...",
+     "location": { "lat": 37.7749, "lng": -122.4194 },
+     "depth_map_dimensions": { "width": 256, "height": 192 },
+     "assertion": "base64..."
+   }
+   ```
 
-**And** retries up to 5 times
-**And** upload status is updated in local state
-**And** I can see pending uploads in the History tab
-**And** I can manually trigger retry
+**And** all components are stored locally awaiting upload
 
-**Prerequisites:** Story 4.1
+**And** progress indicator shows processing status
+
+**Prerequisites:** Story 3.5, Story 3.6
 
 **Technical Notes:**
-- Upload queue in `hooks/useUploadQueue.ts`
-- Persist queue state with Zustand + AsyncStorage
-- Show upload progress percentage
-- Covers FR16, FR19
+- Use `expo-crypto` for SHA-256 hashing
+- Use pako or similar for gzip compression in JS
+- Store in app's document directory with capture ID
+- Total upload size: ~3MB photo + ~1MB depth + ~1KB metadata
 
 ---
 
-### Story 4.3: Offline Storage & Auto-Upload
+### Story 3.8: Capture Preview with Depth Visualization
 
 As a **user**,
-I want **captures saved securely when offline**,
-So that **I never lose evidence even without connectivity**.
+I want **to preview my capture with depth visualization before upload**,
+So that **I can verify the capture looks correct**.
 
 **Acceptance Criteria:**
 
-**Given** I capture a photo while offline
-**When** the upload attempt fails
-**Then** the capture is stored in encrypted local storage
+**Given** a capture has completed local processing
+**When** the preview screen displays
+**Then** the user sees:
+- Full-resolution photo
+- Toggle to overlay depth visualization
+- Capture metadata summary (time, location if available)
+- Device attestation badge (✓ or ⚠)
 
-**And** encryption key is Secure Enclave-backed
-**And** capture is marked as "pending upload"
-**And** when connectivity returns, upload automatically starts
-**And** I see a warning: "Evidence timestamping delayed"
+**And** the user can:
+- Tap "Upload" to proceed with upload
+- Tap "Discard" to delete the capture
+- Tap "Capture Another" to return to camera
+
+**And** the depth overlay shows:
+- Color-coded depth heatmap
+- Transparency slider (0-100%)
+
+**Prerequisites:** Story 3.7
+
+**Technical Notes:**
+- Route to `preview.tsx` after capture
+- Pass capture ID as route param
+- Load photo and depth from local storage
+- Render depth overlay similar to camera view
+
+---
+
+## Epic 4: Upload & Evidence Processing
+
+**Goal:** Process uploaded captures through the evidence generation pipeline, including depth analysis, attestation verification, and metadata validation.
+
+**User Value:** User's captured photos are analyzed and assigned a confidence level based on hardware attestation, LiDAR depth analysis, and metadata consistency.
+
+**FRs Covered:** FR14-FR26, FR44-FR46
+
+### Story 4.1: Multipart Upload Endpoint
+
+As a **mobile app**,
+I want **to upload photos with depth maps and metadata in a single request**,
+So that **all capture data is submitted atomically**.
+
+**Acceptance Criteria:**
+
+**Given** a registered device with a processed capture
+**When** the app calls `POST /api/v1/captures` with multipart/form-data:
+- Part `photo`: JPEG binary (~3MB)
+- Part `depth_map`: gzipped float32 array (~1MB)
+- Part `metadata`: JSON with captured_at, location, device_model, assertion
+
+**Then** the backend:
+1. Validates device signature headers (X-Device-Id, X-Device-Timestamp, X-Device-Signature)
+2. Verifies device exists and is registered
+3. Stores photo and depth_map to S3
+4. Creates pending capture record in database
+5. Returns capture ID and "processing" status
+
+**And** response format:
+```json
+{
+  "data": {
+    "capture_id": "uuid",
+    "status": "processing",
+    "verification_url": "https://realitycam.app/verify/{uuid}"
+  }
+}
+```
+
+**Prerequisites:** Story 1.4, Story 2.7
+
+**Technical Notes:**
+- Use `axum-extra` multipart handling
+- Stream parts directly to S3 (avoid loading 4MB into memory)
+- Generate presigned upload URLs if needed for large files
+- Apply rate limiting: 10 captures/hour/device
+
+---
+
+### Story 4.2: Mobile Upload Queue with Retry
+
+As a **user**,
+I want **my captures to upload reliably with automatic retry**,
+So that **I don't lose captures due to network issues**.
+
+**Acceptance Criteria:**
+
+**Given** a capture is ready for upload
+**When** the user initiates upload (or auto-upload from queue)
+**Then** the upload queue:
+1. Adds capture to persistent queue (survives app restart)
+2. Attempts upload via TLS 1.3
+3. Shows progress indicator (0-100%)
+4. On success: removes from queue, shows verification URL
+5. On failure: implements exponential backoff (1s, 2s, 4s, 8s, max 5 minutes)
+
+**And** the user can:
+- See pending uploads in History tab
+- Cancel a pending upload
+- Retry a failed upload manually
+
+**And** auto-retry continues in background (with user consent)
+
+**Prerequisites:** Story 4.1, Story 3.8
+
+**Technical Notes:**
+- Store queue in `expo-secure-store` or SQLite
+- Use `expo-background-fetch` for background uploads
+- Show notification when upload completes in background
+- Track retry count; mark as "failed" after 10 attempts
+
+---
+
+### Story 4.3: Offline Storage with Encryption
+
+As a **user**,
+I want **my captures stored securely when offline**,
+So that **they remain private until uploaded**.
+
+**Acceptance Criteria:**
+
+**Given** a capture is taken while device is offline
+**When** the capture is stored locally
+**Then** storage is:
+- Encrypted using Secure Enclave-backed key
+- Stored in app's document directory
+- Marked as "pending upload" in local database
+
+**And** the user sees:
+- "Offline" badge on capture in History
+- "Will upload when online" message
+- Warning: "Timestamp verification will differ from capture time"
+
+**And** when connectivity returns:
+- Captures automatically queue for upload
+- Upload order preserves capture chronology
 
 **Prerequisites:** Story 4.2
 
 **Technical Notes:**
-- Use `expo-secure-store` for encryption key storage
-- Use `expo-file-system` for encrypted file storage
-- Network state detection via `NetInfo`
-- Covers FR17, FR18
+- Use `expo-secure-store` for encryption key management
+- Encrypt photo, depth map, and metadata together
+- Store offline captures in separate directory
+- Check connectivity via `@react-native-community/netinfo`
 
 ---
 
-### Story 4.4: Attestation Verification on Upload
+### Story 4.4: Backend Assertion Verification
 
 As a **backend service**,
-I want **to verify the device's attestation status on each upload**,
-So that **evidence includes current device trust level**.
+I want **to verify the per-capture assertion from the mobile app**,
+So that **I can confirm this capture came from a registered, attested device**.
 
 **Acceptance Criteria:**
 
-**Given** a capture upload from a registered device
-**When** processing the capture
-**Then** the backend retrieves device attestation level
+**Given** an upload includes an assertion in metadata
+**When** backend processes the capture
+**Then** assertion verification:
+1. Extracts assertion from metadata JSON
+2. Looks up device by X-Device-Id header
+3. Retrieves device's attestation public key
+4. Decodes CBOR assertion object
+5. Verifies signature over clientDataHash
+6. Verifies counter increment (replay protection)
 
-**And** verifies device signature is valid
-**And** records attestation verification result in evidence:
-```json
-{
-  "hardware_attestation": {
-    "status": "pass",
-    "level": "secure_enclave",
-    "device_model": "iPhone 15 Pro",
-    "key_id": "..."
-  }
-}
-```
-**And** if attestation verification fails, status is "fail"
+**And** on successful verification:
+- Record attestation check as "pass" in evidence
+- Update device counter in database
 
-**Prerequisites:** Story 2.5, Story 4.1
+**And** on failed verification:
+- Record attestation check as "fail" in evidence
+- Log failure reason
+- Continue processing (don't reject capture)
+
+**Prerequisites:** Story 4.1, Story 2.5
 
 **Technical Notes:**
-- Service in `backend/src/services/evidence/hardware.rs`
-- Covers FR20
+- Assertion verification similar to attestation but simpler
+- Use same `x509-parser` and crypto libraries
+- Counter must be strictly increasing per device
+- Store last-seen counter to detect replays
 
 ---
 
 ### Story 4.5: LiDAR Depth Analysis Service
 
 As a **backend service**,
-I want **to analyze the depth map for authenticity signals**,
-So that **I can determine if the scene was real 3D space**.
+I want **to analyze depth maps and detect flat vs. real scenes**,
+So that **I can determine if the photo shows a real 3D environment**.
 
 **Acceptance Criteria:**
 
-**Given** a capture with depth map
+**Given** an uploaded capture with depth_map
 **When** depth analysis runs
-**Then** it decompresses the gzipped depth data
-
-**And** calculates depth variance (std dev of depth values)
-**And** counts distinct depth layers (clustering)
-**And** calculates edge coherence (depth edges vs RGB edges)
-**And** determines `is_likely_real_scene`:
-  - `true` if: variance > 0.5 AND layers >= 3 AND coherence > 0.7
-  - `false` otherwise
-
-**And** records analysis in evidence:
-```json
-{
-  "depth_analysis": {
-    "status": "pass",
-    "depth_variance": 2.4,
-    "depth_layers": 5,
-    "edge_coherence": 0.87,
-    "min_depth": 0.8,
-    "is_likely_real_scene": true
-  }
+**Then** the service computes:
+```rust
+DepthAnalysis {
+    depth_variance: f32,      // Std dev of depth values
+    edge_coherence: f32,      // Correlation of depth edges with RGB edges
+    min_depth: f32,           // Nearest point in meters
+    max_depth: f32,           // Farthest point in meters
+    depth_layers: u32,        // Number of distinct depth planes
+    is_likely_real_scene: bool
 }
 ```
+
+**And** "is_likely_real_scene" is true when:
+- `depth_variance > 0.5`
+- `depth_layers >= 3`
+- `edge_coherence > 0.7`
+
+**And** depth analysis runs in < 5 seconds
+
+**And** results are stored in evidence package
 
 **Prerequisites:** Story 4.1
 
 **Technical Notes:**
-- Service in `backend/src/services/evidence/depth.rs`
-- Use image crate for RGB processing
-- Thresholds from Architecture doc (may need tuning)
-- Covers FR21, FR22
+- Decompress gzipped depth map
+- Use Canny edge detection on RGB for edge coherence
+- Depth layer detection: histogram peaks in depth distribution
+- Flat images (screens): variance ~0.02, layers = 1-2, min_depth ~0.3-0.5m
+- Real scenes: variance > 0.5, layers >= 3, varying depths
 
 ---
 
-### Story 4.6: Metadata Validation
+### Story 4.6: Metadata Consistency Checks
 
 As a **backend service**,
 I want **to validate capture metadata for consistency**,
-So that **obvious manipulation attempts are flagged**.
+So that **I can detect obvious manipulation attempts**.
 
 **Acceptance Criteria:**
 
-**Given** a capture with EXIF metadata
-**When** validation runs
-**Then** it compares EXIF timestamp to server receipt time
+**Given** an uploaded capture with metadata
+**When** metadata validation runs
+**Then** the following checks are performed:
 
-**And** allows tolerance of ±5 minutes (clock drift)
-**And** validates device model is iPhone Pro (has LiDAR)
-**And** validates resolution matches device capability
-**And** records validation in evidence:
-```json
-{
-  "metadata": {
-    "timestamp_valid": true,
-    "timestamp_delta_seconds": 3,
-    "model_valid": true,
-    "model_has_lidar": true
-  }
-}
-```
+| Check | Criteria | Status |
+|-------|----------|--------|
+| Timestamp validity | EXIF time within 15 min of server receipt | pass/fail |
+| Device model | Model is iPhone Pro with LiDAR | pass/fail |
+| Resolution | Matches device capability | pass/unavailable |
+| Location plausibility | If provided, coords are on Earth | pass/fail/unavailable |
+
+**And** each check result is recorded in evidence package
+
+**And** failures don't reject the capture, but lower confidence
 
 **Prerequisites:** Story 4.1
 
 **Technical Notes:**
-- Service in `backend/src/services/evidence/metadata.rs`
-- EXIF parsing with `kamadak-exif` or similar
-- iPhone Pro model list from PRD
-- Covers FR23, FR24
+- Parse EXIF from JPEG using `kamadak-exif` crate
+- Device model whitelist: iPhone 12-17 Pro/Pro Max
+- Resolution check: compare to known device resolutions
+- Location: lat -90 to 90, lng -180 to 180
 
 ---
 
-### Story 4.7: Evidence Package & Confidence Calculation
+### Story 4.7: Privacy Coarsening for Location
+
+As a **privacy-conscious system**,
+I want **to coarsen GPS coordinates before public display**,
+So that **exact locations are not exposed**.
+
+**Acceptance Criteria:**
+
+**Given** a capture with full-precision GPS coordinates
+**When** evidence is prepared for public display
+**Then** location is coarsened:
+- Coordinates rounded to 2 decimal places (~1.1km precision)
+- Displayed as city-level (reverse geocode to city name)
+- Full precision stored but marked "not publicly accessible"
+
+**And** if user opted out of location:
+- Evidence notes "location not provided"
+- Status is "unavailable" (not suspicious)
+
+**Prerequisites:** Story 4.6
+
+**Technical Notes:**
+- Store both: `location_precise` (internal) and `location_coarse` (public)
+- Reverse geocoding via external API or offline database
+- Per FR45: opt-out noted but not penalized in confidence
+
+---
+
+### Story 4.8: Evidence Package Assembly
 
 As a **backend service**,
-I want **to aggregate all checks and calculate confidence level**,
-So that **captures have a clear trust assessment**.
+I want **to assemble all check results into a unified evidence package**,
+So that **the verification page has complete evidence to display**.
 
 **Acceptance Criteria:**
 
 **Given** all evidence checks have completed
-**When** aggregation runs
-**Then** it combines hardware, depth, and metadata evidence
+**When** evidence package is assembled
+**Then** the package contains:
+```json
+{
+  "hardware_attestation": {
+    "status": "pass|fail|unavailable",
+    "level": "secure_enclave|unverified",
+    "device_model": "iPhone 15 Pro"
+  },
+  "depth_analysis": {
+    "status": "pass|fail",
+    "depth_variance": 2.4,
+    "depth_layers": 5,
+    "edge_coherence": 0.87,
+    "min_depth": 0.8,
+    "max_depth": 4.2,
+    "is_likely_real_scene": true
+  },
+  "metadata": {
+    "timestamp_valid": true,
+    "model_verified": true,
+    "location_available": true,
+    "location_coarse": "San Francisco, CA"
+  }
+}
+```
 
-**And** calculates confidence level:
-- `SUSPICIOUS`: Any check failed
-- `HIGH`: Hardware pass AND depth pass (is_likely_real_scene)
-- `MEDIUM`: Hardware pass XOR depth pass
-- `LOW`: Neither pass (but none failed)
+**And** evidence is stored as JSONB in captures table
 
-**And** stores complete evidence package as JSONB
-**And** updates capture status to "complete"
-**And** records processing duration for metrics
-
-**Prerequisites:** Story 4.4, Story 4.5, Story 4.6
+**Prerequisites:** Story 4.4, Story 4.5, Story 4.6, Story 4.7
 
 **Technical Notes:**
-- Service in `backend/src/services/evidence/mod.rs`
-- Confidence algorithm from Architecture doc
-- Covers FR25, FR26
+- All checks must complete before package is final
+- Use database transaction for consistency
+- Evidence structure supports future check additions
 
 ---
 
-### Story 4.8: Privacy Controls Implementation
+### Story 4.9: Confidence Level Calculation
 
-As a **user**,
-I want **control over what location data is shown publicly**,
-So that **my privacy is protected while evidence remains valid**.
+As a **backend service**,
+I want **to calculate overall confidence from evidence checks**,
+So that **users get a clear trust signal**.
 
 **Acceptance Criteria:**
 
-**Given** a capture with GPS coordinates
-**When** the capture is stored and processed
-**Then** GPS is stored at full precision in database (private)
+**Given** a complete evidence package
+**When** confidence is calculated
+**Then** the algorithm is:
+```
+if any_check_status == "fail":
+    return SUSPICIOUS
 
-**And** public view shows coarse location (city level only)
-**And** if user opted out of location, evidence notes "location_opted_out: true"
-**And** opted-out location reduces confidence ceiling but isn't marked suspicious
-**And** depth map is stored but not publicly downloadable
-**And** only depth visualization (heatmap image) is public
+hardware_pass = hardware_attestation.status == "pass"
+depth_pass = depth_analysis.is_likely_real_scene
 
-**Prerequisites:** Story 4.7
+match (hardware_pass, depth_pass):
+    (true, true)   => HIGH
+    (true, false)  => MEDIUM  // Hardware OK, depth suspicious
+    (false, true)  => MEDIUM  // Depth OK, hardware unverified
+    (false, false) => LOW
+```
+
+**And** confidence level is stored with capture
+
+**And** capture status changes from "processing" to "complete"
+
+**Prerequisites:** Story 4.8
 
 **Technical Notes:**
-- Coarse location: round to ~0.1 degree (~10km precision)
-- Generate depth visualization image during processing
-- Store original depth, expose only visualization
-- Covers FR44, FR45, FR46
+- Confidence levels: HIGH, MEDIUM, LOW, SUSPICIOUS
+- "unavailable" status doesn't cause SUSPICIOUS
+- Future: weights per check type for nuanced scoring
 
 ---
 
-## Epic 5: C2PA Integration & Verification Interface
+### Story 4.10: Upload Result Display in App
 
-**Goal:** Generate C2PA manifests for interoperability and provide public verification interface.
+As a **user**,
+I want **to see my capture's verification result after upload**,
+So that **I know the evidence strength and can share the verify link**.
 
-**User Value:** Complete end-to-end flow where anyone can verify a capture via URL or by uploading a file. Evidence is embedded in industry-standard C2PA format.
+**Acceptance Criteria:**
 
-**FRs Covered:** FR27, FR28, FR29, FR30, FR31, FR32, FR33, FR34, FR35, FR36, FR37, FR38, FR39, FR40
+**Given** an upload has completed processing
+**When** the result screen displays
+**Then** the user sees:
+- Confidence badge (HIGH/MEDIUM/LOW with color coding)
+- Brief explanation of what each evidence type found
+- Shareable verification URL
+- "Share" button (native share sheet)
+- "View Details" to see full evidence breakdown
+
+**And** the verification URL is:
+- Short and memorable: `https://realitycam.app/v/{short_id}`
+- Copyable with one tap
+
+**Prerequisites:** Story 4.9, Story 3.8
+
+**Technical Notes:**
+- Poll backend for completion (or use WebSocket)
+- Navigate to `result.tsx` when processing complete
+- Store verification URL in local history
+- Short ID: base62 encoding of UUID prefix (8 chars)
 
 ---
+
+## Epic 5: C2PA & Verification Experience
+
+**Goal:** Generate C2PA manifests for interoperability and provide a public verification interface for recipients to verify photo authenticity.
+
+**User Value:** Recipients can verify photos via shareable links, see confidence levels, explore evidence details, and verify files by uploading them.
+
+**FRs Covered:** FR27-FR40
 
 ### Story 5.1: C2PA Manifest Generation
 
 As a **backend service**,
-I want **to create C2PA manifests with evidence summary**,
-So that **captures are interoperable with Content Credentials ecosystem**.
+I want **to create C2PA manifests containing our evidence summary**,
+So that **photos are interoperable with the Content Credentials ecosystem**.
 
 **Acceptance Criteria:**
 
-**Given** a capture with complete evidence package
-**When** C2PA generation runs
-**Then** it creates a C2PA manifest with:
-- Claim generator: "RealityCam/1.0"
-- Capture action: "c2pa.created"
-- Assertions including evidence summary
-- Ingredient (original photo)
+**Given** a capture with completed evidence package
+**When** C2PA manifest generation runs
+**Then** the manifest contains:
+- **Claim Generator:** "RealityCam/1.0.0"
+- **Actions:** "c2pa.created" with timestamp
+- **Assertions:**
+  - Hardware attestation level
+  - Depth analysis summary (real_scene: true/false)
+  - Confidence level (HIGH/MEDIUM/LOW/SUSPICIOUS)
+  - Device model
+- **Signature:** Ed25519, certificate chain embedded
 
-**And** manifest follows C2PA 2.0 specification
-**And** manifest includes custom assertions for RealityCam evidence
+**And** manifest is valid per C2PA spec 2.0
 
-**Prerequisites:** Story 4.7
+**And** manifest is stored as separate file (captures/{id}/manifest.c2pa)
+
+**Prerequisites:** Story 4.9
 
 **Technical Notes:**
-- Use `c2pa-rs` 0.51.x crate
-- Service in `backend/src/services/c2pa.rs`
-- Custom assertion namespace for depth analysis
-- Covers FR27
+- Use `c2pa-rs` crate version 0.51.x
+- Ed25519 signing key from AWS KMS (HSM-backed)
+- Include our CA cert in certificate chain
+- Custom assertion schema for depth analysis
 
 ---
 
-### Story 5.2: C2PA Signing with Ed25519
+### Story 5.2: C2PA Manifest Embedding
 
 As a **backend service**,
-I want **to sign C2PA manifests with our server key**,
-So that **manifests are cryptographically verifiable**.
+I want **to embed the C2PA manifest into the photo file**,
+So that **the photo carries its provenance metadata**.
 
 **Acceptance Criteria:**
 
-**Given** a C2PA manifest ready for signing
-**When** signing is performed
-**Then** manifest is signed with Ed25519 key
+**Given** a C2PA manifest has been generated
+**When** embedding runs
+**Then**:
+- Original photo preserved at `captures/{id}/original.jpg`
+- C2PA-embedded photo created at `captures/{id}/c2pa.jpg`
+- Manifest embedded in JUMBF box per C2PA spec
+- Photo remains valid JPEG, viewable in any viewer
 
-**And** in development: key loaded from file
-**And** in production: key stored in HSM (AWS KMS)
-**And** certificate chain is included in manifest
-**And** signing timestamp is recorded
+**And** both versions are accessible via API
 
 **Prerequisites:** Story 5.1
 
 **Technical Notes:**
-- Ed25519 via `ed25519-dalek`
-- HSM integration via `aws-sdk-kms` for production
-- Certificate renewal process documented
-- Covers FR28
+- `c2pa-rs` handles JUMBF embedding
+- Embedded photo slightly larger (~5-10KB for manifest)
+- Preserve original for hash verification
+- CDN serves both versions
 
 ---
 
-### Story 5.3: C2PA Embedding & Storage
+### Story 5.3: Verification Page - Confidence Summary
 
-As a **backend service**,
-I want **to embed the manifest in the photo and store both versions**,
-So that **users get standard-compliant media files**.
-
-**Acceptance Criteria:**
-
-**Given** a signed C2PA manifest and original photo
-**When** embedding runs
-**Then** manifest is embedded in photo as JUMBF
-
-**And** original photo stored at `captures/{id}/original.jpg`
-**And** C2PA photo stored at `captures/{id}/c2pa.jpg`
-**And** standalone manifest stored at `captures/{id}/manifest.c2pa`
-**And** all files accessible via presigned URLs (1 hour expiry)
-
-**Prerequisites:** Story 5.2
-
-**Technical Notes:**
-- Use c2pa-rs `embed_file` function
-- S3 structure from Architecture doc
-- CloudFront CDN for media delivery
-- Covers FR29, FR30
-
----
-
-### Story 5.4: Verification Page - Summary View
-
-As a **viewer**,
-I want **to see a capture's verification summary**,
-So that **I can quickly assess its trustworthiness**.
+As a **verification page visitor**,
+I want **to see a clear confidence summary when I open a verify link**,
+So that **I immediately understand the trust level of this photo**.
 
 **Acceptance Criteria:**
 
-**Given** I navigate to `/verify/{capture_id}`
+**Given** a user opens `https://realitycam.app/verify/{id}`
 **When** the page loads
-**Then** I see:
-- Confidence badge (HIGH/MEDIUM/LOW/SUSPICIOUS) with appropriate color
-- Captured photo
-- Capture timestamp and (coarse) location
-- Depth analysis visualization (heatmap preview)
-- Device model that captured it
+**Then** the user sees:
+- **Hero section:** Photo thumbnail with confidence badge overlay
+- **Confidence badge:** Large, color-coded (GREEN=HIGH, YELLOW=MEDIUM, ORANGE=LOW, RED=SUSPICIOUS)
+- **One-line summary:** "This photo has HIGH confidence" or similar
+- **Captured timestamp:** "Captured Nov 22, 2025 at 10:30 AM"
+- **Location:** City-level if available, "Location not provided" if opted out
 
-**And** page loads in < 1.5s (FCP)
-**And** media served via CDN with presigned URLs
-**And** invalid capture ID shows "Capture not found"
+**And** the page loads in < 1.5s (FCP)
 
-**Prerequisites:** Story 1.5, Story 4.7
+**And** meta tags support social sharing (OG image, title, description)
+
+**Prerequisites:** Story 1.6
 
 **Technical Notes:**
-- Page at `apps/web/app/verify/[id]/page.tsx`
-- API: `GET /api/v1/captures/{id}`
-- Confidence colors: HIGH=green, MEDIUM=yellow, LOW=orange, SUSPICIOUS=red
-- Covers FR31, FR32, FR33
+- Next.js App Router with server components for SEO
+- Fetch capture data from backend API
+- Generate OG image dynamically with confidence badge
+- CDN caching for static assets
 
 ---
 
-### Story 5.5: Evidence Panel Component
+### Story 5.4: Verification Page - Depth Analysis Visualization
 
-As a **viewer**,
-I want **to see detailed evidence breakdown**,
-So that **I can understand exactly what was verified**.
+As a **verification page visitor**,
+I want **to see a visualization of the depth analysis**,
+So that **I can understand the 3D scene verification evidence**.
 
 **Acceptance Criteria:**
 
-**Given** I'm on the verification page
-**When** I click "View Evidence Details"
+**Given** the verification page is displaying a capture
+**When** the user views the depth section
+**Then** the user sees:
+- **Depth heatmap overlay:** Toggle-able over the photo
+- **Depth metrics:**
+  - "Depth Variance: 2.4" (with explanation: "Higher = more 3D structure")
+  - "Depth Layers: 5" (with explanation: "Number of distinct distances detected")
+  - "Edge Coherence: 87%" (with explanation: "Depth boundaries match photo edges")
+- **Verdict:** "✓ Real 3D Scene Detected" or "⚠ Flat Surface Detected"
+
+**And** tooltip explanations help non-technical users understand
+
+**Prerequisites:** Story 5.3
+
+**Technical Notes:**
+- Pre-render depth visualization server-side (PNG) for performance
+- Store depth preview at `captures/{id}/depth-preview.png`
+- Interactive toggle for overlay on client
+- Consider 3D point cloud view for forensic users (post-MVP)
+
+---
+
+### Story 5.5: Verification Page - Evidence Panel
+
+As a **verification page visitor**,
+I want **to expand a detailed evidence panel**,
+So that **I can see the status of each individual check**.
+
+**Acceptance Criteria:**
+
+**Given** the verification page is displaying a capture
+**When** the user clicks "View Full Evidence"
 **Then** an expandable panel shows:
 
-**Hardware Attestation:**
-- Status: PASS/FAIL with icon
-- Level: secure_enclave
-- Device model verified
+| Check | Status | Details |
+|-------|--------|---------|
+| Hardware Attestation | ✓ PASS | Secure Enclave, iPhone 15 Pro |
+| LiDAR Depth Analysis | ✓ PASS | Real 3D scene, 5 depth layers |
+| Timestamp | ✓ PASS | Captured Nov 22, 2025 10:30:00 UTC |
+| Device Model | ✓ PASS | iPhone 15 Pro (has LiDAR) |
+| Location | — UNAVAILABLE | User opted out |
 
-**Depth Analysis:**
-- Status: PASS/FAIL with icon
-- Depth variance: X.XX (threshold: >0.5)
-- Depth layers: N (threshold: >=3)
-- Edge coherence: X.XX (threshold: >0.7)
-- is_likely_real_scene: true/false
+**And** each status has appropriate icon:
+- ✓ (green) for PASS
+- ✗ (red) for FAIL
+- — (gray) for UNAVAILABLE
 
-**Metadata:**
-- Timestamp validation: PASS/FAIL
-- Device model validation: PASS/FAIL
+**And** "UNAVAILABLE" is explained: "This check could not be performed but is not suspicious"
 
-**And** each check shows relevant metrics
-**And** failed checks are prominently highlighted
-
-**Prerequisites:** Story 5.4
+**Prerequisites:** Story 5.3
 
 **Technical Notes:**
-- Component at `apps/web/components/Evidence/EvidencePanel.tsx`
-- Collapsible sections for each evidence type
-- Covers FR34, FR35
+- Collapsible accordion component
+- Color-coded status badges
+- Link to methodology documentation for transparency
+- Future: raw data download for forensic analysts
 
 ---
 
-### Story 5.6: File Upload Verification
+### Story 5.6: Verification Page - C2PA Manifest Display
 
-As a **viewer**,
-I want **to upload a file to check if it's verified**,
-So that **I can verify media I received from elsewhere**.
+As a **verification page visitor**,
+I want **to see and download the C2PA manifest**,
+So that **I can verify the photo in other C2PA-compatible tools**.
 
 **Acceptance Criteria:**
 
-**Given** I'm on the verification page (or home page)
-**When** I drag/drop or select a file
-**Then** the file is hashed client-side (SHA-256)
+**Given** the verification page is displaying a capture
+**When** the user scrolls to the C2PA section
+**Then** the user sees:
+- C2PA / Content Credentials logo
+- "This photo includes Content Credentials"
+- Link to download C2PA-embedded photo
+- Link to download standalone manifest (.c2pa)
+- "Verify with Content Authenticity" link (to verify.contentauthenticity.org)
 
-**And** hash is sent to `POST /api/v1/verify-file`
-**And** I see a loading indicator during lookup
-**And** supported formats: JPEG, PNG (image files)
+**And** downloads use presigned URLs that expire in 1 hour
 
-**Prerequisites:** Story 1.5
+**Prerequisites:** Story 5.2, Story 5.3
 
 **Technical Notes:**
-- Component at `apps/web/components/Upload/FileDropzone.tsx`
-- Use Web Crypto API for client-side hashing
-- Max file size: 25MB
-- Covers FR36, FR37
+- Presigned S3 URLs for downloads
+- Include SHA-256 hash of files for integrity
+- Link to external C2PA verify tools for third-party validation
 
 ---
 
-### Story 5.7: File Verification Results Display
+### Story 5.7: File Upload Verification Endpoint
 
-As a **viewer**,
-I want **to see results after uploading a file**,
-So that **I know if the file has provenance records**.
+As a **backend service**,
+I want **to verify uploaded files against our capture database**,
+So that **users can verify photos they received externally**.
 
 **Acceptance Criteria:**
 
-**Given** I've uploaded a file for verification
-**When** the lookup completes
-**Then** one of three results is displayed:
+**Given** a user has a photo file they want to verify
+**When** they call `POST /api/v1/verify-file` with the file
+**Then** the backend:
+1. Computes SHA-256 hash of uploaded file
+2. Searches captures table for matching `target_media_hash`
+3. Returns one of three responses:
 
-**Match Found:**
-- "This file matches a verified capture"
-- Link to full verification page
-- Summary of evidence
+**Match found:**
+```json
+{
+  "data": {
+    "status": "verified",
+    "capture_id": "uuid",
+    "confidence_level": "high",
+    "verification_url": "https://realitycam.app/verify/{uuid}"
+  }
+}
+```
 
-**No Match, Has C2PA:**
-- "No RealityCam record, but file has Content Credentials"
-- Display C2PA manifest info (issuer, timestamp)
-- Note: "Verify with original issuer"
+**No match but C2PA manifest present:**
+```json
+{
+  "data": {
+    "status": "c2pa_only",
+    "manifest_info": { "generator": "...", "assertions": [...] },
+    "note": "This file has Content Credentials but was not captured with RealityCam"
+  }
+}
+```
 
-**No Match, No C2PA:**
+**No match and no manifest:**
+```json
+{
+  "data": {
+    "status": "no_record",
+    "note": "No provenance record found for this file"
+  }
+}
+```
+
+**Prerequisites:** Story 1.4
+
+**Technical Notes:**
+- Hash lookup via `idx_captures_hash` index (O(1))
+- Parse C2PA manifest using `c2pa-rs` if hash not found
+- Rate limit: 100 verifications/hour/IP
+- Max file size: 20MB
+
+---
+
+### Story 5.8: File Upload UI on Verification Page
+
+As a **verification page visitor**,
+I want **to upload a file and check if it's in the RealityCam database**,
+So that **I can verify photos I received without a verify link**.
+
+**Acceptance Criteria:**
+
+**Given** the user is on the verification page landing
+**When** the user drops a file or clicks to upload
+**Then** the UI:
+1. Shows file preview and "Checking..." indicator
+2. Uploads file to `POST /api/v1/verify-file`
+3. Displays result:
+
+**If verified:**
+- "✓ Verified! This photo is in our database"
+- Shows confidence badge and link to full verification page
+
+**If C2PA only:**
+- "This photo has Content Credentials but wasn't captured with RealityCam"
+- Shows parsed C2PA info
+
+**If no record:**
 - "No provenance record found"
-- Explanation that file wasn't captured with RealityCam
-- Not necessarily suspicious, just unverified
+- Explains what this means (not necessarily fake, just not in our system)
 
-**Prerequisites:** Story 5.6
+**Prerequisites:** Story 5.7, Story 1.6
 
 **Technical Notes:**
-- C2PA manifest detection using c2pa-rs
-- Clear visual distinction between three states
-- Covers FR38, FR39, FR40
+- Use react-dropzone or similar for drag-drop
+- Client-side hash computation for instant feedback (optional)
+- Show upload progress for large files
+- Accept JPEG, PNG, HEIC
 
 ---
 
-### Story 5.8: Capture Result Screen (Mobile)
+### Story 5.9: Capture History in Mobile App
 
 As a **user**,
-I want **to see my verification URL after upload completes**,
-So that **I can share proof of my capture**.
+I want **to see my capture history in the app**,
+So that **I can access verify links for past captures**.
 
 **Acceptance Criteria:**
 
-**Given** my capture has been uploaded and processed
-**When** I navigate to the result screen
-**Then** I see:
-- "Capture Verified" confirmation
-- Confidence level badge
-- Shareable verification URL
-- "Copy Link" button
-- "Share" button (native share sheet)
-- "Capture Another" button
+**Given** the user has captured photos
+**When** the user opens the History tab
+**Then** they see:
+- Chronological list of captures (newest first)
+- Each item shows:
+  - Thumbnail
+  - Confidence badge
+  - Capture date/time
+  - Status (uploaded, pending, failed)
+- Tap to open full capture details
 
-**And** the URL format is `https://realitycam.app/verify/{id}`
-**And** I can view this capture in my History tab later
+**And** the user can:
+- Share verify link from any completed capture
+- Delete local capture data (note: server record remains)
+- Re-attempt failed uploads
 
-**Prerequisites:** Story 4.7, Story 3.6
+**Prerequisites:** Story 4.10
 
 **Technical Notes:**
-- Screen at `apps/mobile/app/result.tsx`
-- Use `expo-sharing` for native share
-- Store capture reference in local history
-- Completes mobile capture flow
+- Store history in local SQLite or Zustand persisted store
+- Sync with backend for uploaded captures
+- Offline-first: show local data immediately, sync when online
+- Pagination for users with many captures
+
+---
+
+### Story 5.10: Landing Page and Documentation
+
+As a **visitor**,
+I want **to understand what RealityCam does on the landing page**,
+So that **I can decide to download the app or learn about the methodology**.
+
+**Acceptance Criteria:**
+
+**Given** a user visits `https://realitycam.app/`
+**When** the page loads
+**Then** the user sees:
+- **Hero:** "Prove your photos are real" with value prop
+- **How it works:** 3-step visual (Capture → Attest → Verify)
+- **Evidence types:** Hardware attestation + LiDAR depth explained simply
+- **App Store link:** Download for iPhone Pro
+- **File verification:** Drop zone for checking received photos
+- **Methodology:** Link to transparent documentation
+
+**And** the page is:
+- Mobile-responsive
+- Fast loading (< 2s LCP)
+- SEO optimized
+
+**Prerequisites:** Story 1.6
+
+**Technical Notes:**
+- Static generation for landing page (maximum performance)
+- App Store badge with deep link
+- Reuse file verification component from Story 5.8
+- Create `/methodology` page explaining evidence types
 
 ---
 
@@ -1200,79 +1592,76 @@ So that **I can share proof of my capture**.
 
 | FR | Description | Epic | Story |
 |----|-------------|------|-------|
-| FR1 | App detects iPhone Pro device with LiDAR capability | 2 | 2.1 |
-| FR2 | App generates cryptographic keys in Secure Enclave | 2 | 2.2 |
-| FR3 | App requests DCAppAttest attestation from iOS | 2 | 2.3 |
-| FR4 | Backend verifies DCAppAttest assertions against Apple's service | 2 | 2.4, 2.5 |
-| FR5 | System assigns attestation level: secure_enclave or unverified | 2 | 2.5 |
-| FR6 | App displays camera view with LiDAR depth overlay | 3 | 3.1 |
-| FR7 | App captures photo via back camera | 3 | 3.2 |
-| FR8 | App simultaneously captures LiDAR depth map via ARKit | 3 | 3.2 |
-| FR9 | App records GPS coordinates if permission granted | 3 | 3.3 |
-| FR10 | App captures device attestation signature for the capture | 3 | 3.4 |
-| FR11 | App computes SHA-256 hash of photo before upload | 3 | 3.5 |
-| FR12 | App compresses depth map (gzip float32 array) | 3 | 3.5 |
-| FR13 | App constructs structured capture request with photo + depth + metadata | 3 | 3.5 |
-| FR14 | App uploads capture via multipart POST (photo + depth_map + metadata JSON) | 4 | 4.1 |
-| FR15 | App uses TLS 1.3 for all API communication | 4 | 4.1 |
-| FR16 | App implements retry with exponential backoff on upload failure | 4 | 4.2 |
-| FR17 | App stores captures in encrypted local storage when offline (Secure Enclave key) | 4 | 4.3 |
-| FR18 | App auto-uploads pending captures when connectivity returns | 4 | 4.3 |
-| FR19 | App displays pending upload status to user | 4 | 4.2 |
-| FR20 | Backend verifies DCAppAttest attestation and records level | 4 | 4.4 |
-| FR21 | Backend performs LiDAR depth analysis (variance, layers, edge coherence) | 4 | 4.5 |
-| FR22 | Backend determines "is_likely_real_scene" from depth analysis | 4 | 4.5 |
-| FR23 | Backend validates EXIF timestamp against server receipt time | 4 | 4.6 |
-| FR24 | Backend validates device model is iPhone Pro (has LiDAR) | 4 | 4.6 |
-| FR25 | Backend generates evidence package with all check results | 4 | 4.7 |
-| FR26 | Backend calculates confidence level (HIGH/MEDIUM/LOW/SUSPICIOUS) | 4 | 4.7 |
-| FR27 | Backend creates C2PA manifest with evidence summary | 5 | 5.1 |
-| FR28 | Backend signs C2PA manifest with Ed25519 key (HSM-backed in production) | 5 | 5.2 |
-| FR29 | Backend embeds C2PA manifest in photo file | 5 | 5.3 |
-| FR30 | System stores both original and C2PA-embedded versions | 5 | 5.3 |
-| FR31 | Users can view capture verification via shareable URL | 5 | 5.4 |
-| FR32 | Verification page displays confidence summary (HIGH/MEDIUM/LOW/SUSPICIOUS) | 5 | 5.4 |
-| FR33 | Verification page displays depth analysis visualization | 5 | 5.4 |
-| FR34 | Users can expand detailed evidence panel with per-check status | 5 | 5.5 |
-| FR35 | Each check displays pass/fail with relevant metrics | 5 | 5.5 |
-| FR36 | Users can upload file to verification endpoint | 5 | 5.6 |
-| FR37 | System computes hash and searches for matching capture | 5 | 5.6 |
-| FR38 | If match found: display linked capture evidence | 5 | 5.7 |
-| FR39 | If no match but C2PA manifest present: display manifest info with note | 5 | 5.7 |
-| FR40 | If no match and no manifest: display "No provenance record found" | 5 | 5.7 |
-| FR41 | System generates device-level pseudonymous ID (Secure Enclave backed) | 2 | 2.2 |
-| FR42 | Users can capture and verify without account (anonymous by default) | 2 | 2.6 |
-| FR43 | Device registration stores attestation key ID and capability flags | 2 | 2.4 |
-| FR44 | GPS stored at coarse level (city) by default in public view | 4 | 4.8 |
-| FR45 | Users can opt-out of location (noted in evidence, not suspicious) | 4 | 4.8 |
-| FR46 | Depth map stored but not publicly downloadable (only visualization) | 4 | 4.8 |
+| FR1 | Detect iPhone Pro with LiDAR | 2 | 2.1 |
+| FR2 | Generate Secure Enclave keys | 2 | 2.2 |
+| FR3 | Request DCAppAttest attestation | 2 | 2.3 |
+| FR4 | Backend verifies attestation | 2 | 2.5 |
+| FR5 | Assign attestation level | 2 | 2.5 |
+| FR6 | Camera view with depth overlay | 3 | 3.2, 3.3 |
+| FR7 | Capture photo | 3 | 3.2 |
+| FR8 | Capture LiDAR depth map | 3 | 3.1, 3.4 |
+| FR9 | Record GPS coordinates | 3 | 3.5 |
+| FR10 | Capture attestation signature | 3 | 3.6 |
+| FR11 | Compute SHA-256 hash | 3 | 3.7 |
+| FR12 | Compress depth map | 3 | 3.7 |
+| FR13 | Construct capture request | 3 | 3.7 |
+| FR14 | Upload via multipart POST | 4 | 4.1 |
+| FR15 | TLS 1.3 for API | 4 | 4.1, 4.2 |
+| FR16 | Retry with exponential backoff | 4 | 4.2 |
+| FR17 | Encrypted offline storage | 4 | 4.3 |
+| FR18 | Auto-upload when online | 4 | 4.2, 4.3 |
+| FR19 | Pending upload status | 4 | 4.2 |
+| FR20 | Verify attestation | 4 | 4.4 |
+| FR21 | Depth analysis | 4 | 4.5 |
+| FR22 | Determine real scene | 4 | 4.5 |
+| FR23 | Validate EXIF timestamp | 4 | 4.6 |
+| FR24 | Validate device model | 4 | 4.6 |
+| FR25 | Generate evidence package | 4 | 4.8 |
+| FR26 | Calculate confidence level | 4 | 4.9 |
+| FR27 | Create C2PA manifest | 5 | 5.1 |
+| FR28 | Sign C2PA manifest | 5 | 5.1 |
+| FR29 | Embed C2PA manifest | 5 | 5.2 |
+| FR30 | Store both versions | 5 | 5.2 |
+| FR31 | Shareable verify URL | 5 | 5.3 |
+| FR32 | Confidence summary | 5 | 5.3 |
+| FR33 | Depth visualization | 5 | 5.4 |
+| FR34 | Expandable evidence panel | 5 | 5.5 |
+| FR35 | Per-check status display | 5 | 5.5 |
+| FR36 | File upload verification | 5 | 5.7, 5.8 |
+| FR37 | Hash lookup | 5 | 5.7 |
+| FR38 | Match found display | 5 | 5.8 |
+| FR39 | C2PA-only display | 5 | 5.8 |
+| FR40 | No record display | 5 | 5.8 |
+| FR41 | Device pseudonymous ID | 2 | 2.5 |
+| FR42 | Anonymous capture | 2 | 2.6 |
+| FR43 | Device registration storage | 2 | 2.5 |
+| FR44 | Coarse GPS in public view | 4 | 4.7 |
+| FR45 | Location opt-out | 3, 4 | 3.5, 4.7 |
+| FR46 | Depth map not downloadable | 4, 5 | 4.5, 5.4 |
 
 ---
 
 ## Summary
 
-**5 Epics, 33 Stories, 46 FRs covered**
+**Total: 5 Epics, 41 Stories**
 
-| Epic | Goal | Stories | Key Deliverable |
-|------|------|---------|-----------------|
-| 1 | Foundation | 5 | Dev environment ready |
-| 2 | Device Registration | 6 | Hardware trust established |
-| 3 | Photo Capture | 6 | Attested photos with depth |
-| 4 | Upload & Evidence | 8 | Evidence computation pipeline |
-| 5 | C2PA & Verification | 8 | End-to-end verification flow |
+| Epic | Stories | FRs Covered |
+|------|---------|-------------|
+| Epic 1: Foundation & Project Setup | 6 | Infrastructure |
+| Epic 2: Device Registration & Attestation | 7 | FR1-FR5, FR41-FR43 |
+| Epic 3: Photo Capture with LiDAR Depth | 8 | FR6-FR13 |
+| Epic 4: Upload & Evidence Processing | 10 | FR14-FR26, FR44-FR46 |
+| Epic 5: C2PA & Verification Experience | 10 | FR27-FR40 |
 
-**Implementation Order:** Epics 1→2→3→4→5 (sequential, no parallel tracks needed for MVP)
+**Context Incorporated:**
+- ✅ PRD requirements (all 46 FRs mapped)
+- ✅ Architecture technical decisions (tech stack, API contracts, patterns)
 
-**After Completing All Epics:**
-- Users can capture photos with LiDAR depth on iPhone Pro
-- Every capture is hardware-attested via Secure Enclave
-- Evidence is computed: depth analysis + attestation + metadata
-- Captures receive confidence levels (HIGH/MEDIUM/LOW/SUSPICIOUS)
-- Anyone can verify via URL or file upload
-- C2PA manifests enable ecosystem interoperability
+**Status:** COMPLETE - Ready for Phase 4 Implementation!
 
 ---
 
-_Generated by BMAD Epic Decomposition Workflow_
-_Date: 2025-11-22_
-_For: Luca_
+_For implementation: Use the `create-story` workflow to generate individual story implementation plans from this epic breakdown._
+
+_This document will be updated after UX Design workflow to incorporate interaction details and mockup references._
+

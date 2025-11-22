@@ -1,0 +1,36 @@
+run_id: continuous-run-20251122-205526
+run_started: 2025-11-22T20:55:26Z
+branch: main
+initial_commit: be63c1426fa3661af0e7528a5d8c91a81d88904b
+configuration:
+  auto_context_epics: true
+  max_epic_validation_attempts: 3
+  max_stories: null
+  max_validation_attempts: 3
+  max_review_cycles: 3
+  max_consecutive_failures: 5
+  auto_commit: true
+  auto_push: true
+  dry_run: false
+
+# Epic contexting phase results
+epics_contexting:
+  total_backlog_epics: 5
+  contexted_successfully: 0
+  blocked_validation: 0
+  skipped_already_contexted: 0
+
+epics_processed: []
+stories_pending: []
+stories_processed: []
+
+statistics:
+  epics_contexted: 0
+  epics_blocked: 0
+  total_stories: 0
+  success_count: 0
+  blocked_validation_count: 0
+  blocked_review_count: 0
+  blocked_external_count: 0
+  blocked_git_count: 0
+  consecutive_failures: 0

@@ -83,7 +83,7 @@ workflow_status:
         status: "docs/epics.md"
         agent: "pm"
         command: "create-epics-and-stories"
-        output: "5 epics, 33 stories, 46 FRs covered"
+        output: "5 epics, 41 stories, 46 FRs covered"
 
       - id: "test-design"
         status: "recommended"
@@ -95,19 +95,22 @@ workflow_status:
         status: "optional"
         agent: "architect"
         command: "validate-architecture"
-
+  # Phase 3: Pre-Implementation Gate
+  - phase: 3
+    name: "Pre-Implementation"
+    workflows:
       - id: "implementation-readiness"
         status: "docs/implementation-readiness-report-2025-11-22.md"
         agent: "architect"
         command: "implementation-readiness"
-        output: "READY WITH CONDITIONS - 46/46 FRs covered, no critical gaps, 3 high-priority concerns (UX/test design/open questions)"
+        output: "Ready with conditions - LiDAR spike, DCAppAttest research required"
 
-  # Phase 3: Implementation
-  - phase: 3
+  # Phase 4: Implementation
+  - phase: 4
     name: "Implementation"
     workflows:
       - id: "sprint-planning"
         status: "docs/sprint-artifacts/sprint-status.yaml"
         agent: "sm"
         command: "sprint-planning"
-        output: "5 epics, 33 stories initialized in backlog"
+        output: "5 epics, 41 stories initialized in backlog"
