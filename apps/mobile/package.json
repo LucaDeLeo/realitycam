@@ -1,0 +1,40 @@
+{
+  "name": "@realitycam/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "ios": "expo run:ios",
+    "prebuild": "expo prebuild --platform ios",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ci": "vitest run --coverage --reporter=junit --outputFile=test-results/junit.xml",
+    "test:e2e": "maestro test .maestro/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "expo": "~53.0.0",
+    "expo-camera": "~17.0.0",
+    "expo-crypto": "~15.0.0",
+    "expo-file-system": "~19.0.0",
+    "expo-location": "~18.0.0",
+    "expo-router": "~4.0.0",
+    "expo-secure-store": "~15.0.0",
+    "expo-sensors": "~15.0.0",
+    "expo-status-bar": "~2.0.0",
+    "react": "^19.0.0",
+    "react-native": "~0.79.0",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@testing-library/react-native": "^12.4.0",
+    "@types/react": "~18.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "typescript": "~5.6.0",
+    "vitest": "^2.1.0",
+    "@vitest/coverage-v8": "^2.1.0"
+  }
+}

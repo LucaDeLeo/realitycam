@@ -80,9 +80,10 @@ workflow_status:
         note: "Complete architecture with 13 decisions, 5 ADRs"
 
       - id: "create-epics-and-stories"
-        status: "required"
+        status: "docs/epics.md"
         agent: "pm"
         command: "create-epics-and-stories"
+        output: "5 epics, 33 stories, 46 FRs covered"
 
       - id: "test-design"
         status: "recommended"
@@ -96,17 +97,17 @@ workflow_status:
         command: "validate-architecture"
 
       - id: "implementation-readiness"
-        status: "required"
+        status: "docs/implementation-readiness-report-2025-11-22.md"
         agent: "architect"
         command: "implementation-readiness"
-        note: "Gate check before implementation"
+        output: "Ready with conditions - 46/46 FRs covered"
 
   # Phase 3: Implementation
   - phase: 3
     name: "Implementation"
     workflows:
       - id: "sprint-planning"
-        status: "required"
+        status: "docs/sprint-artifacts/sprint-status.yaml"
         agent: "sm"
         command: "sprint-planning"
-        note: "Creates sprint plan - subsequent work tracked in sprint-status.yaml"
+        output: "5 epics, 33 stories initialized in backlog"
