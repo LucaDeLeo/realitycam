@@ -55,3 +55,40 @@ export type KeyGenerationStatus =
   | 'generating'
   | 'ready'
   | 'failed';
+
+/**
+ * Attestation lifecycle states
+ * Used to track DCAppAttest attestation progress
+ *
+ * State transitions:
+ * - idle: Initial state, attestation not started
+ * - fetching_challenge: Requesting challenge from backend
+ * - attesting: Calling attestKeyAsync with challenge
+ * - attested: Successfully completed DCAppAttest attestation
+ * - failed: Attestation failed (may retry or continue unverified)
+ */
+export type AttestationStatus =
+  | 'idle'
+  | 'fetching_challenge'
+  | 'attesting'
+  | 'attested'
+  | 'failed';
+
+/**
+ * Challenge response from backend GET /api/v1/devices/challenge
+ * Used for DCAppAttest attestation
+ */
+export interface ChallengeResponse {
+  data: {
+    /** Base64-encoded 32-byte challenge nonce */
+    challenge: string;
+    /** ISO timestamp when challenge expires (5 minutes from creation) */
+    expires_at: string;
+  };
+  meta: {
+    /** Unique request identifier for tracing */
+    request_id: string;
+    /** ISO timestamp of response */
+    timestamp: string;
+  };
+}

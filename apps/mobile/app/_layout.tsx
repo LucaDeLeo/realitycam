@@ -1,14 +1,16 @@
 /**
  * Root Layout
  *
- * Entry point for the app navigation. Performs device capability check
- * and Secure Enclave key generation before allowing access to main app features.
+ * Entry point for the app navigation. Performs device capability check,
+ * Secure Enclave key generation, and DCAppAttest attestation before
+ * allowing access to main app features.
  *
  * Flow:
  * 1. Hydrate persisted state from AsyncStorage
  * 2. Detect device capabilities (Story 2.1)
  * 3. Generate Secure Enclave key (Story 2.2)
- * 4. Render main app or error screens
+ * 4. Perform DCAppAttest attestation (Story 2.3)
+ * 5. Render main app or error screens
  */
 
 import { Stack } from 'expo-router';
@@ -19,10 +21,12 @@ import {
   ActivityIndicator,
   StyleSheet,
   useColorScheme,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useDeviceCapabilities } from '../hooks/useDeviceCapabilities';
 import { useSecureEnclaveKey } from '../hooks/useSecureEnclaveKey';
+import { useDeviceAttestation } from '../hooks/useDeviceAttestation';
 import { UnsupportedDeviceScreen } from '../components/Device/UnsupportedDeviceScreen';
 import { colors } from '../constants/colors';
 
@@ -57,10 +61,18 @@ function LoadingScreen({ message = 'Checking device capabilities...' }: { messag
 }
 
 /**
- * Warning banner shown when key generation fails
+ * Warning banner shown when key generation or attestation fails
  * App continues to work but captures will be marked as unverified
  */
-function AttestationWarningBanner({ message }: { message: string }) {
+function AttestationWarningBanner({
+  message,
+  onRetry,
+  showRetry = false,
+}: {
+  message: string;
+  onRetry?: () => void;
+  showRetry?: boolean;
+}) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
@@ -72,14 +84,34 @@ function AttestationWarningBanner({ message }: { message: string }) {
         { backgroundColor: isDark ? colors.warningDark : colors.warning },
       ]}
     >
-      <Text
-        style={[
-          styles.warningText,
-          { color: isDark ? colors.warningTextDark : colors.warningText },
-        ]}
-      >
-        {message}
-      </Text>
+      <View style={styles.warningContent}>
+        <Text
+          style={[
+            styles.warningText,
+            { color: isDark ? colors.warningTextDark : colors.warningText },
+          ]}
+        >
+          {message}
+        </Text>
+        {showRetry && onRetry && (
+          <TouchableOpacity
+            onPress={onRetry}
+            style={[
+              styles.retryButton,
+              { borderColor: isDark ? colors.warningTextDark : colors.warningText },
+            ]}
+          >
+            <Text
+              style={[
+                styles.retryButtonText,
+                { color: isDark ? colors.warningTextDark : colors.warningText },
+              ]}
+            >
+              Retry
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </SafeAreaView>
   );
 }
@@ -95,6 +127,17 @@ export default function RootLayout() {
     isKeyLoading,
     isKeyFailed,
   } = useSecureEnclaveKey();
+
+  // Initialize DCAppAttest attestation (Story 2.3)
+  // This hook runs after key generation completes successfully
+  const {
+    attestationStatus,
+    isAttesting,
+    isAttestationFailed,
+    attestationError,
+    retryAttempt,
+    initiateAttestation,
+  } = useDeviceAttestation();
 
   // Show loading screen during hydration and capability detection
   if (!hasHydrated || isLoading) {
@@ -127,13 +170,41 @@ export default function RootLayout() {
     );
   }
 
+  // Show loading screen during attestation (Story 2.3)
+  // Display different messages based on attestation phase
+  if (isAttesting) {
+    const message =
+      attestationStatus === 'fetching_challenge'
+        ? 'Preparing security verification...'
+        : 'Verifying device security...';
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="auto" />
+        <LoadingScreen message={message} />
+      </SafeAreaProvider>
+    );
+  }
+
+  // Determine which warning to show (key generation or attestation failure)
+  const showKeyWarning = isKeyFailed && keyGenerationError;
+  const showAttestationWarning = isAttestationFailed && attestationError;
+  // For attestation failures, show retry button if under max retries (3)
+  const showRetryButton = showAttestationWarning && retryAttempt < 3;
+
   // Supported device - render normal app navigation
-  // If key generation failed, show warning banner but don't block app
+  // If key generation or attestation failed, show warning banner but don't block app
   return (
     <SafeAreaProvider>
       <StatusBar style="auto" />
-      {isKeyFailed && keyGenerationError && (
+      {showKeyWarning && (
         <AttestationWarningBanner message={keyGenerationError} />
+      )}
+      {showAttestationWarning && !showKeyWarning && (
+        <AttestationWarningBanner
+          message={attestationError}
+          onRetry={initiateAttestation}
+          showRetry={!!showRetryButton}
+        />
       )}
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -157,9 +228,26 @@ const styles = StyleSheet.create({
     padding: 12,
     paddingHorizontal: 16,
   },
+  warningContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
   warningText: {
     fontSize: 14,
     textAlign: 'center',
     fontWeight: '500',
+    flex: 1,
+  },
+  retryButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

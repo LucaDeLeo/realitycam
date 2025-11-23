@@ -19,4 +19,6 @@ export type {
   DeviceCapabilities,
   DeviceRegistrationState,
   KeyGenerationStatus,
+  AttestationStatus,
+  ChallengeResponse,
 } from './types/device';

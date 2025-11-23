@@ -11,7 +11,11 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { DeviceCapabilities, KeyGenerationStatus } from '@realitycam/shared';
+import type {
+  DeviceCapabilities,
+  KeyGenerationStatus,
+  AttestationStatus,
+} from '@realitycam/shared';
 
 /**
  * Device store state interface
@@ -52,6 +56,32 @@ interface DeviceState {
   setKeyError: (error: string | undefined) => void;
   /** Reset key state (for regeneration scenarios) */
   resetKeyState: () => void;
+
+  // --- Story 2.3: Attestation State ---
+  /** Current attestation lifecycle status */
+  attestationStatus: AttestationStatus;
+  /** Base64-encoded CBOR attestation object from DCAppAttest */
+  attestationObject: string | null;
+  /** Base64-encoded challenge from backend (preserved for registration) */
+  challenge: string | null;
+  /** Unix timestamp when challenge expires */
+  challengeExpiresAt: number | null;
+  /** Error message if attestation failed */
+  attestationError: string | undefined;
+  /** True when attestation has completed successfully (persisted to prevent re-attestation) */
+  isAttested: boolean;
+
+  // --- Story 2.3 Actions ---
+  /** Set attestation status */
+  setAttestationStatus: (status: AttestationStatus) => void;
+  /** Set attestation object (base64 CBOR) */
+  setAttestationObject: (object: string | null) => void;
+  /** Set challenge and its expiration time */
+  setChallenge: (challenge: string | null, expiresAt?: string) => void;
+  /** Set attestation error message */
+  setAttestationError: (error: string | undefined) => void;
+  /** Reset attestation state (for retry scenarios) */
+  resetAttestationState: () => void;
 }
 
 /**
@@ -79,6 +109,14 @@ export const useDeviceStore = create<DeviceState>()(
       keyGenerationStatus: 'idle',
       keyGenerationError: undefined,
       isAttestationReady: false,
+
+      // Story 2.3 state
+      attestationStatus: 'idle',
+      attestationObject: null,
+      challenge: null,
+      challengeExpiresAt: null,
+      attestationError: undefined,
+      isAttested: false,
 
       // Story 2.1 actions
       setCapabilities: (capabilities) =>
@@ -112,16 +150,49 @@ export const useDeviceStore = create<DeviceState>()(
           keyGenerationError: undefined,
           isAttestationReady: false,
         }),
+
+      // Story 2.3 actions
+      setAttestationStatus: (status) =>
+        set({
+          attestationStatus: status,
+          // Clear error when transitioning away from failed state
+          ...(status !== 'failed' ? { attestationError: undefined } : {}),
+          // Mark as attested when status is 'attested'
+          ...(status === 'attested' ? { isAttested: true } : {}),
+        }),
+      setAttestationObject: (object) =>
+        set({ attestationObject: object }),
+      setChallenge: (challenge, expiresAt) =>
+        set({
+          challenge,
+          challengeExpiresAt: expiresAt ? new Date(expiresAt).getTime() : null,
+        }),
+      setAttestationError: (error) =>
+        set({
+          attestationError: error,
+          attestationStatus: 'failed',
+        }),
+      resetAttestationState: () =>
+        set({
+          attestationStatus: 'idle',
+          attestationObject: null,
+          challenge: null,
+          challengeExpiresAt: null,
+          attestationError: undefined,
+          // Note: isAttested is NOT reset here - attestation is one-time per key
+        }),
     }),
     {
       name: 'realitycam-device-storage',
       storage: createJSONStorage(() => AsyncStorage),
       // Persist capabilities and key state (keyId stored separately in SecureStore for security)
       // We persist keyGenerationStatus to know if we previously succeeded/failed
+      // Story 2.3: Also persist isAttested to prevent re-attestation (one-time enforcement)
       partialize: (state) => ({
         capabilities: state.capabilities,
         keyGenerationStatus: state.keyGenerationStatus,
         isAttestationReady: state.isAttestationReady,
+        isAttested: state.isAttested,
       }),
       onRehydrateStorage: () => (state) => {
         // Called when hydration completes

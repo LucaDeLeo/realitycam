@@ -1,0 +1,451 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML for: 2-3-dcappattest-integration
+  Generated: 2025-11-22
+  Project: RealityCam
+  Epic: 2 - Device Registration & Hardware Attestation
+-->
+<story-context>
+  <metadata>
+    <story-key>2-3-dcappattest-integration</story-key>
+    <story-title>DCAppAttest Integration</story-title>
+    <epic-id>2</epic-id>
+    <epic-title>Device Registration and Hardware Attestation</epic-title>
+    <generated-date>2025-11-22</generated-date>
+    <status>ready-for-dev</status>
+    <context-version>1.0</context-version>
+  </metadata>
+
+  <!-- Story Reference -->
+  <story-reference>
+    <file-path>docs/sprint-artifacts/stories/2-3-dcappattest-integration.md</file-path>
+    <description>Full story specification with acceptance criteria, tasks, and dev notes</description>
+  </story-reference>
+
+  <!-- Epic Context -->
+  <epic-context>
+    <tech-spec-path>docs/sprint-artifacts/tech-spec-epic-2.md</tech-spec-path>
+    <epics-path>docs/epics.md</epics-path>
+    <description>Epic 2 establishes hardware-rooted trust via DCAppAttest. This story (2.3) implements the mobile-side attestation flow: fetching challenge from backend, calling attestKeyAsync, and managing attestation state.</description>
+    <ac-mapping>
+      <item>AC-2.3.1-2: Challenge endpoint mobile-side consumption</item>
+      <item>AC-2.4.1-4: DCAppAttest attestation request and capture</item>
+    </ac-mapping>
+  </epic-context>
+
+  <!-- Documentation Artifacts -->
+  <documentation-artifacts>
+    <artifact>
+      <path>docs/architecture.md</path>
+      <description>System architecture with ADR-007 (@expo/app-integrity decision), mobile app structure, API contracts, and device authentication patterns</description>
+      <relevance>Primary reference for attestation library choice, API response formats, and security architecture</relevance>
+    </artifact>
+    <artifact>
+      <path>docs/sprint-artifacts/tech-spec-epic-2.md</path>
+      <description>Technical specification for Epic 2 including detailed acceptance criteria, API contracts, data models, and DCAppAttest verification workflow</description>
+      <relevance>Authoritative source for AC-2.3 and AC-2.4 acceptance criteria this story must satisfy</relevance>
+    </artifact>
+    <artifact>
+      <path>docs/epics.md</path>
+      <description>Epic breakdown with Story 2.3 user story, acceptance criteria, and technical notes</description>
+      <relevance>High-level story context and user value definition</relevance>
+    </artifact>
+    <artifact>
+      <path>docs/sprint-artifacts/sprint-status.yaml</path>
+      <description>Sprint tracking file showing story statuses and epic progress</description>
+      <relevance>Status tracking and workflow progression</relevance>
+    </artifact>
+  </documentation-artifacts>
+
+  <!-- Existing Code Interfaces -->
+  <existing-code-interfaces>
+    <interface>
+      <path>apps/mobile/hooks/useSecureEnclaveKey.ts</path>
+      <description>Hook managing Secure Enclave key generation lifecycle from Story 2.2. Provides keyId, keyGenerationStatus, isAttestationReady that this story depends on.</description>
+      <relevance>CRITICAL - useDeviceAttestation must wait for isAttestationReady before initiating attestation. Provides keyId for attestKeyAsync call.</relevance>
+      <exports>
+        <export>useSecureEnclaveKey() hook</export>
+        <export>keyId: string | null</export>
+        <export>keyGenerationStatus: KeyGenerationStatus</export>
+        <export>isAttestationReady: boolean</export>
+        <export>isKeyLoading, isKeyFailed computed values</export>
+        <export>regenerateKey() action</export>
+        <export>isSecurityError() utility function</export>
+        <export>ERROR_MESSAGES constant</export>
+      </exports>
+    </interface>
+    <interface>
+      <path>apps/mobile/store/deviceStore.ts</path>
+      <description>Zustand store managing device capabilities and key state. This story MUST extend this store with attestation-specific state and actions.</description>
+      <relevance>CRITICAL - Must be extended with attestationStatus, attestationObject, challenge, challengeExpiresAt, attestationError, isAttested fields</relevance>
+      <current-state>
+        <field>capabilities: DeviceCapabilities | null</field>
+        <field>isLoading: boolean</field>
+        <field>hasHydrated: boolean</field>
+        <field>keyId: string | null</field>
+        <field>keyGenerationStatus: KeyGenerationStatus</field>
+        <field>keyGenerationError: string | undefined</field>
+        <field>isAttestationReady: boolean</field>
+      </current-state>
+      <persistence-config>Persisted to AsyncStorage with key "realitycam-device-storage". Currently persists: capabilities, keyGenerationStatus, isAttestationReady</persistence-config>
+    </interface>
+    <interface>
+      <path>backend/src/routes/devices.rs</path>
+      <description>Backend device routes with challenge and registration endpoint stubs. Currently returns 501 Not Implemented.</description>
+      <relevance>Shows API structure. Story 2.3 will consume GET /api/v1/devices/challenge (implementation in Story 2.4)</relevance>
+      <endpoints>
+        <endpoint>GET /challenge - returns 501 stub</endpoint>
+        <endpoint>POST /register - returns 501 stub</endpoint>
+      </endpoints>
+    </interface>
+    <interface>
+      <path>apps/mobile/hooks/useDeviceCapabilities.ts</path>
+      <description>Device capability detection hook from Story 2.1</description>
+      <relevance>Provides capabilities.hasDCAppAttest check that gates attestation flow</relevance>
+    </interface>
+    <interface>
+      <path>apps/mobile/app/_layout.tsx</path>
+      <description>Root layout orchestrating device capability check and key generation. Must be extended to integrate useDeviceAttestation hook.</description>
+      <relevance>CRITICAL - Integration point for attestation flow after key generation succeeds</relevance>
+      <current-flow>
+        <step>1. Hydrate persisted state</step>
+        <step>2. Detect device capabilities (useDeviceCapabilities)</step>
+        <step>3. Generate Secure Enclave key (useSecureEnclaveKey)</step>
+        <step>4. Render main app or error screens</step>
+      </current-flow>
+      <required-change>Add step between 3 and 4: useDeviceAttestation hook integration with loading screen</required-change>
+    </interface>
+    <interface>
+      <path>packages/shared/src/types/device.ts</path>
+      <description>Shared TypeScript types for device capabilities and key generation status</description>
+      <relevance>MUST extend with AttestationStatus type and ChallengeResponse interface</relevance>
+      <current-exports>
+        <export>Platform type</export>
+        <export>DeviceCapabilities interface</export>
+        <export>DeviceRegistrationState interface</export>
+        <export>KeyGenerationStatus type</export>
+      </current-exports>
+    </interface>
+    <interface>
+      <path>packages/shared/src/index.ts</path>
+      <description>Package exports - must be updated to export new attestation types</description>
+      <relevance>Required for type exports to be available in mobile app</relevance>
+    </interface>
+    <interface>
+      <path>apps/mobile/constants/colors.ts</path>
+      <description>Color constants including warning colors for attestation failures</description>
+      <relevance>Already has warning colors (warning, warningDark, warningText, warningTextDark) needed for attestation UI</relevance>
+    </interface>
+  </existing-code-interfaces>
+
+  <!-- Development Constraints -->
+  <development-constraints>
+    <constraint>
+      <id>ARCH-001</id>
+      <category>Pattern</category>
+      <description>Use @expo/app-integrity for DCAppAttest (ADR-007). Do NOT create custom native modules for attestation.</description>
+      <source>docs/architecture.md#ADR-007</source>
+    </constraint>
+    <constraint>
+      <id>ARCH-002</id>
+      <category>State Management</category>
+      <description>Use Zustand store with persist middleware for device state. Extend existing deviceStore.ts rather than creating new store.</description>
+      <source>docs/architecture.md, apps/mobile/store/deviceStore.ts</source>
+    </constraint>
+    <constraint>
+      <id>ARCH-003</id>
+      <category>API Pattern</category>
+      <description>Challenge nonces expire after 5 minutes. Must handle challenge refresh if attestation takes too long.</description>
+      <source>docs/sprint-artifacts/tech-spec-epic-2.md#Constraints</source>
+    </constraint>
+    <constraint>
+      <id>ARCH-004</id>
+      <category>Security</category>
+      <description>DCAppAttest attestation is ONE-TIME per key. Track isAttested flag to prevent re-attestation attempts.</description>
+      <source>docs/sprint-artifacts/tech-spec-epic-2.md#Constraints</source>
+    </constraint>
+    <constraint>
+      <id>ARCH-005</id>
+      <category>Error Handling</category>
+      <description>Attestation failure should NOT block app functionality. Set attestationLevel to "unverified" and continue.</description>
+      <source>docs/architecture.md#ADR-001, Story AC-5</source>
+    </constraint>
+    <constraint>
+      <id>ARCH-006</id>
+      <category>TypeScript</category>
+      <description>All code must pass pnpm typecheck. Use strict typing, no any types unless absolutely necessary.</description>
+      <source>Story 2.2 learnings</source>
+    </constraint>
+    <constraint>
+      <id>ARCH-007</id>
+      <category>UI</category>
+      <description>All UI components must support dark mode via useColorScheme hook. Use colors from constants/colors.ts.</description>
+      <source>Story 2.2 learnings, _layout.tsx pattern</source>
+    </constraint>
+    <constraint>
+      <id>ARCH-008</id>
+      <category>Native API</category>
+      <description>AppIntegrity.isSupported is a boolean constant, NOT a function. AppIntegrity.attestKeyAsync() returns base64 string.</description>
+      <source>Story 2.2 learnings, @expo/app-integrity API</source>
+    </constraint>
+    <constraint>
+      <id>ARCH-009</id>
+      <category>Simulator</category>
+      <description>DCAppAttest will fail on iOS Simulator. Handle gracefully - app should work in unverified mode.</description>
+      <source>Story dev notes</source>
+    </constraint>
+    <constraint>
+      <id>ARCH-010</id>
+      <category>Hook Pattern</category>
+      <description>Use hasInitialized ref pattern to prevent multiple initialization attempts, same as useSecureEnclaveKey.ts</description>
+      <source>apps/mobile/hooks/useSecureEnclaveKey.ts pattern</source>
+    </constraint>
+  </development-constraints>
+
+  <!-- Dependencies -->
+  <dependencies>
+    <dependency>
+      <name>@expo/app-integrity</name>
+      <version>~0.1.0</version>
+      <purpose>DCAppAttest wrapper for attestKeyAsync and generateAssertionAsync</purpose>
+      <already-installed>true</already-installed>
+    </dependency>
+    <dependency>
+      <name>expo-secure-store</name>
+      <version>~15.0.0</version>
+      <purpose>Secure storage for key ID (used by Story 2.2, available for this story)</purpose>
+      <already-installed>true</already-installed>
+    </dependency>
+    <dependency>
+      <name>zustand</name>
+      <version>^5.0.0</version>
+      <purpose>State management with persistence</purpose>
+      <already-installed>true</already-installed>
+    </dependency>
+    <dependency>
+      <name>@react-native-async-storage/async-storage</name>
+      <version>2.2.0</version>
+      <purpose>Zustand persistence backend</purpose>
+      <already-installed>true</already-installed>
+    </dependency>
+    <dependency>
+      <name>@realitycam/shared</name>
+      <version>workspace:*</version>
+      <purpose>Shared TypeScript types</purpose>
+      <already-installed>true</already-installed>
+    </dependency>
+  </dependencies>
+
+  <!-- Testing Context -->
+  <testing-context>
+    <test-framework>
+      <name>Manual Testing</name>
+      <description>Primary testing method for this story - requires real iPhone Pro device for full attestation</description>
+    </test-framework>
+    <test-requirements>
+      <requirement>TypeScript compilation check: pnpm typecheck in packages/shared and apps/mobile</requirement>
+      <requirement>Manual test: Challenge fetch with running backend (or mock)</requirement>
+      <requirement>Manual test: Attestation on iOS Simulator (expected to fail gracefully)</requirement>
+      <requirement>Manual test: Attestation on real iPhone Pro device</requirement>
+      <requirement>Manual test: Error handling and retry logic</requirement>
+      <requirement>Manual test: Zustand state persistence across app restarts</requirement>
+      <requirement>Manual test: One-time enforcement (no re-attestation after success)</requirement>
+    </test-requirements>
+    <test-commands>
+      <command>cd packages/shared and pnpm typecheck</command>
+      <command>cd apps/mobile and pnpm typecheck</command>
+      <command>cd backend and cargo run (for challenge endpoint when implemented)</command>
+      <command>cd apps/mobile and npx expo run:ios</command>
+    </test-commands>
+    <simulator-behavior>
+      <note>fetchChallenge() will work if backend is running</note>
+      <note>AppIntegrity.attestKeyAsync() will FAIL on simulator</note>
+      <note>Expected: Catch error, set status to 'failed', continue in unverified mode</note>
+    </simulator-behavior>
+  </testing-context>
+
+  <!-- Implementation Notes -->
+  <implementation-notes>
+    <note>
+      <id>IMP-001</id>
+      <category>API</category>
+      <content>Challenge endpoint (GET /api/v1/devices/challenge) returns 501 stub in Story 2.4 implementation. For Story 2.3 testing, mock the response or use a simple local server.</content>
+    </note>
+    <note>
+      <id>IMP-002</id>
+      <category>Flow</category>
+      <content>Attestation flow: key ready (from 2.2) -> fetch challenge -> attestKeyAsync(keyId, challengeBytes) -> store attestationObject. attestationObject is base64 string containing CBOR data.</content>
+    </note>
+    <note>
+      <id>IMP-003</id>
+      <category>Challenge Conversion</category>
+      <content>Challenge from backend is base64 string. Must decode to Uint8Array before passing to attestKeyAsync. Use atob() and manual byte conversion.</content>
+    </note>
+    <note>
+      <id>IMP-004</id>
+      <category>State Machine</category>
+      <content>AttestationStatus: 'idle' -> 'fetching_challenge' -> 'attesting' -> 'attested' | 'failed'. Track transitions clearly in hook.</content>
+    </note>
+    <note>
+      <id>IMP-005</id>
+      <category>Persistence</category>
+      <content>isAttested flag MUST be persisted to prevent re-attestation. Add to partialize function in deviceStore persist config.</content>
+    </note>
+    <note>
+      <id>IMP-006</id>
+      <category>Integration</category>
+      <content>After attestation completes (success or failure), Story 2.4 will use attestationObject + challenge + keyId for backend registration.</content>
+    </note>
+    <note>
+      <id>IMP-007</id>
+      <category>Retry Logic</category>
+      <content>Network failures: exponential backoff (1s, 2s, 4s), max 3 attempts. After 3 failures, proceed in unverified mode.</content>
+    </note>
+  </implementation-notes>
+
+  <!-- File Changes Summary -->
+  <file-changes>
+    <files-to-create>
+      <file>
+        <path>apps/mobile/hooks/useDeviceAttestation.ts</path>
+        <description>Main attestation orchestration hook - challenge fetch, attestKeyAsync call, state management</description>
+      </file>
+      <file>
+        <path>apps/mobile/services/api.ts</path>
+        <description>API client with fetchChallenge() function and error handling</description>
+      </file>
+    </files-to-create>
+    <files-to-modify>
+      <file>
+        <path>packages/shared/src/types/device.ts</path>
+        <description>Add AttestationStatus type and ChallengeResponse interface</description>
+      </file>
+      <file>
+        <path>packages/shared/src/index.ts</path>
+        <description>Export new AttestationStatus and ChallengeResponse types</description>
+      </file>
+      <file>
+        <path>apps/mobile/store/deviceStore.ts</path>
+        <description>Extend with attestation state fields and actions</description>
+      </file>
+      <file>
+        <path>apps/mobile/app/_layout.tsx</path>
+        <description>Integrate useDeviceAttestation hook with loading screen for attestation phase</description>
+      </file>
+    </files-to-modify>
+  </file-changes>
+
+  <!-- API Contracts -->
+  <api-contracts>
+    <contract>
+      <endpoint>GET /api/v1/devices/challenge</endpoint>
+      <description>Request attestation challenge (implemented in Story 2.4)</description>
+      <request>No body required</request>
+      <response>
+        <format>JSON</format>
+        <success-status>200</success-status>
+        <body><![CDATA[
+{
+  "data": {
+    "challenge": "A1B2C3D4E5F6...",  // Base64-encoded 32 bytes
+    "expires_at": "2025-11-22T10:35:00Z"
+  },
+  "meta": {
+    "request_id": "uuid",
+    "timestamp": "2025-11-22T10:30:00Z"
+  }
+}
+        ]]></body>
+      </response>
+      <errors>
+        <error code="429">Too Many Requests - rate limit 10/min/IP</error>
+      </errors>
+    </contract>
+  </api-contracts>
+
+  <!-- Type Definitions to Add -->
+  <type-definitions>
+    <type>
+      <name>AttestationStatus</name>
+      <definition><![CDATA[
+export type AttestationStatus =
+  | 'idle'              // Initial state, not started
+  | 'fetching_challenge' // Requesting challenge from backend
+  | 'attesting'          // Calling attestKeyAsync
+  | 'attested'           // Successfully completed
+  | 'failed';            // Failed (may retry or continue unverified)
+      ]]></definition>
+    </type>
+    <type>
+      <name>ChallengeResponse</name>
+      <definition><![CDATA[
+export interface ChallengeResponse {
+  data: {
+    challenge: string;      // Base64-encoded 32 bytes
+    expires_at: string;     // ISO timestamp
+  };
+  meta: {
+    request_id: string;
+    timestamp: string;
+  };
+}
+      ]]></definition>
+    </type>
+  </type-definitions>
+
+  <!-- Code Patterns -->
+  <code-patterns>
+    <pattern>
+      <name>Hook State Machine Pattern</name>
+      <description>Pattern from useSecureEnclaveKey for managing async lifecycle with Zustand</description>
+      <reference>apps/mobile/hooks/useSecureEnclaveKey.ts</reference>
+    </pattern>
+    <pattern>
+      <name>Zustand Persist Pattern</name>
+      <description>Persist middleware with partialize and onRehydrateStorage</description>
+      <reference>apps/mobile/store/deviceStore.ts</reference>
+    </pattern>
+    <pattern>
+      <name>Dark Mode Support Pattern</name>
+      <description>useColorScheme with conditional styling</description>
+      <reference>apps/mobile/app/_layout.tsx</reference>
+    </pattern>
+  </code-patterns>
+
+  <!-- Error Messages -->
+  <error-messages>
+    <message>
+      <type>Network timeout</type>
+      <user-message>Unable to verify device. Please check your connection.</user-message>
+    </message>
+    <message>
+      <type>Rate limited</type>
+      <user-message>Too many requests. Please wait a moment and try again.</user-message>
+    </message>
+    <message>
+      <type>Security failure</type>
+      <user-message>Device security verification failed. Captures will be marked as unverified.</user-message>
+    </message>
+    <message>
+      <type>Challenge expired</type>
+      <user-message>Refreshing security token...</user-message>
+    </message>
+    <message>
+      <type>General failure</type>
+      <user-message>Unable to complete device verification. Captures will be marked as unverified.</user-message>
+    </message>
+  </error-messages>
+
+  <!-- Story 2.4 Integration Points -->
+  <integration-points>
+    <integration>
+      <story>2.4 - Backend Device Registration Endpoint</story>
+      <description>After this story completes, Story 2.4 will implement the backend challenge endpoint and registration endpoint. The mobile app will then send registration request with attestationObject, challenge, and keyId.</description>
+      <data-handoff>
+        <field>attestationObject: string (base64 CBOR)</field>
+        <field>challenge: string (base64 32 bytes)</field>
+        <field>keyId: string (from Story 2.2)</field>
+      </data-handoff>
+    </integration>
+  </integration-points>
+</story-context>
