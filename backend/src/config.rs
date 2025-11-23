@@ -62,6 +62,11 @@ pub struct Config {
 
     /// Rate limit: burst size (default: 30)
     pub rate_limit_burst: u32,
+
+    /// Require verified device signatures for protected endpoints
+    /// When true, devices with failed signature verification are rejected
+    /// When false (MVP mode), they proceed with is_verified=false and capped confidence
+    pub require_verified_devices: bool,
 }
 
 impl Config {
@@ -130,6 +135,9 @@ impl Config {
                 .unwrap_or_else(|_| "30".to_string())
                 .parse()
                 .expect("RATE_LIMIT_BURST must be a number"),
+            require_verified_devices: env::var("REQUIRE_VERIFIED_DEVICES")
+                .map(|v| v.to_lowercase() == "true" || v == "1")
+                .unwrap_or(false), // MVP default: permissive mode
         }
     }
 
@@ -155,6 +163,7 @@ impl Config {
             strict_attestation: false,
             rate_limit_per_second: 100,
             rate_limit_burst: 200,
+            require_verified_devices: false,
         }
     }
 }
