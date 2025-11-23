@@ -12,3 +12,10 @@ export type {
 
 // Capture Types
 export type { Capture } from './types/capture';
+
+// Device Types
+export type {
+  Platform,
+  DeviceCapabilities,
+  DeviceRegistrationState,
+} from './types/device';

@@ -1,0 +1,483 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML
+  Generated: 2025-11-22
+  Story: 2-1-iphone-pro-detection-capability-check
+  Epic: 2 - Device Registration & Hardware Attestation
+  Project: RealityCam
+
+  This file serves as the single source of truth for story implementation.
+  It contains all relevant documentation, code patterns, interfaces, and constraints.
+-->
+<story-context>
+  <!-- STORY REFERENCE -->
+  <story-reference>
+    <story-key>2-1-iphone-pro-detection-capability-check</story-key>
+    <story-file>docs/sprint-artifacts/stories/2-1-iphone-pro-detection-capability-check.md</story-file>
+    <status>drafted</status>
+    <epic-id>2</epic-id>
+    <epic-title>Device Registration and Hardware Attestation</epic-title>
+    <tech-spec>docs/sprint-artifacts/tech-spec-epic-2.md</tech-spec>
+  </story-reference>
+
+  <!-- STORY SUMMARY -->
+  <story-summary>
+    <title>iPhone Pro Detection and Capability Check</title>
+    <user-story>
+      As a user, I want the app to detect whether my device is an iPhone Pro with LiDAR, Secure Enclave, and DCAppAttest support, so that I know if my device can use the full attestation features and the app can proceed to device registration.
+    </user-story>
+    <business-value>
+      Foundation for hardware-rooted trust. Users need to know immediately if their device supports RealityCam's attestation features. Non-Pro devices must be blocked from capture features with clear explanation.
+    </business-value>
+    <functional-requirements-covered>FR1 (App detects iPhone Pro device with LiDAR capability)</functional-requirements-covered>
+  </story-summary>
+
+  <!-- ACCEPTANCE CRITERIA -->
+  <acceptance-criteria>
+    <criterion id="AC-1" title="Device Model Detection">
+      <description>App detects and stores device model string (e.g., "iPhone 15 Pro", "iPhone 14 Pro Max") on launch, accessible via Zustand store within 500ms</description>
+      <testable>true</testable>
+    </criterion>
+    <criterion id="AC-2" title="iOS Version Verification">
+      <description>App confirms iOS version 14.0+ required for DCAppAttest. Records unsupportedReason if below 14.0</description>
+      <testable>true</testable>
+    </criterion>
+    <criterion id="AC-3" title="LiDAR Sensor Availability Check">
+      <description>App uses ARKit ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) to verify LiDAR presence. Simulator returns hasLiDAR: false gracefully</description>
+      <testable>true</testable>
+    </criterion>
+    <criterion id="AC-4" title="Secure Enclave Availability Verification">
+      <description>App confirms Secure Enclave is present without user interaction or permissions</description>
+      <testable>true</testable>
+    </criterion>
+    <criterion id="AC-5" title="DCAppAttest Support Check">
+      <description>App confirms DCAppAttest API is available using @expo/app-integrity isPlatformSupported()</description>
+      <testable>true</testable>
+    </criterion>
+    <criterion id="AC-6" title="Aggregate Capability Assessment">
+      <description>isSupported: true only if ALL checks pass (iOS 14+, hasLiDAR, hasSecureEnclave, hasDCAppAttest)</description>
+      <testable>true</testable>
+    </criterion>
+    <criterion id="AC-7" title="Non-Pro Device Blocking Screen">
+      <description>Unsupported devices see blocking screen with title, explanation, and list of supported devices. Cannot navigate to capture features</description>
+      <testable>true</testable>
+    </criterion>
+    <criterion id="AC-8" title="Supported Device Continuation">
+      <description>Supported devices proceed to device registration flow. Capabilities stored in Zustand</description>
+      <testable>true</testable>
+    </criterion>
+    <criterion id="AC-9" title="Zustand State Management">
+      <description>deviceStore created at store/deviceStore.ts with DeviceCapabilities interface, persist middleware for AsyncStorage</description>
+      <testable>true</testable>
+    </criterion>
+    <criterion id="AC-10" title="TypeScript Types in Shared Package">
+      <description>DeviceCapabilities type defined in packages/shared/src/types/device.ts, imported via @realitycam/shared</description>
+      <testable>true</testable>
+    </criterion>
+  </acceptance-criteria>
+
+  <!-- DOCUMENTATION ARTIFACTS -->
+  <documentation-artifacts>
+    <artifact id="doc-1" relevance="critical">
+      <file>docs/prd.md</file>
+      <description>Product Requirements Document - FR1 device detection requirement, iPhone Pro supported models table, LiDAR as primary authenticity signal</description>
+      <sections-relevant>
+        <section>iOS App Requirements - Platform Support (MVP)</section>
+        <section>Device Capabilities - Required</section>
+        <section>Functional Requirements - Device and Attestation (FR1-FR5)</section>
+      </sections-relevant>
+    </artifact>
+    <artifact id="doc-2" relevance="critical">
+      <file>docs/architecture.md</file>
+      <description>Architecture decisions including ADR-001 (iPhone Pro Only), ADR-007 (@expo/app-integrity for DCAppAttest), project structure, mobile dependencies</description>
+      <sections-relevant>
+        <section>ADR-001: iPhone Pro Only (MVP)</section>
+        <section>ADR-007: @expo/app-integrity for DCAppAttest</section>
+        <section>Mobile Dependencies (package.json)</section>
+        <section>Project Structure - apps/mobile</section>
+        <section>FR Category to Architecture Mapping</section>
+      </sections-relevant>
+    </artifact>
+    <artifact id="doc-3" relevance="critical">
+      <file>docs/sprint-artifacts/tech-spec-epic-2.md</file>
+      <description>Technical specification for Epic 2 with detailed AC mapping, TypeScript types, workflow diagrams, and implementation patterns</description>
+      <sections-relevant>
+        <section>AC-2.1: Device Capability Detection</section>
+        <section>TypeScript Types (Mobile) - DeviceCapabilities interface</section>
+        <section>Services and Modules - Mobile Services</section>
+        <section>Shared Types - packages/shared/src/types/device.ts</section>
+      </sections-relevant>
+    </artifact>
+    <artifact id="doc-4" relevance="high">
+      <file>docs/epics.md</file>
+      <description>Epic breakdown with Story 2.1 definition and acceptance criteria</description>
+      <sections-relevant>
+        <section>Epic 2: Device Registration and Attestation</section>
+        <section>Story 2.1: Detect iPhone Pro and LiDAR Capability</section>
+      </sections-relevant>
+    </artifact>
+    <artifact id="doc-5" relevance="medium">
+      <file>docs/sprint-artifacts/sprint-status.yaml</file>
+      <description>Current sprint status showing this story as "drafted"</description>
+    </artifact>
+  </documentation-artifacts>
+
+  <!-- EXISTING CODE INTERFACES -->
+  <existing-code-interfaces>
+    <interface id="code-1" relevance="critical">
+      <file>apps/mobile/app/_layout.tsx</file>
+      <description>Root layout - MUST be modified to integrate capability check at app launch. Currently wraps Stack with SafeAreaProvider and StatusBar</description>
+      <integration-point>Add capability check hook, loading state, and conditional UnsupportedDeviceScreen rendering</integration-point>
+      <code-snippet><![CDATA[
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+export default function RootLayout() {
+  return (
+    <SafeAreaProvider>
+      <StatusBar style="auto" />
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      </Stack>
+    </SafeAreaProvider>
+  );
+}
+      ]]></code-snippet>
+    </interface>
+    <interface id="code-2" relevance="high">
+      <file>apps/mobile/app.config.ts</file>
+      <description>Expo configuration with iOS bundle identifier (com.realitycam.app), deployment target iOS 15.1, camera permissions</description>
+      <key-config>
+        <item>bundleIdentifier: com.realitycam.app</item>
+        <item>deploymentTarget: 15.1</item>
+        <item>plugins: expo-router, expo-secure-store, expo-camera</item>
+      </key-config>
+    </interface>
+    <interface id="code-3" relevance="high">
+      <file>apps/mobile/package.json</file>
+      <description>Mobile app dependencies - @expo/app-integrity (~0.1.0), zustand (^5.0.0), expo-device needs to be added</description>
+      <dependencies>
+        <dep name="@expo/app-integrity" version="~0.1.0" status="installed">DCAppAttest wrapper</dep>
+        <dep name="zustand" version="^5.0.0" status="installed">State management</dep>
+        <dep name="expo-device" version="latest" status="NEEDS_INSTALL">Device model detection</dep>
+        <dep name="@react-native-async-storage/async-storage" version="latest" status="NEEDS_INSTALL">Zustand persistence</dep>
+      </dependencies>
+    </interface>
+    <interface id="code-4" relevance="high">
+      <file>apps/mobile/constants/colors.ts</file>
+      <description>iOS HIG compliant color constants for theming - use for UnsupportedDeviceScreen component</description>
+      <color-tokens>
+        <token name="primary">#007AFF</token>
+        <token name="background">#FFFFFF</token>
+        <token name="backgroundDark">#000000</token>
+        <token name="text">#000000</token>
+        <token name="textDark">#FFFFFF</token>
+        <token name="textSecondary">#6D6D72</token>
+      </color-tokens>
+    </interface>
+    <interface id="code-5" relevance="high">
+      <file>apps/mobile/app/(tabs)/_layout.tsx</file>
+      <description>Tab layout with Capture and History tabs - device capabilities must be checked BEFORE this renders</description>
+    </interface>
+    <interface id="code-6" relevance="high">
+      <file>apps/mobile/app/(tabs)/capture.tsx</file>
+      <description>Capture screen placeholder - will only be accessible after capability check passes</description>
+    </interface>
+    <interface id="code-7" relevance="medium">
+      <file>packages/shared/src/index.ts</file>
+      <description>Shared package exports - MUST add device.ts types export</description>
+      <current-exports>
+        <export>ApiResponse, ApiError from ./types/api</export>
+        <export>ConfidenceLevel, EvidenceStatus, HardwareAttestation, DepthAnalysis, Evidence from ./types/evidence</export>
+        <export>Capture from ./types/capture</export>
+      </current-exports>
+    </interface>
+    <interface id="code-8" relevance="medium">
+      <file>packages/shared/src/types/evidence.ts</file>
+      <description>Evidence types including attestation levels - provides pattern for type definitions</description>
+    </interface>
+  </existing-code-interfaces>
+
+  <!-- DEVELOPMENT CONSTRAINTS -->
+  <development-constraints>
+    <constraint id="dc-1" source="architecture.md#ADR-001">
+      <title>iPhone Pro Only</title>
+      <description>MVP targets iPhone Pro exclusively. All Pro models (12/13/14/15/16/17 Pro and Pro Max) have LiDAR and Secure Enclave</description>
+    </constraint>
+    <constraint id="dc-2" source="architecture.md#ADR-007">
+      <title>@expo/app-integrity for DCAppAttest</title>
+      <description>Use official Expo package for attestation. isPlatformSupported() returns boolean for device support check</description>
+    </constraint>
+    <constraint id="dc-3" source="tech-spec-epic-2.md">
+      <title>iOS Version Minimum</title>
+      <description>DCAppAttest requires iOS 14.0+. App config already sets deploymentTarget: 15.1</description>
+    </constraint>
+    <constraint id="dc-4" source="prd.md">
+      <title>Performance Requirement</title>
+      <description>Device capability detection must complete within 500ms of app launch</description>
+    </constraint>
+    <constraint id="dc-5" source="story-file">
+      <title>Graceful Degradation</title>
+      <description>Simulator and edge cases must not crash. Return isSupported: false gracefully</description>
+    </constraint>
+    <constraint id="dc-6" source="architecture.md">
+      <title>TypeScript Strict Mode</title>
+      <description>Always verify compilation with npx tsc --noEmit before marking complete</description>
+    </constraint>
+    <constraint id="dc-7" source="story-file">
+      <title>Dark Mode Support</title>
+      <description>All components must support dark mode. Use useColorScheme() and colors.ts constants</description>
+    </constraint>
+  </development-constraints>
+
+  <!-- DEPENDENCIES -->
+  <dependencies>
+    <npm-dependencies>
+      <dependency name="@expo/app-integrity" version="~0.1.0" required="true">
+        <purpose>DCAppAttest integration and isPlatformSupported() check</purpose>
+        <status>installed</status>
+      </dependency>
+      <dependency name="zustand" version="^5.0.0" required="true">
+        <purpose>State management with persist middleware</purpose>
+        <status>installed</status>
+      </dependency>
+      <dependency name="expo-device" version="latest" required="true">
+        <purpose>Device model and iOS version detection</purpose>
+        <status>NEEDS_INSTALL</status>
+        <install-command>npx expo install expo-device</install-command>
+      </dependency>
+      <dependency name="@react-native-async-storage/async-storage" version="latest" required="true">
+        <purpose>Zustand persist storage adapter</purpose>
+        <status>NEEDS_INSTALL</status>
+        <install-command>npx expo install @react-native-async-storage/async-storage</install-command>
+      </dependency>
+    </npm-dependencies>
+    <internal-dependencies>
+      <dependency name="@realitycam/shared" required="true">
+        <purpose>DeviceCapabilities type import</purpose>
+        <status>available</status>
+      </dependency>
+    </internal-dependencies>
+    <story-dependencies>
+      <dependency story="1-4-ios-app-shell-navigation" status="done">
+        <description>Mobile app shell with navigation structure</description>
+      </dependency>
+      <dependency story="1-1-monorepo-structure" status="done">
+        <description>Project structure and shared package</description>
+      </dependency>
+    </story-dependencies>
+  </dependencies>
+
+  <!-- TESTING CONTEXT -->
+  <testing-context>
+    <test-framework>Jest (unit tests)</test-framework>
+    <e2e-framework>Maestro (optional)</e2e-framework>
+    <test-requirements>
+      <requirement id="test-1">
+        <description>TypeScript compilation must pass: npx tsc --noEmit</description>
+        <type>compilation</type>
+      </requirement>
+      <requirement id="test-2">
+        <description>Expo prebuild must succeed: npx expo prebuild --platform ios</description>
+        <type>build</type>
+      </requirement>
+      <requirement id="test-3">
+        <description>Simulator should show UnsupportedDeviceScreen (no LiDAR)</description>
+        <type>manual</type>
+      </requirement>
+      <requirement id="test-4">
+        <description>iPhone Pro physical device should proceed to tabs</description>
+        <type>manual</type>
+      </requirement>
+      <requirement id="test-5">
+        <description>Zustand persistence verified by force-closing and reopening app</description>
+        <type>manual</type>
+      </requirement>
+    </test-requirements>
+    <test-commands>
+      <command purpose="TypeScript check">cd apps/mobile && npx tsc --noEmit</command>
+      <command purpose="Shared types check">cd packages/shared && npx tsc --noEmit</command>
+      <command purpose="iOS prebuild">cd apps/mobile && npx expo prebuild --platform ios</command>
+      <command purpose="Run on simulator">cd apps/mobile && npx expo run:ios</command>
+    </test-commands>
+  </testing-context>
+
+  <!-- IMPLEMENTATION NOTES -->
+  <implementation-notes>
+    <note id="impl-1" category="pattern">
+      <title>Device Detection Strategy</title>
+      <content>
+        Use expo-device for model/version detection:
+        - Device.modelName returns "iPhone 15 Pro"
+        - Device.osVersion returns "17.1"
+        - Device.isDevice returns false on simulator
+      </content>
+    </note>
+    <note id="impl-2" category="pattern">
+      <title>LiDAR Detection Options</title>
+      <content>
+        Two approaches (use model string matching for MVP, ARKit for future):
+        1. Model String Matching (recommended for MVP):
+           const LIDAR_MODELS = ['iPhone 12 Pro', 'iPhone 12 Pro Max', ...];
+           const hasLiDAR = LIDAR_MODELS.some(m => model.includes(m));
+        2. ARKit Probe (more accurate but requires native):
+           ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh)
+      </content>
+    </note>
+    <note id="impl-3" category="pattern">
+      <title>Zustand Persist Pattern</title>
+      <content><![CDATA[
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+export const useDeviceStore = create<DeviceState>()(
+  persist(
+    (set) => ({
+      capabilities: null,
+      isLoading: true,
+      setCapabilities: (caps) => set({ capabilities: caps, isLoading: false }),
+      clearCapabilities: () => set({ capabilities: null, isLoading: true }),
+    }),
+    {
+      name: 'device-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+    }
+  )
+);
+      ]]></content>
+    </note>
+    <note id="impl-4" category="pattern">
+      <title>App Layout Integration Pattern</title>
+      <content><![CDATA[
+// app/_layout.tsx
+export default function RootLayout() {
+  const { capabilities, isLoading } = useDeviceStore();
+
+  // Run capability check on mount
+  useDeviceCapabilities();
+
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
+  if (!capabilities?.isSupported) {
+    return <UnsupportedDeviceScreen reason={capabilities?.unsupportedReason} />;
+  }
+
+  return (
+    <SafeAreaProvider>
+      <StatusBar style="auto" />
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      </Stack>
+    </SafeAreaProvider>
+  );
+}
+      ]]></content>
+    </note>
+    <note id="impl-5" category="warning">
+      <title>DCAppAttest on Simulator</title>
+      <content>
+        AppIntegrity.isPlatformSupported() may throw or return false on simulator.
+        Always wrap in try-catch and default to false.
+      </content>
+    </note>
+    <note id="impl-6" category="warning">
+      <title>Secure Enclave Check</title>
+      <content>
+        Secure Enclave is present on all iOS devices since iPhone 5s.
+        For MVP, use Device.isDevice as proxy (all real devices have it).
+        True hardware check would require native module.
+      </content>
+    </note>
+  </implementation-notes>
+
+  <!-- FILES TO CREATE -->
+  <files-to-create>
+    <file path="packages/shared/src/types/device.ts" priority="1">
+      <description>DeviceCapabilities and Platform types for cross-package sharing</description>
+      <template><![CDATA[
+export type Platform = 'ios';
+
+export interface DeviceCapabilities {
+  model: string;
+  iosVersion: string;
+  hasLiDAR: boolean;
+  hasSecureEnclave: boolean;
+  hasDCAppAttest: boolean;
+  isSupported: boolean;
+  unsupportedReason?: string;
+}
+
+// For Epic 2 registration flow (Story 2.2+)
+export interface DeviceState {
+  deviceId: string | null;
+  keyId: string | null;
+  attestationLevel: 'secure_enclave' | 'unverified' | null;
+  isRegistered: boolean;
+  registrationError?: string;
+}
+      ]]></template>
+    </file>
+    <file path="apps/mobile/store/deviceStore.ts" priority="2">
+      <description>Zustand store for device capabilities with AsyncStorage persistence</description>
+    </file>
+    <file path="apps/mobile/hooks/useDeviceCapabilities.ts" priority="3">
+      <description>Hook to detect device capabilities and update store</description>
+    </file>
+    <file path="apps/mobile/utils/lidarDetection.ts" priority="4">
+      <description>LiDAR detection utility using model string matching</description>
+    </file>
+    <file path="apps/mobile/components/Device/UnsupportedDeviceScreen.tsx" priority="5">
+      <description>Blocking screen for non-Pro devices with dark mode support</description>
+    </file>
+  </files-to-create>
+
+  <!-- FILES TO MODIFY -->
+  <files-to-modify>
+    <file path="packages/shared/src/index.ts" priority="1">
+      <description>Export device types from shared package</description>
+      <change>Add: export type { Platform, DeviceCapabilities, DeviceState } from './types/device';</change>
+    </file>
+    <file path="apps/mobile/app/_layout.tsx" priority="2">
+      <description>Integrate capability check at app launch, show blocking screen if unsupported</description>
+    </file>
+    <file path="apps/mobile/package.json" priority="3">
+      <description>Add expo-device and @react-native-async-storage/async-storage dependencies (via npx expo install)</description>
+    </file>
+  </files-to-modify>
+
+  <!-- SUPPORTED DEVICES REFERENCE -->
+  <supported-devices>
+    <device model="iPhone 12 Pro" released="2020" lidar="true" secure-enclave="true" />
+    <device model="iPhone 12 Pro Max" released="2020" lidar="true" secure-enclave="true" />
+    <device model="iPhone 13 Pro" released="2021" lidar="true" secure-enclave="true" />
+    <device model="iPhone 13 Pro Max" released="2021" lidar="true" secure-enclave="true" />
+    <device model="iPhone 14 Pro" released="2022" lidar="true" secure-enclave="true" />
+    <device model="iPhone 14 Pro Max" released="2022" lidar="true" secure-enclave="true" />
+    <device model="iPhone 15 Pro" released="2023" lidar="true" secure-enclave="true" />
+    <device model="iPhone 15 Pro Max" released="2023" lidar="true" secure-enclave="true" />
+    <device model="iPhone 16 Pro" released="2024" lidar="true" secure-enclave="true" />
+    <device model="iPhone 16 Pro Max" released="2024" lidar="true" secure-enclave="true" />
+    <device model="iPhone 17 Pro" released="2025" lidar="true" secure-enclave="true" />
+    <device model="iPhone 17 Pro Max" released="2025" lidar="true" secure-enclave="true" />
+  </supported-devices>
+
+  <!-- VALIDATION CHECKLIST -->
+  <validation-checklist>
+    <item id="vc-1" status="pending">expo-device installed via npx expo install</item>
+    <item id="vc-2" status="pending">@react-native-async-storage/async-storage installed</item>
+    <item id="vc-3" status="pending">DeviceCapabilities type in packages/shared/src/types/device.ts</item>
+    <item id="vc-4" status="pending">Type exported from packages/shared/src/index.ts</item>
+    <item id="vc-5" status="pending">deviceStore.ts with persist middleware</item>
+    <item id="vc-6" status="pending">useDeviceCapabilities hook implemented</item>
+    <item id="vc-7" status="pending">lidarDetection.ts utility</item>
+    <item id="vc-8" status="pending">UnsupportedDeviceScreen component with dark mode</item>
+    <item id="vc-9" status="pending">_layout.tsx integration complete</item>
+    <item id="vc-10" status="pending">TypeScript compilation passes (both packages)</item>
+    <item id="vc-11" status="pending">Expo prebuild succeeds</item>
+    <item id="vc-12" status="pending">Simulator shows blocking screen</item>
+  </validation-checklist>
+</story-context>
