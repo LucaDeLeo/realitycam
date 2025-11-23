@@ -216,12 +216,21 @@ stories_processed:
     git_commit_sha: 847f68d
     git_push_status: success
     files_changed: 16
+  - story_key: 4-2-upload-queue-retry
+    status: success
+    duration_seconds: 300
+    phases_completed: [create, context, implement, review]
+    validation_attempts: 1
+    review_cycles: 1
+    git_commit_sha: d1a604d
+    git_push_status: success
+    files_changed: 17
 
 statistics:
   epics_contexted_jit: 3
   epics_already_contexted: 1
   total_stories: 33
-  success_count: 18
+  success_count: 19
   blocked_validation_count: 0
   blocked_review_count: 0
   blocked_external_count: 0

@@ -211,3 +211,119 @@ export const DEFAULT_RETRY_CONFIG: RetryConfig = {
   maxBackoffMs: 300_000, // 5 minutes
   baseDelayMs: 1_000,    // 1 second
 };
+
+// ============================================================================
+// Offline Storage Types (Story 4.3)
+// ============================================================================
+
+/**
+ * Storage location for queued captures
+ * - memory: Capture data held in Zustand store (default for online captures)
+ * - disk: Capture data encrypted and stored on disk (for offline captures)
+ */
+export type CaptureStorageLocation = 'memory' | 'disk';
+
+/**
+ * Storage quota status thresholds
+ * - ok: Below warning threshold
+ * - warning: At or above 80% of quota
+ * - exceeded: At or above 100% of quota (cannot save more)
+ */
+export type StorageQuotaStatus = 'ok' | 'warning' | 'exceeded';
+
+/**
+ * Encryption metadata stored with each offline capture
+ * Contains all info needed to decrypt capture files
+ */
+export interface OfflineCaptureEncryption {
+  /** Reference to encryption key in expo-secure-store */
+  keyId: string;
+  /** Base64-encoded initialization vector for AES-GCM */
+  iv: string;
+  /** Encryption algorithm used */
+  algorithm: 'aes-256-gcm';
+  /** ISO timestamp when encryption was applied */
+  createdAt: string;
+}
+
+/**
+ * Metadata for an offline-stored capture
+ * Stored in encryption.json alongside encrypted capture files
+ */
+export interface OfflineCaptureMetadata {
+  /** Capture UUID */
+  captureId: string;
+  /** Encryption details */
+  encryption: OfflineCaptureEncryption;
+  /** Size of encrypted photo file in bytes */
+  photoSize: number;
+  /** Size of encrypted depth map file in bytes */
+  depthSize: number;
+  /** Size of encrypted metadata file in bytes */
+  metadataSize: number;
+  /** Total storage used by this capture in bytes */
+  totalSize: number;
+  /** ISO timestamp when capture was queued */
+  queuedAt: string;
+}
+
+/**
+ * Storage quota information and status
+ */
+export interface StorageQuotaInfo {
+  /** Current quota status */
+  status: StorageQuotaStatus;
+  /** Number of offline captures stored */
+  captureCount: number;
+  /** Maximum captures allowed */
+  maxCaptures: number;
+  /** Bytes used by offline captures */
+  storageUsedBytes: number;
+  /** Maximum storage in bytes */
+  maxStorageBytes: number;
+  /** Usage percentage (0-100) */
+  usagePercent: number;
+  /** Age of oldest capture in hours (if any) */
+  oldestCaptureAgeHours?: number;
+}
+
+/**
+ * Quota configuration constants
+ */
+export const STORAGE_QUOTA_CONFIG = {
+  /** Maximum number of offline captures */
+  MAX_CAPTURES: 50,
+  /** Maximum storage in bytes (500MB) */
+  MAX_STORAGE_BYTES: 500 * 1024 * 1024,
+  /** Warning threshold (80%) */
+  WARNING_THRESHOLD: 0.8,
+  /** Days after which captures are considered stale */
+  STALE_CAPTURE_DAYS: 7,
+} as const;
+
+/**
+ * Index entry for a stored capture
+ * Used for tracking captures without loading full data
+ */
+export interface CaptureIndexEntry {
+  /** Capture UUID */
+  captureId: string;
+  /** ISO timestamp when queued */
+  queuedAt: string;
+  /** Total bytes used by this capture */
+  totalSize: number;
+  /** Current queue status */
+  status: QueuedCaptureStatus;
+  /** Whether this was captured offline */
+  isOfflineCapture: boolean;
+}
+
+/**
+ * Extended QueuedCapture with offline storage fields
+ */
+export interface OfflineQueuedCapture extends QueuedCapture {
+  /** Where capture data is stored */
+  storageLocation: CaptureStorageLocation;
+  /** True if capture was created while offline */
+  isOfflineCapture: boolean;
+}

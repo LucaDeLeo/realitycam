@@ -55,5 +55,13 @@ export type {
   UploadQueueActions,
   CaptureUploadResponse,
   RetryConfig,
+  // Offline Storage Types (Story 4.3)
+  CaptureStorageLocation,
+  StorageQuotaStatus,
+  OfflineCaptureEncryption,
+  OfflineCaptureMetadata,
+  StorageQuotaInfo,
+  CaptureIndexEntry,
+  OfflineQueuedCapture,
 } from './types/upload';
-export { DEFAULT_RETRY_CONFIG } from './types/upload';
+export { DEFAULT_RETRY_CONFIG, STORAGE_QUOTA_CONFIG } from './types/upload';

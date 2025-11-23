@@ -17,7 +17,19 @@ import type {
   UploadQueueState,
   UploadQueueActions,
   UploadError,
+  CaptureStorageLocation,
+  OfflineQueuedCapture,
 } from '@realitycam/shared';
+
+/**
+ * Extended queued capture with offline storage support
+ */
+interface ExtendedQueuedCapture extends QueuedCapture {
+  /** Where capture data is stored (memory or disk) */
+  storageLocation?: CaptureStorageLocation;
+  /** True if capture was created while offline */
+  isOfflineCapture?: boolean;
+}
 
 /**
  * Combined store type with state and actions
@@ -27,6 +39,12 @@ type UploadQueueStore = UploadQueueState & UploadQueueActions & {
   hasHydrated: boolean;
   /** Set hydration status */
   setHasHydrated: (hydrated: boolean) => void;
+  /** Enqueue with offline storage support */
+  enqueueOffline: (capture: ProcessedCapture, storageLocation: CaptureStorageLocation) => void;
+  /** Restore captures from disk storage on app start */
+  restoreFromDiskStorage: () => Promise<void>;
+  /** Get extended capture with storage info */
+  getExtendedCapture: (id: string) => ExtendedQueuedCapture | undefined;
 };
 
 /**
@@ -78,11 +96,13 @@ export const useUploadQueueStore = create<UploadQueueStore>()(
        */
       enqueue: (capture: ProcessedCapture) => {
         const now = new Date().toISOString();
-        const queuedCapture: QueuedCapture = {
+        const queuedCapture: ExtendedQueuedCapture = {
           capture,
           status: 'pending',
           retryCount: 0,
           queuedAt: now,
+          storageLocation: 'memory',
+          isOfflineCapture: false,
         };
 
         set((state) => ({
@@ -93,6 +113,93 @@ export const useUploadQueueStore = create<UploadQueueStore>()(
           id: capture.id,
           queueLength: get().items.length,
         });
+      },
+
+      /**
+       * Add a processed capture to the queue with offline storage
+       * Used when network is unavailable and capture is stored on disk
+       */
+      enqueueOffline: (capture: ProcessedCapture, storageLocation: CaptureStorageLocation) => {
+        const now = new Date().toISOString();
+        const queuedCapture: ExtendedQueuedCapture = {
+          capture,
+          status: 'pending',
+          retryCount: 0,
+          queuedAt: now,
+          storageLocation,
+          isOfflineCapture: true,
+        };
+
+        set((state) => ({
+          items: [...state.items, queuedCapture],
+        }));
+
+        console.log('[uploadQueueStore] Enqueued offline capture:', {
+          id: capture.id,
+          storageLocation,
+          queueLength: get().items.length,
+        });
+      },
+
+      /**
+       * Restore captures from disk storage on app start
+       * Called during hydration to restore offline captures
+       */
+      restoreFromDiskStorage: async () => {
+        // Import dynamically to avoid circular dependencies
+        const { getStoredCaptures } = await import('../services/captureIndex');
+        const { loadCaptureFromStorage } = await import('../services/offlineStorage');
+
+        console.log('[uploadQueueStore] Restoring captures from disk storage');
+
+        try {
+          const storedCaptures = await getStoredCaptures();
+          const currentItems = get().items;
+          const currentIds = new Set(currentItems.map((item) => item.capture.id));
+
+          let restoredCount = 0;
+          for (const entry of storedCaptures) {
+            // Skip if already in queue
+            if (currentIds.has(entry.captureId)) {
+              continue;
+            }
+
+            // Only restore pending/failed captures
+            if (entry.status !== 'pending' && entry.status !== 'failed') {
+              continue;
+            }
+
+            // Load capture data from disk
+            const capture = await loadCaptureFromStorage(entry.captureId);
+            if (capture) {
+              const queuedCapture: ExtendedQueuedCapture = {
+                capture,
+                status: 'pending',
+                retryCount: 0,
+                queuedAt: entry.queuedAt,
+                storageLocation: 'disk',
+                isOfflineCapture: true,
+              };
+
+              set((state) => ({
+                items: [...state.items, queuedCapture],
+              }));
+
+              restoredCount++;
+            }
+          }
+
+          console.log('[uploadQueueStore] Restored captures from disk:', restoredCount);
+        } catch (error) {
+          console.error('[uploadQueueStore] Failed to restore from disk:', error);
+        }
+      },
+
+      /**
+       * Get extended capture with storage info
+       */
+      getExtendedCapture: (id: string): ExtendedQueuedCapture | undefined => {
+        return get().items.find((item) => item.capture.id === id) as ExtendedQueuedCapture | undefined;
       },
 
       /**
@@ -423,3 +530,28 @@ export const selectCurrentUpload = (state: UploadQueueStore) => {
   if (!state.currentUploadId) return null;
   return state.items.find((item) => item.capture.id === state.currentUploadId);
 };
+
+/**
+ * Select only offline captures (stored on disk)
+ */
+export const selectOfflineCaptures = (state: UploadQueueStore) =>
+  state.items.filter((item) => {
+    const extended = item as ExtendedQueuedCapture;
+    return extended.isOfflineCapture === true;
+  });
+
+/**
+ * Select offline capture counts
+ */
+export const selectOfflineCounts = (state: UploadQueueStore) => {
+  const offline = selectOfflineCaptures(state);
+  return {
+    total: offline.length,
+    pending: offline.filter((item) => item.status === 'pending').length,
+    failed: offline.filter((item) => item.status === 'failed').length,
+    permanentlyFailed: offline.filter((item) => item.status === 'permanently_failed').length,
+  };
+};
+
+// Export the extended type for external use
+export type { ExtendedQueuedCapture };

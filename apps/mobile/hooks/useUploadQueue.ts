@@ -17,6 +17,7 @@ import {
   shouldRetry,
   isMaxRetriesExceeded,
 } from '../utils/retryStrategy';
+import { cleanupCapture } from '../services/captureCleanup';
 
 /**
  * useUploadQueue hook return type
@@ -147,6 +148,23 @@ export function useUploadQueue(): UseUploadQueueReturn {
         captureId,
         serverCaptureId: capture_id,
       });
+
+      // Clean up local files after successful upload (deferred to avoid blocking)
+      setTimeout(async () => {
+        try {
+          const result = await cleanupCapture(captureId);
+          if (result.success) {
+            console.log('[useUploadQueue] Cleanup completed:', {
+              captureId,
+              freedBytes: result.freedBytes,
+            });
+          } else {
+            console.warn('[useUploadQueue] Cleanup failed:', result.error);
+          }
+        } catch (err) {
+          console.warn('[useUploadQueue] Cleanup error:', err);
+        }
+      }, 100);
     } else {
       // Upload failed
       const { error } = result;
