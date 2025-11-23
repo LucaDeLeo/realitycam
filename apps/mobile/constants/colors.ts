@@ -25,6 +25,12 @@ export const colors = {
   // Border Colors
   border: '#C6C6C8',
   borderDark: '#38383A',
+
+  // Warning Colors (for attestation failures)
+  warning: '#FFF3CD', // Light mode warning background
+  warningDark: '#664D03', // Dark mode warning background
+  warningText: '#856404', // Light mode warning text
+  warningTextDark: '#FFF3CD', // Dark mode warning text
 } as const;
 
 export type ColorKey = keyof typeof colors;

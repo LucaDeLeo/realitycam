@@ -37,3 +37,21 @@ export interface DeviceRegistrationState {
   isRegistered: boolean;
   registrationError?: string;
 }
+
+/**
+ * Key generation lifecycle states
+ * Used to track Secure Enclave key generation progress
+ *
+ * State transitions:
+ * - idle: Initial state, no key generation attempted yet
+ * - checking: Checking SecureStore for existing key
+ * - generating: Creating new key in Secure Enclave via generateKeyAsync()
+ * - ready: Key is available (either found in storage or newly generated)
+ * - failed: Key generation failed (device unsupported, jailbroken, etc.)
+ */
+export type KeyGenerationStatus =
+  | 'idle'
+  | 'checking'
+  | 'generating'
+  | 'ready'
+  | 'failed';

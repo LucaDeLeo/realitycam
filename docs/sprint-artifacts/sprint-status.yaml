@@ -48,7 +48,7 @@ development_status:
   # Epic 2: Device Registration & Hardware Attestation (6 stories)
   epic-2: contexted
   2-1-iphone-pro-detection-capability-check: done
-  2-2-secure-enclave-key-generation: backlog
+  2-2-secure-enclave-key-generation: done
   2-3-dcappattest-integration: backlog
   2-4-backend-device-registration-endpoint: backlog
   2-5-dcappattest-verification-backend: backlog

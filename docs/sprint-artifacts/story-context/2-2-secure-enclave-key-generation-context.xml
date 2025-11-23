@@ -1,0 +1,738 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML
+  Generated: 2025-11-22
+  Story: 2-2-secure-enclave-key-generation
+  Epic: 2 - Device Registration & Hardware Attestation
+  Project: RealityCam
+
+  This file serves as the single source of truth for story implementation.
+  It contains all relevant documentation, code patterns, interfaces, and constraints.
+-->
+<story-context>
+  <!-- STORY REFERENCE -->
+  <story-reference>
+    <story-key>2-2-secure-enclave-key-generation</story-key>
+    <story-file>docs/sprint-artifacts/stories/2-2-secure-enclave-key-generation.md</story-file>
+    <status>drafted</status>
+    <epic-id>2</epic-id>
+    <epic-title>Device Registration and Hardware Attestation</epic-title>
+    <tech-spec>docs/sprint-artifacts/tech-spec-epic-2.md</tech-spec>
+  </story-reference>
+
+  <!-- STORY SUMMARY -->
+  <story-summary>
+    <title>Secure Enclave Key Generation</title>
+    <user-story>
+      As a user, I want my device to generate a hardware-backed cryptographic key pair in the Secure Enclave, so that my captures can be cryptographically signed by my device and I can complete device attestation.
+    </user-story>
+    <business-value>
+      Foundation for hardware-rooted cryptographic identity. The Secure Enclave key is the basis for all attestation claims - without this, device attestation (Story 2.3) cannot proceed. This key proves the device is genuine and uncompromised.
+    </business-value>
+    <functional-requirements-covered>FR2 (App generates cryptographic keys in Secure Enclave via @expo/app-integrity)</functional-requirements-covered>
+  </story-summary>
+
+  <!-- ACCEPTANCE CRITERIA -->
+  <acceptance-criteria>
+    <criterion id="AC-1" title="First Launch Key Generation">
+      <description>On first launch with no existing key, AppIntegrity.generateKeyAsync() creates key pair in Secure Enclave, returns key ID as string, completes within 500ms on supported devices</description>
+      <testable>true</testable>
+    </criterion>
+    <criterion id="AC-2" title="Key ID Secure Storage">
+      <description>Key ID persisted in expo-secure-store with key 'attestation_key_id' using highest security level (WHEN_UNLOCKED_THIS_DEVICE_ONLY), survives app restarts</description>
+      <testable>true</testable>
+    </criterion>
+    <criterion id="AC-3" title="Subsequent Launch Key Retrieval">
+      <description>On subsequent launches, existing key ID retrieved from SecureStore, no new generation occurs, key ID validated as non-empty string and loaded into device store</description>
+      <testable>true</testable>
+    </criterion>
+    <criterion id="AC-4" title="Key Generation Error Handling">
+      <description>When generateKeyAsync() fails, display error message "Unable to generate secure key. Device attestation unavailable.", set attestationLevel to "unverified", log error, app remains functional</description>
+      <testable>true</testable>
+    </criterion>
+    <criterion id="AC-5" title="Device Store Integration">
+      <description>DeviceStore updated with keyId, keyGenerationStatus, keyGenerationError fields; state accessible via useDeviceStore hook; state changes trigger UI updates</description>
+      <testable>true</testable>
+    </criterion>
+    <criterion id="AC-6" title="Key Lifecycle State Machine">
+      <description>States: idle -> checking -> generating -> ready OR idle -> checking -> ready (existing key) OR idle -> checking -> generating -> failed; each transition reflected in store</description>
+      <testable>true</testable>
+    </criterion>
+    <criterion id="AC-7" title="Attestation Readiness Flag">
+      <description>isAttestationReady: true set on successful key generation; indicates ready for attestation request (Story 2.3); capture flow checks this flag</description>
+      <testable>true</testable>
+    </criterion>
+    <criterion id="AC-8" title="Jailbreak/Compromise Detection Handling">
+      <description>Security restriction failures display "Device security verification failed. Captures will be marked as unverified."; app continues with degraded attestation; no crash</description>
+      <testable>true</testable>
+    </criterion>
+    <criterion id="AC-9" title="Key Persistence Validation">
+      <description>On launch, stored key ID validated; if invalid/corrupted, storage cleared and key regenerated following first-launch flow</description>
+      <testable>true</testable>
+    </criterion>
+    <criterion id="AC-10" title="Hook Implementation">
+      <description>useSecureEnclaveKey hook at hooks/useSecureEnclaveKey.ts encapsulates all logic; integrates with device store; called from app layout after capability detection passes</description>
+      <testable>true</testable>
+    </criterion>
+  </acceptance-criteria>
+
+  <!-- DOCUMENTATION ARTIFACTS -->
+  <documentation-artifacts>
+    <artifact id="doc-1" relevance="critical">
+      <file>docs/prd.md</file>
+      <description>Product Requirements Document - FR2 specifies app generates cryptographic keys in Secure Enclave via @expo/app-integrity</description>
+      <sections-relevant>
+        <section>Functional Requirements - Device and Attestation (FR1-FR5)</section>
+        <section>FR2: App generates cryptographic keys in Secure Enclave</section>
+      </sections-relevant>
+    </artifact>
+    <artifact id="doc-2" relevance="critical">
+      <file>docs/architecture.md</file>
+      <description>Architecture decisions including ADR-007 (@expo/app-integrity for DCAppAttest), Mobile Dependencies, attestation vs assertion distinction</description>
+      <sections-relevant>
+        <section>ADR-007: @expo/app-integrity for DCAppAttest</section>
+        <section>Mobile Dependencies - @expo/app-integrity, expo-secure-store, zustand</section>
+        <section>Mobile Library Decisions - Attestation vs Assertion distinction</section>
+        <section>Security Architecture - Key Management</section>
+      </sections-relevant>
+    </artifact>
+    <artifact id="doc-3" relevance="critical">
+      <file>docs/sprint-artifacts/tech-spec-epic-2.md</file>
+      <description>Technical specification for Epic 2 with AC-2.2 Secure Enclave Key Generation criteria, TypeScript types, workflow diagrams</description>
+      <sections-relevant>
+        <section>AC-2.2: Secure Enclave Key Generation (AC-2.2.1 through AC-2.2.4)</section>
+        <section>TypeScript Types - DeviceState interface with keyId, attestationLevel</section>
+        <section>Device Registration Flow diagram</section>
+        <section>Services and Modules - Mobile Services (deviceStore, useDeviceAttestation)</section>
+      </sections-relevant>
+    </artifact>
+    <artifact id="doc-4" relevance="high">
+      <file>docs/epics.md</file>
+      <description>Epic breakdown with Story 2.2 definition - Generate Secure Enclave Key Pair</description>
+      <sections-relevant>
+        <section>Epic 2: Device Registration and Attestation</section>
+        <section>Story 2.2 definition and acceptance criteria</section>
+      </sections-relevant>
+    </artifact>
+    <artifact id="doc-5" relevance="medium">
+      <file>docs/sprint-artifacts/sprint-status.yaml</file>
+      <description>Current sprint status showing story 2-2 as "drafted", story 2-1 as "done"</description>
+    </artifact>
+  </documentation-artifacts>
+
+  <!-- EXISTING CODE INTERFACES -->
+  <existing-code-interfaces>
+    <interface id="code-1" relevance="critical">
+      <file>apps/mobile/store/deviceStore.ts</file>
+      <description>Zustand store for device capabilities - MUST BE EXTENDED with key management fields (keyId, keyGenerationStatus, keyGenerationError, isAttestationReady)</description>
+      <integration-point>Add new state fields and actions for key generation lifecycle</integration-point>
+      <code-snippet><![CDATA[
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { DeviceCapabilities } from '@realitycam/shared';
+
+interface DeviceState {
+  /** Detected device capabilities (null before detection) */
+  capabilities: DeviceCapabilities | null;
+  /** Loading state during capability detection */
+  isLoading: boolean;
+  /** Whether hydration from AsyncStorage is complete */
+  hasHydrated: boolean;
+  /** Set capabilities after detection completes */
+  setCapabilities: (capabilities: DeviceCapabilities) => void;
+  /** Clear stored capabilities (useful for re-detection) */
+  clearCapabilities: () => void;
+  /** Set hydration status */
+  setHasHydrated: (hydrated: boolean) => void;
+}
+
+export const useDeviceStore = create<DeviceState>()(
+  persist(
+    (set) => ({
+      capabilities: null,
+      isLoading: true,
+      hasHydrated: false,
+      setCapabilities: (capabilities) =>
+        set({ capabilities, isLoading: false }),
+      clearCapabilities: () =>
+        set({ capabilities: null, isLoading: true }),
+      setHasHydrated: (hydrated) => set({ hasHydrated: hydrated }),
+    }),
+    {
+      name: 'realitycam-device-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({ capabilities: state.capabilities }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
+    }
+  )
+);
+      ]]></code-snippet>
+    </interface>
+    <interface id="code-2" relevance="critical">
+      <file>apps/mobile/hooks/useDeviceCapabilities.ts</file>
+      <description>Device capability detection hook - provides pattern for hook implementation. useSecureEnclaveKey should follow similar patterns including useRef for initialization guard</description>
+      <integration-point>Reference for hook patterns: useRef for initialization, useEffect dependencies, store integration</integration-point>
+      <code-snippet><![CDATA[
+import { useEffect, useRef } from 'react';
+import * as Device from 'expo-device';
+import * as AppIntegrity from '@expo/app-integrity';
+import type { DeviceCapabilities } from '@realitycam/shared';
+import { useDeviceStore } from '../store/deviceStore';
+
+export function useDeviceCapabilities() {
+  const { capabilities, isLoading, hasHydrated, setCapabilities } =
+    useDeviceStore();
+  const detectionStarted = useRef(false);
+
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (capabilities !== null || detectionStarted.current) {
+      if (capabilities !== null && isLoading) {
+        setCapabilities(capabilities);
+      }
+      return;
+    }
+    detectionStarted.current = true;
+
+    const performDetection = async () => {
+      const detected = await detectCapabilities();
+      setCapabilities(detected);
+    };
+    performDetection();
+  }, [hasHydrated, capabilities, isLoading, setCapabilities]);
+
+  return { capabilities, isLoading, hasHydrated };
+}
+      ]]></code-snippet>
+    </interface>
+    <interface id="code-3" relevance="critical">
+      <file>packages/shared/src/types/device.ts</file>
+      <description>Shared device types - MUST BE EXTENDED with KeyGenerationStatus type</description>
+      <integration-point>Add KeyGenerationStatus type: 'idle' | 'checking' | 'generating' | 'ready' | 'failed'</integration-point>
+      <code-snippet><![CDATA[
+export type Platform = 'ios';
+
+export interface DeviceCapabilities {
+  model: string;
+  iosVersion: string;
+  hasLiDAR: boolean;
+  hasSecureEnclave: boolean;
+  hasDCAppAttest: boolean;
+  isSupported: boolean;
+  unsupportedReason?: string;
+}
+
+export interface DeviceRegistrationState {
+  deviceId: string | null;
+  keyId: string | null;
+  attestationLevel: 'secure_enclave' | 'unverified' | null;
+  isRegistered: boolean;
+  registrationError?: string;
+}
+      ]]></code-snippet>
+    </interface>
+    <interface id="code-4" relevance="high">
+      <file>apps/mobile/app/_layout.tsx</file>
+      <description>Root layout - MUST BE MODIFIED to call useSecureEnclaveKey after capability detection passes</description>
+      <integration-point>Add useSecureEnclaveKey hook call, handle key generation loading/error states</integration-point>
+      <code-snippet><![CDATA[
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { View, Text, ActivityIndicator, StyleSheet, useColorScheme } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useDeviceCapabilities } from '../hooks/useDeviceCapabilities';
+import { UnsupportedDeviceScreen } from '../components/Device/UnsupportedDeviceScreen';
+import { colors } from '../constants/colors';
+
+export default function RootLayout() {
+  const { capabilities, isLoading, hasHydrated } = useDeviceCapabilities();
+
+  if (!hasHydrated || isLoading) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="auto" />
+        <LoadingScreen />
+      </SafeAreaProvider>
+    );
+  }
+
+  if (!capabilities?.isSupported) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="auto" />
+        <UnsupportedDeviceScreen reason={capabilities?.unsupportedReason} />
+      </SafeAreaProvider>
+    );
+  }
+
+  // Supported device - render normal app navigation
+  return (
+    <SafeAreaProvider>
+      <StatusBar style="auto" />
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      </Stack>
+    </SafeAreaProvider>
+  );
+}
+      ]]></code-snippet>
+    </interface>
+    <interface id="code-5" relevance="high">
+      <file>apps/mobile/utils/lidarDetection.ts</file>
+      <description>LiDAR detection utility - provides pattern for utility functions with clear exports</description>
+    </interface>
+    <interface id="code-6" relevance="medium">
+      <file>apps/mobile/constants/colors.ts</file>
+      <description>Color constants for theming - use for any warning banners or status indicators</description>
+    </interface>
+    <interface id="code-7" relevance="medium">
+      <file>packages/shared/src/index.ts</file>
+      <description>Shared package exports - MUST ADD KeyGenerationStatus type export</description>
+      <current-exports>
+        <export>Platform, DeviceCapabilities, DeviceRegistrationState from ./types/device</export>
+        <export>ApiResponse, ApiError from ./types/api</export>
+        <export>Evidence types from ./types/evidence</export>
+        <export>Capture from ./types/capture</export>
+      </current-exports>
+    </interface>
+  </existing-code-interfaces>
+
+  <!-- DEVELOPMENT CONSTRAINTS -->
+  <development-constraints>
+    <constraint id="dc-1" source="architecture.md#ADR-007">
+      <title>@expo/app-integrity for DCAppAttest</title>
+      <description>Use official Expo package for attestation. generateKeyAsync() creates hardware-bound key in Secure Enclave. Returns base64-encoded key ID string.</description>
+    </constraint>
+    <constraint id="dc-2" source="tech-spec-epic-2.md">
+      <title>Key Generation is ONE-TIME</title>
+      <description>Attestation is ONE-TIME per key - cannot re-attest. Key ID must be stored securely and retrieved on subsequent launches.</description>
+    </constraint>
+    <constraint id="dc-3" source="story-file">
+      <title>Performance Requirement</title>
+      <description>Key generation must complete within 500ms on supported devices (Secure Enclave is hardware-optimized)</description>
+    </constraint>
+    <constraint id="dc-4" source="story-file">
+      <title>Timeout Handling</title>
+      <description>Fail if key generation takes > 5 seconds</description>
+    </constraint>
+    <constraint id="dc-5" source="story-file#Dev-Notes">
+      <title>Simulator Behavior</title>
+      <description>AppIntegrity.generateKeyAsync() will likely fail on simulator. Expected behavior: catch error, set status to 'failed', continue in unverified mode. App should remain functional.</description>
+    </constraint>
+    <constraint id="dc-6" source="story-file#Dev-Notes">
+      <title>TypeScript Strict Mode</title>
+      <description>Always verify compilation with pnpm typecheck before marking complete</description>
+    </constraint>
+    <constraint id="dc-7" source="story-file#Dev-Notes">
+      <title>Zustand Persistence</title>
+      <description>Use zustand/middleware with persist for cross-session state. Key-related fields should be persisted. Hydration tracking is critical.</description>
+    </constraint>
+    <constraint id="dc-8" source="story-file#Dev-Notes">
+      <title>Dark Mode Support</title>
+      <description>All UI components must support dark mode via useColorScheme</description>
+    </constraint>
+    <constraint id="dc-9" source="story-file#Dev-Notes">
+      <title>DCAppAttest API Constant</title>
+      <description>AppIntegrity.isSupported is a boolean constant (not a function) - already checked in Story 2.1</description>
+    </constraint>
+    <constraint id="dc-10" source="architecture.md">
+      <title>Secure Storage Requirements</title>
+      <description>Use expo-secure-store with WHEN_UNLOCKED_THIS_DEVICE_ONLY for highest security level</description>
+    </constraint>
+  </development-constraints>
+
+  <!-- DEPENDENCIES -->
+  <dependencies>
+    <npm-dependencies>
+      <dependency name="@expo/app-integrity" version="~0.1.0" required="true">
+        <purpose>generateKeyAsync() for Secure Enclave key generation</purpose>
+        <status>installed</status>
+      </dependency>
+      <dependency name="expo-secure-store" version="~15.0.0" required="true">
+        <purpose>Persist key ID with highest security level</purpose>
+        <status>installed</status>
+      </dependency>
+      <dependency name="zustand" version="^5.0.0" required="true">
+        <purpose>State management with persist middleware</purpose>
+        <status>installed</status>
+      </dependency>
+      <dependency name="@react-native-async-storage/async-storage" version="2.2.0" required="true">
+        <purpose>Zustand persist storage adapter for capabilities (key ID uses SecureStore)</purpose>
+        <status>installed</status>
+      </dependency>
+      <dependency name="expo-device" version="~8.0.9" required="true">
+        <purpose>Already used in Story 2.1 for device detection</purpose>
+        <status>installed</status>
+      </dependency>
+    </npm-dependencies>
+    <internal-dependencies>
+      <dependency name="@realitycam/shared" required="true">
+        <purpose>KeyGenerationStatus type (to be added), DeviceCapabilities type</purpose>
+        <status>available</status>
+      </dependency>
+    </internal-dependencies>
+    <story-dependencies>
+      <dependency story="2-1-iphone-pro-detection-capability-check" status="done">
+        <description>Device capability detection - provides capabilities.isSupported and capabilities.hasDCAppAttest checks. Key generation should only proceed after capability check passes.</description>
+      </dependency>
+      <dependency story="1-4-ios-app-shell-navigation" status="done">
+        <description>Mobile app shell with navigation structure, _layout.tsx</description>
+      </dependency>
+    </story-dependencies>
+  </dependencies>
+
+  <!-- TESTING CONTEXT -->
+  <testing-context>
+    <test-framework>TypeScript compilation (primary), Manual testing on simulator/device</test-framework>
+    <test-requirements>
+      <requirement id="test-1">
+        <description>TypeScript compilation must pass: pnpm typecheck</description>
+        <type>compilation</type>
+        <commands>
+          <command>cd /Users/luca/dev/realitycam/packages/shared && pnpm typecheck</command>
+          <command>cd /Users/luca/dev/realitycam/apps/mobile && pnpm typecheck</command>
+        </commands>
+      </requirement>
+      <requirement id="test-2">
+        <description>Test key generation on iOS simulator (may fail - expected behavior)</description>
+        <type>manual</type>
+        <expected-behavior>Should catch error, set status to 'failed', continue with unverified mode</expected-behavior>
+      </requirement>
+      <requirement id="test-3">
+        <description>Test key persistence across app restarts</description>
+        <type>manual</type>
+        <steps>
+          <step>Generate key on first launch</step>
+          <step>Force close app</step>
+          <step>Reopen app</step>
+          <step>Verify existing key retrieved from SecureStore (no new generation)</step>
+        </steps>
+      </requirement>
+      <requirement id="test-4">
+        <description>Test error handling flow with proper UI messaging</description>
+        <type>manual</type>
+      </requirement>
+      <requirement id="test-5">
+        <description>Verify Zustand state updates correctly on key generation status changes</description>
+        <type>manual</type>
+      </requirement>
+    </test-requirements>
+    <test-commands>
+      <command purpose="TypeScript check shared">cd /Users/luca/dev/realitycam/packages/shared && pnpm typecheck</command>
+      <command purpose="TypeScript check mobile">cd /Users/luca/dev/realitycam/apps/mobile && pnpm typecheck</command>
+      <command purpose="Run on simulator">cd /Users/luca/dev/realitycam/apps/mobile && npx expo run:ios</command>
+    </test-commands>
+  </testing-context>
+
+  <!-- IMPLEMENTATION NOTES -->
+  <implementation-notes>
+    <note id="impl-1" category="api-reference">
+      <title>@expo/app-integrity API</title>
+      <content><![CDATA[
+import * as AppIntegrity from '@expo/app-integrity';
+
+// Check platform support (already done in Story 2.1)
+const isSupported = AppIntegrity.isSupported; // boolean constant
+
+// Generate key in Secure Enclave (ONE-TIME)
+const keyId: string = await AppIntegrity.generateKeyAsync();
+// Returns: Base64-encoded key identifier
+// Throws: Error if device is compromised or unsupported
+
+// Key ID is used later for:
+// - attestKeyAsync(keyId, challenge) -> returns attestation object (Story 2.3)
+// - generateAssertionAsync(keyId, clientDataHash) -> returns assertion (Story 2.7)
+      ]]></content>
+    </note>
+    <note id="impl-2" category="pattern">
+      <title>Secure Storage Pattern</title>
+      <content><![CDATA[
+import * as SecureStore from 'expo-secure-store';
+
+const SECURE_STORE_KEY_ID = 'attestation_key_id';
+
+// Store key ID with maximum security
+async function storeKeyId(keyId: string): Promise<void> {
+  await SecureStore.setItemAsync(SECURE_STORE_KEY_ID, keyId, {
+    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+  });
+}
+
+// Retrieve key ID
+async function getStoredKeyId(): Promise<string | null> {
+  return await SecureStore.getItemAsync(SECURE_STORE_KEY_ID);
+}
+
+// Clear key ID (for regeneration scenarios)
+async function clearStoredKeyId(): Promise<void> {
+  await SecureStore.deleteItemAsync(SECURE_STORE_KEY_ID);
+}
+      ]]></content>
+    </note>
+    <note id="impl-3" category="pattern">
+      <title>State Machine Implementation</title>
+      <content><![CDATA[
+type KeyGenerationStatus = 'idle' | 'checking' | 'generating' | 'ready' | 'failed';
+
+// State transitions:
+// App Launch -> 'idle'
+// Start check -> 'checking'
+// Key found in storage -> 'ready'
+// No key, starting generation -> 'generating'
+// Generation success -> 'ready'
+// Generation failure -> 'failed'
+      ]]></content>
+    </note>
+    <note id="impl-4" category="pattern">
+      <title>Hook Implementation Pattern (from Story Dev Notes)</title>
+      <content><![CDATA[
+// hooks/useSecureEnclaveKey.ts
+import { useEffect, useRef } from 'react';
+import * as AppIntegrity from '@expo/app-integrity';
+import * as SecureStore from 'expo-secure-store';
+import { useDeviceStore } from '../store/deviceStore';
+
+const SECURE_STORE_KEY_ID = 'attestation_key_id';
+
+export function useSecureEnclaveKey() {
+  const {
+    keyId,
+    keyGenerationStatus,
+    setKeyId,
+    setKeyStatus,
+    setKeyError,
+    isSupported,
+  } = useDeviceStore();
+
+  const hasInitialized = useRef(false);
+
+  useEffect(() => {
+    if (hasInitialized.current || !isSupported) return;
+    hasInitialized.current = true;
+    initializeKey();
+  }, [isSupported]);
+
+  async function initializeKey() {
+    setKeyStatus('checking');
+    try {
+      const existingKeyId = await SecureStore.getItemAsync(SECURE_STORE_KEY_ID);
+      if (existingKeyId && existingKeyId.length > 0) {
+        setKeyId(existingKeyId);
+        setKeyStatus('ready');
+        return;
+      }
+      setKeyStatus('generating');
+      const newKeyId = await generateNewKey();
+      if (newKeyId) {
+        await SecureStore.setItemAsync(SECURE_STORE_KEY_ID, newKeyId, {
+          keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+        });
+        setKeyId(newKeyId);
+        setKeyStatus('ready');
+      }
+    } catch (error) {
+      handleKeyError(error);
+    }
+  }
+
+  async function generateNewKey(): Promise<string | null> {
+    const keyId = await AppIntegrity.generateKeyAsync();
+    return keyId;
+  }
+
+  function handleKeyError(error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Key generation failed:', message);
+    setKeyError(message);
+    setKeyStatus('failed');
+  }
+
+  return {
+    keyId,
+    keyGenerationStatus,
+    isAttestationReady: keyGenerationStatus === 'ready' && keyId !== null,
+  };
+}
+      ]]></content>
+    </note>
+    <note id="impl-5" category="pattern">
+      <title>Device Store Extension (from Story Dev Notes)</title>
+      <content><![CDATA[
+// store/deviceStore.ts - additions to existing store
+interface DeviceState {
+  // ... existing fields from Story 2.1
+  capabilities: DeviceCapabilities | null;
+  isLoading: boolean;
+  hasHydrated: boolean;
+
+  // Key management (Story 2.2) - ADD THESE
+  keyId: string | null;
+  keyGenerationStatus: 'idle' | 'checking' | 'generating' | 'ready' | 'failed';
+  keyGenerationError?: string;
+  isAttestationReady: boolean;
+
+  // Existing actions
+  setCapabilities: (caps: DeviceCapabilities) => void;
+  clearCapabilities: () => void;
+  setHasHydrated: (hydrated: boolean) => void;
+
+  // New actions - ADD THESE
+  setKeyId: (keyId: string | null) => void;
+  setKeyStatus: (status: KeyGenerationStatus) => void;
+  setKeyError: (error: string) => void;
+}
+      ]]></content>
+    </note>
+    <note id="impl-6" category="warning">
+      <title>Simulator Behavior</title>
+      <content>
+On iOS Simulator:
+- AppIntegrity.generateKeyAsync() will likely fail
+- Expected behavior: Catch error, set status to 'failed', continue in unverified mode
+- App should remain functional, just without hardware attestation
+      </content>
+    </note>
+    <note id="impl-7" category="error-messages">
+      <title>Error Messages (from Story Dev Notes)</title>
+      <content>
+| Error Type | User Message |
+|------------|--------------|
+| Generation failure | "Unable to generate secure key. Device attestation unavailable." |
+| Jailbreak detected | "Device security verification failed. Captures will be marked as unverified." |
+| Storage failure | "Unable to save security credentials. Please restart the app." |
+| Timeout | "Key generation timed out. Please try again." |
+      </content>
+    </note>
+    <note id="impl-8" category="integration">
+      <title>Integration with Story 2.3</title>
+      <content>
+Once key generation succeeds (this story):
+1. keyId is stored and available in deviceStore
+2. isAttestationReady is true
+3. Story 2.3 uses keyId for AppIntegrity.attestKeyAsync(keyId, challenge)
+4. Attestation is ONE-TIME per key - never re-attest
+      </content>
+    </note>
+  </implementation-notes>
+
+  <!-- FILES TO CREATE -->
+  <files-to-create>
+    <file path="apps/mobile/hooks/useSecureEnclaveKey.ts" priority="1">
+      <description>Hook for key generation/retrieval - encapsulates all Secure Enclave key logic</description>
+      <responsibilities>
+        <item>Check for existing key in SecureStore on mount</item>
+        <item>Generate new key via AppIntegrity.generateKeyAsync() if none exists</item>
+        <item>Store generated key ID in SecureStore with highest security</item>
+        <item>Update device store with key state</item>
+        <item>Handle errors gracefully</item>
+        <item>Implement state machine transitions</item>
+      </responsibilities>
+    </file>
+  </files-to-create>
+
+  <!-- FILES TO MODIFY -->
+  <files-to-modify>
+    <file path="apps/mobile/store/deviceStore.ts" priority="1">
+      <description>Extend Zustand store with key management state and actions</description>
+      <changes>
+        <change>Add keyId: string | null field</change>
+        <change>Add keyGenerationStatus: 'idle' | 'checking' | 'generating' | 'ready' | 'failed' field</change>
+        <change>Add keyGenerationError?: string field</change>
+        <change>Add isAttestationReady: boolean field</change>
+        <change>Add setKeyId action</change>
+        <change>Add setKeyStatus action</change>
+        <change>Add setKeyError action</change>
+        <change>Update partialize to include key fields in persistence</change>
+      </changes>
+    </file>
+    <file path="packages/shared/src/types/device.ts" priority="2">
+      <description>Add KeyGenerationStatus type for shared use</description>
+      <changes>
+        <change>Add: export type KeyGenerationStatus = 'idle' | 'checking' | 'generating' | 'ready' | 'failed';</change>
+      </changes>
+    </file>
+    <file path="packages/shared/src/index.ts" priority="3">
+      <description>Export new KeyGenerationStatus type</description>
+      <changes>
+        <change>Add KeyGenerationStatus to device types export</change>
+      </changes>
+    </file>
+    <file path="apps/mobile/app/_layout.tsx" priority="4">
+      <description>Integrate useSecureEnclaveKey hook after capability check passes</description>
+      <changes>
+        <change>Import useSecureEnclaveKey hook</change>
+        <change>Call hook when capabilities.isSupported is true</change>
+        <change>Handle key generation loading state (optional - can proceed while generating)</change>
+        <change>Handle key generation failure gracefully (don't block app)</change>
+      </changes>
+    </file>
+  </files-to-modify>
+
+  <!-- VALIDATION CHECKLIST -->
+  <validation-checklist>
+    <item id="vc-1" status="pending">KeyGenerationStatus type added to packages/shared/src/types/device.ts</item>
+    <item id="vc-2" status="pending">Type exported from packages/shared/src/index.ts</item>
+    <item id="vc-3" status="pending">deviceStore.ts extended with key management fields and actions</item>
+    <item id="vc-4" status="pending">useSecureEnclaveKey hook implemented at hooks/useSecureEnclaveKey.ts</item>
+    <item id="vc-5" status="pending">Hook checks for existing key in SecureStore first</item>
+    <item id="vc-6" status="pending">Hook generates new key via AppIntegrity.generateKeyAsync() if needed</item>
+    <item id="vc-7" status="pending">Key ID stored in SecureStore with WHEN_UNLOCKED_THIS_DEVICE_ONLY</item>
+    <item id="vc-8" status="pending">State machine transitions implemented correctly</item>
+    <item id="vc-9" status="pending">Error handling with specific error messages</item>
+    <item id="vc-10" status="pending">_layout.tsx integration complete</item>
+    <item id="vc-11" status="pending">TypeScript compilation passes (both packages)</item>
+    <item id="vc-12" status="pending">Simulator handles failure gracefully (unverified mode)</item>
+    <item id="vc-13" status="pending">Key persistence verified across app restarts</item>
+  </validation-checklist>
+
+  <!-- TECH-SPEC AC MAPPING -->
+  <tech-spec-mapping>
+    <mapping story-ac="AC-1" tech-spec-ac="AC-2.2.1">
+      <description>On first launch, AppIntegrity.generateKeyAsync() generates hardware-bound key</description>
+    </mapping>
+    <mapping story-ac="AC-2" tech-spec-ac="AC-2.2.2">
+      <description>Key ID returned and stored in expo-secure-store with key attestation_key_id</description>
+    </mapping>
+    <mapping story-ac="AC-3" tech-spec-ac="AC-2.2.3">
+      <description>Subsequent launches retrieve existing key ID from secure storage</description>
+    </mapping>
+    <mapping story-ac="AC-4" tech-spec-ac="AC-2.2.4">
+      <description>Key generation failure shows error message and sets attestation to "unverified"</description>
+    </mapping>
+  </tech-spec-mapping>
+
+  <!-- STORY 2.1 LEARNINGS -->
+  <previous-story-learnings source="2-1-iphone-pro-detection-capability-check">
+    <learning id="learn-1">
+      <title>TypeScript Strict Mode</title>
+      <description>Always verify with pnpm typecheck before marking complete</description>
+    </learning>
+    <learning id="learn-2">
+      <title>Zustand Persistence</title>
+      <description>Use zustand/middleware with persist for cross-session state - hydration tracking is critical</description>
+    </learning>
+    <learning id="learn-3">
+      <title>Error Handling</title>
+      <description>Wrap all native API calls in try/catch with graceful fallbacks</description>
+    </learning>
+    <learning id="learn-4">
+      <title>Simulator Behavior</title>
+      <description>Native APIs may fail on simulator - handle gracefully</description>
+    </learning>
+    <learning id="learn-5">
+      <title>DCAppAttest API</title>
+      <description>Use AppIntegrity.isSupported constant (not a function) for support check</description>
+    </learning>
+    <learning id="learn-6">
+      <title>Loading States</title>
+      <description>Hydration must complete before accessing persisted state</description>
+    </learning>
+    <learning id="learn-7">
+      <title>Dark Mode</title>
+      <description>All UI components must support dark mode via useColorScheme</description>
+    </learning>
+  </previous-story-learnings>
+</story-context>

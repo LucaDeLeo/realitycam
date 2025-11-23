@@ -18,4 +18,5 @@ export type {
   Platform,
   DeviceCapabilities,
   DeviceRegistrationState,
+  KeyGenerationStatus,
 } from './types/device';
