@@ -30,7 +30,10 @@ use uuid::Uuid;
 use crate::error::{ApiError, ApiErrorWithRequestId};
 use crate::middleware::DeviceContext;
 use crate::models::{Device, EvidencePackage, HardwareAttestation, ProcessingInfo};
-use crate::services::{analyze_depth_map, process_location_for_evidence, validate_metadata, verify_capture_assertion, StorageService};
+use crate::services::{
+    analyze_depth_map, process_location_for_evidence, validate_metadata, verify_capture_assertion,
+    StorageService,
+};
 
 /// Backend version for processing info (from Cargo.toml)
 const BACKEND_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -152,8 +155,8 @@ async fn parse_multipart(mut multipart: Multipart) -> Result<ParsedMultipart, Ap
     }
 
     // Ensure all required parts are present
-    let photo_bytes =
-        photo_bytes.ok_or_else(|| ApiError::Validation("Missing required part: photo".to_string()))?;
+    let photo_bytes = photo_bytes
+        .ok_or_else(|| ApiError::Validation("Missing required part: photo".to_string()))?;
 
     let depth_map_bytes = depth_map_bytes
         .ok_or_else(|| ApiError::Validation("Missing required part: depth_map".to_string()))?;
@@ -360,11 +363,7 @@ async fn upload_capture(
 
     // Upload files to S3
     let (photo_s3_key, depth_map_s3_key) = storage
-        .upload_capture_files(
-            capture_id,
-            parsed.photo_bytes,
-            parsed.depth_map_bytes,
-        )
+        .upload_capture_files(capture_id, parsed.photo_bytes, parsed.depth_map_bytes)
         .await
         .map_err(|e| ApiErrorWithRequestId {
             error: e,
@@ -587,12 +586,14 @@ async fn upload_capture(
     });
 
     // Parse captured_at timestamp
-    let captured_at = parsed.metadata.captured_at_datetime().map_err(|e| {
-        ApiErrorWithRequestId {
-            error: e,
-            request_id,
-        }
-    })?;
+    let captured_at =
+        parsed
+            .metadata
+            .captured_at_datetime()
+            .map_err(|e| ApiErrorWithRequestId {
+                error: e,
+                request_id,
+            })?;
 
     // Create database record with evidence
     let confidence_str = match confidence_level {

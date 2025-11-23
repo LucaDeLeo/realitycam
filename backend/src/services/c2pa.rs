@@ -172,11 +172,7 @@ impl C2paService {
     ///
     /// # Returns
     /// C2PA manifest structure
-    pub fn generate_manifest(
-        &self,
-        evidence: &EvidencePackage,
-        captured_at: &str,
-    ) -> C2paManifest {
+    pub fn generate_manifest(&self, evidence: &EvidencePackage, captured_at: &str) -> C2paManifest {
         let assertion = self.build_assertion(evidence, captured_at);
 
         let version = env!("CARGO_PKG_VERSION");
@@ -204,12 +200,15 @@ impl C2paService {
     ) -> Result<String, C2paError> {
         let manifest = self.generate_manifest(evidence, captured_at);
 
-        serde_json::to_string_pretty(&manifest)
-            .map_err(|e| C2paError::Serialization(e.to_string()))
+        serde_json::to_string_pretty(&manifest).map_err(|e| C2paError::Serialization(e.to_string()))
     }
 
     /// Builds the RealityCam assertion from evidence
-    fn build_assertion(&self, evidence: &EvidencePackage, captured_at: &str) -> RealityCamAssertion {
+    fn build_assertion(
+        &self,
+        evidence: &EvidencePackage,
+        captured_at: &str,
+    ) -> RealityCamAssertion {
         let confidence_level = match evidence.calculate_confidence() {
             ConfidenceLevel::High => "high",
             ConfidenceLevel::Medium => "medium",

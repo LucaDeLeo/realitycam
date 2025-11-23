@@ -12,8 +12,8 @@ use ciborium::Value;
 use coset::CborSerializable;
 use sha2::{Digest, Sha256};
 use std::str::FromStr;
-use x509_parser::prelude::*;
 use x509_parser::oid_registry::Oid;
+use x509_parser::prelude::*;
 
 use crate::config::Config;
 
@@ -184,8 +184,8 @@ pub fn decode_attestation_object(base64_data: &str) -> Result<AttestationObject,
         .map_err(|_| AttestationError::InvalidBase64)?;
 
     // Parse CBOR
-    let value: Value =
-        ciborium::from_reader(&bytes[..]).map_err(|e| AttestationError::InvalidCbor(e.to_string()))?;
+    let value: Value = ciborium::from_reader(&bytes[..])
+        .map_err(|e| AttestationError::InvalidCbor(e.to_string()))?;
 
     let map = value
         .as_map()
@@ -206,12 +206,12 @@ pub fn decode_attestation_object(base64_data: &str) -> Result<AttestationObject,
         .to_vec();
 
     // Extract "attStmt" map
-    let att_stmt = find_map_value(map, "attStmt")
-        .ok_or(AttestationError::MissingField("attStmt"))?;
+    let att_stmt =
+        find_map_value(map, "attStmt").ok_or(AttestationError::MissingField("attStmt"))?;
 
     // Extract "attStmt.x5c" (certificate chain)
-    let x5c_array = find_array_value(att_stmt, "x5c")
-        .ok_or(AttestationError::MissingField("x5c"))?;
+    let x5c_array =
+        find_array_value(att_stmt, "x5c").ok_or(AttestationError::MissingField("x5c"))?;
 
     let x5c: Vec<Vec<u8>> = x5c_array
         .iter()
@@ -260,27 +260,24 @@ pub fn parse_authenticator_data(data: &[u8]) -> Result<AuthenticatorData, Attest
         )));
     }
 
-    let rp_id_hash: [u8; 32] = data[0..32]
-        .try_into()
-        .map_err(|_| AttestationError::InvalidAuthData("Failed to extract RP ID hash".to_string()))?;
+    let rp_id_hash: [u8; 32] = data[0..32].try_into().map_err(|_| {
+        AttestationError::InvalidAuthData("Failed to extract RP ID hash".to_string())
+    })?;
 
     let flags = data[32];
 
-    let counter = u32::from_be_bytes(
-        data[33..37]
-            .try_into()
-            .map_err(|_| AttestationError::InvalidAuthData("Failed to extract counter".to_string()))?,
-    );
+    let counter =
+        u32::from_be_bytes(data[33..37].try_into().map_err(|_| {
+            AttestationError::InvalidAuthData("Failed to extract counter".to_string())
+        })?);
 
     let aaguid: [u8; 16] = data[37..53]
         .try_into()
         .map_err(|_| AttestationError::InvalidAuthData("Failed to extract AAGUID".to_string()))?;
 
-    let cred_id_len = u16::from_be_bytes(
-        data[53..55]
-            .try_into()
-            .map_err(|_| AttestationError::InvalidAuthData("Failed to extract credential ID length".to_string()))?,
-    ) as usize;
+    let cred_id_len = u16::from_be_bytes(data[53..55].try_into().map_err(|_| {
+        AttestationError::InvalidAuthData("Failed to extract credential ID length".to_string())
+    })?) as usize;
 
     if data.len() < 55 + cred_id_len {
         return Err(AttestationError::InvalidAuthData(format!(
@@ -329,9 +326,8 @@ pub fn verify_certificate_chain(
     // Parse all certificates
     let mut parsed_certs = Vec::new();
     for (i, cert_der) in certs.iter().enumerate() {
-        let (_, cert) = X509Certificate::from_der(cert_der).map_err(|e| {
-            AttestationError::InvalidCertificate(format!("Certificate {i}: {e:?}"))
-        })?;
+        let (_, cert) = X509Certificate::from_der(cert_der)
+            .map_err(|e| AttestationError::InvalidCertificate(format!("Certificate {i}: {e:?}")))?;
         parsed_certs.push(cert);
     }
 
@@ -428,8 +424,8 @@ fn extract_nonce_from_cert(cert_der: &[u8]) -> Result<Vec<u8>, AttestationError>
         .map_err(|e| AttestationError::InvalidCertificate(format!("{e:?}")))?;
 
     // Parse the OID - Apple nonce extension: 1.2.840.113635.100.8.2
-    let nonce_oid = Oid::from_str(APPLE_NONCE_OID_STR)
-        .map_err(|_| AttestationError::InvalidNonceFormat)?;
+    let nonce_oid =
+        Oid::from_str(APPLE_NONCE_OID_STR).map_err(|_| AttestationError::InvalidNonceFormat)?;
 
     // Find the nonce extension
     let nonce_ext = cert
@@ -440,8 +436,8 @@ fn extract_nonce_from_cert(cert_der: &[u8]) -> Result<Vec<u8>, AttestationError>
 
     // The extension value is ASN.1: SEQUENCE { [1] OCTET STRING (nonce) }
     // Parse the DER structure to extract the actual nonce bytes
-    let (_, seq) = der_parser::parse_der(nonce_ext.value)
-        .map_err(|_| AttestationError::InvalidNonceFormat)?;
+    let (_, seq) =
+        der_parser::parse_der(nonce_ext.value).map_err(|_| AttestationError::InvalidNonceFormat)?;
 
     // Navigate to extract the OCTET STRING containing the nonce
     // Structure: SEQUENCE { CONTEXT-SPECIFIC [1] { OCTET STRING (nonce) } }
@@ -501,10 +497,7 @@ fn extract_nonce_from_asn1(der: &der_parser::ber::BerObject) -> Result<Vec<u8>, 
 /// Verifies the app identity by comparing RP ID hash with expected App ID hash.
 ///
 /// App ID = TeamID.BundleID (e.g., "XXXXXXXXXX.com.example.realitycam")
-pub fn verify_app_identity(
-    rp_id_hash: &[u8; 32],
-    config: &Config,
-) -> Result<(), AttestationError> {
+pub fn verify_app_identity(rp_id_hash: &[u8; 32], config: &Config) -> Result<(), AttestationError> {
     let app_id = format!("{}.{}", config.apple_team_id, config.apple_bundle_id);
     let expected_hash = Sha256::digest(app_id.as_bytes());
 
@@ -550,9 +543,9 @@ pub fn extract_public_key(cose_key_cbor: &[u8]) -> Result<Vec<u8>, AttestationEr
         .ok_or_else(|| AttestationError::InvalidPublicKey("Missing curve parameter".to_string()))?;
 
     // P-256 curve is value 1 in COSE
-    let crv_i64: i64 = crv.try_into().map_err(|_| {
-        AttestationError::InvalidPublicKey("Invalid curve value".to_string())
-    })?;
+    let crv_i64: i64 = crv
+        .try_into()
+        .map_err(|_| AttestationError::InvalidPublicKey("Invalid curve value".to_string()))?;
     if crv_i64 != 1 {
         return Err(AttestationError::InvalidPublicKey(format!(
             "Expected P-256 curve (1), got {crv_i64}"

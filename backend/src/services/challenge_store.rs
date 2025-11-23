@@ -136,7 +136,9 @@ impl ChallengeStore {
     pub async fn verify_and_consume(&self, challenge: &[u8; 32]) -> Result<(), ChallengeError> {
         let mut challenges = self.challenges.write().await;
 
-        let entry = challenges.get_mut(challenge).ok_or(ChallengeError::NotFound)?;
+        let entry = challenges
+            .get_mut(challenge)
+            .ok_or(ChallengeError::NotFound)?;
 
         if entry.used {
             return Err(ChallengeError::AlreadyUsed);

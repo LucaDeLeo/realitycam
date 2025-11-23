@@ -177,8 +177,7 @@ impl Default for DepthAnalysis {
 /// - Device model (iPhone Pro whitelist)
 /// - Resolution (known LiDAR formats)
 /// - Location (valid GPS coordinates)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct MetadataEvidence {
     /// Whether the timestamp is within acceptable bounds (15 min window)
     pub timestamp_valid: bool,
@@ -200,7 +199,6 @@ pub struct MetadataEvidence {
     pub location_coarse: Option<String>,
 }
 
-
 // ============================================================================
 // Processing Info Structure (Story 4-7)
 // ============================================================================
@@ -208,8 +206,7 @@ pub struct MetadataEvidence {
 /// Processing information for evidence generation
 ///
 /// Records timing and version info for the evidence processing pipeline.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProcessingInfo {
     /// When processing completed (ISO 8601)
     pub processed_at: String,
@@ -218,7 +215,6 @@ pub struct ProcessingInfo {
     /// Backend version that processed the capture
     pub backend_version: String,
 }
-
 
 impl ProcessingInfo {
     /// Creates a new ProcessingInfo with current timestamp
@@ -290,8 +286,14 @@ mod tests {
 
     #[test]
     fn test_check_status_serialization() {
-        assert_eq!(serde_json::to_string(&CheckStatus::Pass).unwrap(), "\"pass\"");
-        assert_eq!(serde_json::to_string(&CheckStatus::Fail).unwrap(), "\"fail\"");
+        assert_eq!(
+            serde_json::to_string(&CheckStatus::Pass).unwrap(),
+            "\"pass\""
+        );
+        assert_eq!(
+            serde_json::to_string(&CheckStatus::Fail).unwrap(),
+            "\"fail\""
+        );
         assert_eq!(
             serde_json::to_string(&CheckStatus::Unavailable).unwrap(),
             "\"unavailable\""
@@ -312,16 +314,34 @@ mod tests {
 
     #[test]
     fn test_attestation_level_from_str() {
-        assert_eq!(AttestationLevel::from("secure_enclave"), AttestationLevel::SecureEnclave);
-        assert_eq!(AttestationLevel::from("unverified"), AttestationLevel::Unverified);
-        assert_eq!(AttestationLevel::from("anything_else"), AttestationLevel::Unverified);
+        assert_eq!(
+            AttestationLevel::from("secure_enclave"),
+            AttestationLevel::SecureEnclave
+        );
+        assert_eq!(
+            AttestationLevel::from("unverified"),
+            AttestationLevel::Unverified
+        );
+        assert_eq!(
+            AttestationLevel::from("anything_else"),
+            AttestationLevel::Unverified
+        );
     }
 
     #[test]
     fn test_confidence_level_serialization() {
-        assert_eq!(serde_json::to_string(&ConfidenceLevel::High).unwrap(), "\"high\"");
-        assert_eq!(serde_json::to_string(&ConfidenceLevel::Medium).unwrap(), "\"medium\"");
-        assert_eq!(serde_json::to_string(&ConfidenceLevel::Low).unwrap(), "\"low\"");
+        assert_eq!(
+            serde_json::to_string(&ConfidenceLevel::High).unwrap(),
+            "\"high\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ConfidenceLevel::Medium).unwrap(),
+            "\"medium\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ConfidenceLevel::Low).unwrap(),
+            "\"low\""
+        );
         assert_eq!(
             serde_json::to_string(&ConfidenceLevel::Suspicious).unwrap(),
             "\"suspicious\""
@@ -330,7 +350,10 @@ mod tests {
 
     #[test]
     fn test_hardware_attestation_unavailable() {
-        let hw = HardwareAttestation::unavailable("iPhone 15 Pro".to_string(), AttestationLevel::SecureEnclave);
+        let hw = HardwareAttestation::unavailable(
+            "iPhone 15 Pro".to_string(),
+            AttestationLevel::SecureEnclave,
+        );
         assert_eq!(hw.status, CheckStatus::Unavailable);
         assert!(!hw.assertion_verified);
         assert!(!hw.counter_valid);
@@ -338,7 +361,8 @@ mod tests {
 
     #[test]
     fn test_hardware_attestation_pass() {
-        let hw = HardwareAttestation::pass("iPhone 15 Pro".to_string(), AttestationLevel::SecureEnclave);
+        let hw =
+            HardwareAttestation::pass("iPhone 15 Pro".to_string(), AttestationLevel::SecureEnclave);
         assert_eq!(hw.status, CheckStatus::Pass);
         assert!(hw.assertion_verified);
         assert!(hw.counter_valid);

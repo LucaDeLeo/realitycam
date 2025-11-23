@@ -33,10 +33,10 @@ const RESOLUTION_TOLERANCE: u32 = 10;
 
 /// Known LiDAR depth map resolutions (width, height)
 const VALID_RESOLUTIONS: &[(u32, u32)] = &[
-    (256, 192),  // iPhone Pro LiDAR standard
-    (320, 240),  // QVGA
-    (640, 480),  // VGA
-    (384, 288),  // Alternative resolution
+    (256, 192), // iPhone Pro LiDAR standard
+    (320, 240), // QVGA
+    (640, 480), // VGA
+    (384, 288), // Alternative resolution
 ];
 
 /// iPhone Pro models with LiDAR capability
@@ -52,8 +52,8 @@ const IPHONE_PRO_WHITELIST: &[&str] = &[
     "iphone 15 pro max",
     "iphone 16 pro",
     "iphone 16 pro max",
-    "iphone 17 pro",      // Future-proofing
-    "iphone 17 pro max",  // Future-proofing
+    "iphone 17 pro",     // Future-proofing
+    "iphone 17 pro max", // Future-proofing
 ];
 
 // ============================================================================
@@ -308,8 +308,8 @@ pub fn validate_metadata(metadata: &CaptureMetadataPayload) -> MetadataEvidence 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Duration;
     use crate::types::capture::DepthMapDimensions;
+    use chrono::Duration;
 
     // ========================================================================
     // Timestamp Validation Tests

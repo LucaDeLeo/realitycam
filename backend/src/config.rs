@@ -68,14 +68,13 @@ impl Config {
             .collect();
 
         Self {
-            database_url: env::var("DATABASE_URL")
-                .unwrap_or_else(|_| "postgres://realitycam:localdev@localhost:5432/realitycam".to_string()),
+            database_url: env::var("DATABASE_URL").unwrap_or_else(|_| {
+                "postgres://realitycam:localdev@localhost:5432/realitycam".to_string()
+            }),
             s3_endpoint: env::var("S3_ENDPOINT")
                 .unwrap_or_else(|_| "http://localhost:4566".to_string()),
-            s3_bucket: env::var("S3_BUCKET")
-                .unwrap_or_else(|_| "realitycam-media-dev".to_string()),
-            host: env::var("HOST")
-                .unwrap_or_else(|_| "0.0.0.0".to_string()),
+            s3_bucket: env::var("S3_BUCKET").unwrap_or_else(|_| "realitycam-media-dev".to_string()),
+            host: env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
             port: env::var("PORT")
                 .unwrap_or_else(|_| "8080".to_string())
                 .parse()
@@ -97,14 +96,12 @@ impl Config {
                 .parse()
                 .expect("DB_IDLE_TIMEOUT_SECS must be a number"),
             cors_origins,
-            log_format: env::var("LOG_FORMAT")
-                .unwrap_or_else(|_| "pretty".to_string()),
+            log_format: env::var("LOG_FORMAT").unwrap_or_else(|_| "pretty".to_string()),
             shutdown_timeout_secs: env::var("SHUTDOWN_TIMEOUT_SECS")
                 .unwrap_or_else(|_| "30".to_string())
                 .parse()
                 .expect("SHUTDOWN_TIMEOUT_SECS must be a number"),
-            apple_team_id: env::var("APPLE_TEAM_ID")
-                .unwrap_or_else(|_| "XXXXXXXXXX".to_string()),
+            apple_team_id: env::var("APPLE_TEAM_ID").unwrap_or_else(|_| "XXXXXXXXXX".to_string()),
             apple_bundle_id: env::var("APPLE_BUNDLE_ID")
                 .unwrap_or_else(|_| "com.realitycam.app".to_string()),
         }

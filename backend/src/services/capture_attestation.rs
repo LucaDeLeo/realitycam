@@ -61,7 +61,10 @@ impl std::fmt::Display for CaptureAssertionError {
                 write!(f, "Invalid authenticator data: {msg}")
             }
             CaptureAssertionError::CounterNotIncreasing { received, stored } => {
-                write!(f, "Counter not increasing: received {received}, stored {stored}")
+                write!(
+                    f,
+                    "Counter not increasing: received {received}, stored {stored}"
+                )
             }
             CaptureAssertionError::MissingPublicKey => write!(f, "Device has no public key"),
             CaptureAssertionError::InvalidPublicKey(msg) => write!(f, "Invalid public key: {msg}"),
@@ -178,7 +181,14 @@ pub fn verify_capture_assertion(
     };
 
     // Attempt verification - any error results in status=fail
-    match verify_assertion_internal(device, assertion_b64, photo_hash, captured_at, config, request_id) {
+    match verify_assertion_internal(
+        device,
+        assertion_b64,
+        photo_hash,
+        captured_at,
+        config,
+        request_id,
+    ) {
         Ok(new_counter) => {
             tracing::info!(
                 request_id = %request_id,
@@ -200,9 +210,8 @@ pub fn verify_capture_assertion(
             // Determine which component failed
             let (assertion_verified, counter_valid) = match &e {
                 CaptureAssertionError::CounterNotIncreasing { .. } => (true, false),
-                CaptureAssertionError::SignatureInvalid(_) | CaptureAssertionError::RpIdMismatch => {
-                    (false, true)
-                }
+                CaptureAssertionError::SignatureInvalid(_)
+                | CaptureAssertionError::RpIdMismatch => (false, true),
                 _ => (false, false),
             };
 
@@ -304,9 +313,8 @@ fn verify_assertion_internal(
         request_id = %request_id,
         "[capture_attestation] Parsing public key"
     );
-    let verifying_key = VerifyingKey::from_sec1_bytes(public_key_bytes).map_err(|e| {
-        CaptureAssertionError::InvalidPublicKey(format!("Failed to parse: {e}"))
-    })?;
+    let verifying_key = VerifyingKey::from_sec1_bytes(public_key_bytes)
+        .map_err(|e| CaptureAssertionError::InvalidPublicKey(format!("Failed to parse: {e}")))?;
 
     // Step 10: Parse signature (supports DER and raw r||s)
     tracing::debug!(
@@ -381,17 +389,15 @@ fn parse_assertion_auth_data(data: &[u8]) -> Result<AssertionAuthData, CaptureAs
         )));
     }
 
-    let rp_id_hash: [u8; 32] = data[0..32]
-        .try_into()
-        .map_err(|_| CaptureAssertionError::InvalidAuthData("Failed to extract RP ID hash".to_string()))?;
+    let rp_id_hash: [u8; 32] = data[0..32].try_into().map_err(|_| {
+        CaptureAssertionError::InvalidAuthData("Failed to extract RP ID hash".to_string())
+    })?;
 
     let flags = data[32];
 
-    let counter = u32::from_be_bytes(
-        data[33..37]
-            .try_into()
-            .map_err(|_| CaptureAssertionError::InvalidAuthData("Failed to extract counter".to_string()))?,
-    );
+    let counter = u32::from_be_bytes(data[33..37].try_into().map_err(|_| {
+        CaptureAssertionError::InvalidAuthData("Failed to extract counter".to_string())
+    })?);
 
     Ok(AssertionAuthData {
         rp_id_hash,
@@ -576,7 +582,10 @@ mod tests {
     fn test_parse_assertion_auth_data_too_short() {
         let data = vec![0u8; 36]; // Less than 37 bytes
         let result = parse_assertion_auth_data(&data);
-        assert!(matches!(result, Err(CaptureAssertionError::InvalidAuthData(_))));
+        assert!(matches!(
+            result,
+            Err(CaptureAssertionError::InvalidAuthData(_))
+        ));
     }
 
     #[test]

@@ -172,7 +172,9 @@ impl ApiError {
             ApiError::HashNotFound => "No capture matches the uploaded file hash".to_string(),
             ApiError::AttestationFailed(_) => "Device attestation verification failed".to_string(),
             ApiError::SignatureInvalid => self.to_string(),
-            ApiError::TimestampExpired => "Request timestamp is outside the allowed window".to_string(),
+            ApiError::TimestampExpired => {
+                "Request timestamp is outside the allowed window".to_string()
+            }
 
             // These should not expose internal details
             ApiError::Internal(_) => "An internal error occurred".to_string(),
@@ -186,9 +188,7 @@ impl ApiError {
                 "Too many requests. Please wait before trying again.".to_string()
             }
             ApiError::ChallengeInvalid(_) => "Challenge is invalid or expired".to_string(),
-            ApiError::DeviceAuthRequired => {
-                "Device authentication headers required".to_string()
-            }
+            ApiError::DeviceAuthRequired => "Device authentication headers required".to_string(),
             ApiError::DeviceUnverified => "Device is not verified".to_string(),
             ApiError::TimestampInvalid => "Request timestamp is invalid".to_string(),
             ApiError::ReplayDetected => "Request replay detected".to_string(),

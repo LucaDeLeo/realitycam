@@ -125,12 +125,12 @@ async fn verify_file(
     );
 
     // Parse multipart to get file bytes
-    let file_bytes = parse_file_multipart(multipart).await.map_err(|e| {
-        ApiErrorWithRequestId {
+    let file_bytes = parse_file_multipart(multipart)
+        .await
+        .map_err(|e| ApiErrorWithRequestId {
             error: e,
             request_id,
-        }
-    })?;
+        })?;
 
     tracing::info!(
         request_id = %request_id,
@@ -151,12 +151,12 @@ async fn verify_file(
     );
 
     // Check database for matching capture
-    let capture = lookup_capture_by_hash(&pool, &hash_bytes).await.map_err(|e| {
-        ApiErrorWithRequestId {
+    let capture = lookup_capture_by_hash(&pool, &hash_bytes)
+        .await
+        .map_err(|e| ApiErrorWithRequestId {
             error: e,
             request_id,
-        }
-    })?;
+        })?;
 
     if let Some(capture) = capture {
         // Match found - return verified status
@@ -235,7 +235,9 @@ async fn parse_file_multipart(mut multipart: Multipart) -> Result<Vec<u8>, ApiEr
         }
     }
 
-    Err(ApiError::Validation("Missing required part: file".to_string()))
+    Err(ApiError::Validation(
+        "Missing required part: file".to_string(),
+    ))
 }
 
 /// Database record for capture lookup

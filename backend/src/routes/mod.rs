@@ -46,9 +46,9 @@ pub fn api_router(state: AppState) -> Router {
     // Configure device authentication middleware for captures router
     // MVP mode: allow unverified devices (require_verified = false)
     let device_auth_config = DeviceAuthConfig {
-        require_verified: false, // MVP: allow unverified devices
+        require_verified: false,       // MVP: allow unverified devices
         timestamp_tolerance_secs: 300, // 5 minutes
-        future_tolerance_secs: 60, // 1 minute
+        future_tolerance_secs: 60,     // 1 minute
     };
 
     // Captures router with device authentication middleware

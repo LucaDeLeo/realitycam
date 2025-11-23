@@ -259,7 +259,10 @@ struct InsertDeviceParams<'a> {
 /// - assertion_counter = 0
 ///
 /// Returns DeviceAlreadyRegistered error if attestation_key_id already exists (AC-4).
-async fn insert_device(pool: &sqlx::PgPool, params: InsertDeviceParams<'_>) -> Result<Device, ApiError> {
+async fn insert_device(
+    pool: &sqlx::PgPool,
+    params: InsertDeviceParams<'_>,
+) -> Result<Device, ApiError> {
     sqlx::query_as!(
         Device,
         r#"
@@ -409,8 +412,8 @@ async fn register_device(
     );
 
     // Validate request
-    let (key_id, attestation_object_b64, challenge_bytes) =
-        validate_registration_request(&req).map_err(|e| ApiErrorWithRequestId {
+    let (key_id, attestation_object_b64, challenge_bytes) = validate_registration_request(&req)
+        .map_err(|e| ApiErrorWithRequestId {
             error: e,
             request_id,
         })?;
@@ -423,106 +426,111 @@ async fn register_device(
     );
 
     // Decode attestation object for storage
-    let attestation_bytes = decode_base64(&attestation_object_b64, "attestation_object")
-        .map_err(|e| ApiErrorWithRequestId {
-            error: e,
-            request_id,
-        })?;
-
-    // Attempt verification if challenge is provided
-    let (attestation_level, public_key, assertion_counter) = if let Some(ref challenge) =
-        challenge_bytes
-    {
-        // Try to verify the challenge first
-        let challenge_array: [u8; 32] = challenge.as_slice().try_into().map_err(|_| {
-            tracing::warn!(
-                request_id = %request_id,
-                challenge_len = challenge.len(),
-                "Invalid challenge length"
-            );
+    let attestation_bytes =
+        decode_base64(&attestation_object_b64, "attestation_object").map_err(|e| {
             ApiErrorWithRequestId {
-                error: ApiError::ChallengeInvalid("Invalid challenge length".to_string()),
+                error: e,
                 request_id,
             }
         })?;
 
-        // Verify and consume the challenge (AC-2: single-use, check expiry)
-        match state.challenge_store.verify_and_consume(&challenge_array).await {
-            Ok(()) => {
-                tracing::info!(
-                    request_id = %request_id,
-                    step = "challenge_validation",
-                    status = "pass",
-                    "Challenge validated and consumed"
-                );
-            }
-            Err(e) => {
-                let reason = match e {
-                    ChallengeError::NotFound => "Challenge not found",
-                    ChallengeError::AlreadyUsed => "Challenge already used",
-                    ChallengeError::Expired => "Challenge expired",
-                    ChallengeError::RateLimitExceeded => "Rate limit exceeded",
-                };
+    // Attempt verification if challenge is provided
+    let (attestation_level, public_key, assertion_counter) =
+        if let Some(ref challenge) = challenge_bytes {
+            // Try to verify the challenge first
+            let challenge_array: [u8; 32] = challenge.as_slice().try_into().map_err(|_| {
                 tracing::warn!(
                     request_id = %request_id,
-                    step = "challenge_validation",
-                    status = "fail",
-                    reason = reason,
-                    "Challenge validation failed"
+                    challenge_len = challenge.len(),
+                    "Invalid challenge length"
                 );
-                // On challenge failure, degrade to unverified (AC-10)
-                return register_unverified_device(
-                    &state,
+                ApiErrorWithRequestId {
+                    error: ApiError::ChallengeInvalid("Invalid challenge length".to_string()),
                     request_id,
-                    &key_id,
-                    &req,
-                    &attestation_bytes,
-                )
-                .await;
-            }
-        }
+                }
+            })?;
 
-        // Perform attestation verification (AC-3 through AC-8)
-        match verify_attestation(
-            &attestation_object_b64,
-            challenge,
-            &state.config,
-            request_id,
-        )
-        .await
-        {
-            Ok(result) => {
-                tracing::info!(
-                    request_id = %request_id,
-                    status = "verified",
-                    public_key_len = result.public_key.len(),
-                    counter = result.counter,
-                    "Attestation verification successful"
-                );
-                (
-                    "secure_enclave",
-                    Some(result.public_key),
-                    result.counter as i64,
-                )
+            // Verify and consume the challenge (AC-2: single-use, check expiry)
+            match state
+                .challenge_store
+                .verify_and_consume(&challenge_array)
+                .await
+            {
+                Ok(()) => {
+                    tracing::info!(
+                        request_id = %request_id,
+                        step = "challenge_validation",
+                        status = "pass",
+                        "Challenge validated and consumed"
+                    );
+                }
+                Err(e) => {
+                    let reason = match e {
+                        ChallengeError::NotFound => "Challenge not found",
+                        ChallengeError::AlreadyUsed => "Challenge already used",
+                        ChallengeError::Expired => "Challenge expired",
+                        ChallengeError::RateLimitExceeded => "Rate limit exceeded",
+                    };
+                    tracing::warn!(
+                        request_id = %request_id,
+                        step = "challenge_validation",
+                        status = "fail",
+                        reason = reason,
+                        "Challenge validation failed"
+                    );
+                    // On challenge failure, degrade to unverified (AC-10)
+                    return register_unverified_device(
+                        &state,
+                        request_id,
+                        &key_id,
+                        &req,
+                        &attestation_bytes,
+                    )
+                    .await;
+                }
             }
-            Err(e) => {
-                // Log internal details but don't expose to client (AC-10)
-                tracing::warn!(
-                    request_id = %request_id,
-                    error = %e,
-                    "Attestation verification failed - degrading to unverified"
-                );
-                ("unverified", None, 0)
+
+            // Perform attestation verification (AC-3 through AC-8)
+            match verify_attestation(
+                &attestation_object_b64,
+                challenge,
+                &state.config,
+                request_id,
+            )
+            .await
+            {
+                Ok(result) => {
+                    tracing::info!(
+                        request_id = %request_id,
+                        status = "verified",
+                        public_key_len = result.public_key.len(),
+                        counter = result.counter,
+                        "Attestation verification successful"
+                    );
+                    (
+                        "secure_enclave",
+                        Some(result.public_key),
+                        result.counter as i64,
+                    )
+                }
+                Err(e) => {
+                    // Log internal details but don't expose to client (AC-10)
+                    tracing::warn!(
+                        request_id = %request_id,
+                        error = %e,
+                        "Attestation verification failed - degrading to unverified"
+                    );
+                    ("unverified", None, 0)
+                }
             }
-        }
-    } else {
-        // No challenge provided - device is unverified
-        tracing::info!(
-            request_id = %request_id,
-            "No challenge provided - registering as unverified"
-        );
-        ("unverified", None, 0)
-    };
+        } else {
+            // No challenge provided - device is unverified
+            tracing::info!(
+                request_id = %request_id,
+                "No challenge provided - registering as unverified"
+            );
+            ("unverified", None, 0)
+        };
 
     // Insert device into database
     let device = insert_device(

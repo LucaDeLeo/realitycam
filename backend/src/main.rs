@@ -83,51 +83,48 @@ async fn main() {
     };
 
     // Build the router with middleware stack
-    let app = routes::api_router(app_state)
-        .layer(
-            ServiceBuilder::new()
-                // Set request ID on incoming requests
-                .layer(SetRequestIdLayer::new(
-                    x_request_id.clone(),
-                    MakeRequestUuid,
-                ))
-                // Propagate request ID to response headers
-                .layer(PropagateRequestIdLayer::new(x_request_id))
-                // Add tracing with request ID in spans
-                .layer(
-                    TraceLayer::new_for_http()
-                        .make_span_with(|request: &axum::http::Request<_>| {
-                            let request_id = request
-                                .headers()
-                                .get(X_REQUEST_ID)
-                                .and_then(|v| v.to_str().ok())
-                                .and_then(|s| Uuid::parse_str(s).ok())
-                                .unwrap_or_else(Uuid::new_v4);
+    let app = routes::api_router(app_state).layer(
+        ServiceBuilder::new()
+            // Set request ID on incoming requests
+            .layer(SetRequestIdLayer::new(
+                x_request_id.clone(),
+                MakeRequestUuid,
+            ))
+            // Propagate request ID to response headers
+            .layer(PropagateRequestIdLayer::new(x_request_id))
+            // Add tracing with request ID in spans
+            .layer(
+                TraceLayer::new_for_http()
+                    .make_span_with(|request: &axum::http::Request<_>| {
+                        let request_id = request
+                            .headers()
+                            .get(X_REQUEST_ID)
+                            .and_then(|v| v.to_str().ok())
+                            .and_then(|s| Uuid::parse_str(s).ok())
+                            .unwrap_or_else(Uuid::new_v4);
 
-                            tracing::info_span!(
-                                "http_request",
-                                method = %request.method(),
-                                uri = %request.uri(),
-                                request_id = %request_id,
-                            )
-                        })
-                        .on_response(
-                            |response: &axum::http::Response<_>,
-                             latency: Duration,
-                             _span: &Span| {
-                                tracing::info!(
-                                    status = %response.status().as_u16(),
-                                    latency_ms = %latency.as_millis(),
-                                    "request completed"
-                                );
-                            },
-                        ),
-                )
-                // CORS layer
-                .layer(cors)
-                // Extract request ID as extension for handlers
-                .layer(axum::middleware::from_fn(extract_request_id)),
-        );
+                        tracing::info_span!(
+                            "http_request",
+                            method = %request.method(),
+                            uri = %request.uri(),
+                            request_id = %request_id,
+                        )
+                    })
+                    .on_response(
+                        |response: &axum::http::Response<_>, latency: Duration, _span: &Span| {
+                            tracing::info!(
+                                status = %response.status().as_u16(),
+                                latency_ms = %latency.as_millis(),
+                                "request completed"
+                            );
+                        },
+                    ),
+            )
+            // CORS layer
+            .layer(cors)
+            // Extract request ID as extension for handlers
+            .layer(axum::middleware::from_fn(extract_request_id)),
+    );
 
     // Run the server with graceful shutdown
     let addr: SocketAddr = format!("{}:{}", config.host, config.port)
@@ -188,10 +185,7 @@ fn build_cors_layer(origins: &[String]) -> CorsLayer {
                 HeaderName::from_static(X_REQUEST_ID),
             ])
     } else {
-        let allowed_origins: Vec<_> = origins
-            .iter()
-            .filter_map(|o| o.parse().ok())
-            .collect();
+        let allowed_origins: Vec<_> = origins.iter().filter_map(|o| o.parse().ok()).collect();
 
         CorsLayer::new()
             .allow_origin(allowed_origins)

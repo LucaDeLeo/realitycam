@@ -122,9 +122,7 @@ impl CaptureMetadataPayload {
 
     fn validate_captured_at(&self) -> Result<(), ApiError> {
         if self.captured_at.is_empty() {
-            return Err(ApiError::Validation(
-                "captured_at is required".to_string(),
-            ));
+            return Err(ApiError::Validation("captured_at is required".to_string()));
         }
 
         // Try to parse as ISO 8601

@@ -283,13 +283,19 @@ mod tests {
     fn test_photo_s3_key() {
         let capture_id = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
         let key = photo_s3_key(capture_id);
-        assert_eq!(key, "captures/550e8400-e29b-41d4-a716-446655440000/photo.jpg");
+        assert_eq!(
+            key,
+            "captures/550e8400-e29b-41d4-a716-446655440000/photo.jpg"
+        );
     }
 
     #[test]
     fn test_depth_map_s3_key() {
         let capture_id = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
         let key = depth_map_s3_key(capture_id);
-        assert_eq!(key, "captures/550e8400-e29b-41d4-a716-446655440000/depth.gz");
+        assert_eq!(
+            key,
+            "captures/550e8400-e29b-41d4-a716-446655440000/depth.gz"
+        );
     }
 }

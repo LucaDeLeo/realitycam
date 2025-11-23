@@ -2,12 +2,7 @@
 //!
 //! Provides /health and /ready endpoints at root level for monitoring.
 
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::IntoResponse,
-    Json,
-};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::PgPool;

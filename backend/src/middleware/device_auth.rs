@@ -13,8 +13,8 @@ use axum::{
     http::{Request, Response, StatusCode},
 };
 use base64::{engine::general_purpose::STANDARD, Engine as _};
-use ciborium::Value;
 use chrono::Utc;
+use ciborium::Value;
 use p256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
@@ -451,7 +451,11 @@ async fn lookup_device(db: &PgPool, device_id: Uuid) -> Result<Device, ApiError>
 }
 
 /// Updates the device assertion counter in the database
-async fn update_device_counter(db: &PgPool, device_id: Uuid, new_counter: i64) -> Result<(), sqlx::Error> {
+async fn update_device_counter(
+    db: &PgPool,
+    device_id: Uuid,
+    new_counter: i64,
+) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
         UPDATE devices
@@ -511,11 +515,10 @@ fn verify_device_assertion(
     message.extend_from_slice(&client_data_hash);
 
     // Parse the public key (uncompressed EC point: 0x04 || x || y)
-    let verifying_key = VerifyingKey::from_sec1_bytes(public_key_bytes)
-        .map_err(|e| {
-            tracing::error!(error = %e, "Failed to parse public key");
-            ApiError::SignatureInvalid
-        })?;
+    let verifying_key = VerifyingKey::from_sec1_bytes(public_key_bytes).map_err(|e| {
+        tracing::error!(error = %e, "Failed to parse public key");
+        ApiError::SignatureInvalid
+    })?;
 
     // Parse the signature (could be DER or raw r||s format)
     let signature = parse_signature(&assertion.signature)?;
@@ -536,9 +539,9 @@ fn parse_cbor_assertion(data: &[u8]) -> Result<ParsedAssertion, ApiError> {
         ApiError::Validation("Invalid CBOR assertion".to_string())
     })?;
 
-    let map = value.as_map().ok_or_else(|| {
-        ApiError::Validation("Assertion must be a CBOR map".to_string())
-    })?;
+    let map = value
+        .as_map()
+        .ok_or_else(|| ApiError::Validation("Assertion must be a CBOR map".to_string()))?;
 
     // Extract authenticatorData
     let authenticator_data = map
@@ -546,7 +549,9 @@ fn parse_cbor_assertion(data: &[u8]) -> Result<ParsedAssertion, ApiError> {
         .find(|(k, _)| k.as_text() == Some("authenticatorData"))
         .and_then(|(_, v)| v.as_bytes())
         .map(|b| b.to_vec())
-        .ok_or_else(|| ApiError::Validation("Missing authenticatorData in assertion".to_string()))?;
+        .ok_or_else(|| {
+            ApiError::Validation("Missing authenticatorData in assertion".to_string())
+        })?;
 
     // Extract signature
     let signature = map
@@ -706,9 +711,7 @@ mod tests {
 
     #[test]
     fn test_extract_headers_missing_device_id() {
-        let request = Request::builder()
-            .body(Body::empty())
-            .unwrap();
+        let request = Request::builder().body(Body::empty()).unwrap();
 
         let result = extract_device_headers(&request);
         assert!(matches!(result, Err(ApiError::DeviceAuthRequired)));

@@ -72,7 +72,10 @@ pub enum DepthAnalysisError {
     ParseError(String),
 
     #[error("Insufficient valid depth data: {valid_count} valid of {total_count} total")]
-    InsufficientData { valid_count: usize, total_count: usize },
+    InsufficientData {
+        valid_count: usize,
+        total_count: usize,
+    },
 
     #[error("Empty depth map")]
     EmptyDepthMap,
@@ -168,11 +171,7 @@ pub fn parse_float32_array(bytes: &[u8]) -> Result<Vec<f32>, DepthAnalysisError>
 fn filter_valid_depths(depths: &[f32]) -> Vec<f64> {
     depths
         .iter()
-        .filter(|d| {
-            d.is_finite()
-                && **d >= MIN_VALID_DEPTH
-                && **d <= MAX_VALID_DEPTH
-        })
+        .filter(|d| d.is_finite() && **d >= MIN_VALID_DEPTH && **d <= MAX_VALID_DEPTH)
         .map(|d| *d as f64)
         .collect()
 }
@@ -248,11 +247,7 @@ pub fn compute_depth_statistics(depths: &[f32]) -> Result<DepthStatistics, Depth
 ///
 /// # Returns
 /// LayerDetectionResult with count and peak depths
-pub fn detect_depth_layers(
-    depths: &[f32],
-    min_depth: f64,
-    max_depth: f64,
-) -> LayerDetectionResult {
+pub fn detect_depth_layers(depths: &[f32], min_depth: f64, max_depth: f64) -> LayerDetectionResult {
     let valid = filter_valid_depths(depths);
 
     if valid.is_empty() || max_depth <= min_depth {
@@ -275,7 +270,11 @@ pub fn detect_depth_layers(
     // Simple 3-point moving average smoothing
     let mut smoothed = vec![0.0f64; HISTOGRAM_BINS];
     for i in 0..HISTOGRAM_BINS {
-        let left = if i > 0 { histogram[i - 1] } else { histogram[i] };
+        let left = if i > 0 {
+            histogram[i - 1]
+        } else {
+            histogram[i]
+        };
         let right = if i < HISTOGRAM_BINS - 1 {
             histogram[i + 1]
         } else {
@@ -583,9 +582,9 @@ async fn analyze_depth_map_inner(
 /// - 640x480 = 307,200
 fn infer_dimensions(pixel_count: usize) -> (usize, usize) {
     match pixel_count {
-        49152 => (256, 192),   // iPhone Pro LiDAR
-        76800 => (320, 240),   // QVGA
-        307200 => (640, 480),  // VGA
+        49152 => (256, 192),  // iPhone Pro LiDAR
+        76800 => (320, 240),  // QVGA
+        307200 => (640, 480), // VGA
         _ => {
             // Guess 4:3 aspect ratio
             let height = ((pixel_count as f64 / (4.0 / 3.0)).sqrt()) as usize;
@@ -634,13 +633,14 @@ mod tests {
                 let base = 0.5 + (x as f32 / width as f32) * 4.0;
                 let variation = (y as f32 / height as f32) * 0.5;
                 // Add some "objects" at different depths
-                let depth = if x > width / 3 && x < 2 * width / 3 && y > height / 3 && y < 2 * height / 3 {
-                    1.0 // Foreground object
-                } else if x < width / 4 {
-                    3.5 // Left side far
-                } else {
-                    base + variation
-                };
+                let depth =
+                    if x > width / 3 && x < 2 * width / 3 && y > height / 3 && y < 2 * height / 3 {
+                        1.0 // Foreground object
+                    } else if x < width / 4 {
+                        3.5 // Left side far
+                    } else {
+                        base + variation
+                    };
                 depths.push(depth);
             }
         }
@@ -691,7 +691,10 @@ mod tests {
         let stats = compute_depth_statistics(&depths).unwrap();
 
         // Flat plane should have very low variance
-        assert!(stats.variance < 0.01, "Flat plane variance should be near 0");
+        assert!(
+            stats.variance < 0.01,
+            "Flat plane variance should be near 0"
+        );
         assert!((stats.min_depth - 0.4).abs() < 0.01);
         assert!((stats.max_depth - 0.4).abs() < 0.01);
         assert!(stats.coverage > 0.99);
@@ -703,7 +706,10 @@ mod tests {
         let stats = compute_depth_statistics(&depths).unwrap();
 
         // Varied scene should have significant variance
-        assert!(stats.variance > 0.5, "Varied scene should have variance > 0.5");
+        assert!(
+            stats.variance > 0.5,
+            "Varied scene should have variance > 0.5"
+        );
         assert!(stats.max_depth > stats.min_depth);
     }
 
@@ -714,7 +720,10 @@ mod tests {
         let layers = detect_depth_layers(&depths, stats.min_depth, stats.max_depth);
 
         // Flat surface should have 1-2 layers
-        assert!(layers.layer_count <= 2, "Flat surface should have <= 2 layers");
+        assert!(
+            layers.layer_count <= 2,
+            "Flat surface should have <= 2 layers"
+        );
     }
 
     #[test]
@@ -798,14 +807,14 @@ mod tests {
     #[test]
     fn test_filter_valid_depths() {
         let depths = vec![
-            0.0f32,          // Invalid: zero
-            f32::NAN,        // Invalid: NaN
-            f32::INFINITY,   // Invalid: inf
-            0.05,            // Invalid: too small
-            25.0,            // Invalid: too large
-            0.5,             // Valid
-            1.0,             // Valid
-            2.0,             // Valid
+            0.0f32,        // Invalid: zero
+            f32::NAN,      // Invalid: NaN
+            f32::INFINITY, // Invalid: inf
+            0.05,          // Invalid: too small
+            25.0,          // Invalid: too large
+            0.5,           // Valid
+            1.0,           // Valid
+            2.0,           // Valid
         ];
 
         let valid = filter_valid_depths(&depths);
@@ -826,7 +835,10 @@ mod tests {
     fn test_all_invalid_depths() {
         let depths = vec![0.0f32, f32::NAN, f32::INFINITY, 0.01, 100.0];
         let result = compute_depth_statistics(&depths);
-        assert!(matches!(result, Err(DepthAnalysisError::InsufficientData { .. })));
+        assert!(matches!(
+            result,
+            Err(DepthAnalysisError::InsufficientData { .. })
+        ));
     }
 
     #[test]
@@ -841,9 +853,7 @@ mod tests {
         assert!(
             !is_real,
             "Flat scene should not be detected as real. variance={}, layers={}, coherence={}",
-            stats.variance,
-            layers.layer_count,
-            coherence
+            stats.variance, layers.layer_count, coherence
         );
     }
 
