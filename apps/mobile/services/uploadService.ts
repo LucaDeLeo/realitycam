@@ -21,8 +21,11 @@ import { useDeviceStore } from '../store/deviceStore';
  * API base URL from environment or localhost default
  */
 const API_BASE_URL = (() => {
-  // @ts-expect-error Expo sets this at build time via babel
-  const envUrl = typeof __DEV__ !== 'undefined' ? undefined : globalThis.EXPO_PUBLIC_API_URL;
+  // Prefer Expo public env on both dev and release builds (device-friendly)
+  const envUrl =
+    process.env.EXPO_PUBLIC_API_URL ||
+    // @ts-expect-error Expo injects global env at build time
+    (typeof globalThis !== 'undefined' ? globalThis.EXPO_PUBLIC_API_URL : undefined);
   return envUrl || 'http://localhost:8080';
 })();
 

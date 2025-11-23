@@ -18,6 +18,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: false,
     bundleIdentifier: 'com.realitycam.app',
+    developmentTeam: process.env.EXPO_DEVELOPMENT_TEAM,
     infoPlist: {
       NSCameraUsageDescription: 'RealityCam needs camera access to capture authenticated photos.',
       NSLocationWhenInUseUsageDescription: 'RealityCam needs location access to include GPS data in photo evidence.',

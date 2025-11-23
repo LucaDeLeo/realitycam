@@ -15,8 +15,11 @@ import type { ChallengeResponse } from '@realitycam/shared';
  * Note: Expo sets EXPO_PUBLIC_* env vars at build time
  */
 const API_BASE_URL = (() => {
-  // @ts-expect-error Expo sets this at build time via babel
-  const envUrl = typeof __DEV__ !== 'undefined' ? undefined : globalThis.EXPO_PUBLIC_API_URL;
+  // Prefer Expo public env on both dev and release builds (device-friendly)
+  const envUrl =
+    process.env.EXPO_PUBLIC_API_URL ||
+    // @ts-expect-error Expo injects global env at build time
+    (typeof globalThis !== 'undefined' ? globalThis.EXPO_PUBLIC_API_URL : undefined);
   return envUrl || 'http://localhost:8080';
 })();
 
