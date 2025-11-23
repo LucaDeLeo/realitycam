@@ -136,7 +136,7 @@ pub fn decompress_depth_map(compressed: &[u8]) -> Result<Vec<u8>, DepthAnalysisE
 /// # Returns
 /// Vector of f32 depth values
 pub fn parse_float32_array(bytes: &[u8]) -> Result<Vec<f32>, DepthAnalysisError> {
-    if bytes.len() % 4 != 0 {
+    if !bytes.len().is_multiple_of(4) {
         return Err(DepthAnalysisError::ParseError(format!(
             "Byte count {} is not divisible by 4",
             bytes.len()

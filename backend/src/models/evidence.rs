@@ -375,9 +375,11 @@ mod tests {
 
     #[test]
     fn test_confidence_both_pass_is_high() {
-        let mut depth = DepthAnalysis::default();
-        depth.status = CheckStatus::Pass;
-        depth.is_likely_real_scene = true;
+        let depth = DepthAnalysis {
+            status: CheckStatus::Pass,
+            is_likely_real_scene: true,
+            ..Default::default()
+        };
 
         let evidence = EvidencePackage {
             hardware_attestation: HardwareAttestation::pass(
@@ -421,9 +423,11 @@ mod tests {
 
     #[test]
     fn test_confidence_depth_fail_is_suspicious() {
-        let mut depth = DepthAnalysis::default();
-        depth.status = CheckStatus::Fail;
-        depth.is_likely_real_scene = false;
+        let depth = DepthAnalysis {
+            status: CheckStatus::Fail,
+            is_likely_real_scene: false,
+            ..Default::default()
+        };
 
         let evidence = EvidencePackage {
             hardware_attestation: HardwareAttestation::pass(
@@ -439,9 +443,11 @@ mod tests {
 
     #[test]
     fn test_confidence_depth_pass_hw_unavailable_is_medium() {
-        let mut depth = DepthAnalysis::default();
-        depth.status = CheckStatus::Pass;
-        depth.is_likely_real_scene = true;
+        let depth = DepthAnalysis {
+            status: CheckStatus::Pass,
+            is_likely_real_scene: true,
+            ..Default::default()
+        };
 
         let evidence = EvidencePackage {
             hardware_attestation: HardwareAttestation::unavailable(
