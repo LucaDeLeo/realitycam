@@ -218,6 +218,10 @@ export const useUploadQueueStore = create<UploadQueueStore>()(
       markCompleted: (id: string, captureId: string, verificationUrl: string) => {
         const now = new Date().toISOString();
 
+        // Get item before state change to check if it was an offline capture
+        const item = get().items.find((i) => i.capture.id === id) as ExtendedQueuedCapture | undefined;
+        const wasOfflineCapture = item?.isOfflineCapture === true;
+
         set((state) => ({
           items: state.items.map((item) =>
             item.capture.id === id
@@ -239,7 +243,15 @@ export const useUploadQueueStore = create<UploadQueueStore>()(
           id,
           captureId,
           verificationUrl,
+          wasOfflineCapture,
         });
+
+        // Trigger cleanup for offline captures (Story 4.3 AC-6)
+        if (wasOfflineCapture) {
+          import('../services/captureCleanup')
+            .then(({ onUploadCompleted }) => onUploadCompleted(id))
+            .catch((err) => console.warn('[uploadQueueStore] Cleanup trigger failed:', err));
+        }
       },
 
       /**

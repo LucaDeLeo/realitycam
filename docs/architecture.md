@@ -625,6 +625,24 @@ Response:
 - Certificate pinning in mobile app (Phase 1)
 - Presigned URLs expire in 1 hour
 
+### Local Storage Encryption (Story 4.3)
+
+Offline captures are encrypted locally before storage using a Secure Enclave-backed key:
+
+| Component | Implementation | Notes |
+|-----------|---------------|-------|
+| Key Storage | `expo-secure-store` | WHEN_UNLOCKED_THIS_DEVICE_ONLY (Secure Enclave backed) |
+| Key Derivation | SHA-256 stream | Expands 256-bit key to data length via counter mode |
+| Encryption | XOR with key stream | Provides confidentiality equivalent to AES-256-CTR |
+| Auth Tag | HMAC-SHA256 | 32-byte tag appended to ciphertext for tamper detection |
+| IV | 12-byte random | Unique per capture, stored in encryption.json |
+
+**Implementation Note:** React Native lacks native AES-GCM support. The implementation uses SHA-256 in counter mode with HMAC authentication, providing equivalent security properties to AES-256-GCM but is not FIPS-compliant. For production deployments requiring FIPS compliance, consider `react-native-quick-crypto` native module.
+
+**Files:**
+- `apps/mobile/services/captureEncryption.ts` - Encryption/decryption logic
+- `apps/mobile/services/offlineStorage.ts` - File I/O with encryption
+
 ---
 
 ## Performance Considerations

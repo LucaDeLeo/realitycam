@@ -1,6 +1,6 @@
 # Story 4.3: Offline Storage and Auto-Upload
 
-Status: review
+Status: done
 
 ## Story
 
@@ -469,14 +469,16 @@ The implementation of offline storage and auto-upload functionality is substanti
 
 ### Action Items
 
-- [ ] [MEDIUM] Integrate onUploadCompleted() call into upload completion flow [file: apps/mobile/store/uploadQueueStore.ts:218-243 or apps/mobile/hooks/useUploadQueue.ts:131-149]
-- [ ] [MEDIUM] Document encryption deviation from AES-256-GCM in architecture docs [file: docs/architecture.md]
+- [x] [MEDIUM] Integrate onUploadCompleted() call into upload completion flow [file: apps/mobile/store/uploadQueueStore.ts:218-243 or apps/mobile/hooks/useUploadQueue.ts:131-149] **FIXED: Added cleanup trigger in markCompleted() - lines 249-254**
+- [x] [MEDIUM] Document encryption deviation from AES-256-GCM in architecture docs [file: docs/architecture.md] **FIXED: Added "Local Storage Encryption (Story 4.3)" section at line 628**
 - [ ] [LOW] Consider implementing true network pause instead of retry mechanism [file: apps/mobile/hooks/useUploadQueue.ts]
 - [ ] [LOW] Add integration test for offline->upload->cleanup flow
 
 ### Next Steps
 
-Story auto-loops back to implementation to address MEDIUM severity issues (M1, M2). The cleanup integration (M1) is the priority fix as it affects functional correctness. The encryption documentation (M2) is informational.
+~~Story auto-loops back to implementation to address MEDIUM severity issues (M1, M2). The cleanup integration (M1) is the priority fix as it affects functional correctness. The encryption documentation (M2) is informational.~~
+
+**COMPLETED (2025-11-23):** Both MEDIUM severity issues addressed in review cycle 2. All acceptance criteria validated, TypeScript passes, story marked as done.
 
 ---
 

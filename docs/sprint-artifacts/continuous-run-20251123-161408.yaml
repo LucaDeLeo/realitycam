@@ -1,0 +1,34 @@
+run_id: continuous-run-20251123-161408
+run_started: 2025-11-23T16:14:08Z
+branch: main
+initial_commit: c351e47
+
+configuration:
+  jit_epic_context: true
+  max_epic_validation_attempts: 3
+  max_stories: null
+  max_validation_attempts: 3
+  max_review_cycles: 3
+  max_consecutive_failures: 5
+  auto_commit: true
+  auto_push: true
+  dry_run: false
+
+epics_contexted: []
+
+stories_pending:
+  - 4-3-offline-storage-auto-upload
+
+stories_processed: []
+
+statistics:
+  epics_contexted_jit: 0
+  epics_already_contexted: 0
+  total_stories: 1
+  success_count: 0
+  blocked_validation_count: 0
+  blocked_review_count: 0
+  blocked_external_count: 0
+  blocked_epic_context_count: 0
+  blocked_git_count: 0
+  consecutive_failures: 0

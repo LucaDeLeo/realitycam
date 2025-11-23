@@ -69,7 +69,7 @@ development_status:
   epic-4: contexted
   4-1-capture-upload-endpoint: done
   4-2-upload-queue-retry: done
-  4-3-offline-storage-auto-upload: in-progress
+  4-3-offline-storage-auto-upload: done
   4-4-attestation-verification-upload: done
   4-5-lidar-depth-analysis-service: done
   4-6-metadata-validation: done
