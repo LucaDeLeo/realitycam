@@ -120,9 +120,13 @@ const styles = StyleSheet.create({
   imageContainer: {
     position: 'relative',
     backgroundColor: '#000000',
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   image: {
     backgroundColor: '#000000',
+    width: '100%',
   },
   depthOverlay: {
     position: 'absolute',

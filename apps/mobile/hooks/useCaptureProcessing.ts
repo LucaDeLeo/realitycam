@@ -127,8 +127,9 @@ export function useCaptureProcessing(): UseCaptureProcessingReturn {
         console.log('[useCaptureProcessing] Computing photo hash...');
         let photoHash: string;
         try {
+          // Use legacy API
           const photoBase64 = await FileSystem.readAsStringAsync(raw.photoUri, {
-            encoding: 'base64',
+            encoding: FileSystem.EncodingType.Base64,
           });
           photoHash = await Crypto.digestStringAsync(
             Crypto.CryptoDigestAlgorithm.SHA256,

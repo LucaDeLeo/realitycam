@@ -90,13 +90,7 @@ export default function HistoryScreen() {
           { backgroundColor: isDark ? colors.backgroundDark : colors.background },
         ]}
       >
-        <View style={styles.emptyContainer}>
-          <Ionicons
-            name="time-outline"
-            size={80}
-            color={colors.primary}
-            style={styles.icon}
-          />
+      <View style={styles.emptyContainer}>
           <Text style={[styles.title, { color: isDark ? colors.textDark : colors.text }]}>
             History
           </Text>

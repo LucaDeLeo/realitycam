@@ -364,7 +364,7 @@ export function useCapture(): UseCaptureReturn {
 
           // Compute photo hash from file
           const photoBase64 = await FileSystem.readAsStringAsync(photo.uri, {
-            encoding: 'base64',
+            encoding: FileSystem.EncodingType.Base64,
           });
           const photoHash = await Crypto.digestStringAsync(
             Crypto.CryptoDigestAlgorithm.SHA256,

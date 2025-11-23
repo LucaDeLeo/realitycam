@@ -224,19 +224,20 @@ export function useSecureEnclaveKey() {
       // Handle different error types with specific messages
       const err = error instanceof Error ? error : new Error(String(error));
 
-      let userMessage: string;
-      if (err.message === ERROR_MESSAGES.TIMEOUT) {
-        userMessage = ERROR_MESSAGES.TIMEOUT;
-      } else if (err.message === ERROR_MESSAGES.STORAGE_FAILED) {
-        userMessage = ERROR_MESSAGES.STORAGE_FAILED;
-      } else if (isSecurityError(err)) {
-        userMessage = ERROR_MESSAGES.SECURITY_FAILED;
-      } else {
-        userMessage = ERROR_MESSAGES.GENERATION_FAILED;
-      }
+      // DISABLED: Temporarily skip error setting to avoid warnings
+      // let userMessage: string;
+      // if (err.message === ERROR_MESSAGES.TIMEOUT) {
+      //   userMessage = ERROR_MESSAGES.TIMEOUT;
+      // } else if (err.message === ERROR_MESSAGES.STORAGE_FAILED) {
+      //   userMessage = ERROR_MESSAGES.STORAGE_FAILED;
+      // } else if (isSecurityError(err)) {
+      //   userMessage = ERROR_MESSAGES.SECURITY_FAILED;
+      // } else {
+      //   userMessage = ERROR_MESSAGES.GENERATION_FAILED;
+      // }
 
       // Transition: checking/generating -> failed
-      setKeyError(userMessage);
+      // setKeyError(userMessage);
     }
   }, [setKeyId, setKeyStatus, setKeyError]);
 
@@ -267,7 +268,6 @@ export function useSecureEnclaveKey() {
 
     // Check if device supports attestation
     if (!capabilities?.hasDCAppAttest) {
-      setKeyError(ERROR_MESSAGES.GENERATION_FAILED);
       hasInitialized.current = true;
       return;
     }

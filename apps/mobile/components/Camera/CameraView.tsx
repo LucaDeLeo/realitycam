@@ -16,8 +16,10 @@ import {
   StyleSheet,
   useColorScheme,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { CameraView as ExpoCameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import { Ionicons } from '@expo/vector-icons';
 import type { DepthFrame } from '@realitycam/shared';
 import { useLiDAR } from '../../hooks/useLiDAR';
 import { DepthOverlay } from './DepthOverlay';
@@ -113,6 +115,9 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
 
   // Local overlay state
   const [overlayEnabled, setOverlayEnabled] = useState(initialShowOverlay);
+  
+  // Camera facing state (front/back)
+  const [facing, setFacing] = useState<CameraType>('back');
 
   // LiDAR hook
   const {
@@ -174,6 +179,16 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
     onOverlayToggle?.(newState);
   }, [overlayEnabled, onOverlayToggle]);
 
+  // Handle camera flip
+  const handleFlipCamera = useCallback(() => {
+    setFacing((current) => {
+      const newFacing = current === 'back' ? 'front' : 'back';
+      // Reset camera ready state when flipping
+      setCameraReady(false);
+      return newFacing;
+    });
+  }, []);
+
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
     captureDepthFrame,
@@ -214,9 +229,10 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
     <View style={styles.container}>
       {/* Camera Preview */}
       <ExpoCameraView
+        key={facing} // Force re-render when facing changes
         ref={setCameraRef}
         style={styles.camera}
-        facing="back"
+        facing={facing}
         mode="picture"
         onCameraReady={() => {
           setCameraReady(true);
@@ -234,23 +250,35 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
 
       {/* Controls Overlay */}
       <View style={styles.controls}>
-        {/* Depth Toggle Button */}
-        <View style={styles.toggleContainer}>
+        {/* DISABLED: Depth Toggle Button - temporarily hidden */}
+        {/* <View style={styles.toggleContainer}>
           <DepthToggle
             enabled={overlayEnabled}
             onToggle={handleOverlayToggle}
             disabled={!isAvailable || !isReady}
           />
-        </View>
+        </View> */}
 
-        {/* Capture Button */}
+        {/* Capture Button and Flip Camera Button */}
         {onCapture && (
-          <View style={styles.captureButtonContainer}>
-            <CaptureButton
-              onCapture={onCapture}
-              isCapturing={isCapturing}
-              disabled={!permission?.granted || !cameraReady}
-            />
+          <View style={styles.captureControlsContainer}>
+            <View style={styles.captureButtonContainer}>
+              <CaptureButton
+                onCapture={onCapture}
+                isCapturing={isCapturing}
+                disabled={!permission?.granted || !cameraReady}
+              />
+            </View>
+            {/* Flip Camera Button - Right side of capture button */}
+            <TouchableOpacity
+              style={styles.flipButton}
+              onPress={handleFlipCamera}
+              activeOpacity={0.7}
+              accessibilityLabel={facing === 'back' ? 'Switch to front camera' : 'Switch to back camera'}
+              accessibilityRole="button"
+            >
+              <Ionicons name="camera-reverse-outline" size={28} color="#FFFFFF" />
+            </TouchableOpacity>
           </View>
         )}
 
@@ -287,12 +315,32 @@ const styles = StyleSheet.create({
     top: 60,
     right: 20,
   },
-  captureButtonContainer: {
+  captureControlsContainer: {
     position: 'absolute',
     bottom: 40,
     left: 0,
     right: 0,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 24,
+  },
+  captureButtonContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  flipButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
   statusContainer: {
     position: 'absolute',
