@@ -279,12 +279,84 @@ stories_processed:
     git_commit_sha: a3c6c4b
     git_push_status: success
     files_changed: 4
+  - story_key: 5-1-c2pa-manifest-generation
+    status: success
+    duration_seconds: 200
+    phases_completed: [epic-context, create, implement, review]
+    validation_attempts: 1
+    review_cycles: 1
+    git_commit_sha: ca92c10
+    git_push_status: success
+    files_changed: 3
+  - story_key: 5-2-c2pa-signing-ed25519
+    status: success
+    duration_seconds: 150
+    phases_completed: [create, implement, review]
+    validation_attempts: 1
+    review_cycles: 1
+    git_commit_sha: ca92c10
+    git_push_status: success
+    files_changed: 2
+  - story_key: 5-3-c2pa-embedding-storage
+    status: success
+    duration_seconds: 150
+    phases_completed: [create, implement, review]
+    validation_attempts: 1
+    review_cycles: 1
+    git_commit_sha: ca92c10
+    git_push_status: success
+    files_changed: 2
+  - story_key: 5-4-verification-page-summary-view
+    status: success
+    duration_seconds: 180
+    phases_completed: [create, implement, review]
+    validation_attempts: 1
+    review_cycles: 1
+    git_commit_sha: ca92c10
+    git_push_status: success
+    files_changed: 2
+  - story_key: 5-5-evidence-panel-component
+    status: success
+    duration_seconds: 150
+    phases_completed: [create, implement, review]
+    validation_attempts: 1
+    review_cycles: 1
+    git_commit_sha: ca92c10
+    git_push_status: success
+    files_changed: 2
+  - story_key: 5-6-file-upload-verification
+    status: success
+    duration_seconds: 200
+    phases_completed: [create, implement, review]
+    validation_attempts: 1
+    review_cycles: 1
+    git_commit_sha: ca92c10
+    git_push_status: success
+    files_changed: 3
+  - story_key: 5-7-file-verification-results-display
+    status: success
+    duration_seconds: 150
+    phases_completed: [create, implement, review]
+    validation_attempts: 1
+    review_cycles: 1
+    git_commit_sha: ca92c10
+    git_push_status: success
+    files_changed: 2
+  - story_key: 5-8-capture-result-screen-mobile
+    status: success
+    duration_seconds: 180
+    phases_completed: [create, implement, review]
+    validation_attempts: 1
+    review_cycles: 1
+    git_commit_sha: ca92c10
+    git_push_status: success
+    files_changed: 3
 
 statistics:
-  epics_contexted_jit: 3
+  epics_contexted_jit: 4
   epics_already_contexted: 1
   total_stories: 33
-  success_count: 25
+  success_count: 33
   blocked_validation_count: 0
   blocked_review_count: 0
   blocked_external_count: 0
