@@ -213,3 +213,88 @@ export interface CaptureAssertionError {
   /** User-friendly error message */
   message: string;
 }
+
+// ============================================================================
+// Local Processing Types (Story 3.5)
+// ============================================================================
+
+/**
+ * Capture status lifecycle
+ * Tracks capture from initial photo through upload completion
+ */
+export type CaptureStatus =
+  | 'capturing'    // Photo + depth being taken
+  | 'processing'   // Local processing (hash, compress)
+  | 'ready'        // Ready for upload
+  | 'uploading'    // Upload in progress (Epic 4)
+  | 'completed'    // Upload successful
+  | 'failed';      // Upload failed
+
+/**
+ * Metadata for upload payload
+ * Assembled during local processing for backend consumption
+ */
+export interface CaptureMetadata {
+  /** ISO timestamp of capture */
+  captured_at: string;
+  /** Device model string (e.g., "iPhone 15 Pro") */
+  device_model: string;
+  /** SHA-256 base64 hash of photo bytes */
+  photo_hash: string;
+  /** Depth map dimensions */
+  depth_map_dimensions: {
+    width: number;
+    height: number;
+  };
+  /** Optional GPS location data */
+  location?: CaptureLocation;
+  /** Base64 per-capture assertion (if device is attested) */
+  assertion?: string;
+}
+
+/**
+ * Processed capture ready for upload
+ * Contains compressed depth, hashes, and assembled metadata
+ */
+export interface ProcessedCapture {
+  /** UUID for this capture */
+  id: string;
+  /** Local file URI to captured JPEG */
+  photoUri: string;
+  /** SHA-256 base64 hash of photo bytes */
+  photoHash: string;
+  /** Base64-encoded gzipped depth map (Float32Array compressed with pako) */
+  compressedDepthMap: string;
+  /** Depth map dimensions */
+  depthDimensions: {
+    width: number;
+    height: number;
+  };
+  /** Assembled metadata for backend */
+  metadata: CaptureMetadata;
+  /** Base64 device assertion (if available) */
+  assertion?: string;
+  /** Processing lifecycle status */
+  status: CaptureStatus;
+  /** ISO timestamp when capture was created */
+  createdAt: string;
+}
+
+/**
+ * Error codes for processing failures
+ */
+export type ProcessingErrorCode =
+  | 'HASH_FAILED'       // SHA-256 computation failed
+  | 'COMPRESSION_FAILED' // Gzip compression failed
+  | 'FILE_READ_FAILED'  // Failed to read photo file
+  | 'UNKNOWN';          // Unknown error
+
+/**
+ * Processing error
+ */
+export interface ProcessingError {
+  /** Error classification */
+  code: ProcessingErrorCode;
+  /** User-friendly error message */
+  message: string;
+}

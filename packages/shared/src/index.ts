@@ -27,6 +27,12 @@ export type {
   CaptureAssertion,
   CaptureAssertionErrorCode,
   CaptureAssertionError,
+  // Story 3.5: Local Processing Types
+  CaptureStatus,
+  CaptureMetadata,
+  ProcessedCapture,
+  ProcessingErrorCode,
+  ProcessingError,
 } from './types/capture';
 
 // Device Types

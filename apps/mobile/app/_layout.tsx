@@ -208,6 +208,14 @@ export default function RootLayout() {
       )}
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="preview"
+          options={{
+            title: 'Preview',
+            headerShown: true,
+            presentation: 'fullScreenModal',
+          }}
+        />
       </Stack>
     </SafeAreaProvider>
   );

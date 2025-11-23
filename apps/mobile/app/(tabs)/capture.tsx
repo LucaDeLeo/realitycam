@@ -4,18 +4,23 @@
  * Main camera capture screen with LiDAR depth overlay.
  * Displays camera preview with real-time depth visualization.
  * Implements synchronized photo + depth + location capture via useCapture hook.
+ * Processes capture and navigates to preview screen.
  *
  * @see Story 3.1 - Camera View with LiDAR Depth Overlay
  * @see Story 3.2 - Photo Capture with Depth Map
  * @see Story 3.3 - GPS Metadata Collection
+ * @see Story 3.5 - Local Processing Pipeline
+ * @see Story 3.6 - Capture Preview Screen
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, useColorScheme, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { CameraView, CameraViewHandle } from '../../components/Camera';
 import { useDeviceStore } from '../../store/deviceStore';
 import { useCapture } from '../../hooks/useCapture';
+import { useCaptureProcessing } from '../../hooks/useCaptureProcessing';
 import { colors } from '../../constants/colors';
 import type { RawCapture } from '@realitycam/shared';
 
@@ -57,6 +62,7 @@ function LiDARUnavailable({ reason }: { reason?: string }) {
 export default function CaptureScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const router = useRouter();
 
   // Get device capabilities from store
   const capabilities = useDeviceStore((state) => state.capabilities);
@@ -83,6 +89,14 @@ export default function CaptureScreen() {
     hasLocationPermission,
     locationPermissionStatus,
   } = useCapture();
+
+  // Processing hook for local processing pipeline (Story 3.5)
+  const {
+    processCapture,
+    isProcessing,
+    error: processingError,
+    clearError: clearProcessingError,
+  } = useCaptureProcessing();
 
   // Track if we've requested location permission (to avoid repeated prompts)
   const hasRequestedLocationPermission = useRef(false);
@@ -113,6 +127,7 @@ export default function CaptureScreen() {
     }
 
     try {
+      // Step 1: Capture photo + depth + location
       const rawCapture = await capture();
       console.log('[CaptureScreen] Capture successful:', {
         id: rawCapture.id,
@@ -121,31 +136,41 @@ export default function CaptureScreen() {
         syncDeltaMs: rawCapture.syncDeltaMs,
         depthSize: `${rawCapture.depthFrame.width}x${rawCapture.depthFrame.height}`,
         hasLocation: !!rawCapture.location,
-        location: rawCapture.location ? {
-          lat: rawCapture.location.latitude,
-          lng: rawCapture.location.longitude,
-          accuracy: rawCapture.location.accuracy,
-        } : null,
+        hasAssertion: !!rawCapture.assertion,
       });
 
-      // TODO: Story 3-6 will add navigation to preview screen
-      // For now, show success feedback
-      const locationInfo = rawCapture.location
-        ? `\nLocation: ${rawCapture.location.latitude.toFixed(4)}, ${rawCapture.location.longitude.toFixed(4)}`
-        : '\nLocation: Not available';
-      Alert.alert(
-        'Capture Complete',
-        `Photo captured with depth data.\nSync delta: ${rawCapture.syncDeltaMs}ms${locationInfo}`,
-        [{ text: 'OK' }]
-      );
+      // Step 2: Process capture (hash, compress, assemble metadata)
+      console.log('[CaptureScreen] Processing capture...');
+      const processedCapture = await processCapture(rawCapture);
+      console.log('[CaptureScreen] Processing complete:', {
+        id: processedCapture.id,
+        status: processedCapture.status,
+        photoHashPrefix: processedCapture.photoHash.substring(0, 8) + '...',
+      });
+
+      // Step 3: Navigate to preview screen with processed capture data
+      console.log('[CaptureScreen] Navigating to preview...');
+      router.push({
+        pathname: '/preview',
+        params: { capture: JSON.stringify(processedCapture) },
+      });
     } catch (err) {
-      // Error is already logged by useCapture, just show alert
-      const errorMessage = captureError?.message || 'Failed to capture photo. Please try again.';
+      // Error is already logged by hooks, just show alert
+      const errorMessage =
+        captureError?.message ||
+        processingError?.message ||
+        'Failed to capture photo. Please try again.';
       Alert.alert('Capture Failed', errorMessage, [
-        { text: 'OK', onPress: clearError },
+        {
+          text: 'OK',
+          onPress: () => {
+            clearError();
+            clearProcessingError();
+          },
+        },
       ]);
     }
-  }, [capture, captureError, clearError, locationPermissionStatus, requestLocationPermission]);
+  }, [capture, captureError, clearError, processingError, clearProcessingError, locationPermissionStatus, requestLocationPermission, processCapture, router]);
 
   // Check if device has LiDAR capability
   // This is a double-check - the device store should already show LiDAR
@@ -170,8 +195,8 @@ export default function CaptureScreen() {
         maxDepth={5}
         overlayOpacity={0.4}
         onCapture={handleCapture}
-        isCapturing={isCapturing}
-        isCaptureReady={isCaptureReady}
+        isCapturing={isCapturing || isProcessing}
+        isCaptureReady={isCaptureReady && !isProcessing}
         onCameraRef={setCameraRef}
       />
     </View>
