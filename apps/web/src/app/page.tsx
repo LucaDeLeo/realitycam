@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { FileDropzone } from '@/components/Upload/FileDropzone';
 
 export default function Home() {
@@ -107,7 +108,7 @@ export default function Home() {
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-3">
               Want to see an example?
             </p>
-            <a
+            <Link
               href="/verify/demo"
               className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
             >
@@ -126,7 +127,7 @@ export default function Home() {
                   d="M9 5l7 7-7 7"
                 />
               </svg>
-            </a>
+            </Link>
           </div>
         </div>
       </main>

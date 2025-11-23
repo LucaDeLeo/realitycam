@@ -423,7 +423,7 @@ mod tests {
 
         for model in models {
             let result = verify_device_model(model);
-            assert!(result.is_verified, "Model {} should be verified", model);
+            assert!(result.is_verified, "Model {model} should be verified");
         }
     }
 

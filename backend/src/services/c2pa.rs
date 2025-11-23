@@ -180,8 +180,8 @@ impl C2paService {
         let assertion = self.build_assertion(evidence, captured_at);
 
         let version = env!("CARGO_PKG_VERSION");
-        let claim_generator = format!("{}/{}", CLAIM_GENERATOR, version);
-        let software_agent = format!("{}/{}", SOFTWARE_AGENT, version);
+        let claim_generator = format!("{CLAIM_GENERATOR}/{version}");
+        let software_agent = format!("{SOFTWARE_AGENT}/{version}");
 
         C2paManifest {
             claim_generator,

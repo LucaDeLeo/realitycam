@@ -213,8 +213,7 @@ impl CaptureMetadataPayload {
 pub fn validate_photo_size(size: usize) -> Result<(), ApiError> {
     if size > MAX_PHOTO_SIZE {
         return Err(ApiError::PayloadTooLarge(format!(
-            "photo exceeds maximum size of {} bytes (got {} bytes)",
-            MAX_PHOTO_SIZE, size
+            "photo exceeds maximum size of {MAX_PHOTO_SIZE} bytes (got {size} bytes)"
         )));
     }
     if size == 0 {
@@ -227,8 +226,7 @@ pub fn validate_photo_size(size: usize) -> Result<(), ApiError> {
 pub fn validate_depth_map_size(size: usize) -> Result<(), ApiError> {
     if size > MAX_DEPTH_MAP_SIZE {
         return Err(ApiError::PayloadTooLarge(format!(
-            "depth_map exceeds maximum size of {} bytes (got {} bytes)",
-            MAX_DEPTH_MAP_SIZE, size
+            "depth_map exceeds maximum size of {MAX_DEPTH_MAP_SIZE} bytes (got {size} bytes)"
         )));
     }
     if size == 0 {

@@ -178,6 +178,7 @@ impl Default for DepthAnalysis {
 /// - Resolution (known LiDAR formats)
 /// - Location (valid GPS coordinates)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct MetadataEvidence {
     /// Whether the timestamp is within acceptable bounds (15 min window)
     pub timestamp_valid: bool,
@@ -199,20 +200,6 @@ pub struct MetadataEvidence {
     pub location_coarse: Option<String>,
 }
 
-impl Default for MetadataEvidence {
-    fn default() -> Self {
-        Self {
-            timestamp_valid: false,
-            timestamp_delta_seconds: 0,
-            model_verified: false,
-            model_name: String::new(),
-            resolution_valid: false,
-            location_available: false,
-            location_opted_out: false,
-            location_coarse: None,
-        }
-    }
-}
 
 // ============================================================================
 // Processing Info Structure (Story 4-7)
@@ -222,6 +209,7 @@ impl Default for MetadataEvidence {
 ///
 /// Records timing and version info for the evidence processing pipeline.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct ProcessingInfo {
     /// When processing completed (ISO 8601)
     pub processed_at: String,
@@ -231,15 +219,6 @@ pub struct ProcessingInfo {
     pub backend_version: String,
 }
 
-impl Default for ProcessingInfo {
-    fn default() -> Self {
-        Self {
-            processed_at: String::new(),
-            processing_time_ms: 0,
-            backend_version: String::new(),
-        }
-    }
-}
 
 impl ProcessingInfo {
     /// Creates a new ProcessingInfo with current timestamp

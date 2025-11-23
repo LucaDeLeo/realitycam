@@ -360,7 +360,7 @@ pub fn compute_edge_coherence(depths: &[f32], width: usize, height: usize) -> f6
             let center = depths[idx];
 
             // Skip invalid center pixels
-            if !center.is_finite() || center < MIN_VALID_DEPTH || center > MAX_VALID_DEPTH {
+            if !center.is_finite() || !(MIN_VALID_DEPTH..=MAX_VALID_DEPTH).contains(&center) {
                 continue;
             }
 
@@ -753,8 +753,7 @@ mod tests {
         // Flat surface should have low edge coherence
         assert!(
             coherence < 0.5,
-            "Flat surface should have low coherence, got {}",
-            coherence
+            "Flat surface should have low coherence, got {coherence}"
         );
     }
 
@@ -766,8 +765,7 @@ mod tests {
         // Varied scene should have higher edge coherence
         assert!(
             coherence > 0.3,
-            "Varied scene should have coherence > 0.3, got {}",
-            coherence
+            "Varied scene should have coherence > 0.3, got {coherence}"
         );
     }
 

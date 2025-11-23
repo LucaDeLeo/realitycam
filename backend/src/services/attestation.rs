@@ -828,7 +828,7 @@ mod tests {
     #[test]
     fn test_decode_attestation_object_invalid_cbor() {
         use base64::{engine::general_purpose::STANDARD, Engine as _};
-        let invalid_cbor = STANDARD.encode(&[0xFF, 0xFF, 0xFF]); // Invalid CBOR
+        let invalid_cbor = STANDARD.encode([0xFF, 0xFF, 0xFF]); // Invalid CBOR
         let result = decode_attestation_object(&invalid_cbor);
         assert!(matches!(result, Err(AttestationError::InvalidCbor(_))));
     }

@@ -546,7 +546,7 @@ mod tests {
         let request_id = Uuid::new_v4();
 
         // Valid base64 but invalid CBOR
-        let invalid_cbor_b64 = STANDARD.encode(&[0xFF, 0xFF, 0xFF]);
+        let invalid_cbor_b64 = STANDARD.encode([0xFF, 0xFF, 0xFF]);
 
         let result = verify_capture_assertion(
             &device,

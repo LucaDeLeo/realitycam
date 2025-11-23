@@ -68,7 +68,7 @@ pub fn coarsen_coordinates(latitude: f64, longitude: f64) -> (f64, f64) {
 /// Formatted coordinate string
 pub fn format_location_coarse(latitude: f64, longitude: f64) -> String {
     let (coarse_lat, coarse_lng) = coarsen_coordinates(latitude, longitude);
-    format!("{:.2}, {:.2}", coarse_lat, coarse_lng)
+    format!("{coarse_lat:.2}, {coarse_lng:.2}")
 }
 
 /// Processes location data for privacy-aware storage
