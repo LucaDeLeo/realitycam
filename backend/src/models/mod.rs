@@ -12,6 +12,6 @@ pub use capture::{Capture, CreateCaptureParams};
 pub use device::Device;
 pub use evidence::{
     AttestationLevel, CheckStatus, ConfidenceLevel, DepthAnalysis, EvidencePackage,
-    HardwareAttestation, MetadataEvidence,
+    HardwareAttestation, MetadataEvidence, ProcessingInfo,
 };
 pub use verification_log::VerificationLog;

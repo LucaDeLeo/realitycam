@@ -29,8 +29,11 @@ use uuid::Uuid;
 
 use crate::error::{ApiError, ApiErrorWithRequestId};
 use crate::middleware::DeviceContext;
-use crate::models::{Device, EvidencePackage, HardwareAttestation, MetadataEvidence};
-use crate::services::{analyze_depth_map, verify_capture_assertion, StorageService};
+use crate::models::{Device, EvidencePackage, HardwareAttestation, ProcessingInfo};
+use crate::services::{analyze_depth_map, process_location_for_evidence, validate_metadata, verify_capture_assertion, StorageService};
+
+/// Backend version for processing info (from Cargo.toml)
+const BACKEND_VERSION: &str = env!("CARGO_PKG_VERSION");
 use crate::types::{
     capture::{validate_depth_map_size, validate_photo_size},
     ApiResponse, CaptureMetadataPayload, CaptureUploadResponse,
@@ -272,7 +275,7 @@ async fn insert_capture_with_evidence(
     .bind(&params.depth_map_s3_key)
     .bind(&params.evidence)
     .bind(&params.confidence_level)
-    .bind("pending") // Initial status
+    .bind("complete") // Status set to complete after evidence pipeline (Story 4-7)
     .bind(&params.location_precise)
     .bind(params.captured_at)
     .fetch_one(pool)
@@ -314,6 +317,9 @@ async fn upload_capture(
     Extension(device_ctx): Extension<DeviceContext>,
     multipart: Multipart,
 ) -> Result<(StatusCode, Json<ApiResponse<CaptureUploadResponse>>), ApiErrorWithRequestId> {
+    // Start timing for processing info (Story 4-7)
+    let processing_start = std::time::Instant::now();
+
     tracing::info!(
         request_id = %request_id,
         device_id = %device_ctx.device_id,
@@ -461,21 +467,84 @@ async fn upload_capture(
     // End Story 4.5 additions
     // ========================================================================
 
+    // ========================================================================
+    // STORY 4.6: Metadata Validation
+    // ========================================================================
+    // Validate capture metadata (timestamp, device model, location, resolution).
+    // This is NON-BLOCKING: failures do not reject the upload.
+
+    let metadata_evidence = validate_metadata(&parsed.metadata);
+
+    tracing::info!(
+        request_id = %request_id,
+        capture_id = %capture_id,
+        timestamp_valid = metadata_evidence.timestamp_valid,
+        timestamp_delta = metadata_evidence.timestamp_delta_seconds,
+        model_verified = metadata_evidence.model_verified,
+        resolution_valid = metadata_evidence.resolution_valid,
+        location_available = metadata_evidence.location_available,
+        "[metadata_validation] Metadata validation completed"
+    );
+
+    // ========================================================================
+    // End Story 4.6 additions
+    // ========================================================================
+
+    // ========================================================================
+    // STORY 4.8: Privacy Controls
+    // ========================================================================
+    // Apply location coarsening for privacy protection.
+    // Precise location stored separately; coarse location in evidence package.
+
+    let location_coarse = process_location_for_evidence(parsed.metadata.location.as_ref());
+
+    // Update metadata evidence with coarsened location
+    let mut metadata_evidence = metadata_evidence;
+    metadata_evidence.location_coarse = location_coarse.clone();
+
+    tracing::info!(
+        request_id = %request_id,
+        capture_id = %capture_id,
+        location_coarse = ?location_coarse,
+        location_opted_out = metadata_evidence.location_opted_out,
+        "[privacy] Location privacy controls applied"
+    );
+
+    // ========================================================================
+    // End Story 4.8 additions
+    // ========================================================================
+
+    // ========================================================================
+    // STORY 4.7: Evidence Package & Processing Info
+    // ========================================================================
+    // Finalize evidence package with processing timing and version info.
+
+    let processing_time_ms = processing_start.elapsed().as_millis() as u64;
+    let processing_info = ProcessingInfo::new(processing_time_ms, BACKEND_VERSION);
+
     // Build complete evidence package
-    // Metadata evidence is placeholder for now (Story 4.6)
     let evidence_package = EvidencePackage {
         hardware_attestation,
         depth_analysis,
-        metadata: MetadataEvidence {
-            timestamp_valid: true, // Validated during metadata parsing
-            model_verified: true,  // Device context from middleware
-            location_available: parsed.metadata.location.is_some(),
-            location_coarse: None, // Will be set in Story 4.6
-        },
+        metadata: metadata_evidence,
+        processing: processing_info,
     };
 
     // Calculate confidence level based on evidence
     let confidence_level = evidence_package.calculate_confidence();
+
+    tracing::info!(
+        request_id = %request_id,
+        capture_id = %capture_id,
+        confidence_level = ?confidence_level,
+        processing_time_ms = processing_time_ms,
+        backend_version = BACKEND_VERSION,
+        "[evidence_pipeline] Evidence package finalized"
+    );
+
+    // ========================================================================
+    // End Story 4.7 additions
+    // ========================================================================
 
     tracing::info!(
         request_id = %request_id,
@@ -565,7 +634,7 @@ async fn upload_capture(
 
     let response_data = CaptureUploadResponse {
         capture_id: db_capture_id,
-        status: "processing".to_string(),
+        status: "complete".to_string(), // Evidence pipeline completed synchronously (Story 4-7)
         verification_url,
     };
 

@@ -72,9 +72,9 @@ development_status:
   4-3-offline-storage-auto-upload: in-progress
   4-4-attestation-verification-upload: done
   4-5-lidar-depth-analysis-service: done
-  4-6-metadata-validation: backlog
-  4-7-evidence-package-confidence-calculation: backlog
-  4-8-privacy-controls-implementation: backlog
+  4-6-metadata-validation: done
+  4-7-evidence-package-confidence-calculation: done
+  4-8-privacy-controls-implementation: done
   epic-4-retrospective: optional
 
   # Epic 5: C2PA Integration & Verification Interface (8 stories)

@@ -170,15 +170,30 @@ impl Default for DepthAnalysis {
 // Metadata Evidence Structure
 // ============================================================================
 
-/// Metadata validation evidence
+/// Metadata validation evidence (Story 4-6)
+///
+/// Records the result of validating capture metadata including:
+/// - Timestamp (within 15 minute window of server time)
+/// - Device model (iPhone Pro whitelist)
+/// - Resolution (known LiDAR formats)
+/// - Location (valid GPS coordinates)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MetadataEvidence {
-    /// Whether the timestamp is within acceptable bounds
+    /// Whether the timestamp is within acceptable bounds (15 min window)
     pub timestamp_valid: bool,
-    /// Whether the device model is verified
+    /// Delta between captured_at and server time in seconds
+    /// Positive = captured in past, Negative = captured in future
+    pub timestamp_delta_seconds: i64,
+    /// Whether the device model is verified (iPhone Pro whitelist)
     pub model_verified: bool,
-    /// Whether location data is available
+    /// The device model name
+    pub model_name: String,
+    /// Whether depth map resolution matches known LiDAR formats
+    pub resolution_valid: bool,
+    /// Whether valid location data is available
     pub location_available: bool,
+    /// Whether user opted out of location sharing
+    pub location_opted_out: bool,
     /// Coarse location (city/region level, for display)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub location_coarse: Option<String>,
@@ -188,9 +203,51 @@ impl Default for MetadataEvidence {
     fn default() -> Self {
         Self {
             timestamp_valid: false,
+            timestamp_delta_seconds: 0,
             model_verified: false,
+            model_name: String::new(),
+            resolution_valid: false,
             location_available: false,
+            location_opted_out: false,
             location_coarse: None,
+        }
+    }
+}
+
+// ============================================================================
+// Processing Info Structure (Story 4-7)
+// ============================================================================
+
+/// Processing information for evidence generation
+///
+/// Records timing and version info for the evidence processing pipeline.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProcessingInfo {
+    /// When processing completed (ISO 8601)
+    pub processed_at: String,
+    /// Total processing time in milliseconds
+    pub processing_time_ms: u64,
+    /// Backend version that processed the capture
+    pub backend_version: String,
+}
+
+impl Default for ProcessingInfo {
+    fn default() -> Self {
+        Self {
+            processed_at: String::new(),
+            processing_time_ms: 0,
+            backend_version: String::new(),
+        }
+    }
+}
+
+impl ProcessingInfo {
+    /// Creates a new ProcessingInfo with current timestamp
+    pub fn new(processing_time_ms: u64, backend_version: &str) -> Self {
+        Self {
+            processed_at: chrono::Utc::now().to_rfc3339(),
+            processing_time_ms,
+            backend_version: backend_version.to_string(),
         }
     }
 }
@@ -199,11 +256,11 @@ impl Default for MetadataEvidence {
 // Evidence Package Structure
 // ============================================================================
 
-/// Complete evidence package for a capture
+/// Complete evidence package for a capture (Story 4-7)
 ///
 /// Contains all verification evidence collected during
 /// capture processing: hardware attestation, depth analysis,
-/// and metadata validation.
+/// metadata validation, and processing info.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvidencePackage {
     /// Hardware attestation evidence
@@ -212,6 +269,8 @@ pub struct EvidencePackage {
     pub depth_analysis: DepthAnalysis,
     /// Metadata validation evidence
     pub metadata: MetadataEvidence,
+    /// Processing information (timing, version)
+    pub processing: ProcessingInfo,
 }
 
 impl EvidencePackage {
@@ -330,6 +389,7 @@ mod tests {
             ),
             depth_analysis: DepthAnalysis::default(),
             metadata: MetadataEvidence::default(),
+            processing: ProcessingInfo::default(),
         };
         assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Suspicious);
     }
@@ -347,6 +407,7 @@ mod tests {
             ),
             depth_analysis: depth,
             metadata: MetadataEvidence::default(),
+            processing: ProcessingInfo::default(),
         };
         assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::High);
     }
@@ -360,6 +421,7 @@ mod tests {
             ),
             depth_analysis: DepthAnalysis::default(),
             metadata: MetadataEvidence::default(),
+            processing: ProcessingInfo::default(),
         };
         assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Medium);
     }
@@ -373,7 +435,72 @@ mod tests {
             ),
             depth_analysis: DepthAnalysis::default(),
             metadata: MetadataEvidence::default(),
+            processing: ProcessingInfo::default(),
         };
         assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Low);
+    }
+
+    #[test]
+    fn test_confidence_depth_fail_is_suspicious() {
+        let mut depth = DepthAnalysis::default();
+        depth.status = CheckStatus::Fail;
+        depth.is_likely_real_scene = false;
+
+        let evidence = EvidencePackage {
+            hardware_attestation: HardwareAttestation::pass(
+                "iPhone 15 Pro".to_string(),
+                AttestationLevel::SecureEnclave,
+            ),
+            depth_analysis: depth,
+            metadata: MetadataEvidence::default(),
+            processing: ProcessingInfo::default(),
+        };
+        assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Suspicious);
+    }
+
+    #[test]
+    fn test_confidence_depth_pass_hw_unavailable_is_medium() {
+        let mut depth = DepthAnalysis::default();
+        depth.status = CheckStatus::Pass;
+        depth.is_likely_real_scene = true;
+
+        let evidence = EvidencePackage {
+            hardware_attestation: HardwareAttestation::unavailable(
+                "iPhone 15 Pro".to_string(),
+                AttestationLevel::SecureEnclave,
+            ),
+            depth_analysis: depth,
+            metadata: MetadataEvidence::default(),
+            processing: ProcessingInfo::default(),
+        };
+        assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Medium);
+    }
+
+    #[test]
+    fn test_processing_info_new() {
+        let info = ProcessingInfo::new(1500, "0.1.0");
+        assert_eq!(info.processing_time_ms, 1500);
+        assert_eq!(info.backend_version, "0.1.0");
+        assert!(!info.processed_at.is_empty());
+    }
+
+    #[test]
+    fn test_evidence_package_serialization() {
+        let evidence = EvidencePackage {
+            hardware_attestation: HardwareAttestation::pass(
+                "iPhone 15 Pro".to_string(),
+                AttestationLevel::SecureEnclave,
+            ),
+            depth_analysis: DepthAnalysis::default(),
+            metadata: MetadataEvidence::default(),
+            processing: ProcessingInfo::new(1000, "0.1.0"),
+        };
+
+        let json = serde_json::to_string(&evidence).unwrap();
+        assert!(json.contains("\"hardware_attestation\""));
+        assert!(json.contains("\"depth_analysis\""));
+        assert!(json.contains("\"metadata\""));
+        assert!(json.contains("\"processing\""));
+        assert!(json.contains("\"processing_time_ms\":1000"));
     }
 }
