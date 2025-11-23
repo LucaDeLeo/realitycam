@@ -211,6 +211,64 @@ impl StorageService {
     pub fn bucket(&self) -> &str {
         &self.bucket
     }
+
+    /// Downloads a depth map from S3
+    ///
+    /// # Arguments
+    /// * `capture_id` - Unique capture identifier
+    ///
+    /// # Returns
+    /// The raw gzipped depth map bytes
+    pub async fn download_depth_map(&self, capture_id: Uuid) -> Result<Vec<u8>, ApiError> {
+        let key = depth_map_s3_key(capture_id);
+
+        tracing::debug!(
+            capture_id = %capture_id,
+            key = %key,
+            "Downloading depth map from S3"
+        );
+
+        let response = self
+            .client
+            .get_object()
+            .bucket(&self.bucket)
+            .key(&key)
+            .send()
+            .await
+            .map_err(|e| {
+                warn!(
+                    capture_id = %capture_id,
+                    key = %key,
+                    error = %e,
+                    "Failed to download depth map from S3"
+                );
+                ApiError::StorageError(format!("Failed to download depth map: {e}"))
+            })?;
+
+        let bytes = response
+            .body
+            .collect()
+            .await
+            .map_err(|e| {
+                warn!(
+                    capture_id = %capture_id,
+                    error = %e,
+                    "Failed to read depth map body from S3"
+                );
+                ApiError::StorageError(format!("Failed to read depth map body: {e}"))
+            })?
+            .into_bytes()
+            .to_vec();
+
+        tracing::debug!(
+            capture_id = %capture_id,
+            key = %key,
+            size_bytes = bytes.len(),
+            "Depth map downloaded successfully"
+        );
+
+        Ok(bytes)
+    }
 }
 
 // ============================================================================

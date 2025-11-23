@@ -29,10 +29,8 @@ use uuid::Uuid;
 
 use crate::error::{ApiError, ApiErrorWithRequestId};
 use crate::middleware::DeviceContext;
-use crate::models::{
-    DepthAnalysis, Device, EvidencePackage, HardwareAttestation, MetadataEvidence,
-};
-use crate::services::{verify_capture_assertion, StorageService};
+use crate::models::{Device, EvidencePackage, HardwareAttestation, MetadataEvidence};
+use crate::services::{analyze_depth_map, verify_capture_assertion, StorageService};
 use crate::types::{
     capture::{validate_depth_map_size, validate_photo_size},
     ApiResponse, CaptureMetadataPayload, CaptureUploadResponse,
@@ -433,11 +431,41 @@ async fn upload_capture(
     // Build hardware attestation evidence from assertion result
     let hardware_attestation: HardwareAttestation = assertion_result.into();
 
+    // ========================================================================
+    // STORY 4.5: LiDAR Depth Analysis
+    // ========================================================================
+    // Analyze the depth map to determine if scene is real vs flat (screen photo).
+    // This is NON-BLOCKING: failures do not reject the upload.
+
+    // Extract dimensions from metadata
+    let depth_dimensions = Some((
+        parsed.metadata.depth_map_dimensions.width,
+        parsed.metadata.depth_map_dimensions.height,
+    ));
+
+    // Perform depth analysis - downloads from S3, decompresses, analyzes
+    let depth_analysis = analyze_depth_map(&storage, capture_id, depth_dimensions).await;
+
+    tracing::info!(
+        request_id = %request_id,
+        capture_id = %capture_id,
+        depth_status = ?depth_analysis.status,
+        depth_variance = depth_analysis.depth_variance,
+        depth_layers = depth_analysis.depth_layers,
+        edge_coherence = depth_analysis.edge_coherence,
+        is_likely_real_scene = depth_analysis.is_likely_real_scene,
+        "[depth_analysis] Depth analysis completed"
+    );
+
+    // ========================================================================
+    // End Story 4.5 additions
+    // ========================================================================
+
     // Build complete evidence package
-    // Depth analysis and metadata evidence are placeholders for now (Stories 4.5, 4.6)
+    // Metadata evidence is placeholder for now (Story 4.6)
     let evidence_package = EvidencePackage {
         hardware_attestation,
-        depth_analysis: DepthAnalysis::default(),
+        depth_analysis,
         metadata: MetadataEvidence {
             timestamp_valid: true, // Validated during metadata parsing
             model_verified: true,  // Device context from middleware

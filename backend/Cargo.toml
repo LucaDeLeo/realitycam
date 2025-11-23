@@ -33,3 +33,5 @@ rand = "0.8"
 der-parser = "9"
 p256 = { version = "0.13", features = ["ecdsa"] }
 hex = "0.4"
+flate2 = "1.0"
+byteorder = "1.5"

@@ -5,6 +5,7 @@
 pub mod attestation;
 pub mod capture_attestation;
 pub mod challenge_store;
+pub mod depth_analysis;
 pub mod storage;
 
 pub use attestation::{
@@ -14,4 +15,5 @@ pub use attestation::{
 };
 pub use capture_attestation::{verify_capture_assertion, CaptureAssertionError, CaptureAssertionResult};
 pub use challenge_store::{ChallengeEntry, ChallengeError, ChallengeStore};
+pub use depth_analysis::analyze_depth_map;
 pub use storage::{depth_map_s3_key, photo_s3_key, StorageService};
