@@ -12,8 +12,8 @@
 //! - "no_record" - No provenance record found
 
 use axum::{
-    extract::{Extension, State},
-    routing::post,
+    extract::{Extension, Path, State},
+    routing::{get, post},
     Json, Router,
 };
 use axum_extra::extract::Multipart;
@@ -83,13 +83,39 @@ pub struct FileVerificationResponse {
     pub file_hash: String,
 }
 
+/// Public capture details response (for web verification page)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CaptureDetailsPublic {
+    /// Capture ID
+    pub capture_id: String,
+    /// Confidence level
+    pub confidence_level: String,
+    /// Capture timestamp
+    pub captured_at: String,
+    /// Upload timestamp
+    pub uploaded_at: String,
+    /// Coarse location (city-level, privacy protected)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub location_coarse: Option<String>,
+    /// Full evidence package
+    pub evidence: serde_json::Value,
+    /// Photo URL (presigned S3 URL)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub photo_url: Option<String>,
+    /// Depth map URL (presigned S3 URL)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub depth_map_url: Option<String>,
+}
+
 // ============================================================================
 // Router Setup
 // ============================================================================
 
 /// Creates the verification routes router.
 pub fn router() -> Router<PgPool> {
-    Router::new().route("/verify-file", post(verify_file))
+    Router::new()
+        .route("/verify-file", post(verify_file))
+        .route("/verify/{id}", get(get_capture_public))
 }
 
 // ============================================================================
@@ -269,6 +295,83 @@ async fn lookup_capture_by_hash(
     })?;
 
     Ok(record)
+}
+
+/// Full capture record for public details
+struct CaptureFullRecord {
+    id: Uuid,
+    confidence_level: String,
+    captured_at: chrono::DateTime<chrono::Utc>,
+    uploaded_at: chrono::DateTime<chrono::Utc>,
+    location_coarse: Option<String>,
+    evidence: Option<serde_json::Value>,
+}
+
+/// GET /api/v1/verify/{id} - Get public capture details
+///
+/// Returns capture details for the web verification page.
+/// This is a PUBLIC endpoint - no authentication required.
+/// Only returns coarse location (not precise) for privacy.
+async fn get_capture_public(
+    State(pool): State<PgPool>,
+    Extension(request_id): Extension<Uuid>,
+    Path(id): Path<String>,
+) -> Result<Json<ApiResponse<CaptureDetailsPublic>>, ApiErrorWithRequestId> {
+    // Parse capture ID
+    let capture_id = Uuid::parse_str(&id).map_err(|_| ApiErrorWithRequestId {
+        error: ApiError::Validation(format!("Invalid capture ID format: {id}")),
+        request_id,
+    })?;
+
+    tracing::info!(
+        request_id = %request_id,
+        capture_id = %capture_id,
+        "Looking up capture for public verification"
+    );
+
+    // Query capture from database
+    let capture = sqlx::query_as!(
+        CaptureFullRecord,
+        r#"
+        SELECT id, confidence_level, captured_at, uploaded_at,
+               location_coarse, evidence
+        FROM captures
+        WHERE id = $1 AND status = 'complete'
+        "#,
+        capture_id
+    )
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| ApiErrorWithRequestId {
+        error: ApiError::Database(e),
+        request_id,
+    })?;
+
+    let capture = capture.ok_or_else(|| ApiErrorWithRequestId {
+        error: ApiError::CaptureNotFound,
+        request_id,
+    })?;
+
+    tracing::info!(
+        request_id = %request_id,
+        capture_id = %capture_id,
+        confidence_level = %capture.confidence_level,
+        "Capture found for public verification"
+    );
+
+    // Build response (no presigned URLs for MVP - just return the data)
+    let response = CaptureDetailsPublic {
+        capture_id: capture.id.to_string(),
+        confidence_level: capture.confidence_level,
+        captured_at: capture.captured_at.to_rfc3339(),
+        uploaded_at: capture.uploaded_at.to_rfc3339(),
+        location_coarse: capture.location_coarse,
+        evidence: capture.evidence.unwrap_or(serde_json::json!({})),
+        photo_url: None, // TODO: Generate presigned S3 URL
+        depth_map_url: None,
+    };
+
+    Ok(Json(ApiResponse::new(response, request_id)))
 }
 
 // ============================================================================

@@ -80,6 +80,25 @@ export interface CaptureResponse {
   };
 }
 
+export interface CapturePublicData {
+  capture_id: string;
+  confidence_level: string;
+  captured_at: string;
+  uploaded_at: string;
+  location_coarse?: string;
+  evidence: EvidencePackage;
+  photo_url?: string;
+  depth_map_url?: string;
+}
+
+export interface CapturePublicResponse {
+  data: CapturePublicData;
+  meta: {
+    request_id: string;
+    timestamp: string;
+  };
+}
+
 export type VerificationStatus = 'verified' | 'c2pa_only' | 'no_record';
 
 export interface C2paManifestInfo {
@@ -130,7 +149,7 @@ export class ApiClient {
   }
 
   /**
-   * Get capture details by ID
+   * Get capture details by ID (requires device auth - for mobile app)
    */
   async getCapture(id: string): Promise<CaptureResponse | null> {
     try {
@@ -148,6 +167,30 @@ export class ApiClient {
       return response.json();
     } catch (error) {
       console.error('Failed to fetch capture:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get public capture details by ID (for web verification page)
+   * Uses the public /api/v1/verify/{id} endpoint
+   */
+  async getCapturePublic(id: string): Promise<CapturePublicResponse | null> {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/v1/verify/${id}`, {
+        cache: 'no-store',
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null;
+        }
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Failed to fetch capture public:', error);
       return null;
     }
   }

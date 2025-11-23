@@ -15,6 +15,8 @@ import {
   useColorScheme,
   ScrollView,
   Alert,
+  ActivityIndicator,
+  Text,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -22,6 +24,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 
 import { CapturePreview, MetadataDisplay, ActionButtons } from '../components/Preview';
 import { colors } from '../constants/colors';
+import { uploadCapture } from '../services/uploadService';
 import type { ProcessedCapture, CaptureMetadata } from '@realitycam/shared';
 
 /**
@@ -36,6 +39,8 @@ export default function PreviewScreen() {
   // State for processed capture data
   const [capture, setCapture] = useState<ProcessedCapture | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Parse capture data from navigation params
   useEffect(() => {
@@ -84,12 +89,58 @@ export default function PreviewScreen() {
   }, [capture, router]);
 
   /**
-   * Handle upload action (placeholder for Epic 4)
+   * Handle upload action
    */
-  const handleUpload = useCallback(() => {
-    console.log('[PreviewScreen] Upload requested for capture:', capture?.id);
-    // Epic 4 will implement actual upload logic
-  }, [capture?.id]);
+  const handleUpload = useCallback(async () => {
+    if (!capture || isUploading) return;
+
+    console.log('[PreviewScreen] Starting upload for capture:', capture.id);
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      const result = await uploadCapture(capture, (progress) => {
+        setUploadProgress(progress);
+      });
+
+      if (result.success) {
+        console.log('[PreviewScreen] Upload successful:', result.data);
+
+        // Navigate to result screen with upload response
+        router.replace({
+          pathname: '/result',
+          params: {
+            result: JSON.stringify({
+              captureId: result.data.data.capture_id,
+              confidenceLevel: 'medium', // Backend will determine actual level
+              verificationUrl: result.data.data.verification_url,
+              photoUri: capture.photoUri,
+              hardwareStatus: 'pass',
+              depthStatus: capture.compressedDepthMap ? 'pass' : 'unavailable',
+              capturedAt: capture.metadata.captured_at,
+            }),
+          },
+        });
+      } else {
+        console.error('[PreviewScreen] Upload failed:', result.error);
+        Alert.alert(
+          'Upload Failed',
+          result.error.message || 'Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (err) {
+      console.error('[PreviewScreen] Upload error:', err);
+      Alert.alert(
+        'Upload Error',
+        'An unexpected error occurred. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  }, [capture, isUploading, router]);
 
   // Show loading or error state
   if (isLoading) {
@@ -143,6 +194,8 @@ export default function PreviewScreen() {
         <CapturePreview
           photoUri={capture.photoUri}
           hasDepthData={!!capture.compressedDepthMap}
+          compressedDepthMap={capture.compressedDepthMap}
+          depthDimensions={capture.depthDimensions}
         />
 
         {/* Metadata Display */}
@@ -170,6 +223,7 @@ export default function PreviewScreen() {
         <ActionButtons
           onDiscard={handleDiscard}
           onUpload={handleUpload}
+          isLoading={isUploading}
         />
       </View>
     </SafeAreaView>

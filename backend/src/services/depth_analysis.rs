@@ -55,6 +55,17 @@ const MIN_VALID_DEPTH: f32 = 0.1;
 /// Maximum valid depth value (meters) - filter outliers
 const MAX_VALID_DEPTH: f32 = 20.0;
 
+/// Screen detection: max depth range for suspicious uniform surface (meters)
+/// Screens are typically 0.3-0.8m away with <0.1m variation
+const SCREEN_DEPTH_RANGE_MAX: f64 = 0.15;
+
+/// Screen detection: minimum percentage of pixels within narrow band
+const SCREEN_UNIFORMITY_THRESHOLD: f64 = 0.85;
+
+/// Screen detection: typical screen distance range (meters)
+const SCREEN_DISTANCE_MIN: f64 = 0.2;
+const SCREEN_DISTANCE_MAX: f64 = 1.5;
+
 // ============================================================================
 // Error Types
 // ============================================================================
@@ -419,14 +430,144 @@ pub fn compute_edge_coherence(depths: &[f32], width: usize, height: usize) -> f6
     coherence
 }
 
+/// Detects if depth pattern matches a screen/monitor (recapture attack)
+///
+/// Screens have:
+/// - Very uniform depth (almost all pixels at same distance)
+/// - Narrow depth range (<15cm variation)
+/// - Typical distance 0.3-1.2m
+///
+/// Returns (is_screen_like, uniformity_ratio)
+pub fn detect_screen_pattern(depths: &[f32], stats: &DepthStatistics) -> (bool, f64) {
+    let valid = filter_valid_depths(depths);
+    if valid.is_empty() {
+        return (false, 0.0);
+    }
+
+    let depth_range = stats.max_depth - stats.min_depth;
+    let mean_depth = valid.iter().sum::<f64>() / valid.len() as f64;
+
+    // Check if in typical screen distance
+    let in_screen_distance = mean_depth >= SCREEN_DISTANCE_MIN && mean_depth <= SCREEN_DISTANCE_MAX;
+
+    // Check depth uniformity - what % of pixels are within tight band of median
+    let median_depth = {
+        let mut sorted = valid.clone();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted[sorted.len() / 2]
+    };
+
+    let tight_band = 0.05; // 5cm band around median
+    let pixels_in_band = valid
+        .iter()
+        .filter(|d| (*d - median_depth).abs() < tight_band)
+        .count();
+    let uniformity_ratio = pixels_in_band as f64 / valid.len() as f64;
+
+    // Screen-like if: narrow range + high uniformity + screen distance
+    let is_screen_like = depth_range < SCREEN_DEPTH_RANGE_MAX
+        && uniformity_ratio > SCREEN_UNIFORMITY_THRESHOLD
+        && in_screen_distance;
+
+    debug!(
+        depth_range = depth_range,
+        uniformity_ratio = uniformity_ratio,
+        mean_depth = mean_depth,
+        is_screen_like = is_screen_like,
+        "[depth_analysis] Screen pattern detection"
+    );
+
+    (is_screen_like, uniformity_ratio)
+}
+
+/// Checks depth variance in image quadrants (anti-spoofing)
+///
+/// Real scenes have depth variation across the frame.
+/// Screens/flat surfaces have uniform depth everywhere.
+///
+/// Returns (passes_check, min_quadrant_variance)
+pub fn check_quadrant_variance(depths: &[f32], width: usize, height: usize) -> (bool, f64) {
+    const MIN_QUADRANT_VARIANCE: f64 = 0.1; // Require some variance in each quadrant
+
+    if depths.len() != width * height || width < 4 || height < 4 {
+        return (false, 0.0);
+    }
+
+    let half_w = width / 2;
+    let half_h = height / 2;
+
+    let mut min_variance = f64::MAX;
+
+    // Check each quadrant
+    for qy in 0..2 {
+        for qx in 0..2 {
+            let mut quadrant_depths = Vec::new();
+            for y in (qy * half_h)..((qy + 1) * half_h).min(height) {
+                for x in (qx * half_w)..((qx + 1) * half_w).min(width) {
+                    let d = depths[y * width + x];
+                    if d.is_finite() && d >= MIN_VALID_DEPTH && d <= MAX_VALID_DEPTH {
+                        quadrant_depths.push(d as f64);
+                    }
+                }
+            }
+
+            if quadrant_depths.len() < 10 {
+                continue;
+            }
+
+            let mean: f64 = quadrant_depths.iter().sum::<f64>() / quadrant_depths.len() as f64;
+            let variance: f64 = (quadrant_depths
+                .iter()
+                .map(|d| (d - mean).powi(2))
+                .sum::<f64>()
+                / quadrant_depths.len() as f64)
+                .sqrt();
+
+            min_variance = min_variance.min(variance);
+        }
+    }
+
+    let passes = min_variance > MIN_QUADRANT_VARIANCE;
+
+    debug!(
+        min_quadrant_variance = min_variance,
+        passes = passes,
+        "[depth_analysis] Quadrant variance check"
+    );
+
+    (passes, min_variance)
+}
+
 /// Determines if the scene is likely real based on all metrics
 ///
 /// # Thresholds (from Epic 4 Tech Spec)
 /// - depth_variance > 0.5 (sufficient depth variation)
 /// - depth_layers >= 3 (multiple distinct depths)
 /// - edge_coherence > 0.7 (depth aligns with photo content)
-pub fn is_real_scene(variance: f64, layers: u32, coherence: f64) -> bool {
-    variance > VARIANCE_THRESHOLD && layers >= LAYER_THRESHOLD && coherence > COHERENCE_THRESHOLD
+/// - NOT screen-like pattern (anti-recapture)
+pub fn is_real_scene(
+    variance: f64,
+    layers: u32,
+    coherence: f64,
+    is_screen_like: bool,
+    quadrant_passes: bool,
+) -> bool {
+    let basic_checks = variance > VARIANCE_THRESHOLD
+        && layers >= LAYER_THRESHOLD
+        && coherence > COHERENCE_THRESHOLD;
+
+    // Fail if screen-like pattern detected
+    if is_screen_like {
+        warn!("[depth_analysis] Screen-like pattern detected - likely recapture attack");
+        return false;
+    }
+
+    // Warn but don't fail on quadrant check (may have false positives)
+    if !quadrant_passes {
+        warn!("[depth_analysis] Low quadrant variance - suspicious uniformity");
+    }
+
+    basic_checks
 }
 
 // ============================================================================
@@ -536,10 +677,22 @@ fn analyze_depth_map_from_bytes_inner(
     // 6. Compute edge coherence
     let coherence = compute_edge_coherence(&depths, width, height);
 
-    // 7. Determine real scene status
-    let is_real = is_real_scene(stats.variance, layers.layer_count, coherence);
+    // 7. NEW: Screen pattern detection (anti-recapture)
+    let (is_screen_like, _) = detect_screen_pattern(&depths, &stats);
 
-    // 8. Build result
+    // 8. NEW: Quadrant variance check
+    let (quadrant_passes, _) = check_quadrant_variance(&depths, width, height);
+
+    // 9. Determine real scene status with anti-spoofing checks
+    let is_real = is_real_scene(
+        stats.variance,
+        layers.layer_count,
+        coherence,
+        is_screen_like,
+        quadrant_passes,
+    );
+
+    // 10. Build result
     let status = if is_real {
         CheckStatus::Pass
     } else {
@@ -679,15 +832,35 @@ async fn analyze_depth_map_inner(
     // 7. Compute edge coherence
     let coherence = compute_edge_coherence(&depths, width, height);
 
-    // 8. Determine real scene status
-    let is_real = is_real_scene(stats.variance, layers.layer_count, coherence);
+    // 8. NEW: Screen pattern detection (anti-recapture)
+    let (is_screen_like, uniformity_ratio) = detect_screen_pattern(&depths, &stats);
 
-    // 9. Build result
+    // 9. NEW: Quadrant variance check
+    let (quadrant_passes, min_quadrant_var) = check_quadrant_variance(&depths, width, height);
+
+    // 10. Determine real scene status with new checks
+    let is_real = is_real_scene(
+        stats.variance,
+        layers.layer_count,
+        coherence,
+        is_screen_like,
+        quadrant_passes,
+    );
+
+    // 11. Build result
     let status = if is_real {
         CheckStatus::Pass
     } else {
         CheckStatus::Fail
     };
+
+    info!(
+        is_screen_like = is_screen_like,
+        uniformity_ratio = uniformity_ratio,
+        quadrant_passes = quadrant_passes,
+        min_quadrant_var = min_quadrant_var,
+        "[depth_analysis] Anti-spoofing checks complete"
+    );
 
     Ok(DepthAnalysis {
         status,
@@ -906,21 +1079,24 @@ mod tests {
 
     #[test]
     fn test_is_real_scene_thresholds() {
-        // All thresholds met
-        assert!(is_real_scene(0.6, 4, 0.8));
+        // All thresholds met, not screen, quadrant passes
+        assert!(is_real_scene(0.6, 4, 0.8, false, true));
 
         // Variance too low
-        assert!(!is_real_scene(0.4, 4, 0.8));
+        assert!(!is_real_scene(0.4, 4, 0.8, false, true));
 
         // Layers too few
-        assert!(!is_real_scene(0.6, 2, 0.8));
+        assert!(!is_real_scene(0.6, 2, 0.8, false, true));
 
         // Coherence too low
-        assert!(!is_real_scene(0.6, 4, 0.6));
+        assert!(!is_real_scene(0.6, 4, 0.6, false, true));
 
         // Edge cases
-        assert!(!is_real_scene(0.5, 3, 0.7)); // Exactly at thresholds = false
-        assert!(is_real_scene(0.51, 3, 0.71)); // Just above = true
+        assert!(!is_real_scene(0.5, 3, 0.7, false, true)); // Exactly at thresholds = false
+        assert!(is_real_scene(0.51, 3, 0.71, false, true)); // Just above = true
+
+        // Screen-like pattern should fail
+        assert!(!is_real_scene(0.6, 4, 0.8, true, true)); // is_screen_like = true
     }
 
     #[test]
@@ -973,13 +1149,15 @@ mod tests {
         let stats = compute_depth_statistics(&depths).unwrap();
         let layers = detect_depth_layers(&depths, stats.min_depth, stats.max_depth);
         let coherence = compute_edge_coherence(&depths, 256, 192);
-        let is_real = is_real_scene(stats.variance, layers.layer_count, coherence);
+        let (is_screen, _) = detect_screen_pattern(&depths, &stats);
+        let (quadrant_ok, _) = check_quadrant_variance(&depths, 256, 192);
+        let is_real = is_real_scene(stats.variance, layers.layer_count, coherence, is_screen, quadrant_ok);
 
         // Flat scene should NOT be detected as real
         assert!(
             !is_real,
-            "Flat scene should not be detected as real. variance={}, layers={}, coherence={}",
-            stats.variance, layers.layer_count, coherence
+            "Flat scene should not be detected as real. variance={}, layers={}, coherence={}, is_screen={}",
+            stats.variance, layers.layer_count, coherence, is_screen
         );
     }
 
@@ -989,7 +1167,9 @@ mod tests {
         let stats = compute_depth_statistics(&depths).unwrap();
         let layers = detect_depth_layers(&depths, stats.min_depth, stats.max_depth);
         let coherence = compute_edge_coherence(&depths, 256, 192);
-        let _is_real = is_real_scene(stats.variance, layers.layer_count, coherence);
+        let (is_screen, _) = detect_screen_pattern(&depths, &stats);
+        let (quadrant_ok, _) = check_quadrant_variance(&depths, 256, 192);
+        let _is_real = is_real_scene(stats.variance, layers.layer_count, coherence, is_screen, quadrant_ok);
 
         // Varied scene should be detected as real (or close to it)
         // Note: synthetic data may not perfectly match real scene characteristics

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ConfidenceBadge } from '@/components/Evidence/ConfidenceBadge';
 import { EvidencePanel } from '@/components/Evidence/EvidencePanel';
 import { ImagePlaceholder } from '@/components/Media/ImagePlaceholder';
+import { apiClient, formatDate, type ConfidenceLevel, type CheckStatus } from '@/lib/api';
 
 interface VerifyPageProps {
   params: Promise<{ id: string }>;
@@ -9,6 +10,48 @@ interface VerifyPageProps {
 
 export default async function VerifyPage({ params }: VerifyPageProps) {
   const { id } = await params;
+
+  // Fetch capture data from backend
+  const response = await apiClient.getCapturePublic(id);
+  const capture = response?.data;
+
+  // Map evidence status to CheckStatus
+  const getCheckStatus = (status: string | undefined): CheckStatus => {
+    if (status === 'pass' || status === 'verified') return 'pass';
+    if (status === 'fail' || status === 'failed') return 'fail';
+    return 'unavailable';
+  };
+
+  // Build evidence items from capture data
+  const evidenceItems = capture?.evidence ? [
+    {
+      label: 'Hardware Attestation',
+      status: getCheckStatus(capture.evidence.hardware_attestation?.status),
+      value: capture.evidence.hardware_attestation?.device_model || undefined,
+    },
+    {
+      label: 'LiDAR Depth Analysis',
+      status: getCheckStatus(capture.evidence.depth_analysis?.status),
+      value: capture.evidence.depth_analysis?.is_likely_real_scene ? 'Real 3D scene detected' : 'Analysis complete',
+    },
+    {
+      label: 'Timestamp',
+      status: capture.evidence.metadata?.timestamp_valid ? 'pass' as CheckStatus : 'fail' as CheckStatus,
+      value: capture.evidence.metadata?.timestamp_delta_seconds !== undefined
+        ? `${Math.abs(capture.evidence.metadata.timestamp_delta_seconds)}s delta`
+        : undefined,
+    },
+    {
+      label: 'Device Model',
+      status: capture.evidence.metadata?.model_verified ? 'pass' as CheckStatus : 'unavailable' as CheckStatus,
+      value: capture.evidence.metadata?.model_name || undefined,
+    },
+    {
+      label: 'Location',
+      status: capture.evidence.metadata?.location_available ? 'pass' as CheckStatus : 'unavailable' as CheckStatus,
+      value: capture.location_coarse || (capture.evidence.metadata?.location_opted_out ? 'Opted out' : undefined),
+    },
+  ] : undefined;
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
@@ -51,7 +94,15 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
                 <h2 className="text-sm font-semibold text-zinc-900 dark:text-white uppercase tracking-wide mb-4">
                   Captured Image
                 </h2>
-                <ImagePlaceholder aspectRatio="4:3" />
+                {capture?.photo_url ? (
+                  <img
+                    src={capture.photo_url}
+                    alt="Captured photo"
+                    className="w-full rounded-lg object-cover"
+                  />
+                ) : (
+                  <ImagePlaceholder aspectRatio="4:3" />
+                )}
               </div>
 
               {/* Summary Section */}
@@ -65,19 +116,23 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
                     Confidence Level
                   </p>
-                  <ConfidenceBadge level="pending" />
+                  <ConfidenceBadge level={capture?.confidence_level as ConfidenceLevel || 'pending'} />
                 </div>
 
-                {/* Metadata Placeholders */}
+                {/* Metadata */}
                 <div className="space-y-4">
                   <div>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">
                       Captured At
                     </p>
                     <p className="text-sm text-zinc-700 dark:text-zinc-300">
-                      <span className="text-zinc-400 dark:text-zinc-500 italic">
-                        Timestamp pending...
-                      </span>
+                      {capture?.captured_at ? (
+                        formatDate(capture.captured_at)
+                      ) : (
+                        <span className="text-zinc-400 dark:text-zinc-500 italic">
+                          Not available
+                        </span>
+                      )}
                     </p>
                   </div>
 
@@ -86,9 +141,17 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
                       Location
                     </p>
                     <p className="text-sm text-zinc-700 dark:text-zinc-300">
-                      <span className="text-zinc-400 dark:text-zinc-500 italic">
-                        Location pending...
-                      </span>
+                      {capture?.location_coarse ? (
+                        capture.location_coarse
+                      ) : capture?.evidence?.metadata?.location_opted_out ? (
+                        <span className="text-zinc-400 dark:text-zinc-500 italic">
+                          Location opted out
+                        </span>
+                      ) : (
+                        <span className="text-zinc-400 dark:text-zinc-500 italic">
+                          Not available
+                        </span>
+                      )}
                     </p>
                   </div>
 
@@ -97,9 +160,11 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
                       Device
                     </p>
                     <p className="text-sm text-zinc-700 dark:text-zinc-300">
-                      <span className="text-zinc-400 dark:text-zinc-500 italic">
-                        Device info pending...
-                      </span>
+                      {capture?.evidence?.metadata?.model_name || capture?.evidence?.hardware_attestation?.device_model || (
+                        <span className="text-zinc-400 dark:text-zinc-500 italic">
+                          Not available
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -107,15 +172,21 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
             </div>
 
             {/* Status Message */}
-            <div className="px-4 sm:px-6 py-4 bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-200 dark:border-zinc-800">
-              <p className="text-sm text-center text-zinc-500 dark:text-zinc-400">
-                Verification results will appear here once the capture is processed
-              </p>
-            </div>
+            {!capture && (
+              <div className="px-4 sm:px-6 py-4 bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-200 dark:border-zinc-800">
+                <p className="text-sm text-center text-zinc-500 dark:text-zinc-400">
+                  Capture not found or still processing
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Evidence Panel */}
-          <EvidencePanel />
+          {evidenceItems ? (
+            <EvidencePanel items={evidenceItems} defaultExpanded={true} />
+          ) : (
+            <EvidencePanel />
+          )}
 
           {/* Back Link */}
           <div className="text-center pt-4">

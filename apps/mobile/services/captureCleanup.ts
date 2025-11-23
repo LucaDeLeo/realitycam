@@ -55,7 +55,7 @@ export async function cleanupCapture(captureId: string): Promise<CleanupResult> 
 
     // Load metadata to get key ID before deletion
     const captureData = await loadCaptureFromStorage(captureId);
-    let keyId: string | null = null;
+    const keyId: string | null = null;
 
     // Note: We can't get keyId from captureData as it's reconstructed
     // The key deletion is handled separately if needed

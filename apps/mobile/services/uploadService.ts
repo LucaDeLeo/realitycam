@@ -245,29 +245,38 @@ export async function uploadCapture(
     const authHeaders = await buildDeviceAuthHeaders(metadataJson);
     console.log('[uploadService] Auth headers built for device:', authHeaders['X-Device-Id']);
 
-    // Create FormData
+    // Create FormData using React Native compatible format
+    // RN FormData expects {uri, type, name} objects for files, not Blobs
     const formData = new FormData();
 
-    // Add photo part
-    // FileSystem.uploadAsync handles file reading internally
-    // For FormData approach, we need to read the file
-    const photoBase64 = await FileSystem.readAsStringAsync(capture.photoUri, {
+    // Add photo part - use file URI directly (RN FormData format)
+    formData.append('photo', {
+      uri: capture.photoUri,
+      type: 'image/jpeg',
+      name: 'capture.jpg',
+    } as unknown as Blob);
+
+    // Save depth_map to temp file for FormData (RN doesn't support Blob from ArrayBuffer)
+    const depthTempPath = `${FileSystem.cacheDirectory}depth_${capture.id}.gz`;
+    await FileSystem.writeAsStringAsync(depthTempPath, capture.compressedDepthMap, {
       encoding: 'base64',
     });
+    formData.append('depth_map', {
+      uri: depthTempPath,
+      type: 'application/gzip',
+      name: 'depth.gz',
+    } as unknown as Blob);
 
-    // Create photo blob from base64
-    const photoBytes = base64ToBytes(photoBase64);
-    const photoBlob = new Blob([photoBytes.buffer as ArrayBuffer], { type: 'image/jpeg' });
-    formData.append('photo', photoBlob, 'capture.jpg');
-
-    // Add depth_map part (already compressed with gzip)
-    const depthBytes = base64ToBytes(capture.compressedDepthMap);
-    const depthBlob = new Blob([depthBytes.buffer as ArrayBuffer], { type: 'application/gzip' });
-    formData.append('depth_map', depthBlob, 'depth.gz');
-
-    // Add metadata part
-    const metadataBlob = new Blob([metadataJson], { type: 'application/json' });
-    formData.append('metadata', metadataBlob);
+    // Save metadata to temp file for FormData
+    const metadataTempPath = `${FileSystem.cacheDirectory}metadata_${capture.id}.json`;
+    await FileSystem.writeAsStringAsync(metadataTempPath, metadataJson, {
+      encoding: 'utf8',
+    });
+    formData.append('metadata', {
+      uri: metadataTempPath,
+      type: 'application/json',
+      name: 'metadata.json',
+    } as unknown as Blob);
 
     console.log('[uploadService] FormData prepared, starting upload...');
 

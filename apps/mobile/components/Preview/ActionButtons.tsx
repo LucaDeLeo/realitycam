@@ -7,16 +7,18 @@
  * @see Story 3.6 - Capture Preview Screen
  */
 
-import { View, Text, StyleSheet, TouchableOpacity, Alert, useColorScheme } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, useColorScheme, ActivityIndicator } from 'react-native';
 import { colors } from '../../constants/colors';
 
 interface ActionButtonsProps {
   /** Called when user confirms discard */
   onDiscard: () => void;
-  /** Called when user taps upload (placeholder for Epic 4) */
+  /** Called when user taps upload */
   onUpload: () => void;
   /** Whether buttons should be disabled */
   disabled?: boolean;
+  /** Whether upload is in progress */
+  isLoading?: boolean;
   /** Additional styles for container */
   style?: object;
 }
@@ -28,10 +30,13 @@ export function ActionButtons({
   onDiscard,
   onUpload,
   disabled = false,
+  isLoading = false,
   style,
 }: ActionButtonsProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+
+  const isDisabled = disabled || isLoading;
 
   /**
    * Handle discard button press with confirmation
@@ -56,15 +61,9 @@ export function ActionButtons({
   };
 
   /**
-   * Handle upload button press (placeholder for Epic 4)
+   * Handle upload button press
    */
   const handleUploadPress = () => {
-    // Placeholder - Epic 4 will implement actual upload
-    Alert.alert(
-      'Coming Soon',
-      'Upload functionality will be implemented in Epic 4.',
-      [{ text: 'OK' }]
-    );
     onUpload();
   };
 
@@ -75,10 +74,10 @@ export function ActionButtons({
         style={[
           styles.button,
           styles.discardButton,
-          disabled && styles.buttonDisabled,
+          isDisabled && styles.buttonDisabled,
         ]}
         onPress={handleDiscardPress}
-        disabled={disabled}
+        disabled={isDisabled}
         activeOpacity={0.7}
       >
         <Text style={[styles.buttonText, styles.discardButtonText]}>Discard</Text>
@@ -89,13 +88,17 @@ export function ActionButtons({
         style={[
           styles.button,
           styles.uploadButton,
-          disabled && styles.buttonDisabled,
+          isDisabled && styles.buttonDisabled,
         ]}
         onPress={handleUploadPress}
-        disabled={disabled}
+        disabled={isDisabled}
         activeOpacity={0.7}
       >
-        <Text style={[styles.buttonText, styles.uploadButtonText]}>Upload</Text>
+        {isLoading ? (
+          <ActivityIndicator size="small" color="#000000" />
+        ) : (
+          <Text style={[styles.buttonText, styles.uploadButtonText]}>Upload</Text>
+        )}
       </TouchableOpacity>
     </View>
   );

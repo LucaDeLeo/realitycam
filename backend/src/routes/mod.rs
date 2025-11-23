@@ -69,11 +69,12 @@ pub fn api_router(state: AppState) -> Router {
     let rate_limit_layer = GovernorLayer::new(Arc::new(governor_config));
 
     // Spawn background task to clean up rate limiter state
+    let captures_limiter = governor_limiter.clone();
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_secs(60)).await;
             tracing::debug!("[rate_limiter] Cleaning up expired rate limit entries");
-            governor_limiter.retain_recent();
+            captures_limiter.retain_recent();
         }
     });
 
@@ -85,14 +86,38 @@ pub fn api_router(state: AppState) -> Router {
         .layer(DeviceAuthLayer::new(state.db.clone(), device_auth_config))
         .layer(rate_limit_layer);
 
+    // Configure rate limiting for verify router (more permissive - public read-only)
+    // 30 requests/second with burst of 60 to prevent enumeration attacks
+    let verify_governor_config = GovernorConfigBuilder::default()
+        .per_second(30)
+        .burst_size(60)
+        .key_extractor(SmartIpKeyExtractor)
+        .finish()
+        .expect("Failed to build verify rate limiter config");
+    let verify_limiter = verify_governor_config.limiter().clone();
+    let verify_rate_limit_layer = GovernorLayer::new(Arc::new(verify_governor_config));
+
+    // Spawn cleanup task for verify limiter
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(60)).await;
+            verify_limiter.retain_recent();
+        }
+    });
+
+    // Verify router with rate limiting (public but protected from abuse)
+    let verify_router = verify::router()
+        .with_state(state.db.clone())
+        .layer(verify_rate_limit_layer);
+
     // Create v1 API routes
     // - devices router: public (registration, challenge)
     // - captures router: protected with device auth middleware
-    // - verify router: public (file verification)
+    // - verify router: public with rate limiting (file verification)
     let v1_router = Router::new()
         .nest("/devices", devices::router())
         .nest("/captures", captures_router)
-        .merge(verify::router().with_state(state.db.clone()))
+        .merge(verify_router)
         .with_state(state);
 
     // Combine all routes

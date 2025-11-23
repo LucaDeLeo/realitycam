@@ -1,5 +1,10 @@
 import { ExpoConfig, ConfigContext } from 'expo/config';
 
+// Extended iOS config to include developmentTeam (valid Expo option not in types)
+interface ExtendedIOS extends NonNullable<ExpoConfig['ios']> {
+  developmentTeam?: string;
+}
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'RealityCam',
@@ -15,6 +20,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     resizeMode: 'contain',
     backgroundColor: '#ffffff',
   },
+  android: {
+    package: 'com.realitycam.app',
+  },
   ios: {
     supportsTablet: false,
     bundleIdentifier: 'com.realitycam.app',
@@ -23,7 +31,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       NSCameraUsageDescription: 'RealityCam needs camera access to capture authenticated photos.',
       NSLocationWhenInUseUsageDescription: 'RealityCam needs location access to include GPS data in photo evidence.',
     },
-  },
+  } as ExtendedIOS,
   plugins: [
     'expo-router',
     'expo-secure-store',
@@ -50,8 +58,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         },
       },
     ],
-    // LiDAR depth module - commented out until plugin is configured
-    // './modules/lidar-depth',
+    // Note: LiDAR depth module is autolinked from modules/lidar-depth via expo-modules-autolinking
   ],
   experiments: {
     typedRoutes: true,
