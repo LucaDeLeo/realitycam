@@ -1,0 +1,927 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML for: 3-2-photo-capture-depth-map
+  Generated: 2025-11-23
+  Project: RealityCam
+  Epic: 3 - Photo Capture with LiDAR Depth
+-->
+<story-context>
+  <metadata>
+    <story-key>3-2-photo-capture-depth-map</story-key>
+    <story-title>Photo Capture with Depth Map</story-title>
+    <epic-id>3</epic-id>
+    <epic-title>Photo Capture with LiDAR Depth</epic-title>
+    <generated-date>2025-11-23</generated-date>
+    <status>ready-for-dev</status>
+    <context-version>1.0</context-version>
+  </metadata>
+
+  <!-- Story Reference -->
+  <story-reference>
+    <file-path>docs/sprint-artifacts/stories/3-2-photo-capture-depth-map.md</file-path>
+    <description>Full story specification for implementing synchronized photo + depth capture with CaptureButton, useCapture hook, state machine, and RawCapture data structure. Requires 100ms sync window between photo and depth timestamps.</description>
+  </story-reference>
+
+  <!-- Epic Context -->
+  <epic-context>
+    <tech-spec-path>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-3.md</tech-spec-path>
+    <epics-path>docs/epics.md</epics-path>
+    <description>Epic 3 implements the core photo capture experience with simultaneous LiDAR depth sensing. Story 3.2 builds on Story 3.1's foundation (useLiDAR hook, CameraView, DepthOverlay) to implement the actual capture orchestration: synchronized photo + depth capture within 100ms, CaptureButton with shutter animation, useCapture hook with state machine, and RawCapture data structure.</description>
+    <ac-mapping>
+      <item>AC-3.4: Photo Capture with Depth - Photo captured at full resolution with depth frame within 100ms, haptic feedback confirms capture</item>
+    </ac-mapping>
+    <depends-on>
+      <dependency story="3-1" status="done">Camera View with LiDAR Depth Overlay - provides useLiDAR hook, CameraView, DepthOverlay, DepthFrame types</dependency>
+    </depends-on>
+  </epic-context>
+
+  <!-- Documentation Artifacts -->
+  <documentation-artifacts>
+    <artifact>
+      <path>docs/architecture.md</path>
+      <description>System architecture with hook patterns, component locations, state management decisions (zustand), and project structure conventions</description>
+      <relevance>Defines useCapture hook location (apps/mobile/hooks/), CaptureButton location (apps/mobile/components/Camera/), and state management patterns</relevance>
+    </artifact>
+    <artifact>
+      <path>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-3.md</path>
+      <description>Technical specification for Epic 3 including useCapture hook implementation, RawCapture and ProcessedCapture interfaces, capture flow sequence diagram, and performance requirements</description>
+      <relevance>AUTHORITATIVE SOURCE for AC-3.4, capture flow orchestration, RawCapture structure, and 100ms sync requirement. Contains code samples for useCapture hook.</relevance>
+    </artifact>
+    <artifact>
+      <path>docs/prd.md</path>
+      <description>Product Requirements Document with FR6-FR13 covering capture flow, UC1 Photo Capture with Depth user journey</description>
+      <relevance>Business context: simultaneous capture of photo + LiDAR depth map + device attestation for provenance</relevance>
+    </artifact>
+    <artifact>
+      <path>docs/sprint-artifacts/stories/3-1-camera-view-lidar-depth-overlay.md</path>
+      <description>Completed Story 3.1 with useLiDAR hook implementation details, DepthFrame structure, and completion notes</description>
+      <relevance>CRITICAL - Documents the captureDepthFrame() API this story depends on. Includes Swift module implementation details and testing notes.</relevance>
+    </artifact>
+    <artifact>
+      <path>docs/sprint-artifacts/sprint-status.yaml</path>
+      <description>Sprint tracking file showing story statuses and epic progress</description>
+      <relevance>Update status from drafted to ready-for-dev after context is assembled</relevance>
+    </artifact>
+  </documentation-artifacts>
+
+  <!-- Existing Code Interfaces -->
+  <existing-code-interfaces>
+    <!-- Story 3-1 Implementations (CRITICAL) -->
+    <interface>
+      <path>apps/mobile/hooks/useLiDAR.ts</path>
+      <description>LiDAR depth capture hook from Story 3-1. Provides captureDepthFrame() API for synchronized depth capture.</description>
+      <relevance>CRITICAL - useCapture hook MUST integrate with useLiDAR to capture depth frames. The captureDepthFrame() method returns Promise&lt;DepthFrame&gt; which is used for synchronized capture.</relevance>
+      <exports>
+        <export>useLiDAR() hook</export>
+        <export>captureDepthFrame(): Promise&lt;DepthFrame&gt; - Capture single depth frame</export>
+        <export>isReady: boolean - ARSession active and ready for capture</export>
+        <export>isAvailable: boolean - LiDAR hardware present</export>
+        <export>currentFrame: DepthFrame | null - Latest frame for overlay</export>
+        <export>error: string | null - Current error state</export>
+        <export>state: LiDARState - Internal state (idle, initializing, ready, capturing, error)</export>
+      </exports>
+      <api-details><![CDATA[
+export interface UseLiDARReturn {
+  isAvailable: boolean;
+  isReady: boolean;
+  isCapturing: boolean;
+  startDepthCapture: () => Promise<void>;
+  stopDepthCapture: () => Promise<void>;
+  captureDepthFrame: () => Promise<DepthFrame>;
+  currentFrame: DepthFrame | null;
+  error: string | null;
+  state: LiDARState;
+}
+      ]]></api-details>
+    </interface>
+    <interface>
+      <path>apps/mobile/components/Camera/CameraView.tsx</path>
+      <description>Camera view container component integrating expo-camera with LiDAR depth overlay. Exposes ref for capture functionality.</description>
+      <relevance>MODIFICATION TARGET - Add CaptureButton to the controls overlay. Wire capture button to useCapture hook. Forward cameraRef for photo capture.</relevance>
+      <exports>
+        <export>CameraView component (forwardRef)</export>
+        <export>CameraViewHandle ref interface with captureDepthFrame(), getCurrentFrame(), startDepthCapture(), stopDepthCapture()</export>
+      </exports>
+      <current-structure><![CDATA[
+// CameraView already:
+// - Manages expo-camera ref (cameraRef)
+// - Integrates useLiDAR hook
+// - Renders DepthOverlay on top
+// - Handles camera permissions
+// - Exposes CameraViewHandle via forwardRef
+
+// Missing (to be added):
+// - CaptureButton component in controls overlay
+// - Wire to useCapture hook
+// - Expose photo capture capability
+      ]]></current-structure>
+    </interface>
+    <interface>
+      <path>apps/mobile/components/Camera/DepthOverlay.tsx</path>
+      <description>Depth heatmap visualization component rendering depth data as colored overlay</description>
+      <relevance>No changes needed - already functional from Story 3-1</relevance>
+    </interface>
+    <interface>
+      <path>apps/mobile/components/Camera/DepthToggle.tsx</path>
+      <description>Toggle button for depth overlay visibility with haptic feedback</description>
+      <relevance>PATTERN REFERENCE - Use same haptic feedback pattern (expo-haptics impactAsync) for CaptureButton</relevance>
+    </interface>
+    <interface>
+      <path>apps/mobile/components/Camera/index.ts</path>
+      <description>Camera components barrel export</description>
+      <relevance>MODIFICATION TARGET - Export new CaptureButton component</relevance>
+    </interface>
+    <interface>
+      <path>apps/mobile/modules/lidar-depth/index.ts</path>
+      <description>LiDAR native module TypeScript interface</description>
+      <relevance>Reference for DepthFrame type and module capabilities. captureDepthFrame() returns DepthFrame with depthMap (base64), width, height, timestamp, intrinsics.</relevance>
+      <exports>
+        <export>LiDARDepthModule - Native module</export>
+        <export>DepthFrame type (re-exported from @realitycam/shared)</export>
+        <export>CameraIntrinsics type</export>
+        <export>DepthFrameEvent interface</export>
+        <export>LiDARError type</export>
+      </exports>
+    </interface>
+
+    <!-- Shared Types -->
+    <interface>
+      <path>packages/shared/src/types/capture.ts</path>
+      <description>Capture-related types including DepthFrame from Story 3-1</description>
+      <relevance>MODIFICATION TARGET - Add RawCapture, CaptureError interfaces as defined in story requirements</relevance>
+      <existing-types><![CDATA[
+export interface CameraIntrinsics { fx, fy, cx, cy }
+export interface DepthFrame { depthMap: string, width, height, timestamp, intrinsics }
+export interface DepthColormap { name, minDepth, maxDepth, opacity }
+export interface DepthOverlayConfig { enabled, colormap, showDepthValues }
+      ]]></existing-types>
+      <types-to-add><![CDATA[
+// Add these types per story AC-5:
+export interface RawCapture {
+  id: string;                    // UUID for this capture
+  photoUri: string;              // Local file URI to captured JPEG
+  photoWidth: number;            // Photo width in pixels
+  photoHeight: number;           // Photo height in pixels
+  depthFrame: DepthFrame;        // From useLiDAR.captureDepthFrame()
+  capturedAt: string;            // ISO timestamp of capture
+  syncDeltaMs: number;           // Time delta between photo and depth (must be < 100ms)
+}
+
+export type CaptureErrorCode =
+  | 'CAMERA_ERROR'
+  | 'DEPTH_CAPTURE_FAILED'
+  | 'SYNC_TIMEOUT'
+  | 'NOT_READY';
+
+export interface CaptureError {
+  code: CaptureErrorCode;
+  message: string;
+  syncDeltaMs?: number;          // Present for SYNC_TIMEOUT errors
+}
+      ]]></types-to-add>
+    </interface>
+    <interface>
+      <path>packages/shared/src/index.ts</path>
+      <description>Package exports for shared types</description>
+      <relevance>MODIFICATION TARGET - Export new RawCapture and CaptureError types</relevance>
+    </interface>
+
+    <!-- Device Store -->
+    <interface>
+      <path>apps/mobile/store/deviceStore.ts</path>
+      <description>Zustand store for device capabilities and attestation state</description>
+      <relevance>Provides keyId for future per-capture assertions (Story 3-4). Check capabilities.hasLiDAR before capture.</relevance>
+      <exports>
+        <export>useDeviceStore() hook</export>
+        <export>capabilities: DeviceCapabilities | null</export>
+        <export>keyId: string | null</export>
+        <export>isAttestationReady: boolean</export>
+        <export>isAttested: boolean</export>
+      </exports>
+    </interface>
+
+    <!-- Screen to Update -->
+    <interface>
+      <path>apps/mobile/app/(tabs)/capture.tsx</path>
+      <description>Main capture screen with CameraView. Currently shows camera with depth overlay.</description>
+      <relevance>MODIFICATION TARGET - Integrate useCapture hook, handle capture results, prepare for preview navigation (Story 3-6)</relevance>
+      <current-state>Uses CameraViewHandle ref, tracks overlayEnabled state, handles LiDAR unavailable case</current-state>
+    </interface>
+
+    <!-- Pattern References -->
+    <interface>
+      <path>apps/mobile/hooks/useDeviceAttestation.ts</path>
+      <description>DCAppAttest attestation hook - pattern reference for hook structure</description>
+      <relevance>PATTERN REFERENCE - Follow state machine pattern with hasInitialized ref, error handling, cleanup</relevance>
+    </interface>
+    <interface>
+      <path>apps/mobile/hooks/useSecureEnclaveKey.ts</path>
+      <description>Secure Enclave key management hook - pattern reference</description>
+      <relevance>PATTERN REFERENCE - Async state management pattern</relevance>
+    </interface>
+
+    <!-- Constants and Utilities -->
+    <interface>
+      <path>apps/mobile/constants/colors.ts</path>
+      <description>Color constants for UI components</description>
+      <relevance>Use for CaptureButton styling, especially disabled states</relevance>
+    </interface>
+  </existing-code-interfaces>
+
+  <!-- Development Constraints -->
+  <development-constraints>
+    <constraint>
+      <id>SYNC-001</id>
+      <category>Synchronization</category>
+      <description>Photo and depth capture MUST be synchronized within 100ms. Use Promise.all to parallelize photo and depth capture for minimum sync delta. Calculate syncDeltaMs = Math.abs(photoTimestamp - depthFrame.timestamp).</description>
+      <source>Story AC-1, Epic tech spec</source>
+    </constraint>
+    <constraint>
+      <id>SYNC-002</id>
+      <category>Timestamp Source</category>
+      <description>For photo timestamp, prefer EXIF DateTimeOriginal if available. Fall back to Date.now() at capture initiation. DepthFrame.timestamp is Unix milliseconds from ARKit.</description>
+      <source>Story dev notes - Synchronization Strategy</source>
+    </constraint>
+    <constraint>
+      <id>STATE-001</id>
+      <category>State Machine</category>
+      <description>Capture state machine: idle -> capturing -> captured -> idle. isCapturing flag MUST prevent concurrent capture attempts. Errors transition to idle with error state set.</description>
+      <source>Story AC-3</source>
+    </constraint>
+    <constraint>
+      <id>PERF-001</id>
+      <category>Performance</category>
+      <description>Total capture time (button tap to RawCapture available) MUST be less than 500ms. Sync delta MUST be less than 100ms. No visible frame drop in camera preview during capture.</description>
+      <source>Story AC-8</source>
+    </constraint>
+    <constraint>
+      <id>UI-001</id>
+      <category>Button Design</category>
+      <description>CaptureButton: iOS-style shutter (70px white circle with ring). States: idle (white fill, ring visible), pressed (scale 0.9, subtle gray), capturing (pulsing opacity, disabled), disabled (opacity 0.5). Animation: scale down on press, flash overlay, scale back.</description>
+      <source>Story dev notes - CaptureButton Design</source>
+    </constraint>
+    <constraint>
+      <id>UI-002</id>
+      <category>Haptic Feedback</category>
+      <description>Use expo-haptics impactAsync(ImpactFeedbackStyle.Medium) on capture. Follow pattern from DepthToggle.tsx.</description>
+      <source>Story AC-2</source>
+    </constraint>
+    <constraint>
+      <id>TS-001</id>
+      <category>TypeScript</category>
+      <description>All code must pass pnpm typecheck. Use strict typing, no any types. Follow existing patterns from Story 3-1 hooks.</description>
+      <source>Project conventions</source>
+    </constraint>
+    <constraint>
+      <id>HOOK-001</id>
+      <category>Hook Pattern</category>
+      <description>useCapture hook must integrate with useLiDAR (not replace it). Call useLiDAR internally and use its captureDepthFrame() and isReady. Hook must manage camera ref registration via setCameraRef().</description>
+      <source>Story AC-4</source>
+    </constraint>
+    <constraint>
+      <id>ERR-001</id>
+      <category>Error Handling</category>
+      <description>Capture errors must be typed: CAMERA_ERROR, DEPTH_CAPTURE_FAILED, SYNC_TIMEOUT, NOT_READY. Preserve previous successful capture on error. Reset capture state to idle on error.</description>
+      <source>Story AC-7</source>
+    </constraint>
+    <constraint>
+      <id>UUID-001</id>
+      <category>ID Generation</category>
+      <description>Use expo-crypto randomUUID() for capture ID generation. expo-crypto is already installed in the project.</description>
+      <source>Story Task 4.4</source>
+    </constraint>
+  </development-constraints>
+
+  <!-- Dependencies -->
+  <dependencies>
+    <dependency>
+      <name>expo-camera</name>
+      <version>~17.0.0</version>
+      <purpose>Photo capture via takePictureAsync()</purpose>
+      <already-installed>true</already-installed>
+      <api-usage><![CDATA[
+// CameraView ref type from expo-camera
+import { CameraView as ExpoCameraView } from 'expo-camera';
+
+// takePictureAsync options
+const photo = await cameraRef.takePictureAsync({
+  quality: 1,        // Full quality
+  exif: true,        // Include EXIF data for timestamp
+  base64: false,     // Don't need base64 for this story
+});
+
+// Returns: { uri: string, width: number, height: number, exif?: object }
+      ]]></api-usage>
+    </dependency>
+    <dependency>
+      <name>expo-haptics</name>
+      <version>^15.0.7</version>
+      <purpose>Haptic feedback on capture button press</purpose>
+      <already-installed>true</already-installed>
+      <api-usage><![CDATA[
+import * as Haptics from 'expo-haptics';
+await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      ]]></api-usage>
+    </dependency>
+    <dependency>
+      <name>expo-crypto</name>
+      <version>~15.0.0</version>
+      <purpose>UUID generation for capture IDs</purpose>
+      <already-installed>true</already-installed>
+      <api-usage><![CDATA[
+import * as Crypto from 'expo-crypto';
+const captureId = Crypto.randomUUID();
+      ]]></api-usage>
+    </dependency>
+    <dependency>
+      <name>zustand</name>
+      <version>^5.0.0</version>
+      <purpose>State management (for future captureStore, not required for this story)</purpose>
+      <already-installed>true</already-installed>
+      <notes>Story notes mention later stories will add zustand store. This story uses local hook state.</notes>
+    </dependency>
+    <dependency>
+      <name>@realitycam/shared</name>
+      <version>workspace:*</version>
+      <purpose>Shared TypeScript types for DepthFrame, RawCapture, CaptureError</purpose>
+      <already-installed>true</already-installed>
+    </dependency>
+  </dependencies>
+
+  <!-- Testing Context -->
+  <testing-context>
+    <test-framework>
+      <name>Jest (Unit Tests)</name>
+      <description>Unit test useCapture hook with mocked useLiDAR and expo-camera</description>
+    </test-framework>
+    <test-framework>
+      <name>Manual Device Testing</name>
+      <description>Capture functionality requires real iPhone Pro device for LiDAR and actual photo capture</description>
+    </test-framework>
+    <test-requirements>
+      <requirement>Task 8.1: Unit test useCapture hook with mocked useLiDAR and expo-camera</requirement>
+      <requirement>Task 8.2: Unit test sync validation logic (&lt; 100ms requirement)</requirement>
+      <requirement>Task 8.3: Component test CaptureButton animations and states</requirement>
+      <requirement>Task 8.4: Manual test on iPhone Pro: capture speed &lt; 500ms</requirement>
+      <requirement>Task 8.5: Manual test: verify sync delta is &lt; 100ms in captured data</requirement>
+      <requirement>Task 8.6: Manual test: haptic feedback on capture</requirement>
+      <requirement>TypeScript compilation: pnpm typecheck in packages/shared and apps/mobile</requirement>
+    </test-requirements>
+    <test-commands>
+      <command>cd packages/shared &amp;&amp; pnpm typecheck</command>
+      <command>cd apps/mobile &amp;&amp; pnpm typecheck</command>
+      <command>cd apps/mobile &amp;&amp; npx expo prebuild --platform ios</command>
+      <command>cd apps/mobile &amp;&amp; npx expo run:ios --device (requires real iPhone Pro)</command>
+    </test-commands>
+    <device-matrix>
+      <device model="iPhone 15 Pro" ios="17.x" purpose="Primary test device" />
+      <device model="iPhone 12 Pro" ios="17.x" purpose="Minimum supported Pro device" />
+      <device model="iOS Simulator" purpose="TypeScript compilation and basic UI testing only" />
+    </device-matrix>
+  </testing-context>
+
+  <!-- Implementation Notes -->
+  <implementation-notes>
+    <note>
+      <id>IMP-001</id>
+      <category>useCapture Hook Structure</category>
+      <content>Create useCapture hook that: (1) calls useLiDAR internally, (2) manages camera ref via setCameraRef, (3) implements capture state machine, (4) orchestrates parallel photo+depth capture via Promise.all, (5) validates sync window, (6) constructs RawCapture.</content>
+    </note>
+    <note>
+      <id>IMP-002</id>
+      <category>Camera Ref Management</category>
+      <content>useCapture must accept camera ref registration. CameraView already has expo-camera ref (cameraRef). Need to expose this to useCapture via setCameraRef or by passing ref down. Consider using forwardRef pattern or callback prop.</content>
+    </note>
+    <note>
+      <id>IMP-003</id>
+      <category>Parallel Capture</category>
+      <content>Use Promise.all([cameraRef.takePictureAsync({quality:1, exif:true}), captureDepthFrame()]) for parallel capture. This minimizes sync delta. Both operations happen near-simultaneously.</content>
+    </note>
+    <note>
+      <id>IMP-004</id>
+      <category>Sync Validation</category>
+      <content>After capture, calculate syncDeltaMs. For photo timestamp, try photo.exif?.DateTimeOriginal (parse to ms), fallback to capture initiation time (record before Promise.all). For depth, use depthFrame.timestamp (already Unix ms). If delta > 100ms, return SYNC_TIMEOUT error.</content>
+    </note>
+    <note>
+      <id>IMP-005</id>
+      <category>CaptureButton Animation</category>
+      <content>Use Animated API (not Reanimated, to avoid extra dependency). Animated.Value for scale (1 -> 0.9 -> 1) and opacity (for flash effect). Use Animated.spring or timing for smooth transitions. Pressable or TouchableWithoutFeedback for gesture handling.</content>
+    </note>
+    <note>
+      <id>IMP-006</id>
+      <category>State Machine Implementation</category>
+      <content>State: idle | capturing | captured. Use useState for current state. isCapturing is derived (state === 'capturing'). After successful capture, transition to 'captured' briefly, then back to 'idle'. On error, immediately go to 'idle' with error set.</content>
+    </note>
+    <note>
+      <id>IMP-007</id>
+      <category>CameraView Integration</category>
+      <content>Add CaptureButton to CameraView's controls overlay (position absolute, bottom center). Wire onCapture to useCapture().capture(). Pass isCapturing to disable button. Consider if useCapture should be in CameraView or capture.tsx - story says capture.tsx should "use useCapture hook".</content>
+    </note>
+    <note>
+      <id>IMP-008</id>
+      <category>Preview Data Preparation</category>
+      <content>AC-6 mentions preview data generation. For this story, just store RawCapture with photoUri, dimensions, depthFrame. Thumbnail generation can use the existing photoUri. Story 3-6 will handle actual preview screen navigation.</content>
+    </note>
+  </implementation-notes>
+
+  <!-- File Changes Summary -->
+  <file-changes>
+    <files-to-create>
+      <file>
+        <path>apps/mobile/hooks/useCapture.ts</path>
+        <description>Capture orchestration hook with state machine, sync validation, camera ref management. Integrates with useLiDAR.</description>
+      </file>
+      <file>
+        <path>apps/mobile/components/Camera/CaptureButton.tsx</path>
+        <description>iOS-style shutter button with animations (scale, flash), haptic feedback, disabled states</description>
+      </file>
+    </files-to-create>
+    <files-to-modify>
+      <file>
+        <path>packages/shared/src/types/capture.ts</path>
+        <description>Add RawCapture interface with id, photoUri, photoWidth, photoHeight, depthFrame, capturedAt, syncDeltaMs. Add CaptureError type with error codes.</description>
+      </file>
+      <file>
+        <path>packages/shared/src/index.ts</path>
+        <description>Export RawCapture, CaptureError, CaptureErrorCode types</description>
+      </file>
+      <file>
+        <path>apps/mobile/components/Camera/CameraView.tsx</path>
+        <description>Add CaptureButton to controls overlay, wire to capture functionality, expose camera ref for useCapture</description>
+      </file>
+      <file>
+        <path>apps/mobile/components/Camera/index.ts</path>
+        <description>Export CaptureButton component</description>
+      </file>
+      <file>
+        <path>apps/mobile/app/(tabs)/capture.tsx</path>
+        <description>Use useCapture hook, handle capture results, prepare for preview navigation</description>
+      </file>
+    </files-to-modify>
+  </file-changes>
+
+  <!-- Type Definitions to Add -->
+  <type-definitions>
+    <type>
+      <name>RawCapture</name>
+      <location>packages/shared/src/types/capture.ts</location>
+      <definition><![CDATA[
+/**
+ * Raw capture data from photo + depth capture
+ * Created immediately after synchronized capture completes
+ */
+export interface RawCapture {
+  /** UUID for this capture (expo-crypto randomUUID) */
+  id: string;
+  /** Local file URI to captured JPEG */
+  photoUri: string;
+  /** Photo width in pixels */
+  photoWidth: number;
+  /** Photo height in pixels */
+  photoHeight: number;
+  /** Depth frame from useLiDAR.captureDepthFrame() */
+  depthFrame: DepthFrame;
+  /** ISO timestamp of capture */
+  capturedAt: string;
+  /** Time delta between photo and depth timestamps (must be < 100ms) */
+  syncDeltaMs: number;
+}
+      ]]></definition>
+    </type>
+    <type>
+      <name>CaptureErrorCode</name>
+      <location>packages/shared/src/types/capture.ts</location>
+      <definition><![CDATA[
+/**
+ * Error codes for capture failures
+ */
+export type CaptureErrorCode =
+  | 'CAMERA_ERROR'           // expo-camera takePictureAsync failed
+  | 'DEPTH_CAPTURE_FAILED'   // useLiDAR captureDepthFrame failed
+  | 'SYNC_TIMEOUT'           // Photo-depth sync exceeded 100ms
+  | 'NOT_READY';             // Camera or LiDAR not ready
+      ]]></definition>
+    </type>
+    <type>
+      <name>CaptureError</name>
+      <location>packages/shared/src/types/capture.ts</location>
+      <definition><![CDATA[
+/**
+ * Structured error for capture failures
+ */
+export interface CaptureError {
+  /** Error classification */
+  code: CaptureErrorCode;
+  /** User-friendly error message */
+  message: string;
+  /** Present for SYNC_TIMEOUT errors - actual sync delta */
+  syncDeltaMs?: number;
+}
+      ]]></definition>
+    </type>
+    <type>
+      <name>CaptureState</name>
+      <location>apps/mobile/hooks/useCapture.ts</location>
+      <definition><![CDATA[
+/**
+ * Capture state machine states
+ */
+type CaptureState = 'idle' | 'capturing' | 'captured';
+      ]]></definition>
+    </type>
+    <type>
+      <name>UseCaptureReturn</name>
+      <location>apps/mobile/hooks/useCapture.ts</location>
+      <definition><![CDATA[
+/**
+ * useCapture hook return type
+ */
+export interface UseCaptureReturn {
+  /** Initiate synchronized photo + depth capture */
+  capture: () => Promise<RawCapture>;
+  /** Whether capture is in progress */
+  isCapturing: boolean;
+  /** Camera + LiDAR ready for capture */
+  isReady: boolean;
+  /** Most recent capture result (null if none) */
+  lastCapture: RawCapture | null;
+  /** Error from last capture attempt (null if none) */
+  error: CaptureError | null;
+  /** Register camera component ref for photo capture */
+  setCameraRef: (ref: ExpoCameraView | null) => void;
+}
+      ]]></definition>
+    </type>
+  </type-definitions>
+
+  <!-- Code Samples -->
+  <code-samples>
+    <sample>
+      <name>useCapture Hook Implementation Outline</name>
+      <description>Reference implementation structure for useCapture hook</description>
+      <code><![CDATA[
+import { useCallback, useState, useRef } from 'react';
+import { CameraView as ExpoCameraView } from 'expo-camera';
+import * as Crypto from 'expo-crypto';
+import { useLiDAR } from './useLiDAR';
+import type { DepthFrame, RawCapture, CaptureError } from '@realitycam/shared';
+
+type CaptureState = 'idle' | 'capturing' | 'captured';
+
+export function useCapture() {
+  const { captureDepthFrame, isReady: isDepthReady } = useLiDAR();
+
+  const [state, setState] = useState<CaptureState>('idle');
+  const [lastCapture, setLastCapture] = useState<RawCapture | null>(null);
+  const [error, setError] = useState<CaptureError | null>(null);
+  const cameraRef = useRef<ExpoCameraView | null>(null);
+
+  const isCapturing = state === 'capturing';
+  const isReady = cameraRef.current !== null && isDepthReady;
+
+  const setCameraRef = useCallback((ref: ExpoCameraView | null) => {
+    cameraRef.current = ref;
+  }, []);
+
+  const capture = useCallback(async (): Promise<RawCapture> => {
+    if (!isReady) {
+      throw { code: 'NOT_READY', message: 'Camera or LiDAR not ready' };
+    }
+    if (isCapturing) {
+      throw { code: 'NOT_READY', message: 'Capture already in progress' };
+    }
+
+    setState('capturing');
+    setError(null);
+
+    try {
+      const captureStartTime = Date.now();
+
+      // Parallel capture for minimum sync delta
+      const [photo, depthFrame] = await Promise.all([
+        cameraRef.current!.takePictureAsync({ quality: 1, exif: true }),
+        captureDepthFrame(),
+      ]);
+
+      // Calculate sync delta
+      const photoTime = photo.exif?.DateTimeOriginal
+        ? new Date(photo.exif.DateTimeOriginal).getTime()
+        : captureStartTime;
+      const syncDeltaMs = Math.abs(photoTime - depthFrame.timestamp);
+
+      // Validate sync window
+      if (syncDeltaMs > 100) {
+        const syncError: CaptureError = {
+          code: 'SYNC_TIMEOUT',
+          message: `Photo-depth sync exceeded 100ms: ${syncDeltaMs}ms`,
+          syncDeltaMs,
+        };
+        setError(syncError);
+        setState('idle');
+        throw syncError;
+      }
+
+      // Construct RawCapture
+      const rawCapture: RawCapture = {
+        id: Crypto.randomUUID(),
+        photoUri: photo.uri,
+        photoWidth: photo.width,
+        photoHeight: photo.height,
+        depthFrame,
+        capturedAt: new Date().toISOString(),
+        syncDeltaMs,
+      };
+
+      setLastCapture(rawCapture);
+      setState('captured');
+
+      // Reset to idle after brief captured state
+      setTimeout(() => setState('idle'), 100);
+
+      return rawCapture;
+    } catch (err) {
+      // Handle and classify error
+      const captureError: CaptureError =
+        err && typeof err === 'object' && 'code' in err
+          ? (err as CaptureError)
+          : { code: 'CAMERA_ERROR', message: String(err) };
+
+      setError(captureError);
+      setState('idle');
+      throw captureError;
+    }
+  }, [isReady, isCapturing, captureDepthFrame]);
+
+  return {
+    capture,
+    isCapturing,
+    isReady,
+    lastCapture,
+    error,
+    setCameraRef,
+  };
+}
+      ]]></code>
+    </sample>
+    <sample>
+      <name>CaptureButton Component Structure</name>
+      <description>iOS-style shutter button with animations</description>
+      <code><![CDATA[
+import React, { useRef } from 'react';
+import {
+  TouchableWithoutFeedback,
+  View,
+  Animated,
+  StyleSheet,
+} from 'react-native';
+import * as Haptics from 'expo-haptics';
+
+interface CaptureButtonProps {
+  onCapture: () => void;
+  disabled?: boolean;
+  isCapturing?: boolean;
+}
+
+export function CaptureButton({ onCapture, disabled, isCapturing }: CaptureButtonProps) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.9,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePress = async () => {
+    if (disabled || isCapturing) return;
+
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {
+      // Haptics not available (simulator)
+    }
+
+    onCapture();
+  };
+
+  return (
+    <TouchableWithoutFeedback
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      onPress={handlePress}
+      disabled={disabled || isCapturing}
+    >
+      <Animated.View
+        style={[
+          styles.button,
+          { transform: [{ scale: scaleAnim }] },
+          (disabled || isCapturing) && styles.buttonDisabled,
+        ]}
+      >
+        <View style={styles.innerCircle} />
+      </Animated.View>
+    </TouchableWithoutFeedback>
+  );
+}
+
+const styles = StyleSheet.create({
+  button: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  innerCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+});
+      ]]></code>
+    </sample>
+    <sample>
+      <name>Sync Validation Logic</name>
+      <description>Calculate and validate photo-depth synchronization</description>
+      <code><![CDATA[
+// Photo timestamp extraction
+const getPhotoTimestamp = (photo: { exif?: { DateTimeOriginal?: string } }, fallback: number): number => {
+  if (photo.exif?.DateTimeOriginal) {
+    // EXIF DateTimeOriginal format: "YYYY:MM:DD HH:MM:SS"
+    const exifTime = photo.exif.DateTimeOriginal.replace(
+      /^(\d{4}):(\d{2}):(\d{2})/,
+      '$1-$2-$3'
+    );
+    const parsed = new Date(exifTime).getTime();
+    if (!isNaN(parsed)) return parsed;
+  }
+  return fallback;
+};
+
+// Sync validation
+const validateSync = (photoTime: number, depthTime: number, maxDelta = 100): void => {
+  const syncDeltaMs = Math.abs(photoTime - depthTime);
+  if (syncDeltaMs > maxDelta) {
+    throw {
+      code: 'SYNC_TIMEOUT' as const,
+      message: `Photo-depth sync exceeded ${maxDelta}ms: ${syncDeltaMs}ms`,
+      syncDeltaMs,
+    };
+  }
+};
+      ]]></code>
+    </sample>
+  </code-samples>
+
+  <!-- Code Patterns -->
+  <code-patterns>
+    <pattern>
+      <name>Animated Button Pattern</name>
+      <description>Use Animated.Value with spring for press feedback</description>
+      <reference>React Native Animated API</reference>
+    </pattern>
+    <pattern>
+      <name>Haptic Feedback Pattern</name>
+      <description>expo-haptics impactAsync on user actions</description>
+      <reference>apps/mobile/components/Camera/DepthToggle.tsx</reference>
+    </pattern>
+    <pattern>
+      <name>Hook State Machine Pattern</name>
+      <description>State transitions with derived values (isCapturing = state === 'capturing')</description>
+      <reference>apps/mobile/hooks/useDeviceAttestation.ts</reference>
+    </pattern>
+    <pattern>
+      <name>Parallel Async Pattern</name>
+      <description>Promise.all for concurrent async operations</description>
+      <reference>Story dev notes</reference>
+    </pattern>
+    <pattern>
+      <name>Camera Ref Pattern</name>
+      <description>forwardRef with useImperativeHandle for exposing methods</description>
+      <reference>apps/mobile/components/Camera/CameraView.tsx</reference>
+    </pattern>
+  </code-patterns>
+
+  <!-- Error Messages -->
+  <error-messages>
+    <message>
+      <type>NOT_READY</type>
+      <user-message>Camera or depth sensor not ready. Please wait and try again.</user-message>
+    </message>
+    <message>
+      <type>CAMERA_ERROR</type>
+      <user-message>Failed to capture photo. Please try again.</user-message>
+    </message>
+    <message>
+      <type>DEPTH_CAPTURE_FAILED</type>
+      <user-message>Failed to capture depth data. Please try again.</user-message>
+    </message>
+    <message>
+      <type>SYNC_TIMEOUT</type>
+      <user-message>Photo and depth capture timing mismatch. Please try again.</user-message>
+    </message>
+  </error-messages>
+
+  <!-- Integration Points -->
+  <integration-points>
+    <integration>
+      <story>3-1 - Camera View with LiDAR Depth Overlay</story>
+      <relationship>DEPENDS ON</relationship>
+      <description>Story 3.2 uses useLiDAR hook from Story 3.1 for depth capture</description>
+      <data-consumed>
+        <field>useLiDAR.captureDepthFrame() - returns DepthFrame</field>
+        <field>useLiDAR.isReady - gates capture readiness</field>
+      </data-consumed>
+    </integration>
+    <integration>
+      <story>3-3 - GPS Metadata Collection</story>
+      <relationship>FOLLOWED BY</relationship>
+      <description>Story 3.3 will add location capture to the RawCapture. useCapture may be extended or a new useLocation hook integrated.</description>
+    </integration>
+    <integration>
+      <story>3-4 - Capture Attestation Signature</story>
+      <relationship>FOLLOWED BY</relationship>
+      <description>Story 3.4 will add per-capture device assertion. Will hash RawCapture data and call generateAssertionAsync.</description>
+    </integration>
+    <integration>
+      <story>3-5 - Local Processing Pipeline</story>
+      <relationship>FOLLOWED BY</relationship>
+      <description>Story 3.5 will process RawCapture: compute photo hash, compress depth map, construct upload payload.</description>
+      <data-handoff>
+        <field>RawCapture.photoUri - for SHA-256 hashing</field>
+        <field>RawCapture.depthFrame.depthMap - for gzip compression</field>
+      </data-handoff>
+    </integration>
+    <integration>
+      <story>3-6 - Capture Preview Screen</story>
+      <relationship>FOLLOWED BY</relationship>
+      <description>Story 3.6 will display preview after capture with depth visualization. Receives RawCapture from this story.</description>
+      <data-handoff>
+        <field>RawCapture.photoUri - for preview display</field>
+        <field>RawCapture.depthFrame - for depth overlay on preview</field>
+      </data-handoff>
+    </integration>
+  </integration-points>
+
+  <!-- Performance Guidelines -->
+  <performance-guidelines>
+    <guideline>
+      <metric>Total Capture Time</metric>
+      <target>&lt; 500ms from button tap to RawCapture available</target>
+      <strategy>Use Promise.all for parallel photo + depth capture</strategy>
+    </guideline>
+    <guideline>
+      <metric>Sync Delta</metric>
+      <target>&lt; 100ms between photo and depth timestamps</target>
+      <strategy>Parallel capture minimizes delta. EXIF timestamp preferred for accuracy.</strategy>
+    </guideline>
+    <guideline>
+      <metric>UI Responsiveness</metric>
+      <target>No visible frame drop during capture</target>
+      <strategy>Capture operations are async. Button animation uses useNativeDriver.</strategy>
+    </guideline>
+    <guideline>
+      <metric>Double-tap Prevention</metric>
+      <target>isCapturing flag blocks concurrent captures</target>
+      <strategy>Button disabled during capture state</strategy>
+    </guideline>
+  </performance-guidelines>
+
+  <!-- External References -->
+  <external-references>
+    <reference>
+      <name>expo-camera takePictureAsync</name>
+      <url>https://docs.expo.dev/versions/latest/sdk/camera/#takepictureasyncoptions</url>
+      <description>Official documentation for photo capture options and return type</description>
+    </reference>
+    <reference>
+      <name>expo-haptics Documentation</name>
+      <url>https://docs.expo.dev/versions/latest/sdk/haptics/</url>
+      <description>Haptic feedback API for capture confirmation</description>
+    </reference>
+    <reference>
+      <name>expo-crypto Documentation</name>
+      <url>https://docs.expo.dev/versions/latest/sdk/crypto/</url>
+      <description>UUID generation for capture IDs</description>
+    </reference>
+    <reference>
+      <name>React Native Animated API</name>
+      <url>https://reactnative.dev/docs/animated</url>
+      <description>Animation API for button press feedback</description>
+    </reference>
+  </external-references>
+</story-context>

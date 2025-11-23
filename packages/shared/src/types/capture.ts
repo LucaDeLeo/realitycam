@@ -71,3 +71,49 @@ export interface DepthOverlayConfig {
   /** Show numeric depth value on tap */
   showDepthValues: boolean;
 }
+
+// ============================================================================
+// Raw Capture Types (Story 3.2)
+// ============================================================================
+
+/**
+ * Raw capture data from photo + depth capture
+ * Created immediately after synchronized capture completes
+ */
+export interface RawCapture {
+  /** UUID for this capture (expo-crypto randomUUID) */
+  id: string;
+  /** Local file URI to captured JPEG */
+  photoUri: string;
+  /** Photo width in pixels */
+  photoWidth: number;
+  /** Photo height in pixels */
+  photoHeight: number;
+  /** Depth frame from useLiDAR.captureDepthFrame() */
+  depthFrame: DepthFrame;
+  /** ISO timestamp of capture */
+  capturedAt: string;
+  /** Time delta between photo and depth timestamps (must be < 100ms) */
+  syncDeltaMs: number;
+}
+
+/**
+ * Error codes for capture failures
+ */
+export type CaptureErrorCode =
+  | 'CAMERA_ERROR'
+  | 'DEPTH_CAPTURE_FAILED'
+  | 'SYNC_TIMEOUT'
+  | 'NOT_READY';
+
+/**
+ * Structured error for capture failures
+ */
+export interface CaptureError {
+  /** Error classification */
+  code: CaptureErrorCode;
+  /** User-friendly error message */
+  message: string;
+  /** Present for SYNC_TIMEOUT errors - actual sync delta */
+  syncDeltaMs?: number;
+}

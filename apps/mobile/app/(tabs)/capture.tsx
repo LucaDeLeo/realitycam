@@ -3,16 +3,20 @@
  *
  * Main camera capture screen with LiDAR depth overlay.
  * Displays camera preview with real-time depth visualization.
+ * Implements synchronized photo + depth capture via useCapture hook.
  *
  * @see Story 3.1 - Camera View with LiDAR Depth Overlay
+ * @see Story 3.2 - Photo Capture with Depth Map
  */
 
 import { useState, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, useColorScheme } from 'react-native';
+import { View, Text, StyleSheet, useColorScheme, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, CameraViewHandle } from '../../components/Camera';
 import { useDeviceStore } from '../../store/deviceStore';
+import { useCapture } from '../../hooks/useCapture';
 import { colors } from '../../constants/colors';
+import type { RawCapture } from '@realitycam/shared';
 
 /**
  * LiDAR unavailable message component
@@ -65,6 +69,17 @@ export default function CaptureScreen() {
   // LiDAR status tracking
   const [lidarError, setLidarError] = useState<string | null>(null);
 
+  // Capture hook for synchronized photo + depth capture
+  const {
+    capture,
+    isCapturing,
+    isReady: isCaptureReady,
+    lastCapture,
+    error: captureError,
+    setCameraRef,
+    clearError,
+  } = useCapture();
+
   // Handle LiDAR status callback
   const handleLiDARStatus = useCallback((available: boolean, error: string | null) => {
     if (!available && error) {
@@ -78,6 +93,34 @@ export default function CaptureScreen() {
   const handleOverlayToggle = useCallback((enabled: boolean) => {
     setOverlayEnabled(enabled);
   }, []);
+
+  // Handle capture button press
+  const handleCapture = useCallback(async () => {
+    try {
+      const rawCapture = await capture();
+      console.log('[CaptureScreen] Capture successful:', {
+        id: rawCapture.id,
+        photoUri: rawCapture.photoUri,
+        dimensions: `${rawCapture.photoWidth}x${rawCapture.photoHeight}`,
+        syncDeltaMs: rawCapture.syncDeltaMs,
+        depthSize: `${rawCapture.depthFrame.width}x${rawCapture.depthFrame.height}`,
+      });
+
+      // TODO: Story 3-6 will add navigation to preview screen
+      // For now, show success feedback
+      Alert.alert(
+        'Capture Complete',
+        `Photo captured with depth data.\nSync delta: ${rawCapture.syncDeltaMs}ms`,
+        [{ text: 'OK' }]
+      );
+    } catch (err) {
+      // Error is already logged by useCapture, just show alert
+      const errorMessage = captureError?.message || 'Failed to capture photo. Please try again.';
+      Alert.alert('Capture Failed', errorMessage, [
+        { text: 'OK', onPress: clearError },
+      ]);
+    }
+  }, [capture, captureError, clearError]);
 
   // Check if device has LiDAR capability
   // This is a double-check - the device store should already show LiDAR
@@ -101,6 +144,10 @@ export default function CaptureScreen() {
         minDepth={0}
         maxDepth={5}
         overlayOpacity={0.4}
+        onCapture={handleCapture}
+        isCapturing={isCapturing}
+        isCaptureReady={isCaptureReady}
+        onCameraRef={setCameraRef}
       />
     </View>
   );

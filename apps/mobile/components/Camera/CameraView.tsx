@@ -3,8 +3,10 @@
  *
  * Container component integrating expo-camera with LiDAR depth overlay.
  * Manages camera permissions and depth capture lifecycle.
+ * Includes CaptureButton for synchronized photo + depth capture.
  *
  * @see Story 3.1 - Camera View with LiDAR Depth Overlay
+ * @see Story 3.2 - Photo Capture with Depth Map
  */
 
 import React, { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
@@ -20,6 +22,7 @@ import type { DepthFrame } from '@realitycam/shared';
 import { useLiDAR } from '../../hooks/useLiDAR';
 import { DepthOverlay } from './DepthOverlay';
 import { DepthToggle } from './DepthToggle';
+import { CaptureButton } from './CaptureButton';
 import { colors } from '../../constants/colors';
 
 interface CameraViewProps {
@@ -35,6 +38,14 @@ interface CameraViewProps {
   maxDepth?: number;
   /** Depth overlay opacity */
   overlayOpacity?: number;
+  /** Callback when capture button is pressed */
+  onCapture?: () => void;
+  /** Whether capture is in progress (disables button) */
+  isCapturing?: boolean;
+  /** Whether capture is ready (enables button) */
+  isCaptureReady?: boolean;
+  /** Callback to receive camera ref for useCapture hook */
+  onCameraRef?: (ref: ExpoCameraView | null) => void;
 }
 
 /**
@@ -87,6 +98,10 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
     minDepth = 0,
     maxDepth = 5,
     overlayOpacity = 0.4,
+    onCapture,
+    isCapturing = false,
+    isCaptureReady = true,
+    onCameraRef,
   },
   ref
 ) {
@@ -110,8 +125,17 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
     error: lidarError,
   } = useLiDAR();
 
-  // Camera ref for future photo capture
+  // Camera ref for photo capture
   const cameraRef = useRef<ExpoCameraView>(null);
+
+  // Provide camera ref to parent via callback
+  const setCameraRef = useCallback(
+    (ref: ExpoCameraView | null) => {
+      (cameraRef as React.MutableRefObject<ExpoCameraView | null>).current = ref;
+      onCameraRef?.(ref);
+    },
+    [onCameraRef]
+  );
 
   // Report LiDAR status to parent
   useEffect(() => {
@@ -182,7 +206,7 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
     <View style={styles.container}>
       {/* Camera Preview */}
       <ExpoCameraView
-        ref={cameraRef}
+        ref={setCameraRef}
         style={styles.camera}
         facing="back"
         mode="picture"
@@ -207,6 +231,17 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
             disabled={!isAvailable || !isReady}
           />
         </View>
+
+        {/* Capture Button */}
+        {onCapture && (
+          <View style={styles.captureButtonContainer}>
+            <CaptureButton
+              onCapture={onCapture}
+              isCapturing={isCapturing}
+              disabled={!isCaptureReady || !isReady}
+            />
+          </View>
+        )}
 
         {/* Status Indicator */}
         {!isReady && isAvailable && (
@@ -240,6 +275,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 60,
     right: 20,
+  },
+  captureButtonContainer: {
+    position: 'absolute',
+    bottom: 40,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
   statusContainer: {
     position: 'absolute',

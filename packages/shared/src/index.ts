@@ -17,6 +17,9 @@ export type {
   DepthFrame,
   DepthColormap,
   DepthOverlayConfig,
+  RawCapture,
+  CaptureErrorCode,
+  CaptureError,
 } from './types/capture';
 
 // Device Types
