@@ -5,6 +5,10 @@ export interface HardwareAttestation {
   status: EvidenceStatus;
   level: 'secure_enclave' | 'unverified';
   device_model: string;
+  /** Whether the per-capture assertion signature was verified (Story 4.4) */
+  assertion_verified: boolean;
+  /** Whether the assertion counter was valid (strictly increasing) (Story 4.4) */
+  counter_valid: boolean;
 }
 
 export interface DepthAnalysis {

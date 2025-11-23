@@ -70,7 +70,7 @@ development_status:
   4-1-capture-upload-endpoint: done
   4-2-upload-queue-retry: done
   4-3-offline-storage-auto-upload: in-progress
-  4-4-attestation-verification-upload: backlog
+  4-4-attestation-verification-upload: done
   4-5-lidar-depth-analysis-service: backlog
   4-6-metadata-validation: backlog
   4-7-evidence-package-confidence-calculation: backlog
