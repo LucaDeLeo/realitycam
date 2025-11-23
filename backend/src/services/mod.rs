@@ -4,6 +4,7 @@
 
 pub mod attestation;
 pub mod challenge_store;
+pub mod storage;
 
 pub use attestation::{
     decode_attestation_object, extract_public_key, parse_authenticator_data, verify_attestation,
@@ -11,3 +12,4 @@ pub use attestation::{
     VerificationResult,
 };
 pub use challenge_store::{ChallengeEntry, ChallengeError, ChallengeStore};
+pub use storage::{depth_map_s3_key, photo_s3_key, StorageService};

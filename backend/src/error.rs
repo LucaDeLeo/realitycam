@@ -33,6 +33,8 @@ pub mod codes {
     pub const DEVICE_UNVERIFIED: &str = "DEVICE_UNVERIFIED";
     pub const TIMESTAMP_INVALID: &str = "TIMESTAMP_INVALID";
     pub const REPLAY_DETECTED: &str = "REPLAY_DETECTED";
+    pub const PAYLOAD_TOO_LARGE: &str = "PAYLOAD_TOO_LARGE";
+    pub const RATE_LIMITED: &str = "RATE_LIMITED";
 }
 
 /// API error type with associated HTTP status codes.
@@ -95,6 +97,13 @@ pub enum ApiError {
 
     #[error("Replay detected")]
     ReplayDetected,
+
+    // Capture upload errors (Story 4.1)
+    #[error("Payload too large")]
+    PayloadTooLarge(String),
+
+    #[error("Rate limited")]
+    RateLimited,
 }
 
 impl ApiError {
@@ -120,6 +129,8 @@ impl ApiError {
             ApiError::DeviceUnverified => codes::DEVICE_UNVERIFIED,
             ApiError::TimestampInvalid => codes::TIMESTAMP_INVALID,
             ApiError::ReplayDetected => codes::REPLAY_DETECTED,
+            ApiError::PayloadTooLarge(_) => codes::PAYLOAD_TOO_LARGE,
+            ApiError::RateLimited => codes::RATE_LIMITED,
         }
     }
 
@@ -145,6 +156,8 @@ impl ApiError {
             ApiError::DeviceUnverified => StatusCode::FORBIDDEN,
             ApiError::TimestampInvalid => StatusCode::UNAUTHORIZED,
             ApiError::ReplayDetected => StatusCode::UNAUTHORIZED,
+            ApiError::PayloadTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
+            ApiError::RateLimited => StatusCode::TOO_MANY_REQUESTS,
         }
     }
 
@@ -179,6 +192,10 @@ impl ApiError {
             ApiError::DeviceUnverified => "Device is not verified".to_string(),
             ApiError::TimestampInvalid => "Request timestamp is invalid".to_string(),
             ApiError::ReplayDetected => "Request replay detected".to_string(),
+            ApiError::PayloadTooLarge(msg) => format!("Payload too large: {msg}"),
+            ApiError::RateLimited => {
+                "Rate limit exceeded. Please wait before trying again.".to_string()
+            }
         }
     }
 

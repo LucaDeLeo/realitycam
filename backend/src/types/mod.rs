@@ -2,6 +2,13 @@
 //!
 //! Defines the standard API response format per architecture specification.
 
+pub mod capture;
+
+pub use capture::{
+    CaptureLocation, CaptureMetadataPayload, CaptureUploadResponse, DepthMapDimensions,
+    ParsedCaptureUpload, MAX_DEPTH_DIMENSION, MAX_DEPTH_MAP_SIZE, MAX_PHOTO_SIZE,
+};
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

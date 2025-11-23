@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 axum = "0.8"
-axum-extra = { version = "0.10", features = ["typed-header"] }
+axum-extra = { version = "0.10", features = ["typed-header", "multipart"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "trace", "request-id", "propagate-header"] }
 tokio = { version = "1", features = ["full", "signal"] }

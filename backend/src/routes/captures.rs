@@ -1,48 +1,422 @@
-//! Capture routes
+//! Capture routes (Story 4.1)
 //!
-//! Stub implementations for capture upload and retrieval endpoints.
+//! Implements capture upload and retrieval endpoints.
+//!
+//! ## Endpoints
+//! - POST /api/v1/captures - Upload a new capture with photo, depth map, and metadata
+//! - GET /api/v1/captures/{id} - Get capture by ID
+//!
+//! ## Authentication
+//! All endpoints require device authentication via DeviceAuthLayer middleware.
+//! DeviceContext is injected into request extensions.
 
 use axum::{
-    extract::{Extension, Path},
+    extract::{Extension, Path, State},
+    http::StatusCode,
     routing::{get, post},
     Json, Router,
 };
+use axum_extra::extract::Multipart;
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+use serde_json::json;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::error::ApiError;
-use crate::types::ApiErrorResponse;
+use crate::error::{ApiError, ApiErrorWithRequestId};
+use crate::middleware::DeviceContext;
+use crate::models::CreateCaptureParams;
+use crate::services::StorageService;
+use crate::types::{
+    capture::{validate_depth_map_size, validate_photo_size},
+    ApiResponse, CaptureMetadataPayload, CaptureUploadResponse,
+};
+
+// ============================================================================
+// Configuration Constants
+// ============================================================================
+
+/// Base URL for verification pages (should come from config in production)
+const VERIFICATION_BASE_URL: &str = "https://realitycam.app/verify";
+
+/// Rate limiting configuration flag (placeholder for MVP)
+/// TODO: Implement full rate limiting in Story 4-2
+const RATE_LIMITING_ENABLED: bool = false;
+
+/// Maximum captures per hour per device (not enforced in MVP)
+#[allow(dead_code)]
+const MAX_CAPTURES_PER_HOUR: u32 = 10;
+
+// ============================================================================
+// Router Setup
+// ============================================================================
 
 /// Creates the captures routes router.
 ///
-/// Returns a router that expects PgPool state (for future database operations).
+/// Routes:
+/// - POST / - Upload a new capture (protected by DeviceAuthLayer)
+/// - GET /{id} - Get capture by ID (protected by DeviceAuthLayer)
 pub fn router() -> Router<PgPool> {
     Router::new()
         .route("/", post(upload_capture))
         .route("/{id}", get(get_capture))
 }
 
+// ============================================================================
+// Multipart Parsing
+// ============================================================================
+
+/// Parsed multipart upload data
+struct ParsedMultipart {
+    photo_bytes: Vec<u8>,
+    depth_map_bytes: Vec<u8>,
+    metadata: CaptureMetadataPayload,
+}
+
+/// Parses multipart form data for capture upload
+///
+/// Extracts three parts:
+/// - "photo" - JPEG image (max 10MB)
+/// - "depth_map" - Gzipped depth data (max 5MB)
+/// - "metadata" - JSON metadata payload
+async fn parse_multipart(mut multipart: Multipart) -> Result<ParsedMultipart, ApiError> {
+    let mut photo_bytes: Option<Vec<u8>> = None;
+    let mut depth_map_bytes: Option<Vec<u8>> = None;
+    let mut metadata: Option<CaptureMetadataPayload> = None;
+
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        tracing::warn!(error = %e, "Failed to read multipart field");
+        ApiError::Validation(format!("Failed to read multipart form: {e}"))
+    })? {
+        let name = field.name().map(String::from);
+
+        match name.as_deref() {
+            Some("photo") => {
+                let bytes = field.bytes().await.map_err(|e| {
+                    tracing::warn!(error = %e, "Failed to read photo field");
+                    ApiError::Validation("Failed to read photo data".to_string())
+                })?;
+
+                validate_photo_size(bytes.len())?;
+                photo_bytes = Some(bytes.to_vec());
+
+                tracing::debug!(size = bytes.len(), "Photo field parsed");
+            }
+
+            Some("depth_map") => {
+                let bytes = field.bytes().await.map_err(|e| {
+                    tracing::warn!(error = %e, "Failed to read depth_map field");
+                    ApiError::Validation("Failed to read depth_map data".to_string())
+                })?;
+
+                validate_depth_map_size(bytes.len())?;
+                depth_map_bytes = Some(bytes.to_vec());
+
+                tracing::debug!(size = bytes.len(), "Depth map field parsed");
+            }
+
+            Some("metadata") => {
+                let text = field.text().await.map_err(|e| {
+                    tracing::warn!(error = %e, "Failed to read metadata field");
+                    ApiError::Validation("Failed to read metadata".to_string())
+                })?;
+
+                let parsed: CaptureMetadataPayload = serde_json::from_str(&text).map_err(|e| {
+                    tracing::warn!(error = %e, "Failed to parse metadata JSON");
+                    ApiError::Validation(format!("Invalid metadata JSON: {e}"))
+                })?;
+
+                // Validate metadata fields
+                parsed.validate()?;
+
+                metadata = Some(parsed);
+
+                tracing::debug!("Metadata field parsed and validated");
+            }
+
+            Some(other) => {
+                tracing::debug!(field = other, "Ignoring unknown multipart field");
+            }
+
+            None => {
+                tracing::debug!("Ignoring unnamed multipart field");
+            }
+        }
+    }
+
+    // Ensure all required parts are present
+    let photo_bytes =
+        photo_bytes.ok_or_else(|| ApiError::Validation("Missing required part: photo".to_string()))?;
+
+    let depth_map_bytes = depth_map_bytes
+        .ok_or_else(|| ApiError::Validation("Missing required part: depth_map".to_string()))?;
+
+    let metadata = metadata
+        .ok_or_else(|| ApiError::Validation("Missing required part: metadata".to_string()))?;
+
+    Ok(ParsedMultipart {
+        photo_bytes,
+        depth_map_bytes,
+        metadata,
+    })
+}
+
+// ============================================================================
+// Rate Limiting (Placeholder)
+// ============================================================================
+
+/// Checks rate limiting for the device (placeholder for MVP)
+///
+/// Returns Ok(()) if within limits, Err(ApiError::RateLimited) if exceeded.
+/// Currently always returns Ok(()) as rate limiting is not enforced in MVP.
+///
+/// TODO: Implement full rate limiting in Story 4-2
+#[allow(dead_code)]
+fn check_rate_limit(_device_id: Uuid) -> Result<(), ApiError> {
+    if !RATE_LIMITING_ENABLED {
+        return Ok(());
+    }
+
+    // TODO: Implement rate limiting logic
+    // - Track capture count per device per hour
+    // - Return 429 if exceeded MAX_CAPTURES_PER_HOUR
+    // - Include Retry-After header in response
+
+    Ok(())
+}
+
+// ============================================================================
+// Database Operations
+// ============================================================================
+
+/// Inserts a new capture record into the database
+async fn insert_capture(pool: &PgPool, params: CreateCaptureParams) -> Result<Uuid, ApiError> {
+    let capture_id = Uuid::new_v4();
+
+    // Using query_scalar with explicit SQL to avoid compile-time schema dependency
+    // This allows the code to compile before the migration is applied
+    sqlx::query_scalar::<_, Uuid>(
+        r#"
+        INSERT INTO captures (
+            id, device_id, target_media_hash, photo_s3_key, depth_map_s3_key,
+            evidence, confidence_level, status, location_precise, captured_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        RETURNING id
+        "#,
+    )
+    .bind(capture_id)
+    .bind(params.device_id)
+    .bind(&params.target_media_hash)
+    .bind(&params.photo_s3_key)
+    .bind(&params.depth_map_s3_key)
+    .bind(json!({})) // Empty evidence initially
+    .bind("low")     // Initial confidence level
+    .bind("pending") // Initial status
+    .bind(&params.location_precise)
+    .bind(params.captured_at)
+    .fetch_one(pool)
+    .await
+    .map_err(|e| {
+        tracing::error!(error = %e, "Failed to insert capture record");
+        ApiError::Database(e)
+    })
+}
+
+// ============================================================================
+// Route Handlers
+// ============================================================================
+
 /// POST /api/v1/captures - Upload a new capture
 ///
-/// Uploads photo with depth map and metadata.
-/// Currently returns 501 Not Implemented.
+/// Accepts multipart form data with:
+/// - photo: JPEG image (max 10MB)
+/// - depth_map: Gzipped depth data (max 5MB)
+/// - metadata: JSON metadata
+///
+/// Device authentication is handled by DeviceAuthLayer middleware.
+///
+/// # Responses
+/// - 202 Accepted: Capture uploaded successfully, processing queued
+/// - 400 Bad Request: Validation error
+/// - 401 Unauthorized: Device auth failed (handled by middleware)
+/// - 413 Payload Too Large: Photo or depth map exceeds size limit
+/// - 429 Too Many Requests: Rate limit exceeded (when enabled)
+/// - 500 Internal Server Error: Storage or database error
 async fn upload_capture(
+    State(pool): State<PgPool>,
     Extension(request_id): Extension<Uuid>,
-) -> (axum::http::StatusCode, Json<ApiErrorResponse>) {
-    let error = ApiError::NotImplemented;
-    let response = ApiErrorResponse::new(error.code(), error.safe_message(), request_id);
-    (error.status_code(), Json(response))
+    Extension(device_ctx): Extension<DeviceContext>,
+    multipart: Multipart,
+) -> Result<(StatusCode, Json<ApiResponse<CaptureUploadResponse>>), ApiErrorWithRequestId> {
+    tracing::info!(
+        request_id = %request_id,
+        device_id = %device_ctx.device_id,
+        device_model = %device_ctx.model,
+        "Processing capture upload request"
+    );
+
+    // Check rate limit (placeholder for MVP)
+    check_rate_limit(device_ctx.device_id).map_err(|e| ApiErrorWithRequestId {
+        error: e,
+        request_id,
+    })?;
+
+    // Parse multipart form data
+    let parsed = parse_multipart(multipart)
+        .await
+        .map_err(|e| ApiErrorWithRequestId {
+            error: e,
+            request_id,
+        })?;
+
+    tracing::info!(
+        request_id = %request_id,
+        photo_size = parsed.photo_bytes.len(),
+        depth_map_size = parsed.depth_map_bytes.len(),
+        device_model = %parsed.metadata.device_model,
+        "Multipart data parsed successfully"
+    );
+
+    // Generate capture ID
+    let capture_id = Uuid::new_v4();
+
+    // Initialize storage service
+    // Note: In production, this should be part of AppState for connection reuse
+    let config = crate::config::Config::load();
+    let storage = StorageService::new(&config).await;
+
+    // Upload files to S3
+    let (photo_s3_key, depth_map_s3_key) = storage
+        .upload_capture_files(
+            capture_id,
+            parsed.photo_bytes,
+            parsed.depth_map_bytes,
+        )
+        .await
+        .map_err(|e| ApiErrorWithRequestId {
+            error: e,
+            request_id,
+        })?;
+
+    tracing::info!(
+        request_id = %request_id,
+        capture_id = %capture_id,
+        photo_s3_key = %photo_s3_key,
+        depth_map_s3_key = %depth_map_s3_key,
+        "Files uploaded to S3"
+    );
+
+    // Decode photo hash from base64
+    let photo_hash_bytes = STANDARD.decode(&parsed.metadata.photo_hash).map_err(|e| {
+        tracing::warn!(error = %e, "Invalid base64 in photo_hash");
+        ApiErrorWithRequestId {
+            error: ApiError::Validation("Invalid base64 encoding in photo_hash".to_string()),
+            request_id,
+        }
+    })?;
+
+    // Prepare location data if present
+    let location_precise = parsed.metadata.location.as_ref().map(|loc| {
+        json!({
+            "latitude": loc.latitude,
+            "longitude": loc.longitude,
+            "altitude": loc.altitude,
+            "accuracy": loc.accuracy
+        })
+    });
+
+    // Parse captured_at timestamp
+    let captured_at = parsed.metadata.captured_at_datetime().map_err(|e| {
+        ApiErrorWithRequestId {
+            error: e,
+            request_id,
+        }
+    })?;
+
+    // Create database record
+    let db_capture_id = insert_capture(
+        &pool,
+        CreateCaptureParams {
+            device_id: device_ctx.device_id,
+            target_media_hash: photo_hash_bytes,
+            photo_s3_key,
+            depth_map_s3_key,
+            captured_at,
+            location_precise,
+        },
+    )
+    .await
+    .map_err(|e| ApiErrorWithRequestId {
+        error: e,
+        request_id,
+    })?;
+
+    tracing::info!(
+        request_id = %request_id,
+        capture_id = %db_capture_id,
+        device_id = %device_ctx.device_id,
+        "Capture record created in database"
+    );
+
+    // Build response
+    let verification_url = format!("{VERIFICATION_BASE_URL}/{db_capture_id}");
+
+    let response_data = CaptureUploadResponse {
+        capture_id: db_capture_id,
+        status: "processing".to_string(),
+        verification_url,
+    };
+
+    tracing::info!(
+        request_id = %request_id,
+        capture_id = %db_capture_id,
+        "Capture upload completed successfully"
+    );
+
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(ApiResponse::new(response_data, request_id)),
+    ))
 }
 
 /// GET /api/v1/captures/{id} - Get capture by ID
 ///
 /// Retrieves capture details and evidence by ID.
 /// Currently returns 501 Not Implemented.
+///
+/// TODO: Implement in a future story
 async fn get_capture(
     Path(_id): Path<String>,
     Extension(request_id): Extension<Uuid>,
-) -> (axum::http::StatusCode, Json<ApiErrorResponse>) {
+) -> Result<(StatusCode, Json<crate::types::ApiErrorResponse>), ApiErrorWithRequestId> {
     let error = ApiError::NotImplemented;
-    let response = ApiErrorResponse::new(error.code(), error.safe_message(), request_id);
-    (error.status_code(), Json(response))
+    let response =
+        crate::types::ApiErrorResponse::new(error.code(), error.safe_message(), request_id);
+    Ok((error.status_code(), Json(response)))
+}
+
+// ============================================================================
+// Unit Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_verification_url_format() {
+        let capture_id = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+        let url = format!("{VERIFICATION_BASE_URL}/{capture_id}");
+        assert_eq!(
+            url,
+            "https://realitycam.app/verify/550e8400-e29b-41d4-a716-446655440000"
+        );
+    }
+
+    #[test]
+    fn test_rate_limit_placeholder_passes() {
+        let device_id = Uuid::new_v4();
+        let result = check_rate_limit(device_id);
+        assert!(result.is_ok());
+    }
 }

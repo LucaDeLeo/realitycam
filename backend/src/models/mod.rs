@@ -7,6 +7,6 @@ mod capture;
 mod device;
 mod verification_log;
 
-pub use capture::Capture;
+pub use capture::{Capture, CreateCaptureParams};
 pub use device::Device;
 pub use verification_log::VerificationLog;
