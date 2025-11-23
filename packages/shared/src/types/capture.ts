@@ -199,10 +199,11 @@ export interface CaptureAssertion {
  * Error codes for capture assertion failures (informational only)
  */
 export type CaptureAssertionErrorCode =
-  | 'NOT_ATTESTED'       // Device not attested (keyId missing)
-  | 'ASSERTION_FAILED'   // generateAssertionAsync threw
-  | 'HASH_FAILED'        // SHA-256 computation failed
-  | 'UNKNOWN';           // Unknown error
+  | 'NOT_ATTESTED'        // Device not attested (keyId missing)
+  | 'ASSERTION_FAILED'    // generateAssertionAsync threw
+  | 'HASH_FAILED'         // SHA-256 computation failed
+  | 'MODULE_UNAVAILABLE'  // AppIntegrity module not available (Expo Go)
+  | 'UNKNOWN';            // Unknown error
 
 /**
  * Capture assertion error (informational - does not prevent capture)

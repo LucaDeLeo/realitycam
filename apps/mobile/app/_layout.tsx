@@ -220,19 +220,9 @@ export default function RootLayout() {
             headerShown: true,
             presentation: 'fullScreenModal',
             headerStyle: {
-              backgroundColor: '#000000', // Black background
-              height: 120, // Same height as tabs header
+              backgroundColor: '#000000',
             },
-            headerTitleContainerStyle: {
-              paddingHorizontal: 20, // Horizontal padding for logo
-              paddingBottom: 8, // Bottom padding (same as tabs)
-            },
-            headerTintColor: '#FFFFFF', // White text and icons
-            headerTitleStyle: {
-              color: '#FFFFFF', // White title text
-              fontWeight: '600',
-              fontSize: 0, // Hide default title since we use custom logo
-            },
+            headerTintColor: '#FFFFFF',
             headerTitle: () => <LogoHeader />,
           }}
         />
@@ -244,19 +234,9 @@ export default function RootLayout() {
             presentation: 'fullScreenModal',
             headerBackVisible: false,
             headerStyle: {
-              backgroundColor: '#000000', // Black background
-              height: 120, // Same height as tabs header
+              backgroundColor: '#000000',
             },
-            headerTitleContainerStyle: {
-              paddingHorizontal: 20, // Horizontal padding for logo
-              paddingBottom: 8, // Bottom padding (same as tabs)
-            },
-            headerTintColor: '#FFFFFF', // White text and icons
-            headerTitleStyle: {
-              color: '#FFFFFF', // White title text
-              fontWeight: '600',
-              fontSize: 0, // Hide default title since we use custom logo
-            },
+            headerTintColor: '#FFFFFF',
             headerTitle: () => <LogoHeader />,
           }}
         />

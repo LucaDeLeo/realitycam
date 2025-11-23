@@ -1,9 +1,15 @@
 /**
  * CameraView Component
  *
- * Container component integrating expo-camera with LiDAR depth overlay.
+ * Container component integrating react-native-vision-camera with LiDAR depth overlay.
  * Manages camera permissions and depth capture lifecycle.
  * Includes CaptureButton for synchronized photo + depth capture.
+ *
+ * Features:
+ * - Physical lens switching: 0.5x (ultra-wide), 1x (wide), 2x (telephoto)
+ * - Real-time depth overlay from LiDAR
+ * - Toggle button for overlay visibility
+ * - Permission handling
  *
  * @see Story 3.1 - Camera View with LiDAR Depth Overlay
  * @see Story 3.2 - Photo Capture with Depth Map
@@ -19,7 +25,12 @@ import {
   TouchableOpacity,
   Platform,
 } from 'react-native';
-import { CameraView as ExpoCameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import {
+  Camera,
+  useCameraDevice,
+  useCameraPermission,
+  CameraPosition,
+} from 'react-native-vision-camera';
 import { Ionicons } from '@expo/vector-icons';
 import type { DepthFrame } from '@realitycam/shared';
 import { useLiDAR } from '../../hooks/useLiDAR';
@@ -48,7 +59,7 @@ interface CameraViewProps {
   /** Whether capture is ready (enables button) */
   isCaptureReady?: boolean;
   /** Callback to receive camera ref for useCapture hook */
-  onCameraRef?: (ref: ExpoCameraView | null) => void;
+  onCameraRef?: (ref: Camera | null) => void;
 }
 
 /**
@@ -65,13 +76,16 @@ export interface CameraViewHandle {
   stopDepthCapture: () => Promise<void>;
 }
 
+/** Zoom level for UI buttons */
+type ZoomLevel = '0.5' | '1' | '2';
+
 /**
  * CameraView with LiDAR depth overlay
  *
  * Features:
- * - Camera preview using expo-camera
+ * - Camera preview using react-native-vision-camera
+ * - Physical lens switching (0.5x, 1x, 2x)
  * - Real-time depth overlay from LiDAR
- * - Toggle button for overlay visibility
  * - Permission handling
  * - LiDAR lifecycle management
  *
@@ -103,7 +117,6 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
     overlayOpacity = 0.4,
     onCapture,
     isCapturing = false,
-    isCaptureReady = true,
     onCameraRef,
   },
   ref
@@ -111,20 +124,28 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  // Camera permissions
-  const [permission, requestPermission] = useCameraPermissions();
+  // Camera permissions (vision-camera)
+  const { hasPermission, requestPermission } = useCameraPermission();
 
   // Local overlay state
   const [overlayEnabled, setOverlayEnabled] = useState(initialShowOverlay);
-  
-  // Camera facing state (front/back)
-  const [facing, setFacing] = useState<CameraType>('back');
-  
-  // Zoom state - actual zoom value for camera (0 to 1 where 0 = 1x, 0.5 = 2x, 1 = max zoom)
-  const [zoom, setZoom] = useState<number>(0);
-  
-  // Zoom level for display
-  const [zoomLevel, setZoomLevel] = useState<'0.5' | '1' | '2'>('1');
+
+  // Camera position state (front/back)
+  const [position, setPosition] = useState<CameraPosition>('back');
+
+  // Zoom state
+  const [zoomLevel, setZoomLevel] = useState<ZoomLevel>('1');
+  const [zoom, setZoom] = useState<number>(1);
+
+  // Camera ready state
+  const [cameraReady, setCameraReady] = useState(false);
+
+  // Camera ref for photo capture
+  const cameraRef = useRef<Camera>(null);
+
+  // Select best available device for the current position (front/back)
+  // Auto-selects multi-camera setups on Pro devices (ultra-wide, wide, telephoto)
+  const device = useCameraDevice(position);
 
   // LiDAR hook
   const {
@@ -137,40 +158,45 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
     error: lidarError,
   } = useLiDAR();
 
-  // Camera ref for photo capture
-  const cameraRef = useRef<ExpoCameraView>(null);
-  const [cameraReady, setCameraReady] = useState(false);
-
   // Provide camera ref to parent via callback
-  const setCameraRef = useCallback(
-    (ref: ExpoCameraView | null) => {
-      (cameraRef as React.MutableRefObject<ExpoCameraView | null>).current = ref;
-      setCameraReady(ref !== null);
+  const setCameraRefCallback = useCallback(
+    (ref: Camera | null) => {
+      (cameraRef as React.MutableRefObject<Camera | null>).current = ref;
       onCameraRef?.(ref);
     },
     [onCameraRef]
   );
 
+  // Initialize zoom to neutral (1x) when device changes
+  useEffect(() => {
+    if (device?.neutralZoom) {
+      setZoom(device.neutralZoom);
+      setZoomLevel('1');
+    }
+  }, [device]);
+
+  // Request permission on first load if not already granted
+  const hasRequestedPermission = useRef(false);
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
+  useEffect(() => {
+    if (!hasPermission && !hasRequestedPermission.current) {
+      hasRequestedPermission.current = true;
+      setIsRequestingPermission(true);
+      requestPermission()
+        .catch((error) => console.warn('Camera permission request failed:', error))
+        .finally(() => setIsRequestingPermission(false));
+    }
+  }, [hasPermission, requestPermission]);
+
   // Report LiDAR status to parent
   useEffect(() => {
-    // Wait until we have a definitive status
-    // In development mode, always report as available (even if not) to allow camera to work
     if (isAvailable || lidarError) {
       onLiDARStatus?.(isAvailable, lidarError);
     } else {
       // Report as available in development mode even if LiDAR check hasn't completed
-      // This allows camera to work without LiDAR
       onLiDARStatus?.(true, null);
     }
   }, [isAvailable, lidarError, onLiDARStatus]);
-
-  // DISABLED: Start depth capture when camera is ready and LiDAR is available
-  // Temporarily disabled for development/testing in Expo Go
-  // useEffect(() => {
-  //   if (permission?.granted && isAvailable && !isReady) {
-  //     startDepthCapture();
-  //   }
-  // }, [permission?.granted, isAvailable, isReady, startDepthCapture]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -188,36 +214,32 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
 
   // Handle camera flip
   const handleFlipCamera = useCallback(() => {
-    setFacing((current) => {
-      const newFacing = current === 'back' ? 'front' : 'back';
-      // Reset camera ready state when flipping
-      setCameraReady(false);
-      return newFacing;
-    });
+    setPosition((p) => (p === 'back' ? 'front' : 'back'));
+    setCameraReady(false);
   }, []);
-  
-  // Handle zoom change
-  const handleZoomChange = useCallback((level: '0.5' | '1' | '2') => {
-    console.log(`[CameraView] Zoom change requested: ${level}x`);
+
+  // Handle zoom level change
+  const handleZoomChange = useCallback((level: ZoomLevel) => {
+    if (!device) return;
+
     setZoomLevel(level);
-    
-    // Map zoom level to camera zoom value (0-1)
-    // Note: Expo Camera zoom is 0-1 where 0 = no zoom, 1 = max zoom
-    // Ultra-wide (0.5x) is NOT supported in Expo Go - requires native development build
-    if (level === '0.5') {
-      // Ultra-wide not available in Expo Go - would need native module
-      console.warn('[CameraView] Ultra-wide (0.5x) not available in Expo Go. Use development build for native lens access.');
-      setZoom(0); // Keep at 1x for now
-    } else if (level === '1') {
-      // Default zoom (1x)
-      setZoom(0);
-      console.log('[CameraView] Zoom set to 1x (default)');
-    } else if (level === '2') {
-      // 2x digital zoom - use zoom value of ~0.5 (adjust as needed)
-      setZoom(0.5);
-      console.log('[CameraView] Zoom set to 2x (digital zoom: 0.5)');
+    const neutralZoom = device.neutralZoom ?? 1;
+
+    switch (level) {
+      case '0.5':
+        // Ultra-wide: half of neutral zoom (clamped to device min)
+        setZoom(Math.max(device.minZoom, neutralZoom * 0.5));
+        break;
+      case '1':
+        // Wide: neutral zoom
+        setZoom(neutralZoom);
+        break;
+      case '2':
+        // Telephoto: double neutral zoom (clamped to device max)
+        setZoom(Math.min(device.maxZoom, neutralZoom * 2));
+        break;
     }
-  }, []);
+  }, [device]);
 
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
@@ -227,19 +249,20 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
     stopDepthCapture,
   }), [captureDepthFrame, currentFrame, startDepthCapture, stopDepthCapture]);
 
-  // Handle camera permission
-  if (!permission) {
+  // While permission is being requested
+  if (isRequestingPermission) {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: isDark ? colors.backgroundDark : colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={[styles.statusText, { color: isDark ? colors.textDark : colors.text }]}>
-          Checking camera permissions...
+          Requesting camera permission...
         </Text>
       </View>
     );
   }
 
-  if (!permission.granted) {
+  // Permission not granted after request
+  if (!hasPermission) {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: isDark ? colors.backgroundDark : colors.background }]}>
         <Text style={[styles.statusText, { color: isDark ? colors.textDark : colors.text }]}>
@@ -255,25 +278,42 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
     );
   }
 
+  // Device still loading
+  if (!device) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: isDark ? colors.backgroundDark : colors.background }]}> 
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.statusText, { color: isDark ? colors.textDark : colors.text }]}> 
+          Initializing camera...
+        </Text>
+      </View>
+    );
+  }
+
+  // Check if ultra-wide is available on this device
+  const hasUltraWide = device.physicalDevices?.includes('ultra-wide-angle-camera') ?? false;
+  const hasTelephoto = device.physicalDevices?.includes('telephoto-camera') ?? false;
+
   return (
     <View style={styles.container}>
       {/* Camera Preview */}
-      <ExpoCameraView
-        key={facing} // Force re-render when facing changes
-        ref={setCameraRef}
-        style={styles.camera}
-        facing={facing}
-        mode="picture"
-        zoom={zoom}
-        onCameraReady={() => {
-          setCameraReady(true);
+      <Camera
+        ref={(ref) => {
+          setCameraRefCallback(ref);
         }}
+        style={StyleSheet.absoluteFill}
+        device={device}
+        isActive={true}
+        photo={true}
+        zoom={zoom}
+        onInitialized={() => setCameraReady(true)}
+        onError={(error) => console.error('Camera error:', error)}
       />
 
       {/* Depth Overlay */}
       <DepthOverlay
         depthFrame={currentFrame}
-        visible={overlayEnabled && isReady}
+        visible={overlayEnabled}
         minDepth={minDepth}
         maxDepth={maxDepth}
         opacity={overlayOpacity}
@@ -281,25 +321,36 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
 
       {/* Controls Overlay */}
       <View style={styles.controls}>
+        {/* Top Controls */}
+        <View style={styles.topControls}>
+          <DepthToggle
+            enabled={overlayEnabled}
+            onToggle={handleOverlayToggle}
+            // Allow toggle regardless of LiDAR availability so overlay isn't gated
+            disabled={false}
+          />
+        </View>
+
         {/* Bottom Controls */}
         <View style={styles.bottomControls}>
-          {/* Zoom Buttons (0.5, 1×, 2×) */}
+          {/* Zoom Buttons (0.5, 1x, 2x) */}
           <View style={styles.zoomSelector}>
             <TouchableOpacity
               style={[
-                styles.zoomButton, 
+                styles.zoomButton,
                 zoomLevel === '0.5' && styles.zoomButtonActive,
-                styles.zoomButtonDisabled // Ultra-wide not available in Expo Go
+                !hasUltraWide && styles.zoomButtonDisabled,
               ]}
               onPress={() => handleZoomChange('0.5')}
               activeOpacity={0.7}
+              disabled={!hasUltraWide}
             >
               <Text style={[
-                styles.zoomText, 
+                styles.zoomText,
                 zoomLevel === '0.5' && styles.zoomTextActive,
-                styles.zoomTextDisabled
+                !hasUltraWide && styles.zoomTextDisabled,
               ]}>
-                0,5
+                0.5x
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -308,16 +359,24 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
               activeOpacity={0.7}
             >
               <Text style={[styles.zoomText, zoomLevel === '1' && styles.zoomTextActive]}>
-                1×
+                1x
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.zoomButton, zoomLevel === '2' && styles.zoomButtonActive]}
+              style={[
+                styles.zoomButton,
+                zoomLevel === '2' && styles.zoomButtonActive,
+                !hasTelephoto && styles.zoomButtonDisabled,
+              ]}
               onPress={() => handleZoomChange('2')}
               activeOpacity={0.7}
+              disabled={!hasTelephoto}
             >
-              <Text style={[styles.zoomText, zoomLevel === '2' && styles.zoomTextActive]}>
-                2×
+              <Text style={[
+                styles.zoomText,
+                zoomLevel === '2' && styles.zoomTextActive,
+              ]}>
+                2x
               </Text>
             </TouchableOpacity>
           </View>
@@ -327,22 +386,22 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
             <View style={styles.captureRow}>
               {/* Empty space on left for symmetry */}
               <View style={styles.captureLeftSpace} />
-              
+
               {/* Capture Button - Center */}
               <View style={styles.captureButtonContainer}>
                 <CaptureButton
                   onCapture={onCapture}
                   isCapturing={isCapturing}
-                  disabled={!permission?.granted || !cameraReady}
+                  disabled={!hasPermission || !cameraReady}
                 />
               </View>
-              
+
               {/* Flip Camera Button - Right */}
               <TouchableOpacity
                 style={styles.flipButton}
                 onPress={handleFlipCamera}
                 activeOpacity={0.7}
-                accessibilityLabel={facing === 'back' ? 'Switch to front camera' : 'Switch to back camera'}
+                accessibilityLabel={position === 'back' ? 'Switch to front camera' : 'Switch to back camera'}
                 accessibilityRole="button"
               >
                 <Ionicons name="camera-reverse-outline" size={28} color="#FFFFFF" />
@@ -373,12 +432,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
-  camera: {
-    ...StyleSheet.absoluteFillObject,
-  },
   controls: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 20,
+  },
+  topControls: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 56 : 24,
+    right: 16,
+    zIndex: 30,
   },
   bottomControls: {
     position: 'absolute',

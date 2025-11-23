@@ -7,12 +7,12 @@
  *
  * Features:
  * - Parallel photo, depth, and location capture via Promise.allSettled
- * - 100ms synchronization window validation for photo/depth
+ * - 250ms synchronization window validation for photo/depth
  * - Location capture in parallel (optional, never blocks capture)
  * - Per-capture attestation signature (optional, never blocks capture)
  * - State machine: idle -> capturing -> captured -> idle
  * - Error handling with typed CaptureError
- * - Camera ref management for expo-camera
+ * - Camera ref management for react-native-vision-camera
  *
  * @see Story 3.2 - Photo Capture with Depth Map
  * @see Story 3.3 - GPS Metadata Collection
@@ -20,7 +20,7 @@
  */
 
 import { useCallback, useState, useRef } from 'react';
-import { CameraView as ExpoCameraView } from 'expo-camera';
+import { Camera } from 'react-native-vision-camera';
 import * as Crypto from 'expo-crypto';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useLiDAR } from './useLiDAR';
@@ -60,7 +60,7 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
 /**
  * Maximum allowed sync delta in milliseconds
  */
-const MAX_SYNC_DELTA_MS = 100;
+const MAX_SYNC_DELTA_MS = 250;
 
 /**
  * Capture state machine states
@@ -82,7 +82,7 @@ export interface UseCaptureReturn {
   /** Error from last capture attempt (null if none) */
   error: CaptureError | null;
   /** Register camera component ref for photo capture */
-  setCameraRef: (ref: ExpoCameraView | null) => void;
+  setCameraRef: (ref: Camera | null) => void;
   /** Clear the last capture error */
   clearError: () => void;
   /** Request location permission (call before first capture) */
@@ -173,8 +173,8 @@ export function useCapture(): UseCaptureReturn {
   const [lastCapture, setLastCapture] = useState<RawCapture | null>(null);
   const [error, setError] = useState<CaptureError | null>(null);
 
-  // Camera ref for expo-camera takePictureAsync
-  const cameraRef = useRef<ExpoCameraView | null>(null);
+  // Camera ref for vision-camera takePhoto
+  const cameraRef = useRef<Camera | null>(null);
 
   // Derived state
   const isCapturing = state === 'capturing';
@@ -185,7 +185,7 @@ export function useCapture(): UseCaptureReturn {
   /**
    * Register camera ref
    */
-  const setCameraRef = useCallback((ref: ExpoCameraView | null) => {
+  const setCameraRef = useCallback((ref: Camera | null) => {
     cameraRef.current = ref;
   }, []);
 
@@ -241,11 +241,7 @@ export function useCapture(): UseCaptureReturn {
       // Parallel capture for minimum sync delta
       // Use Promise.allSettled so location failure doesn't block capture
       const [photoResult, depthResult, locationResult] = await Promise.allSettled([
-        cameraRef.current.takePictureAsync({
-          quality: 1,
-          exif: true,
-          base64: false,
-        }),
+        cameraRef.current.takePhoto(),
         // Only attempt depth capture if LiDAR is available, otherwise resolve to null
         isLiDARAvailable ? captureDepthFrame() : Promise.resolve(null),
         // Only attempt location if permission granted, otherwise resolve to null
@@ -265,7 +261,8 @@ export function useCapture(): UseCaptureReturn {
       const photo = photoResult.value;
 
       // Validate photo result
-      if (!photo || !photo.uri) {
+      // vision-camera returns path (without file:// prefix), not uri
+      if (!photo || !photo.path) {
         const captureError: CaptureError = {
           code: 'CAMERA_ERROR',
           message: 'Failed to capture photo. Please try again.',
@@ -274,6 +271,19 @@ export function useCapture(): UseCaptureReturn {
         setState('idle');
         throw captureError;
       }
+
+      // vision-camera returns path without 'file://' prefix
+      const photoUri = `file://${photo.path}`;
+
+      // Capture a timestamp as close as possible to when the photo finished writing
+      const photoCapturedAt = Date.now();
+
+      // Attempt to parse EXIF/metadata timestamp if present, otherwise fall back
+      const metadata = (photo as unknown as { metadata?: Record<string, unknown> }).metadata;
+      const photoTime = parseExifTimestamp(
+        (metadata?.DateTimeOriginal as string | undefined) ?? (metadata?.CreationDate as string | undefined),
+        photoCapturedAt
+      );
 
       // Extract depth result (required, but create mock if LiDAR unavailable)
       let depthFrame: DepthFrame;
@@ -331,12 +341,7 @@ export function useCapture(): UseCaptureReturn {
         console.log('[useCapture] Location not captured (permission denied or unavailable)');
       }
 
-      // Calculate sync delta
-      // Prefer EXIF timestamp if available, fallback to capture start time
-      const photoTime = parseExifTimestamp(
-        photo.exif?.DateTimeOriginal as string | undefined,
-        captureStartTime
-      );
+      // Calculate sync delta using photo timestamp
       const syncDeltaMs = Math.abs(photoTime - depthFrame.timestamp);
 
       // Validate sync window (skip validation for mock depth frames)
@@ -363,7 +368,7 @@ export function useCapture(): UseCaptureReturn {
           console.log('[useCapture] Generating per-capture attestation...');
 
           // Compute photo hash from file
-          const photoBase64 = await FileSystem.readAsStringAsync(photo.uri, {
+          const photoBase64 = await FileSystem.readAsStringAsync(photoUri, {
             encoding: FileSystem.EncodingType.Base64,
           });
           const photoHash = await Crypto.digestStringAsync(
@@ -417,7 +422,7 @@ export function useCapture(): UseCaptureReturn {
       // Construct RawCapture with optional location and assertion
       const rawCapture: RawCapture = {
         id: captureId,
-        photoUri: photo.uri,
+        photoUri,
         photoWidth: photo.width,
         photoHeight: photo.height,
         depthFrame,
@@ -473,7 +478,7 @@ export function useCapture(): UseCaptureReturn {
       setState('idle');
       throw captureError;
     }
-  }, [isDepthReady, isCapturing, captureDepthFrame, hasLocationPermission, getCurrentLocation, isAttestationReady, generateAssertion]);
+  }, [isCapturing, captureDepthFrame, hasLocationPermission, getCurrentLocation, isAttestationReady, generateAssertion, isLiDARAvailable]);
 
   return {
     capture,

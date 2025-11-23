@@ -28,9 +28,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-secure-store',
     // expo-haptics doesn't need a config plugin, it works without one
     [
-      'expo-camera',
+      'react-native-vision-camera',
       {
-        cameraPermission: 'RealityCam needs camera access to capture authenticated photos.',
+        cameraPermissionText: 'RealityCam needs camera access to capture verified photos.',
+        enableMicrophonePermission: false,
+        enableLocation: false,
       },
     ],
     [
