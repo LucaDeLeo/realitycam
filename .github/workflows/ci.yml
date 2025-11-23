@@ -35,14 +35,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: |
-            apps/web/package-lock.json
-            apps/mobile/package-lock.json
+          cache: 'pnpm'
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -61,27 +63,23 @@ jobs:
             backend/target/
           key: cargo-${{ runner.os }}-${{ hashFiles('backend/Cargo.lock') }}
 
-      # Web
-      - name: Install Web Dependencies
-        working-directory: apps/web
-        run: npm ci
+      # Install all dependencies (monorepo)
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
 
+      # Web
       - name: Lint Web
         working-directory: apps/web
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Type Check Web
         working-directory: apps/web
-        run: npx tsc --noEmit
+        run: pnpm exec tsc --noEmit
 
       # Mobile
-      - name: Install Mobile Dependencies
-        working-directory: apps/mobile
-        run: npm ci
-
       - name: Type Check Mobile
         working-directory: apps/mobile
-        run: npm run typecheck
+        run: pnpm run typecheck
 
       # Backend
       - name: Lint Backend (Clippy)
@@ -103,20 +101,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: apps/web/package-lock.json
+          cache: 'pnpm'
 
       - name: Install Dependencies
-        working-directory: apps/web
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Run Unit Tests
         working-directory: apps/web
-        run: npm run test:ci
+        run: pnpm run test:ci
 
       - name: Upload Coverage
         uses: codecov/codecov-action@v4
@@ -139,20 +140,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: apps/mobile/package-lock.json
+          cache: 'pnpm'
 
       - name: Install Dependencies
-        working-directory: apps/mobile
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Run Unit Tests
         working-directory: apps/mobile
-        run: npm run test:ci
+        run: pnpm run test:ci
 
       - name: Upload Coverage
         uses: codecov/codecov-action@v4
@@ -297,28 +301,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: apps/web/package-lock.json
+          cache: 'pnpm'
 
       - name: Install Dependencies
-        working-directory: apps/web
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Install Playwright Browsers
         working-directory: apps/web
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Build Web App
         working-directory: apps/web
-        run: npm run build
+        run: pnpm run build
 
       - name: Run E2E Tests
         working-directory: apps/web
-        run: npm run test:e2e
+        run: pnpm run test:e2e
         env:
           BASE_URL: http://localhost:3000
           API_URL: http://localhost:3001/api
