@@ -23,6 +23,7 @@ env:
   RUST_BACKTRACE: 1
   NODE_VERSION: '22'
   RUST_VERSION: 'stable'
+  SQLX_OFFLINE: 'true'
 
 jobs:
   # ============================================
