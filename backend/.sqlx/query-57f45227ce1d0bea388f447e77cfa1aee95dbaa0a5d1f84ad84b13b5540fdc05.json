@@ -1,0 +1,89 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO devices (\n            attestation_key_id, platform, model, has_lidar,\n            attestation_chain, attestation_level, public_key, assertion_counter\n        )\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)\n        RETURNING\n            id,\n            attestation_level,\n            attestation_key_id,\n            attestation_chain,\n            platform,\n            model,\n            has_lidar,\n            first_seen_at,\n            last_seen_at,\n            assertion_counter,\n            public_key\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "attestation_level",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "attestation_key_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "attestation_chain",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 4,
+        "name": "platform",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "model",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "has_lidar",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 7,
+        "name": "first_seen_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "last_seen_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "assertion_counter",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 10,
+        "name": "public_key",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Bool",
+        "Bytea",
+        "Text",
+        "Bytea",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "57f45227ce1d0bea388f447e77cfa1aee95dbaa0a5d1f84ad84b13b5540fdc05"
+}
