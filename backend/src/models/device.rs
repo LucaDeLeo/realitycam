@@ -9,13 +9,13 @@ use uuid::Uuid;
 /// A registered device with attestation status and hardware capabilities.
 ///
 /// Devices are registered via the DeviceCheck App Attest flow and track
-/// their attestation level (unverified, basic, or full).
+/// their attestation level (unverified, secure_enclave).
 #[derive(Debug, sqlx::FromRow, Serialize)]
 pub struct Device {
     /// Unique identifier for the device
     pub id: Uuid,
 
-    /// Attestation level: "unverified", "basic", or "full"
+    /// Attestation level: "unverified" or "secure_enclave"
     pub attestation_level: String,
 
     /// Unique key ID from DeviceCheck App Attest
@@ -38,4 +38,13 @@ pub struct Device {
 
     /// When the device was last seen
     pub last_seen_at: DateTime<Utc>,
+
+    /// Assertion counter for replay protection (AC-8)
+    /// Starts at 0 for initial attestation, incremented with each assertion
+    pub assertion_counter: i64,
+
+    /// Extracted public key from attestation (AC-7)
+    /// Uncompressed EC point format: 0x04 || x (32 bytes) || y (32 bytes)
+    /// NULL for unverified devices
+    pub public_key: Option<Vec<u8>>,
 }

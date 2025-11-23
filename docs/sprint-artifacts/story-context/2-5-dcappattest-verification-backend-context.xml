@@ -1,0 +1,1287 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context id="2-5-dcappattest-verification-backend" version="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2-5-dcappattest-verification-backend</storyId>
+    <title>DCAppAttest Verification Backend</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-23</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/2-5-dcappattest-verification-backend.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>backend service</asA>
+    <iWant>to verify DCAppAttest attestation objects against Apple's attestation format and certificate chain</iWant>
+    <soThat>I can cryptographically confirm device identity is hardware-backed and update attestation_level from "unverified" to "verified"</soThat>
+    <acceptanceCriteria>
+      <criterion id="AC-1">Challenge Generation Endpoint - GET /api/v1/devices/challenge returns base64 challenge with 5-minute expiry, rate limited to 10/min/IP</criterion>
+      <criterion id="AC-2">Challenge Storage and Expiration - 5-minute TTL, single-use, indexed for O(1) lookup</criterion>
+      <criterion id="AC-3">Attestation Object CBOR Decoding - Parse CBOR structure extracting fmt, x5c, receipt, authData</criterion>
+      <criterion id="AC-4">Certificate Chain Verification - Verify leaf->intermediate->root against embedded Apple CA</criterion>
+      <criterion id="AC-5">Challenge Binding Verification - Verify nonce = SHA256(authData || clientDataHash) from certificate extension</criterion>
+      <criterion id="AC-6">App Identity Verification - Verify RP ID Hash matches SHA256(TeamID.BundleID)</criterion>
+      <criterion id="AC-7">Public Key Extraction - Extract EC2 P-256 COSE key from authData</criterion>
+      <criterion id="AC-8">Counter Initialization - Verify counter is 0 for initial attestation</criterion>
+      <criterion id="AC-9">Successful Verification - Update device to attestation_level="secure_enclave"</criterion>
+      <criterion id="AC-10">Graceful Degradation - Keep attestation_level="unverified" on failure, log internal details</criterion>
+      <criterion id="AC-11">Request Format Alignment - Support nested attestation format with backward compatibility</criterion>
+      <criterion id="AC-12">Logging and Observability - Structured logs with request ID, verification step, pass/fail status</criterion>
+    </acceptanceCriteria>
+    <tasks>
+      <task id="1" ac="3,7">
+        <name>Add CBOR/COSE Parsing Dependencies</name>
+        <subtasks>
+          <subtask id="1.1">Add coset crate for COSE parsing</subtask>
+          <subtask id="1.2">Add ciborium crate for CBOR parsing</subtask>
+          <subtask id="1.3">Verify dependencies compile</subtask>
+        </subtasks>
+      </task>
+      <task id="2" ac="1,2">
+        <name>Implement Challenge Store Service</name>
+        <subtasks>
+          <subtask id="2.1">Create backend/src/services/challenge_store.rs module</subtask>
+          <subtask id="2.2">Define ChallengeEntry struct with challenge bytes, expiry, used flag</subtask>
+          <subtask id="2.3">Implement ChallengeStore with thread-safe HashMap</subtask>
+          <subtask id="2.4">Implement generate_challenge() - 32 random bytes via rand</subtask>
+          <subtask id="2.5">Implement store_challenge() with 5-minute TTL</subtask>
+          <subtask id="2.6">Implement verify_and_consume() - lookup, check expiry, mark used</subtask>
+          <subtask id="2.7">Implement background cleanup task for expired challenges</subtask>
+          <subtask id="2.8">Add rate limiting tracking per IP (10/min)</subtask>
+          <subtask id="2.9">Write unit tests for challenge store operations</subtask>
+        </subtasks>
+      </task>
+      <task id="3" ac="1,2">
+        <name>Implement Challenge Endpoint</name>
+        <subtasks>
+          <subtask id="3.1">Update get_challenge() handler in devices.rs</subtask>
+          <subtask id="3.2">Extract client IP from request headers</subtask>
+          <subtask id="3.3">Check rate limit, return 429 if exceeded</subtask>
+          <subtask id="3.4">Generate and store challenge</subtask>
+          <subtask id="3.5">Return ChallengeResponse with base64 challenge and expiry</subtask>
+          <subtask id="3.6">Add ChallengeResponse type definition</subtask>
+          <subtask id="3.7">Wire up ChallengeStore state to router</subtask>
+        </subtasks>
+      </task>
+      <task id="4" ac="3-8">
+        <name>Create Attestation Service Module</name>
+        <subtasks>
+          <subtask id="4.1">Create backend/src/services/attestation.rs module</subtask>
+          <subtask id="4.2">Create backend/src/services/mod.rs to export services</subtask>
+          <subtask id="4.3">Define attestation types: AttestationObject, AuthenticatorData, VerificationResult</subtask>
+          <subtask id="4.4">Implement decode_attestation_object() - CBOR parsing</subtask>
+          <subtask id="4.5">Implement parse_authenticator_data() - binary parsing</subtask>
+        </subtasks>
+      </task>
+      <task id="5" ac="4">
+        <name>Implement Certificate Chain Verification</name>
+        <subtasks>
+          <subtask id="5.1">Embed Apple App Attest Root CA certificate (const bytes)</subtask>
+          <subtask id="5.2">Implement verify_certificate_chain() function</subtask>
+          <subtask id="5.3">Parse X.509 certificates using x509-parser crate</subtask>
+          <subtask id="5.4">Verify certificate hierarchy (leaf->intermediate->root)</subtask>
+          <subtask id="5.5">Verify certificate validity periods</subtask>
+          <subtask id="5.6">Verify root CA fingerprint matches embedded</subtask>
+          <subtask id="5.7">Write unit tests with sample certificate chains</subtask>
+        </subtasks>
+      </task>
+      <task id="6" ac="5">
+        <name>Implement Challenge Binding Verification</name>
+        <subtasks>
+          <subtask id="6.1">Implement verify_challenge_binding() function</subtask>
+          <subtask id="6.2">Compute SHA256(authData || clientDataHash)</subtask>
+          <subtask id="6.3">Extract nonce extension from leaf cert (OID 1.2.840.113635.100.8.2)</subtask>
+          <subtask id="6.4">Compare computed nonce with certificate nonce</subtask>
+          <subtask id="6.5">Write unit tests for nonce verification</subtask>
+        </subtasks>
+      </task>
+      <task id="7" ac="6">
+        <name>Implement App Identity Verification</name>
+        <subtasks>
+          <subtask id="7.1">Add App ID configuration (Team ID + Bundle ID) to config.rs</subtask>
+          <subtask id="7.2">Implement verify_app_identity() function</subtask>
+          <subtask id="7.3">Extract RP ID Hash from authData (bytes 0-31)</subtask>
+          <subtask id="7.4">Compute SHA256 of configured App ID</subtask>
+          <subtask id="7.5">Compare hashes</subtask>
+          <subtask id="7.6">Write unit tests for app identity verification</subtask>
+        </subtasks>
+      </task>
+      <task id="8" ac="7">
+        <name>Implement Public Key Extraction</name>
+        <subtasks>
+          <subtask id="8.1">Implement extract_public_key() function</subtask>
+          <subtask id="8.2">Parse COSE key structure from authData</subtask>
+          <subtask id="8.3">Validate key is EC2 with P-256 curve (kty=2, crv=1)</subtask>
+          <subtask id="8.4">Extract x and y coordinates</subtask>
+          <subtask id="8.5">Return public key bytes for storage</subtask>
+          <subtask id="8.6">Write unit tests for key extraction</subtask>
+        </subtasks>
+      </task>
+      <task id="9" ac="8">
+        <name>Implement Counter Verification</name>
+        <subtasks>
+          <subtask id="9.1">Implement extract_counter() function</subtask>
+          <subtask id="9.2">Parse 4-byte big-endian counter from authData (bytes 33-36)</subtask>
+          <subtask id="9.3">Verify counter is 0 for initial attestation</subtask>
+          <subtask id="9.4">Write unit tests for counter extraction</subtask>
+        </subtasks>
+      </task>
+      <task id="10" ac="3-8">
+        <name>Implement Main Verification Pipeline</name>
+        <subtasks>
+          <subtask id="10.1">Create verify_attestation() orchestrating function</subtask>
+          <subtask id="10.2">Call each verification step in order</subtask>
+          <subtask id="10.3">Return VerificationResult with extracted data on success</subtask>
+          <subtask id="10.4">Return specific error on any verification failure</subtask>
+          <subtask id="10.5">Add comprehensive logging for each step</subtask>
+        </subtasks>
+      </task>
+      <task id="11" ac="9,10,11">
+        <name>Update Registration Handler</name>
+        <subtasks>
+          <subtask id="11.1">Update DeviceRegistrationRequest to support nested attestation format</subtask>
+          <subtask id="11.2">Add backward compatibility for flattened format</subtask>
+          <subtask id="11.3">Integrate verification pipeline into register_device() handler</subtask>
+          <subtask id="11.4">On success: update device to attestation_level="secure_enclave"</subtask>
+          <subtask id="11.5">On failure: keep device as attestation_level="unverified"</subtask>
+          <subtask id="11.6">Invalidate used challenge on success</subtask>
+          <subtask id="11.7">Return appropriate response with updated attestation level</subtask>
+        </subtasks>
+      </task>
+      <task id="12" ac="8">
+        <name>Add Database Migration for Counter Column</name>
+        <subtasks>
+          <subtask id="12.1">Create migration to add assertion_counter column to devices</subtask>
+          <subtask id="12.2">Add public_key column (BYTEA) for storing extracted public key</subtask>
+          <subtask id="12.3">Update Device model struct with new fields</subtask>
+          <subtask id="12.4">Update insert/update queries to include new columns</subtask>
+        </subtasks>
+      </task>
+      <task id="13" ac="all">
+        <name>Testing and Verification</name>
+        <subtasks>
+          <subtask id="13.1">Verify cargo build succeeds</subtask>
+          <subtask id="13.2">Verify cargo clippy passes</subtask>
+          <subtask id="13.3">Verify cargo test passes for all new tests</subtask>
+          <subtask id="13.4">Test challenge endpoint with curl</subtask>
+          <subtask id="13.5">Test rate limiting behavior</subtask>
+          <subtask id="13.6">Test registration with valid attestation</subtask>
+          <subtask id="13.7">Test registration with invalid attestation</subtask>
+          <subtask id="13.8">Verify database records updated correctly</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <epicContext>
+    <epicId>2</epicId>
+    <epicTitle>Device Registration and Hardware Attestation</epicTitle>
+    <epicGoal>Enable iPhone Pro devices to register with the backend using hardware attestation (DCAppAttest), establishing a trusted device identity for future authenticated API requests.</epicGoal>
+    <techSpecPath>docs/sprint-artifacts/tech-spec-epic-2.md</techSpecPath>
+    <relatedAcs>
+      <ac id="AC-2.5.1">POST /api/v1/devices/register accepts device registration requests</ac>
+      <ac id="AC-2.5.2">Backend decodes CBOR attestation object</ac>
+      <ac id="AC-2.5.3">Backend verifies certificate chain roots to Apple App Attest CA</ac>
+      <ac id="AC-2.5.4">Backend verifies challenge matches stored, unexpired challenge</ac>
+      <ac id="AC-2.5.5">Backend verifies App ID hash (Team ID + Bundle ID)</ac>
+      <ac id="AC-2.5.6">Successful verification creates device with attestation_level="secure_enclave"</ac>
+      <ac id="AC-2.5.7">Failed verification creates device with attestation_level="unverified"</ac>
+      <ac id="AC-2.5.8">Device record stores attestation_key_id, attestation_chain, model, has_lidar</ac>
+      <ac id="AC-2.5.9">Response returns device_id and attestation_level</ac>
+      <ac id="AC-2.5.10">Duplicate key_id returns 409 Conflict</ac>
+      <ac id="AC-2.3.1">GET /api/v1/devices/challenge returns 32-byte base64 challenge</ac>
+      <ac id="AC-2.3.2">Response includes expires_at timestamp 5 minutes in future</ac>
+      <ac id="AC-2.3.3">Challenge stored server-side with TTL</ac>
+      <ac id="AC-2.3.4">Rate limiting: 10 challenges/minute/IP returns 429</ac>
+    </relatedAcs>
+  </epicContext>
+
+  <documentationArtifacts>
+    <artifact type="prd" relevance="high">
+      <path>docs/prd.md</path>
+      <description>Product requirements document defining MVP scope, hardware attestation requirements, device registration</description>
+      <relevantSections>
+        <section>FR4 - Backend verifies DCAppAttest attestation object against Apple's service</section>
+        <section>FR5 - System assigns attestation level: secure_enclave or unverified</section>
+        <section>Hardware-Rooted Trust - Every capture attested by iOS Secure Enclave via DCAppAttest</section>
+        <section>MVP Success - DCAppAttest hardware attestation working on iPhone Pro</section>
+      </relevantSections>
+    </artifact>
+    <artifact type="architecture" relevance="high">
+      <path>docs/architecture.md</path>
+      <description>Architecture document with API contracts, error codes, security patterns, device authentication flow</description>
+      <relevantSections>
+        <section>API Contracts - Device Registration request/response with nested attestation format</section>
+        <section>Security Architecture - Authentication Flow with device signature verification</section>
+        <section>Error Codes - ATTESTATION_FAILED (401), VALIDATION_ERROR (400), rate limiting (429)</section>
+        <section>ADR-005 - Device-Based Authentication (No Tokens)</section>
+        <section>ADR-007 - @expo/app-integrity for DCAppAttest returns base64 strings for server-side verification</section>
+        <section>Backend Dependencies - x509-parser 0.16, sha2 0.10, ed25519-dalek 2</section>
+      </relevantSections>
+    </artifact>
+    <artifact type="tech-spec" relevance="high">
+      <path>docs/sprint-artifacts/tech-spec-epic-2.md</path>
+      <description>Epic 2 technical specification with detailed DCAppAttest verification workflow, data structures, and acceptance criteria</description>
+      <relevantSections>
+        <section>AC-2.3 Challenge Generation - 32-byte challenge, 5-min TTL, rate limiting</section>
+        <section>AC-2.5 Backend DCAppAttest Verification - Complete verification checklist</section>
+        <section>Appendix Apple DCAppAttest Reference - Attestation object structure, authData layout</section>
+        <section>DCAppAttest Verification Checklist - 9-step verification process</section>
+        <section>Rust Types - ChallengeEntry, DeviceRegistrationRequest, VerifiedAttestation</section>
+        <section>Device Registration Flow - Sequence diagram with all steps</section>
+      </relevantSections>
+    </artifact>
+    <artifact type="story" relevance="high">
+      <path>docs/sprint-artifacts/stories/2-5-dcappattest-verification-backend.md</path>
+      <description>The story being implemented with full acceptance criteria, tasks, dev notes</description>
+    </artifact>
+    <artifact type="related-story" relevance="high">
+      <path>docs/sprint-artifacts/stories/2-4-backend-device-registration-endpoint.md</path>
+      <description>Previous story that implemented device registration storage - this story adds verification to it</description>
+    </artifact>
+    <artifact type="related-context" relevance="high">
+      <path>docs/sprint-artifacts/story-context/2-4-backend-device-registration-endpoint-context.xml</path>
+      <description>Previous story context with implementation patterns for devices.rs, error handling, router setup</description>
+    </artifact>
+  </documentationArtifacts>
+
+  <existingCodeInterfaces>
+    <interface type="route-handler" relevance="critical">
+      <path>backend/src/routes/devices.rs</path>
+      <description>Device routes with registration implemented in Story 2.4. This story transforms get_challenge from 501 stub to full implementation and adds verification to register_device.</description>
+      <currentState>
+        - get_challenge() returns 501 Not Implemented
+        - register_device() stores device with attestation_level="unverified" without verification
+        - DeviceRegistrationRequest uses flattened format (device_id, public_key, attestation_object, platform, model, has_lidar, optional challenge)
+        - Router returns Router&lt;PgPool&gt; with State extractor
+        - Validation functions for required fields and base64 decoding established
+      </currentState>
+      <requiredChanges>
+        <change>Implement get_challenge() handler to generate and return challenge with expiry</change>
+        <change>Add ChallengeResponse struct for challenge endpoint response</change>
+        <change>Add ChallengeStore state to router (in addition to PgPool)</change>
+        <change>Update DeviceRegistrationRequest to support nested attestation format with backward compatibility</change>
+        <change>Integrate attestation verification pipeline into register_device()</change>
+        <change>On verification success: update attestation_level to "secure_enclave", store public_key, initialize counter</change>
+        <change>On verification failure: keep attestation_level as "unverified", log internal details</change>
+        <change>Extract client IP for rate limiting</change>
+      </requiredChanges>
+      <codeSnippet><![CDATA[
+//! Device registration routes - CURRENT STATE (Story 2.4 complete)
+use axum::{
+    extract::{Extension, State},
+    http::StatusCode,
+    routing::{get, post},
+    Json, Router,
+};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
+use uuid::Uuid;
+
+use crate::error::{ApiError, ApiErrorWithRequestId};
+use crate::models::Device;
+use crate::types::{ApiErrorResponse, ApiResponse};
+
+/// Device registration request - FLATTENED format (Story 2.4)
+#[derive(Debug, Deserialize)]
+pub struct DeviceRegistrationRequest {
+    pub device_id: String,
+    pub public_key: String,
+    pub attestation_object: String,
+    pub platform: String,
+    pub model: String,
+    pub has_lidar: bool,
+    #[serde(default)]
+    pub challenge: Option<String>,  // Forward compatibility
+}
+
+/// Router with PgPool state
+pub fn router() -> Router<PgPool> {
+    Router::new()
+        .route("/challenge", get(get_challenge))
+        .route("/register", post(register_device))
+}
+
+/// GET /api/v1/devices/challenge - CURRENTLY 501 STUB
+async fn get_challenge(
+    Extension(request_id): Extension<Uuid>,
+) -> (StatusCode, Json<ApiErrorResponse>) {
+    let error = ApiError::NotImplemented;
+    let response = ApiErrorResponse::new(error.code(), error.safe_message(), request_id);
+    (error.status_code(), Json(response))
+}
+]]></codeSnippet>
+    </interface>
+    <interface type="error-handling" relevance="high">
+      <path>backend/src/error.rs</path>
+      <description>API error handling with all error codes and status mappings. ATTESTATION_FAILED already exists for verification failures.</description>
+      <currentState>
+        - Has AttestationFailed(String) variant mapped to HTTP 401
+        - safe_message returns "Device attestation verification failed" without internal details
+        - ATTESTATION_FAILED error code constant defined
+        - ApiErrorWithRequestId wrapper for handler error returns
+      </currentState>
+      <requiredChanges>
+        <change>Add TOO_MANY_REQUESTS error code for rate limiting (HTTP 429)</change>
+        <change>Add TooManyRequests variant to ApiError enum</change>
+        <change>Map TooManyRequests to StatusCode::TOO_MANY_REQUESTS</change>
+      </requiredChanges>
+      <codeSnippet><![CDATA[
+pub mod codes {
+    pub const ATTESTATION_FAILED: &str = "ATTESTATION_FAILED";
+    // Add: pub const TOO_MANY_REQUESTS: &str = "TOO_MANY_REQUESTS";
+}
+
+#[derive(Debug, Error)]
+pub enum ApiError {
+    #[error("Attestation failed: {0}")]
+    AttestationFailed(String),  // Already exists!
+
+    // Add: TooManyRequests for rate limiting
+}
+
+impl ApiError {
+    pub fn status_code(&self) -> StatusCode {
+        match self {
+            ApiError::AttestationFailed(_) => StatusCode::UNAUTHORIZED,
+            // Add: ApiError::TooManyRequests => StatusCode::TOO_MANY_REQUESTS,
+        }
+    }
+
+    pub fn safe_message(&self) -> String {
+        match self {
+            // This already hides internal details!
+            ApiError::AttestationFailed(_) => "Device attestation verification failed".to_string(),
+        }
+    }
+}
+]]></codeSnippet>
+    </interface>
+    <interface type="model" relevance="high">
+      <path>backend/src/models/device.rs</path>
+      <description>Device entity model. Needs new columns for counter and public key storage.</description>
+      <currentState>Has Device struct with: id, attestation_level, attestation_key_id, attestation_chain, platform, model, has_lidar, first_seen_at, last_seen_at</currentState>
+      <requiredChanges>
+        <change>Add assertion_counter: i64 field (default 0)</change>
+        <change>Add public_key: Option&lt;Vec&lt;u8&gt;&gt; field for extracted COSE public key</change>
+      </requiredChanges>
+      <codeSnippet><![CDATA[
+#[derive(Debug, sqlx::FromRow, Serialize)]
+pub struct Device {
+    pub id: Uuid,
+    pub attestation_level: String,
+    pub attestation_key_id: String,
+    pub attestation_chain: Option<Vec<u8>>,
+    pub platform: String,
+    pub model: String,
+    pub has_lidar: bool,
+    pub first_seen_at: DateTime<Utc>,
+    pub last_seen_at: DateTime<Utc>,
+    // ADD: pub assertion_counter: i64,
+    // ADD: pub public_key: Option<Vec<u8>>,
+}
+]]></codeSnippet>
+    </interface>
+    <interface type="config" relevance="high">
+      <path>backend/src/config.rs</path>
+      <description>Application configuration. Needs Apple app identity configuration for verification.</description>
+      <currentState>Has database, S3, server, CORS, logging configuration</currentState>
+      <requiredChanges>
+        <change>Add apple_team_id: String field (env: APPLE_TEAM_ID)</change>
+        <change>Add apple_bundle_id: String field (env: APPLE_BUNDLE_ID)</change>
+        <change>Load from environment with fallback defaults for development</change>
+      </requiredChanges>
+      <codeSnippet><![CDATA[
+pub struct Config {
+    // ... existing fields
+    // ADD:
+    // pub apple_team_id: String,    // e.g., "XXXXXXXXXX"
+    // pub apple_bundle_id: String,  // e.g., "com.example.realitycam"
+}
+
+impl Config {
+    pub fn load() -> Self {
+        Self {
+            // ...
+            // apple_team_id: env::var("APPLE_TEAM_ID").unwrap_or_else(|_| "XXXXXXXXXX".to_string()),
+            // apple_bundle_id: env::var("APPLE_BUNDLE_ID").unwrap_or_else(|_| "com.realitycam.app".to_string()),
+        }
+    }
+}
+]]></codeSnippet>
+    </interface>
+    <interface type="types" relevance="high">
+      <path>backend/src/types/mod.rs</path>
+      <description>API request/response types. Used for consistent response formatting.</description>
+      <currentState>Has ApiResponse&lt;T&gt;, ApiErrorResponse, Meta, ErrorBody structs</currentState>
+      <usage>Use ApiResponse::new() for all success responses including challenge endpoint</usage>
+    </interface>
+    <interface type="router" relevance="high">
+      <path>backend/src/routes/mod.rs</path>
+      <description>Route modules and router assembly with PgPool state.</description>
+      <currentState>Passes db.clone() as state to v1_router via with_state()</currentState>
+      <requiredChanges>
+        <change>Router state needs to include ChallengeStore in addition to PgPool</change>
+        <change>May need AppState struct combining PgPool + ChallengeStore + Config</change>
+      </requiredChanges>
+    </interface>
+    <interface type="main" relevance="medium">
+      <path>backend/src/main.rs</path>
+      <description>Application entry point with middleware stack. Request ID extraction already implemented.</description>
+      <currentState>
+        - Creates PgPool and passes to api_router
+        - extract_request_id middleware adds Uuid to request extensions
+        - Structured tracing with request_id in spans
+      </currentState>
+      <requiredChanges>
+        <change>Create ChallengeStore instance and pass to router</change>
+        <change>Spawn background task for challenge cleanup</change>
+        <change>Consider creating shared AppState struct</change>
+      </requiredChanges>
+    </interface>
+    <interface type="database-schema" relevance="high">
+      <path>backend/migrations/20251122000001_create_devices.sql</path>
+      <description>Current devices table schema. Needs migration for new columns.</description>
+      <schema><![CDATA[
+CREATE TABLE devices (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    attestation_level   TEXT NOT NULL DEFAULT 'unverified',
+    attestation_key_id  TEXT NOT NULL UNIQUE,
+    attestation_chain   BYTEA,
+    platform            TEXT NOT NULL,
+    model               TEXT NOT NULL,
+    has_lidar           BOOLEAN NOT NULL DEFAULT false,
+    first_seen_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_seen_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- NEEDS MIGRATION TO ADD:
+-- assertion_counter BIGINT NOT NULL DEFAULT 0
+-- public_key BYTEA
+]]></schema>
+    </interface>
+    <interface type="dependency-manifest" relevance="high">
+      <path>backend/Cargo.toml</path>
+      <description>Backend dependencies. Has x509-parser, sha2, base64. Missing CBOR/COSE crates.</description>
+      <currentDependencies>
+        <dep name="axum" version="0.8">Web framework</dep>
+        <dep name="sqlx" version="0.8">Database</dep>
+        <dep name="x509-parser" version="0.16">X.509 certificate parsing - ALREADY PRESENT</dep>
+        <dep name="sha2" version="0.10">SHA-256 hashing - ALREADY PRESENT</dep>
+        <dep name="base64" version="0.22">Base64 encoding - ALREADY PRESENT</dep>
+        <dep name="uuid" version="1">UUID with v4 feature</dep>
+        <dep name="chrono" version="0.4">DateTime with serde</dep>
+        <dep name="tracing" version="0.1">Structured logging</dep>
+      </currentDependencies>
+      <missingDependencies>
+        <dep name="ciborium" version="0.2" status="needs-add">CBOR parsing for attestation object</dep>
+        <dep name="coset" version="0.3" status="needs-add">COSE key parsing for public key extraction</dep>
+        <dep name="rand" version="0.8" status="needs-add">Cryptographically secure random for challenges</dep>
+        <dep name="tokio" version="1">Already present with full features - use for background cleanup task</dep>
+      </missingDependencies>
+    </interface>
+  </existingCodeInterfaces>
+
+  <developmentConstraints>
+    <constraint type="architecture" severity="must">
+      <description>Challenge response must match API contract with data/meta structure</description>
+      <source>docs/architecture.md, Story AC-1</source>
+      <example><![CDATA[
+{
+  "data": {
+    "challenge": "A1B2C3D4E5F6...",  // Base64, 32 bytes
+    "expires_at": "2025-11-22T10:35:00Z"
+  },
+  "meta": {
+    "request_id": "uuid",
+    "timestamp": "2025-11-22T10:30:00Z"
+  }
+}
+]]></example>
+    </constraint>
+    <constraint type="architecture" severity="must">
+      <description>Rate limiting must return 429 with standard error format after 10 challenges/minute/IP</description>
+      <source>Story AC-1, Tech Spec AC-2.3.4</source>
+    </constraint>
+    <constraint type="architecture" severity="must">
+      <description>Challenge TTL must be exactly 5 minutes (300 seconds)</description>
+      <source>Story AC-2, Tech Spec AC-2.3.2</source>
+    </constraint>
+    <constraint type="architecture" severity="must">
+      <description>Challenges must be single-use - invalidated after successful verification</description>
+      <source>Story AC-2, Tech Spec AC-2.3.3</source>
+    </constraint>
+    <constraint type="security" severity="must">
+      <description>Use CSPRNG (OsRng) for challenge generation - no pseudo-random</description>
+      <source>Story Dev Notes - Security Considerations</source>
+      <example><![CDATA[
+use rand::{rngs::OsRng, RngCore};
+
+let mut challenge = [0u8; 32];
+OsRng.fill_bytes(&mut challenge);
+]]></example>
+    </constraint>
+    <constraint type="architecture" severity="must">
+      <description>Attestation object format must be "apple-appattest"</description>
+      <source>Story AC-3, Tech Spec Appendix</source>
+    </constraint>
+    <constraint type="architecture" severity="must">
+      <description>Certificate chain must root to embedded Apple App Attest CA - no network fetching</description>
+      <source>Story AC-4, Tech Spec DCAppAttest Verification Checklist</source>
+    </constraint>
+    <constraint type="architecture" severity="must">
+      <description>Nonce verification: nonce = SHA256(authData || clientDataHash) where clientDataHash = SHA256(challenge)</description>
+      <source>Story AC-5, Tech Spec Appendix</source>
+    </constraint>
+    <constraint type="architecture" severity="must">
+      <description>App ID format for RP ID Hash verification: "TeamID.BundleID"</description>
+      <source>Story AC-6</source>
+      <example><![CDATA[
+let app_id = format!("{}.{}", config.apple_team_id, config.apple_bundle_id);
+let expected_hash = sha256(app_id.as_bytes());
+// Compare with first 32 bytes of authData
+]]></example>
+    </constraint>
+    <constraint type="architecture" severity="must">
+      <description>Public key must be EC2 with P-256 curve (COSE kty=2, crv=1)</description>
+      <source>Story AC-7</source>
+    </constraint>
+    <constraint type="architecture" severity="must">
+      <description>Initial attestation counter must be 0 - reject non-zero counters</description>
+      <source>Story AC-8</source>
+    </constraint>
+    <constraint type="architecture" severity="must">
+      <description>On successful verification: attestation_level="secure_enclave" (NOT "verified")</description>
+      <source>Story AC-9, Architecture</source>
+    </constraint>
+    <constraint type="security" severity="must">
+      <description>On verification failure: DO NOT expose internal failure details in response. Log internally, return generic ATTESTATION_FAILED</description>
+      <source>Story AC-10</source>
+    </constraint>
+    <constraint type="architecture" severity="must">
+      <description>Support nested attestation format from tech-spec with backward compatibility for Story 2.4 flattened format</description>
+      <source>Story AC-11</source>
+      <example><![CDATA[
+// Tech-spec format (nested)
+{
+  "platform": "ios",
+  "model": "iPhone 15 Pro",
+  "has_lidar": true,
+  "attestation": {
+    "key_id": "base64...",
+    "attestation_object": "base64...",
+    "challenge": "base64..."
+  }
+}
+
+// Story 2.4 format (flattened) - must still work
+{
+  "device_id": "key_id_value",
+  "public_key": "base64...",
+  "attestation_object": "base64...",
+  "platform": "ios",
+  "model": "iPhone 15 Pro",
+  "has_lidar": true,
+  "challenge": "base64..."  // optional in 2.4, required for verification
+}
+]]></example>
+    </constraint>
+    <constraint type="pattern" severity="must">
+      <description>Structured logging with request_id correlation for all verification steps</description>
+      <source>Story AC-12</source>
+      <example><![CDATA[
+tracing::info!(
+    request_id = %request_id,
+    step = "certificate_chain",
+    status = "pass",
+    "Certificate chain verification passed"
+);
+
+tracing::warn!(
+    request_id = %request_id,
+    step = "nonce_verification",
+    status = "fail",
+    reason = "computed nonce does not match certificate nonce",
+    "Nonce verification failed"
+);
+]]></example>
+    </constraint>
+    <constraint type="pattern" severity="should">
+      <description>Use const for Apple App Attest CA certificate bytes - embed in binary</description>
+      <source>Story Dev Notes</source>
+    </constraint>
+    <constraint type="pattern" severity="should">
+      <description>Follow established validation patterns from Story 2.4</description>
+      <source>Previous Story Context</source>
+    </constraint>
+  </developmentConstraints>
+
+  <dependencies>
+    <internal>
+      <dep name="backend/src/routes/devices.rs" status="exists">Device routes - update handlers</dep>
+      <dep name="backend/src/error.rs" status="exists">Error handling - add rate limit error</dep>
+      <dep name="backend/src/types/mod.rs" status="exists">API types - use for responses</dep>
+      <dep name="backend/src/config.rs" status="exists">Config - add Apple app identity</dep>
+      <dep name="backend/src/models/device.rs" status="exists">Device model - add new fields</dep>
+      <dep name="backend/src/routes/mod.rs" status="exists">Router - add ChallengeStore state</dep>
+      <dep name="backend/src/main.rs" status="exists">Main - initialize ChallengeStore</dep>
+    </internal>
+    <external>
+      <dep name="x509-parser" version="0.16" crate="true" status="exists">X.509 certificate parsing</dep>
+      <dep name="sha2" version="0.10" crate="true" status="exists">SHA-256 hashing</dep>
+      <dep name="base64" version="0.22" crate="true" status="exists">Base64 encoding/decoding</dep>
+      <dep name="ciborium" version="0.2" crate="true" status="needs-add">CBOR attestation object parsing</dep>
+      <dep name="coset" version="0.3" crate="true" status="needs-add">COSE public key parsing</dep>
+      <dep name="rand" version="0.8" crate="true" status="needs-add">Cryptographically secure random</dep>
+    </external>
+    <prerequisites>
+      <story id="2-4" status="done">Backend Device Registration Endpoint - established registration flow</story>
+      <story id="2-3" status="done">DCAppAttest Integration - mobile sends attestation</story>
+      <story id="1-3" status="done">Backend API Skeleton - error handling, routing patterns</story>
+      <story id="1-2" status="done">Database Schema - devices table exists</story>
+    </prerequisites>
+  </dependencies>
+
+  <testingContext>
+    <framework>Unit tests (cargo test) + manual curl testing</framework>
+    <patterns>
+      <pattern type="unit">In-module tests for attestation parsing, validation, crypto operations</pattern>
+      <pattern type="integration">Testcontainers with real PostgreSQL (future)</pattern>
+      <pattern type="manual">curl commands for endpoint testing</pattern>
+    </patterns>
+    <testIdeas>
+      <test ac="AC-1">GET /api/v1/devices/challenge returns 200 with base64 challenge</test>
+      <test ac="AC-1">Challenge response includes expires_at 5 minutes in future</test>
+      <test ac="AC-1">Challenge is exactly 32 bytes when decoded from base64</test>
+      <test ac="AC-1">11th challenge request within 1 minute returns 429</test>
+      <test ac="AC-2">Challenge can be verified within 5 minutes</test>
+      <test ac="AC-2">Challenge verification fails after 5 minutes (expired)</test>
+      <test ac="AC-2">Challenge cannot be used twice (single-use)</test>
+      <test ac="AC-3">Valid CBOR attestation object decodes successfully</test>
+      <test ac="AC-3">Invalid CBOR returns 400 VALIDATION_ERROR</test>
+      <test ac="AC-3">Attestation with fmt != "apple-appattest" returns 401</test>
+      <test ac="AC-4">Valid certificate chain passes verification</test>
+      <test ac="AC-4">Certificate chain not rooted to Apple CA fails</test>
+      <test ac="AC-4">Expired certificate in chain fails</test>
+      <test ac="AC-5">Correct nonce passes challenge binding verification</test>
+      <test ac="AC-5">Mismatched nonce fails verification</test>
+      <test ac="AC-6">Correct App ID hash passes verification</test>
+      <test ac="AC-6">Wrong App ID hash fails verification</test>
+      <test ac="AC-7">EC2 P-256 public key extracted successfully</test>
+      <test ac="AC-7">Non-P256 key fails extraction</test>
+      <test ac="AC-8">Counter = 0 passes for initial attestation</test>
+      <test ac="AC-8">Counter != 0 fails for initial attestation</test>
+      <test ac="AC-9">Successful verification sets attestation_level to "secure_enclave"</test>
+      <test ac="AC-9">Successful verification stores public_key and initializes counter</test>
+      <test ac="AC-10">Failed verification keeps attestation_level as "unverified"</test>
+      <test ac="AC-10">Failed verification response does not contain internal details</test>
+      <test ac="AC-11">Nested attestation format accepted</test>
+      <test ac="AC-11">Flattened format (Story 2.4) still works</test>
+      <test ac="AC-12">Verification logs include request_id, step, status</test>
+    </testIdeas>
+    <verificationCommands><![CDATA[
+# Start services
+docker-compose -f infrastructure/docker-compose.yml up -d
+sleep 5
+
+# Build and run backend
+cd backend
+cargo build
+cargo clippy
+cargo run &
+
+# In another terminal:
+
+# Test challenge endpoint
+curl -v http://localhost:8080/api/v1/devices/challenge
+# Expected: 200 with { data: { challenge: "...", expires_at: "..." } }
+
+# Test rate limiting (run 11 times quickly)
+for i in {1..11}; do
+  curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8080/api/v1/devices/challenge
+done
+# Expected: First 10 return 200, 11th returns 429
+
+# Test registration with verification (requires real attestation from device)
+# Note: Real testing requires iPhone Pro with DCAppAttest
+
+# Mock test with invalid attestation (should degrade to unverified)
+curl -X POST http://localhost:8080/api/v1/devices/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "ios",
+    "model": "iPhone 15 Pro",
+    "has_lidar": true,
+    "attestation": {
+      "key_id": "dGVzdC1rZXktaWQ=",
+      "attestation_object": "dGVzdC1pbnZhbGlk",
+      "challenge": "dGVzdC1jaGFsbGVuZ2U="
+    }
+  }'
+# Expected: Device created with attestation_level="unverified"
+
+# Verify database state
+docker exec realitycam-postgres psql -U realitycam -c \
+  "SELECT id, attestation_key_id, attestation_level, assertion_counter FROM devices;"
+
+# Run unit tests
+cargo test
+]]></verificationCommands>
+  </testingContext>
+
+  <implementationNotes>
+    <note type="critical" priority="high">
+      <title>AuthenticatorData Binary Layout</title>
+      <content>AuthData is a packed binary structure that must be parsed byte-by-byte</content>
+      <example><![CDATA[
+// AuthenticatorData structure from Apple DCAppAttest
+| Offset | Length | Field                    |
+|--------|--------|--------------------------|
+| 0      | 32     | RP ID Hash (SHA256)      |
+| 32     | 1      | Flags                    |
+| 33     | 4      | Counter (big-endian u32) |
+| 37     | 16     | AAGUID (all zeros)       |
+| 53     | 2      | Credential ID Length (L) |
+| 55     | L      | Credential ID            |
+| 55+L   | var    | COSE Public Key (CBOR)   |
+
+pub struct AuthenticatorData {
+    pub rp_id_hash: [u8; 32],
+    pub flags: u8,
+    pub counter: u32,
+    pub aaguid: [u8; 16],
+    pub credential_id: Vec<u8>,
+    pub public_key: Vec<u8>,  // CBOR-encoded COSE key
+}
+
+fn parse_authenticator_data(data: &[u8]) -> Result<AuthenticatorData, AttestationError> {
+    if data.len() < 55 {
+        return Err(AttestationError::InvalidAuthData);
+    }
+
+    let rp_id_hash: [u8; 32] = data[0..32].try_into().unwrap();
+    let flags = data[32];
+    let counter = u32::from_be_bytes(data[33..37].try_into().unwrap());
+    let aaguid: [u8; 16] = data[37..53].try_into().unwrap();
+    let cred_id_len = u16::from_be_bytes(data[53..55].try_into().unwrap()) as usize;
+
+    if data.len() < 55 + cred_id_len {
+        return Err(AttestationError::InvalidAuthData);
+    }
+
+    let credential_id = data[55..55+cred_id_len].to_vec();
+    let public_key = data[55+cred_id_len..].to_vec();
+
+    Ok(AuthenticatorData {
+        rp_id_hash,
+        flags,
+        counter,
+        aaguid,
+        credential_id,
+        public_key,
+    })
+}
+]]></example>
+    </note>
+    <note type="critical" priority="high">
+      <title>Attestation Object CBOR Structure</title>
+      <content>Use ciborium to decode the attestation object CBOR</content>
+      <example><![CDATA[
+use ciborium::Value;
+use std::collections::BTreeMap;
+
+pub struct AttestationObject {
+    pub fmt: String,
+    pub auth_data: Vec<u8>,
+    pub x5c: Vec<Vec<u8>>,  // Certificate chain (DER)
+    pub receipt: Vec<u8>,
+}
+
+fn decode_attestation_object(bytes: &[u8]) -> Result<AttestationObject, AttestationError> {
+    let value: Value = ciborium::from_reader(bytes)
+        .map_err(|_| AttestationError::InvalidCbor)?;
+
+    let map = value.as_map()
+        .ok_or(AttestationError::InvalidCbor)?;
+
+    // Extract "fmt" - must be "apple-appattest"
+    let fmt = map.iter()
+        .find(|(k, _)| k.as_text() == Some("fmt"))
+        .and_then(|(_, v)| v.as_text())
+        .ok_or(AttestationError::MissingField("fmt"))?
+        .to_string();
+
+    if fmt != "apple-appattest" {
+        return Err(AttestationError::InvalidFormat(fmt));
+    }
+
+    // Extract "authData"
+    let auth_data = map.iter()
+        .find(|(k, _)| k.as_text() == Some("authData"))
+        .and_then(|(_, v)| v.as_bytes())
+        .ok_or(AttestationError::MissingField("authData"))?
+        .to_vec();
+
+    // Extract "attStmt.x5c" (certificate chain)
+    let att_stmt = map.iter()
+        .find(|(k, _)| k.as_text() == Some("attStmt"))
+        .and_then(|(_, v)| v.as_map())
+        .ok_or(AttestationError::MissingField("attStmt"))?;
+
+    let x5c = att_stmt.iter()
+        .find(|(k, _)| k.as_text() == Some("x5c"))
+        .and_then(|(_, v)| v.as_array())
+        .ok_or(AttestationError::MissingField("x5c"))?
+        .iter()
+        .filter_map(|v| v.as_bytes().map(|b| b.to_vec()))
+        .collect();
+
+    // Extract receipt (if present)
+    let receipt = att_stmt.iter()
+        .find(|(k, _)| k.as_text() == Some("receipt"))
+        .and_then(|(_, v)| v.as_bytes())
+        .unwrap_or(&[])
+        .to_vec();
+
+    Ok(AttestationObject { fmt, auth_data, x5c, receipt })
+}
+]]></example>
+    </note>
+    <note type="critical" priority="high">
+      <title>Nonce Extension Extraction (OID 1.2.840.113635.100.8.2)</title>
+      <content>Extract nonce from leaf certificate X.509 extension</content>
+      <example><![CDATA[
+use x509_parser::prelude::*;
+use x509_parser::oid_registry::Oid;
+
+// Apple nonce extension OID
+const APPLE_NONCE_OID: Oid<'static> = oid!(1.2.840.113635.100.8.2);
+
+fn extract_nonce_from_cert(cert_der: &[u8]) -> Result<Vec<u8>, AttestationError> {
+    let (_, cert) = X509Certificate::from_der(cert_der)
+        .map_err(|_| AttestationError::InvalidCertificate)?;
+
+    // Find the nonce extension
+    let nonce_ext = cert.extensions()
+        .iter()
+        .find(|ext| ext.oid == APPLE_NONCE_OID)
+        .ok_or(AttestationError::MissingNonceExtension)?;
+
+    // The extension value is a SEQUENCE containing OCTET STRING
+    // Parse the ASN.1 structure to extract the actual nonce bytes
+    let (_, seq) = der_parser::parse_der(nonce_ext.value)
+        .map_err(|_| AttestationError::InvalidNonceFormat)?;
+
+    // Navigate to the OCTET STRING containing the nonce
+    // Structure: SEQUENCE { [1] OCTET STRING (nonce) }
+    let nonce = seq.as_sequence()
+        .and_then(|s| s.first())
+        .and_then(|item| {
+            // Tagged [1] contains OCTET STRING
+            if let der_parser::BerObjectContent::ContextSpecific(_, content) = &item.content {
+                content.as_slice().ok()
+            } else {
+                None
+            }
+        })
+        .ok_or(AttestationError::InvalidNonceFormat)?
+        .to_vec();
+
+    Ok(nonce)
+}
+]]></example>
+    </note>
+    <note type="critical" priority="high">
+      <title>Challenge Store with Rate Limiting</title>
+      <content>Thread-safe in-memory challenge store with TTL and rate limiting</content>
+      <example><![CDATA[
+use std::collections::HashMap;
+use std::net::IpAddr;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use chrono::{DateTime, Utc, Duration};
+use rand::{rngs::OsRng, RngCore};
+
+pub struct ChallengeEntry {
+    pub challenge: [u8; 32],
+    pub expires_at: DateTime<Utc>,
+    pub used: bool,
+}
+
+pub struct RateLimitEntry {
+    pub count: u32,
+    pub window_start: DateTime<Utc>,
+}
+
+pub struct ChallengeStore {
+    challenges: RwLock<HashMap<[u8; 32], ChallengeEntry>>,
+    rate_limits: RwLock<HashMap<IpAddr, RateLimitEntry>>,
+}
+
+impl ChallengeStore {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self {
+            challenges: RwLock::new(HashMap::new()),
+            rate_limits: RwLock::new(HashMap::new()),
+        })
+    }
+
+    pub async fn check_rate_limit(&self, ip: IpAddr) -> bool {
+        let now = Utc::now();
+        let mut limits = self.rate_limits.write().await;
+
+        let entry = limits.entry(ip).or_insert(RateLimitEntry {
+            count: 0,
+            window_start: now,
+        });
+
+        // Reset window if more than 1 minute passed
+        if now - entry.window_start > Duration::minutes(1) {
+            entry.count = 0;
+            entry.window_start = now;
+        }
+
+        if entry.count >= 10 {
+            return false; // Rate limited
+        }
+
+        entry.count += 1;
+        true
+    }
+
+    pub async fn generate_challenge(&self) -> ([u8; 32], DateTime<Utc>) {
+        let mut challenge = [0u8; 32];
+        OsRng.fill_bytes(&mut challenge);
+
+        let expires_at = Utc::now() + Duration::minutes(5);
+
+        let entry = ChallengeEntry {
+            challenge,
+            expires_at,
+            used: false,
+        };
+
+        self.challenges.write().await.insert(challenge, entry);
+
+        (challenge, expires_at)
+    }
+
+    pub async fn verify_and_consume(&self, challenge: &[u8; 32]) -> Result<(), AttestationError> {
+        let mut challenges = self.challenges.write().await;
+
+        let entry = challenges.get_mut(challenge)
+            .ok_or(AttestationError::ChallengeNotFound)?;
+
+        if entry.used {
+            return Err(AttestationError::ChallengeAlreadyUsed);
+        }
+
+        if Utc::now() > entry.expires_at {
+            return Err(AttestationError::ChallengeExpired);
+        }
+
+        entry.used = true;
+        Ok(())
+    }
+
+    pub async fn cleanup_expired(&self) {
+        let now = Utc::now();
+        let mut challenges = self.challenges.write().await;
+        challenges.retain(|_, entry| entry.expires_at > now);
+    }
+}
+]]></example>
+    </note>
+    <note type="critical" priority="high">
+      <title>Certificate Chain Verification</title>
+      <content>Verify certificate chain roots to embedded Apple CA</content>
+      <example><![CDATA[
+use x509_parser::prelude::*;
+use sha2::{Sha256, Digest};
+
+// Embed Apple App Attest Root CA (DER format)
+// Download from: https://www.apple.com/certificateauthority/
+const APPLE_APP_ATTEST_ROOT_CA: &[u8] = include_bytes!("../certs/apple_app_attest_root_ca.der");
+
+// Expected SHA256 fingerprint of Apple App Attest Root CA
+const APPLE_ROOT_CA_FINGERPRINT: [u8; 32] = [
+    // Fill with actual fingerprint bytes
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+];
+
+fn verify_certificate_chain(certs: &[Vec<u8>]) -> Result<X509Certificate<'_>, AttestationError> {
+    if certs.len() < 2 {
+        return Err(AttestationError::IncompleteCertChain);
+    }
+
+    // Parse all certificates
+    let parsed: Vec<_> = certs.iter()
+        .map(|der| X509Certificate::from_der(der))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| AttestationError::InvalidCertificate)?
+        .into_iter()
+        .map(|(_, cert)| cert)
+        .collect();
+
+    let now = Utc::now();
+
+    // Verify each certificate
+    for cert in &parsed {
+        // Check validity period
+        let not_before = cert.validity().not_before.to_datetime();
+        let not_after = cert.validity().not_after.to_datetime();
+
+        if now < not_before || now > not_after {
+            return Err(AttestationError::CertificateExpired);
+        }
+    }
+
+    // Verify chain: leaf issued by intermediate, intermediate issued by root
+    // For Apple App Attest: x5c[0] = leaf, x5c[1] = intermediate
+    // Root is embedded, not in chain
+
+    // Verify intermediate's issuer matches root's subject
+    let (_, root) = X509Certificate::from_der(APPLE_APP_ATTEST_ROOT_CA)
+        .map_err(|_| AttestationError::InvalidRootCa)?;
+
+    // Verify root CA fingerprint
+    let root_fingerprint: [u8; 32] = Sha256::digest(APPLE_APP_ATTEST_ROOT_CA).into();
+    if root_fingerprint != APPLE_ROOT_CA_FINGERPRINT {
+        return Err(AttestationError::RootCaMismatch);
+    }
+
+    // Verify intermediate is signed by root
+    let intermediate = &parsed[parsed.len() - 1];
+    if intermediate.issuer() != root.subject() {
+        return Err(AttestationError::ChainVerificationFailed);
+    }
+
+    // Verify leaf is signed by intermediate
+    let leaf = &parsed[0];
+    if leaf.issuer() != intermediate.subject() {
+        return Err(AttestationError::ChainVerificationFailed);
+    }
+
+    // TODO: Cryptographic signature verification (requires ring or similar)
+
+    Ok(parsed[0].clone())
+}
+]]></example>
+    </note>
+    <note type="pattern" priority="high">
+      <title>Verification Pipeline Orchestration</title>
+      <content>Main verification function calling all steps in order with comprehensive logging</content>
+      <example><![CDATA[
+pub struct VerificationResult {
+    pub public_key: Vec<u8>,
+    pub counter: u32,
+    pub certificate_chain: Vec<Vec<u8>>,
+}
+
+pub async fn verify_attestation(
+    attestation_object: &[u8],
+    challenge: &[u8],
+    config: &Config,
+    request_id: Uuid,
+) -> Result<VerificationResult, AttestationError> {
+    // Step 1: Decode CBOR attestation object
+    tracing::info!(request_id = %request_id, step = "cbor_decode", "Starting attestation verification");
+    let attestation = decode_attestation_object(attestation_object)?;
+    tracing::info!(request_id = %request_id, step = "cbor_decode", status = "pass", "CBOR decoded successfully");
+
+    // Step 2: Parse authenticator data
+    tracing::info!(request_id = %request_id, step = "parse_auth_data", "Parsing authenticator data");
+    let auth_data = parse_authenticator_data(&attestation.auth_data)?;
+    tracing::info!(request_id = %request_id, step = "parse_auth_data", status = "pass", "Auth data parsed");
+
+    // Step 3: Verify certificate chain
+    tracing::info!(request_id = %request_id, step = "cert_chain", "Verifying certificate chain");
+    let leaf_cert = verify_certificate_chain(&attestation.x5c)?;
+    tracing::info!(request_id = %request_id, step = "cert_chain", status = "pass", "Certificate chain valid");
+
+    // Step 4: Verify challenge binding (nonce)
+    tracing::info!(request_id = %request_id, step = "challenge_binding", "Verifying challenge binding");
+    verify_challenge_binding(&attestation.auth_data, challenge, &attestation.x5c[0])?;
+    tracing::info!(request_id = %request_id, step = "challenge_binding", status = "pass", "Challenge binding valid");
+
+    // Step 5: Verify App ID
+    tracing::info!(request_id = %request_id, step = "app_identity", "Verifying app identity");
+    verify_app_identity(&auth_data.rp_id_hash, config)?;
+    tracing::info!(request_id = %request_id, step = "app_identity", status = "pass", "App identity valid");
+
+    // Step 6: Extract and validate public key
+    tracing::info!(request_id = %request_id, step = "public_key", "Extracting public key");
+    let public_key = extract_public_key(&auth_data.public_key)?;
+    tracing::info!(request_id = %request_id, step = "public_key", status = "pass", "Public key extracted");
+
+    // Step 7: Verify counter is 0
+    tracing::info!(request_id = %request_id, step = "counter", counter = auth_data.counter, "Verifying counter");
+    if auth_data.counter != 0 {
+        tracing::warn!(request_id = %request_id, step = "counter", status = "fail", counter = auth_data.counter, "Non-zero counter for initial attestation");
+        return Err(AttestationError::NonZeroCounter(auth_data.counter));
+    }
+    tracing::info!(request_id = %request_id, step = "counter", status = "pass", "Counter is 0");
+
+    tracing::info!(request_id = %request_id, status = "success", "Attestation verification complete");
+
+    Ok(VerificationResult {
+        public_key,
+        counter: auth_data.counter,
+        certificate_chain: attestation.x5c,
+    })
+}
+]]></example>
+    </note>
+    <note type="pattern" priority="high">
+      <title>Request Format Backward Compatibility</title>
+      <content>Support both nested (tech-spec) and flattened (Story 2.4) formats</content>
+      <example><![CDATA[
+use serde::Deserialize;
+
+/// Nested attestation payload (tech-spec format)
+#[derive(Debug, Deserialize)]
+pub struct AttestationPayload {
+    pub key_id: String,
+    pub attestation_object: String,
+    pub challenge: String,
+}
+
+/// Device registration request supporting both formats
+#[derive(Debug, Deserialize)]
+pub struct DeviceRegistrationRequest {
+    pub platform: String,
+    pub model: String,
+    pub has_lidar: bool,
+
+    // Tech-spec nested format
+    #[serde(default)]
+    pub attestation: Option<AttestationPayload>,
+
+    // Story 2.4 flattened format (backward compatibility)
+    #[serde(default)]
+    pub device_id: Option<String>,
+    #[serde(default)]
+    pub public_key: Option<String>,
+    #[serde(default)]
+    pub attestation_object: Option<String>,
+    #[serde(default)]
+    pub challenge: Option<String>,
+}
+
+impl DeviceRegistrationRequest {
+    /// Extract attestation data, supporting both formats
+    pub fn get_attestation_data(&self) -> Result<(String, String, String), ApiError> {
+        // Prefer nested format
+        if let Some(ref att) = self.attestation {
+            return Ok((
+                att.key_id.clone(),
+                att.attestation_object.clone(),
+                att.challenge.clone(),
+            ));
+        }
+
+        // Fall back to flattened format
+        let key_id = self.device_id.clone()
+            .ok_or(ApiError::Validation("missing key_id or device_id".to_string()))?;
+        let attestation_object = self.attestation_object.clone()
+            .ok_or(ApiError::Validation("missing attestation_object".to_string()))?;
+        let challenge = self.challenge.clone()
+            .ok_or(ApiError::Validation("missing challenge".to_string()))?;
+
+        Ok((key_id, attestation_object, challenge))
+    }
+}
+]]></example>
+    </note>
+    <note type="warning" priority="high">
+      <title>Apple Root CA Certificate Required</title>
+      <content>Download and embed Apple App Attest Root CA before implementation</content>
+      <action>
+        1. Download from https://www.apple.com/certificateauthority/ (Apple App Attestation Root CA)
+        2. Convert to DER format if needed: openssl x509 -in cert.pem -outform DER -out apple_app_attest_root_ca.der
+        3. Create backend/src/certs/ directory
+        4. Place DER file as backend/src/certs/apple_app_attest_root_ca.der
+        5. Calculate SHA256 fingerprint for APPLE_ROOT_CA_FINGERPRINT constant
+      </action>
+    </note>
+    <note type="warning" priority="high">
+      <title>Router State Complexity</title>
+      <content>Router needs both PgPool and ChallengeStore - consider AppState struct</content>
+      <example><![CDATA[
+use std::sync::Arc;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub db: PgPool,
+    pub challenge_store: Arc<ChallengeStore>,
+    pub config: Arc<Config>,
+}
+
+// In main.rs
+let state = AppState {
+    db: pool,
+    challenge_store: ChallengeStore::new(),
+    config: Arc::new(config),
+};
+
+// Spawn cleanup task
+let cleanup_store = state.challenge_store.clone();
+tokio::spawn(async move {
+    loop {
+        tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+        cleanup_store.cleanup_expired().await;
+    }
+});
+
+// In router
+pub fn router() -> Router<AppState> {
+    Router::new()
+        .route("/challenge", get(get_challenge))
+        .route("/register", post(register_device))
+}
+
+// In handlers
+async fn get_challenge(
+    State(state): State<AppState>,
+    Extension(request_id): Extension<Uuid>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+) -> Result<(StatusCode, Json<ApiResponse<ChallengeResponse>>), ApiErrorWithRequestId> {
+    // Use state.challenge_store, state.config
+}
+]]></example>
+    </note>
+    <note type="learning" priority="medium">
+      <title>Previous Story Patterns</title>
+      <content>Patterns established in Story 2.4 that should be followed</content>
+      <patterns>
+        <pattern>Router returns Router&lt;State&gt; with State&lt;T&gt; extractor in handlers</pattern>
+        <pattern>ApiErrorWithRequestId wraps errors for response generation</pattern>
+        <pattern>validate_* functions return Result&lt;T, ApiError&gt;</pattern>
+        <pattern>decode_base64() helper for base64 field validation</pattern>
+        <pattern>Use Cow::Borrowed for PostgreSQL error code comparison</pattern>
+        <pattern>Structured logging with request_id in all handlers</pattern>
+      </patterns>
+    </note>
+  </implementationNotes>
+
+  <filesToCreate>
+    <file path="backend/src/services/mod.rs">New module file exporting attestation and challenge_store services</file>
+    <file path="backend/src/services/attestation.rs">DCAppAttest verification logic - CBOR parsing, cert verification, nonce checking</file>
+    <file path="backend/src/services/challenge_store.rs">In-memory challenge storage with TTL and rate limiting</file>
+    <file path="backend/src/certs/apple_app_attest_root_ca.der">Embedded Apple root CA certificate (download required)</file>
+    <file path="backend/migrations/YYYYMMDDHHMMSS_add_device_attestation_fields.sql">Migration adding assertion_counter and public_key columns</file>
+  </filesToCreate>
+
+  <filesToModify>
+    <file path="backend/Cargo.toml">Add ciborium, coset, rand dependencies</file>
+    <file path="backend/src/main.rs">Initialize ChallengeStore, spawn cleanup task, create AppState</file>
+    <file path="backend/src/routes/mod.rs">Update router state type to AppState</file>
+    <file path="backend/src/routes/devices.rs">Implement get_challenge, integrate verification into register_device, add ChallengeResponse</file>
+    <file path="backend/src/config.rs">Add apple_team_id, apple_bundle_id fields</file>
+    <file path="backend/src/models/device.rs">Add assertion_counter, public_key fields</file>
+    <file path="backend/src/error.rs">Add TooManyRequests variant for rate limiting</file>
+  </filesToModify>
+</story-context>

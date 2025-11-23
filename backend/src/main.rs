@@ -32,6 +32,7 @@ pub mod db;
 pub mod error;
 pub mod models;
 pub mod routes;
+pub mod services;
 pub mod types;
 
 /// Request ID header name
@@ -59,14 +60,29 @@ async fn main() {
         .expect("Failed to run database migrations");
     tracing::info!("Database migrations completed");
 
+    // Initialize challenge store for attestation verification (AC-1, AC-2)
+    let challenge_store = services::ChallengeStore::new();
+    tracing::info!("Challenge store initialized");
+
+    // Spawn background cleanup task for expired challenges
+    let _cleanup_handle = services::ChallengeStore::spawn_cleanup_task(challenge_store.clone());
+    tracing::info!("Challenge cleanup task spawned");
+
     // Build CORS layer
     let cors = build_cors_layer(&config.cors_origins);
 
     // Request ID header
     let x_request_id = HeaderName::from_static(X_REQUEST_ID);
 
+    // Build the application state with database, challenge store, and config
+    let app_state = routes::AppState {
+        db: pool.clone(),
+        challenge_store,
+        config: std::sync::Arc::new(config.clone()),
+    };
+
     // Build the router with middleware stack
-    let app = routes::api_router(pool.clone())
+    let app = routes::api_router(app_state)
         .layer(
             ServiceBuilder::new()
                 // Set request ID on incoming requests

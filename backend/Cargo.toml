@@ -27,3 +27,7 @@ tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
 dotenvy = "0.15"
 http = "1"
 base64 = "0.22"
+ciborium = "0.2"
+coset = "0.3"
+rand = "0.8"
+der-parser = "9"

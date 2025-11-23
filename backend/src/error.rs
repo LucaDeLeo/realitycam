@@ -26,6 +26,8 @@ pub mod codes {
     pub const PROCESSING_FAILED: &str = "PROCESSING_FAILED";
     pub const STORAGE_ERROR: &str = "STORAGE_ERROR";
     pub const DEVICE_ALREADY_REGISTERED: &str = "DEVICE_ALREADY_REGISTERED";
+    pub const TOO_MANY_REQUESTS: &str = "TOO_MANY_REQUESTS";
+    pub const CHALLENGE_INVALID: &str = "CHALLENGE_INVALID";
 }
 
 /// API error type with associated HTTP status codes.
@@ -69,6 +71,12 @@ pub enum ApiError {
 
     #[error("Device already registered")]
     DeviceAlreadyRegistered,
+
+    #[error("Too many requests")]
+    TooManyRequests,
+
+    #[error("Challenge invalid: {0}")]
+    ChallengeInvalid(String),
 }
 
 impl ApiError {
@@ -88,6 +96,8 @@ impl ApiError {
             ApiError::ProcessingFailed(_) => codes::PROCESSING_FAILED,
             ApiError::StorageError(_) => codes::STORAGE_ERROR,
             ApiError::DeviceAlreadyRegistered => codes::DEVICE_ALREADY_REGISTERED,
+            ApiError::TooManyRequests => codes::TOO_MANY_REQUESTS,
+            ApiError::ChallengeInvalid(_) => codes::CHALLENGE_INVALID,
         }
     }
 
@@ -107,6 +117,8 @@ impl ApiError {
             ApiError::ProcessingFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ApiError::StorageError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ApiError::DeviceAlreadyRegistered => StatusCode::CONFLICT,
+            ApiError::TooManyRequests => StatusCode::TOO_MANY_REQUESTS,
+            ApiError::ChallengeInvalid(_) => StatusCode::UNAUTHORIZED,
         }
     }
 
@@ -131,6 +143,10 @@ impl ApiError {
             ApiError::DeviceAlreadyRegistered => {
                 "A device with this attestation key is already registered".to_string()
             }
+            ApiError::TooManyRequests => {
+                "Too many requests. Please wait before trying again.".to_string()
+            }
+            ApiError::ChallengeInvalid(_) => "Challenge is invalid or expired".to_string(),
         }
     }
 

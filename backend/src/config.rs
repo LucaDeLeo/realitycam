@@ -43,6 +43,12 @@ pub struct Config {
 
     /// Graceful shutdown timeout in seconds (default: 30)
     pub shutdown_timeout_secs: u64,
+
+    /// Apple Developer Team ID for DCAppAttest verification (AC-6)
+    pub apple_team_id: String,
+
+    /// Apple Bundle ID for DCAppAttest verification (AC-6)
+    pub apple_bundle_id: String,
 }
 
 impl Config {
@@ -97,6 +103,31 @@ impl Config {
                 .unwrap_or_else(|_| "30".to_string())
                 .parse()
                 .expect("SHUTDOWN_TIMEOUT_SECS must be a number"),
+            apple_team_id: env::var("APPLE_TEAM_ID")
+                .unwrap_or_else(|_| "XXXXXXXXXX".to_string()),
+            apple_bundle_id: env::var("APPLE_BUNDLE_ID")
+                .unwrap_or_else(|_| "com.realitycam.app".to_string()),
+        }
+    }
+
+    /// Creates a default configuration for testing purposes.
+    #[cfg(test)]
+    pub fn default_for_test() -> Self {
+        Self {
+            database_url: "postgres://test:test@localhost:5432/test".to_string(),
+            s3_endpoint: "http://localhost:4566".to_string(),
+            s3_bucket: "test-bucket".to_string(),
+            host: "127.0.0.1".to_string(),
+            port: 8080,
+            db_max_connections: 5,
+            db_min_connections: 1,
+            db_acquire_timeout_secs: 10,
+            db_idle_timeout_secs: 60,
+            cors_origins: vec!["http://localhost:3000".to_string()],
+            log_format: "pretty".to_string(),
+            shutdown_timeout_secs: 5,
+            apple_team_id: "XXXXXXXXXX".to_string(),
+            apple_bundle_id: "com.test.app".to_string(),
         }
     }
 }
