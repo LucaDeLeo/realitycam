@@ -95,6 +95,8 @@ export interface RawCapture {
   capturedAt: string;
   /** Time delta between photo and depth timestamps (must be < 100ms) */
   syncDeltaMs: number;
+  /** Optional GPS location data (undefined if permission denied or unavailable) */
+  location?: CaptureLocation;
 }
 
 /**
@@ -116,4 +118,45 @@ export interface CaptureError {
   message: string;
   /** Present for SYNC_TIMEOUT errors - actual sync delta */
   syncDeltaMs?: number;
+}
+
+// ============================================================================
+// Location Types (Story 3.3)
+// ============================================================================
+
+/**
+ * GPS location data captured with photo
+ * Location is always optional - capture proceeds without it if permission denied
+ */
+export interface CaptureLocation {
+  /** Latitude with 6 decimal places (~11cm precision) */
+  latitude: number;
+  /** Longitude with 6 decimal places */
+  longitude: number;
+  /** Meters above sea level (null if unavailable) */
+  altitude: number | null;
+  /** Horizontal accuracy in meters */
+  accuracy: number;
+  /** ISO timestamp of GPS fix */
+  timestamp: string;
+}
+
+/**
+ * Error codes for location failures (informational only - never blocks capture)
+ */
+export type LocationErrorCode =
+  | 'PERMISSION_DENIED'   // User denied permission
+  | 'TIMEOUT'             // Location request timed out
+  | 'UNAVAILABLE'         // Location services unavailable
+  | 'STALE_LOCATION'      // Location too old (> 10 seconds)
+  | 'UNKNOWN';            // Unknown error
+
+/**
+ * Location error (informational - does not prevent capture)
+ */
+export interface LocationError {
+  /** Error classification */
+  code: LocationErrorCode;
+  /** User-friendly error message */
+  message: string;
 }

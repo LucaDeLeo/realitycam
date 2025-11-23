@@ -20,6 +20,9 @@ export type {
   RawCapture,
   CaptureErrorCode,
   CaptureError,
+  CaptureLocation,
+  LocationErrorCode,
+  LocationError,
 } from './types/capture';
 
 // Device Types

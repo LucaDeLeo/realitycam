@@ -34,6 +34,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     [
+      'expo-location',
+      {
+        locationWhenInUsePermission: 'RealityCam uses your location to record where photos were captured. Location is optional and you can deny this permission.',
+      },
+    ],
+    [
       'expo-build-properties',
       {
         ios: {

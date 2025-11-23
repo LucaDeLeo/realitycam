@@ -1,24 +1,27 @@
 /**
  * useCapture Hook
  *
- * Orchestrates synchronized photo + depth capture.
- * Manages capture state machine, camera ref, and integrates with useLiDAR.
+ * Orchestrates synchronized photo + depth + location capture.
+ * Manages capture state machine, camera ref, and integrates with useLiDAR and useLocation.
  *
  * Features:
- * - Parallel photo and depth capture via Promise.all
- * - 100ms synchronization window validation
+ * - Parallel photo, depth, and location capture via Promise.allSettled
+ * - 100ms synchronization window validation for photo/depth
+ * - Location capture in parallel (optional, never blocks capture)
  * - State machine: idle -> capturing -> captured -> idle
  * - Error handling with typed CaptureError
  * - Camera ref management for expo-camera
  *
  * @see Story 3.2 - Photo Capture with Depth Map
+ * @see Story 3.3 - GPS Metadata Collection
  */
 
 import { useCallback, useState, useRef } from 'react';
 import { CameraView as ExpoCameraView } from 'expo-camera';
 import * as Crypto from 'expo-crypto';
 import { useLiDAR } from './useLiDAR';
-import type { DepthFrame, RawCapture, CaptureError } from '@realitycam/shared';
+import { useLocation } from './useLocation';
+import type { DepthFrame, RawCapture, CaptureError, CaptureLocation } from '@realitycam/shared';
 
 /**
  * Maximum allowed sync delta in milliseconds
@@ -34,7 +37,7 @@ type CaptureState = 'idle' | 'capturing' | 'captured';
  * useCapture hook return type
  */
 export interface UseCaptureReturn {
-  /** Initiate synchronized photo + depth capture */
+  /** Initiate synchronized photo + depth + location capture */
   capture: () => Promise<RawCapture>;
   /** Whether capture is in progress */
   isCapturing: boolean;
@@ -48,6 +51,12 @@ export interface UseCaptureReturn {
   setCameraRef: (ref: ExpoCameraView | null) => void;
   /** Clear the last capture error */
   clearError: () => void;
+  /** Request location permission (call before first capture) */
+  requestLocationPermission: () => Promise<boolean>;
+  /** Whether location permission is granted */
+  hasLocationPermission: boolean;
+  /** Location permission status for UI display */
+  locationPermissionStatus: 'undetermined' | 'granted' | 'denied';
 }
 
 /**
@@ -109,6 +118,14 @@ function parseExifTimestamp(exifDateTime: string | undefined, fallback: number):
 export function useCapture(): UseCaptureReturn {
   // Get depth capture from useLiDAR hook
   const { captureDepthFrame, isReady: isDepthReady } = useLiDAR();
+
+  // Get location capture from useLocation hook
+  const {
+    requestPermission: requestLocationPermission,
+    getCurrentLocation,
+    hasPermission: hasLocationPermission,
+    permissionStatus: locationPermissionStatus,
+  } = useLocation();
 
   // Capture state machine
   const [state, setState] = useState<CaptureState>('idle');
@@ -177,14 +194,29 @@ export function useCapture(): UseCaptureReturn {
 
     try {
       // Parallel capture for minimum sync delta
-      const [photo, depthFrame] = await Promise.all([
+      // Use Promise.allSettled so location failure doesn't block capture
+      const [photoResult, depthResult, locationResult] = await Promise.allSettled([
         cameraRef.current.takePictureAsync({
           quality: 1,
           exif: true,
           base64: false,
         }),
         captureDepthFrame(),
+        // Only attempt location if permission granted, otherwise resolve to null
+        hasLocationPermission ? getCurrentLocation() : Promise.resolve(null),
       ]);
+
+      // Extract photo result (required)
+      if (photoResult.status === 'rejected') {
+        const captureError: CaptureError = {
+          code: 'CAMERA_ERROR',
+          message: 'Failed to capture photo. Please try again.',
+        };
+        setError(captureError);
+        setState('idle');
+        throw captureError;
+      }
+      const photo = photoResult.value;
 
       // Validate photo result
       if (!photo || !photo.uri) {
@@ -195,6 +227,31 @@ export function useCapture(): UseCaptureReturn {
         setError(captureError);
         setState('idle');
         throw captureError;
+      }
+
+      // Extract depth result (required)
+      if (depthResult.status === 'rejected') {
+        const captureError: CaptureError = {
+          code: 'DEPTH_CAPTURE_FAILED',
+          message: 'Failed to capture depth data. Please try again.',
+        };
+        setError(captureError);
+        setState('idle');
+        throw captureError;
+      }
+      const depthFrame = depthResult.value;
+
+      // Extract location result (optional - never blocks capture)
+      let location: CaptureLocation | undefined;
+      if (locationResult.status === 'fulfilled' && locationResult.value !== null) {
+        location = locationResult.value;
+        console.log('[useCapture] Location captured:', {
+          lat: location.latitude,
+          lng: location.longitude,
+          accuracy: location.accuracy,
+        });
+      } else {
+        console.log('[useCapture] Location not captured (permission denied or unavailable)');
       }
 
       // Calculate sync delta
@@ -217,7 +274,7 @@ export function useCapture(): UseCaptureReturn {
         throw captureError;
       }
 
-      // Construct RawCapture
+      // Construct RawCapture with optional location
       const rawCapture: RawCapture = {
         id: Crypto.randomUUID(),
         photoUri: photo.uri,
@@ -226,6 +283,7 @@ export function useCapture(): UseCaptureReturn {
         depthFrame,
         capturedAt: new Date().toISOString(),
         syncDeltaMs,
+        location,
       };
 
       // Update state
@@ -236,7 +294,7 @@ export function useCapture(): UseCaptureReturn {
       setTimeout(() => setState('idle'), 100);
 
       console.log(
-        `[useCapture] Capture complete: id=${rawCapture.id}, syncDelta=${syncDeltaMs}ms`
+        `[useCapture] Capture complete: id=${rawCapture.id}, syncDelta=${syncDeltaMs}ms, hasLocation=${!!location}`
       );
 
       return rawCapture;
@@ -267,7 +325,7 @@ export function useCapture(): UseCaptureReturn {
       setState('idle');
       throw captureError;
     }
-  }, [isDepthReady, isCapturing, captureDepthFrame]);
+  }, [isDepthReady, isCapturing, captureDepthFrame, hasLocationPermission, getCurrentLocation]);
 
   return {
     capture,
@@ -277,5 +335,8 @@ export function useCapture(): UseCaptureReturn {
     error,
     setCameraRef,
     clearError,
+    requestLocationPermission,
+    hasLocationPermission,
+    locationPermissionStatus,
   };
 }

@@ -3,13 +3,14 @@
  *
  * Main camera capture screen with LiDAR depth overlay.
  * Displays camera preview with real-time depth visualization.
- * Implements synchronized photo + depth capture via useCapture hook.
+ * Implements synchronized photo + depth + location capture via useCapture hook.
  *
  * @see Story 3.1 - Camera View with LiDAR Depth Overlay
  * @see Story 3.2 - Photo Capture with Depth Map
+ * @see Story 3.3 - GPS Metadata Collection
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, useColorScheme, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, CameraViewHandle } from '../../components/Camera';
@@ -69,7 +70,7 @@ export default function CaptureScreen() {
   // LiDAR status tracking
   const [lidarError, setLidarError] = useState<string | null>(null);
 
-  // Capture hook for synchronized photo + depth capture
+  // Capture hook for synchronized photo + depth + location capture
   const {
     capture,
     isCapturing,
@@ -78,7 +79,13 @@ export default function CaptureScreen() {
     error: captureError,
     setCameraRef,
     clearError,
+    requestLocationPermission,
+    hasLocationPermission,
+    locationPermissionStatus,
   } = useCapture();
+
+  // Track if we've requested location permission (to avoid repeated prompts)
+  const hasRequestedLocationPermission = useRef(false);
 
   // Handle LiDAR status callback
   const handleLiDARStatus = useCallback((available: boolean, error: string | null) => {
@@ -96,6 +103,15 @@ export default function CaptureScreen() {
 
   // Handle capture button press
   const handleCapture = useCallback(async () => {
+    // Request location permission on first capture if not yet requested
+    if (!hasRequestedLocationPermission.current && locationPermissionStatus === 'undetermined') {
+      hasRequestedLocationPermission.current = true;
+      // Request permission asynchronously - don't block capture
+      requestLocationPermission().then((granted) => {
+        console.log(`[CaptureScreen] Location permission ${granted ? 'granted' : 'denied'}`);
+      });
+    }
+
     try {
       const rawCapture = await capture();
       console.log('[CaptureScreen] Capture successful:', {
@@ -104,13 +120,22 @@ export default function CaptureScreen() {
         dimensions: `${rawCapture.photoWidth}x${rawCapture.photoHeight}`,
         syncDeltaMs: rawCapture.syncDeltaMs,
         depthSize: `${rawCapture.depthFrame.width}x${rawCapture.depthFrame.height}`,
+        hasLocation: !!rawCapture.location,
+        location: rawCapture.location ? {
+          lat: rawCapture.location.latitude,
+          lng: rawCapture.location.longitude,
+          accuracy: rawCapture.location.accuracy,
+        } : null,
       });
 
       // TODO: Story 3-6 will add navigation to preview screen
       // For now, show success feedback
+      const locationInfo = rawCapture.location
+        ? `\nLocation: ${rawCapture.location.latitude.toFixed(4)}, ${rawCapture.location.longitude.toFixed(4)}`
+        : '\nLocation: Not available';
       Alert.alert(
         'Capture Complete',
-        `Photo captured with depth data.\nSync delta: ${rawCapture.syncDeltaMs}ms`,
+        `Photo captured with depth data.\nSync delta: ${rawCapture.syncDeltaMs}ms${locationInfo}`,
         [{ text: 'OK' }]
       );
     } catch (err) {
@@ -120,7 +145,7 @@ export default function CaptureScreen() {
         { text: 'OK', onPress: clearError },
       ]);
     }
-  }, [capture, captureError, clearError]);
+  }, [capture, captureError, clearError, locationPermissionStatus, requestLocationPermission]);
 
   // Check if device has LiDAR capability
   // This is a double-check - the device store should already show LiDAR
