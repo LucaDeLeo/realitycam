@@ -430,16 +430,142 @@ pub fn is_real_scene(variance: f64, layers: u32, coherence: f64) -> bool {
 }
 
 // ============================================================================
-// Main Analysis Function
+// Main Analysis Functions
 // ============================================================================
+
+/// Analyzes a depth map from in-memory bytes and returns DepthAnalysis evidence
+///
+/// This is the preferred entry point for depth analysis when bytes are already
+/// available in memory (e.g., during upload). It avoids redundant S3 downloads.
+///
+/// # Arguments
+/// * `compressed_bytes` - Gzip-compressed depth map bytes
+/// * `dimensions` - Expected (width, height) tuple
+///
+/// # Returns
+/// DepthAnalysis struct with all metrics and status
+///
+/// # Error Handling
+/// All errors are caught and converted to status=unavailable.
+pub fn analyze_depth_map_from_bytes(
+    compressed_bytes: &[u8],
+    dimensions: Option<(u32, u32)>,
+) -> DepthAnalysis {
+    let start = std::time::Instant::now();
+
+    info!(
+        compressed_size = compressed_bytes.len(),
+        dimensions = ?dimensions,
+        "[depth_analysis] Starting depth map analysis from bytes"
+    );
+
+    // Try to perform analysis
+    match analyze_depth_map_from_bytes_inner(compressed_bytes, dimensions) {
+        Ok(analysis) => {
+            let elapsed = start.elapsed();
+            info!(
+                status = ?analysis.status,
+                depth_variance = analysis.depth_variance,
+                depth_layers = analysis.depth_layers,
+                edge_coherence = analysis.edge_coherence,
+                is_likely_real_scene = analysis.is_likely_real_scene,
+                elapsed_ms = elapsed.as_millis(),
+                "[depth_analysis] Analysis complete"
+            );
+            analysis
+        }
+        Err(e) => {
+            let elapsed = start.elapsed();
+            warn!(
+                error = %e,
+                elapsed_ms = elapsed.as_millis(),
+                "[depth_analysis] Analysis failed, returning unavailable"
+            );
+            DepthAnalysis::default()
+        }
+    }
+}
+
+/// Inner analysis function for in-memory bytes that returns Result for error propagation
+fn analyze_depth_map_from_bytes_inner(
+    compressed_bytes: &[u8],
+    dimensions: Option<(u32, u32)>,
+) -> Result<DepthAnalysis, DepthAnalysisError> {
+    if compressed_bytes.is_empty() {
+        return Err(DepthAnalysisError::EmptyDepthMap);
+    }
+
+    // 1. Decompress
+    let decompressed = decompress_depth_map(compressed_bytes)?;
+
+    // 2. Parse Float32 array
+    let depths = parse_float32_array(&decompressed)?;
+
+    // 3. Validate dimensions if provided
+    let (width, height) = match dimensions {
+        Some((w, h)) => {
+            let expected = w as usize * h as usize;
+            if depths.len() != expected {
+                warn!(
+                    expected = expected,
+                    actual = depths.len(),
+                    "[depth_analysis] Dimension mismatch, using actual size"
+                );
+                infer_dimensions(depths.len())
+            } else {
+                (w as usize, h as usize)
+            }
+        }
+        None => infer_dimensions(depths.len()),
+    };
+
+    // 4. Compute statistics
+    let stats = compute_depth_statistics(&depths)?;
+
+    debug!(
+        variance = stats.variance,
+        min_depth = stats.min_depth,
+        max_depth = stats.max_depth,
+        coverage = stats.coverage,
+        "[depth_analysis] Statistics computed"
+    );
+
+    // 5. Detect layers
+    let layers = detect_depth_layers(&depths, stats.min_depth, stats.max_depth);
+
+    // 6. Compute edge coherence
+    let coherence = compute_edge_coherence(&depths, width, height);
+
+    // 7. Determine real scene status
+    let is_real = is_real_scene(stats.variance, layers.layer_count, coherence);
+
+    // 8. Build result
+    let status = if is_real {
+        CheckStatus::Pass
+    } else {
+        CheckStatus::Fail
+    };
+
+    Ok(DepthAnalysis {
+        status,
+        depth_variance: stats.variance,
+        depth_layers: layers.layer_count,
+        edge_coherence: coherence,
+        min_depth: stats.min_depth,
+        max_depth: stats.max_depth,
+        is_likely_real_scene: is_real,
+    })
+}
 
 /// Analyzes a depth map and returns DepthAnalysis evidence
 ///
-/// This is the main entry point for depth analysis. It:
+/// This is the legacy entry point for depth analysis. It:
 /// 1. Downloads the depth map from S3
 /// 2. Decompresses and parses the data
 /// 3. Computes all metrics
 /// 4. Determines real scene status
+///
+/// Prefer `analyze_depth_map_from_bytes` when bytes are already available.
 ///
 /// # Arguments
 /// * `storage` - StorageService for S3 access

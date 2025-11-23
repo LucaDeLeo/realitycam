@@ -369,17 +369,18 @@ async fn upload_capture(
         }
     })?;
 
-    if computed_hash.as_slice() != claimed_hash_bytes.as_slice() {
+    if computed_hash[..] != claimed_hash_bytes[..] {
         tracing::warn!(
             request_id = %request_id,
             device_id = %device_ctx.device_id,
-            computed_hash = %STANDARD.encode(&computed_hash),
+            computed_hash = %STANDARD.encode(computed_hash),
             claimed_hash = %parsed.metadata.photo_hash,
             "Photo hash mismatch - rejecting upload"
         );
         return Err(ApiErrorWithRequestId {
             error: ApiError::Validation(
-                "Photo hash does not match uploaded content. Ensure hash is SHA256 of photo bytes.".to_string()
+                "Photo hash does not match uploaded content. Ensure hash is SHA256 of photo bytes."
+                    .to_string(),
             ),
             request_id,
         });
@@ -400,7 +401,11 @@ async fn upload_capture(
 
     // Upload files to S3
     let (photo_s3_key, depth_map_s3_key) = storage
-        .upload_capture_files(capture_id, parsed.photo_bytes.clone(), parsed.depth_map_bytes.clone())
+        .upload_capture_files(
+            capture_id,
+            parsed.photo_bytes.clone(),
+            parsed.depth_map_bytes.clone(),
+        )
         .await
         .map_err(|e| ApiErrorWithRequestId {
             error: e,
@@ -435,7 +440,7 @@ async fn upload_capture(
         parsed.metadata.assertion.as_deref(),
         &parsed.metadata.photo_hash,
         &parsed.metadata.captured_at,
-        &config,
+        config,
         request_id,
     );
 
@@ -486,7 +491,7 @@ async fn upload_capture(
     ));
 
     // Perform depth analysis - downloads from S3, decompresses, analyzes
-    let depth_analysis = analyze_depth_map(&storage, capture_id, depth_dimensions).await;
+    let depth_analysis = analyze_depth_map(storage, capture_id, depth_dimensions).await;
 
     tracing::info!(
         request_id = %request_id,

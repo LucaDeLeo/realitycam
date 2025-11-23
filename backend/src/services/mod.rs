@@ -23,7 +23,7 @@ pub use capture_attestation::{
     verify_capture_assertion, CaptureAssertionError, CaptureAssertionResult,
 };
 pub use challenge_store::{ChallengeEntry, ChallengeError, ChallengeStore};
-pub use depth_analysis::analyze_depth_map;
+pub use depth_analysis::{analyze_depth_map, analyze_depth_map_from_bytes};
 pub use metadata_validation::validate_metadata;
 pub use privacy::process_location_for_evidence;
 pub use storage::{depth_map_s3_key, photo_s3_key, StorageService};

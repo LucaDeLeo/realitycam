@@ -27,9 +27,6 @@ use crate::config::Config;
 /// Valid: 2020-03-18 to 2045-03-15
 const APPLE_APP_ATTEST_ROOT_CA: &[u8] = include_bytes!("../../certs/apple_app_attest_root_ca.der");
 
-/// Flag indicating the Apple CA is embedded and available for verification
-const APPLE_CA_EMBEDDED: bool = true;
-
 // Apple nonce extension OID: 1.2.840.113635.100.8.2
 // This extension contains the nonce that must match SHA256(authData || clientDataHash)
 const APPLE_NONCE_OID_STR: &str = "1.2.840.113635.100.8.2";
