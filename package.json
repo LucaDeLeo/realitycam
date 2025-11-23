@@ -1,0 +1,23 @@
+{
+  "name": "realitycam",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "pnpm --filter @realitycam/web dev",
+    "dev:mobile": "pnpm --filter @realitycam/mobile start",
+    "build:web": "pnpm --filter @realitycam/web build",
+    "build:shared": "pnpm --filter @realitycam/shared build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "docker:up": "docker-compose -f infrastructure/docker-compose.yml up -d",
+    "docker:down": "docker-compose -f infrastructure/docker-compose.yml down"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

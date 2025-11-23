@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: realitycam-postgres
+    environment:
+      POSTGRES_DB: realitycam
+      POSTGRES_USER: realitycam
+      POSTGRES_PASSWORD: localdev
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U realitycam -d realitycam"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  localstack:
+    image: localstack/localstack:3.8
+    container_name: realitycam-localstack
+    environment:
+      SERVICES: s3
+      AWS_DEFAULT_REGION: us-east-1
+    ports:
+      - "4566:4566"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - ./init-localstack.sh:/etc/localstack/init/ready.d/init.sh:ro
+
+volumes:
+  postgres_data:
+  localstack_data:

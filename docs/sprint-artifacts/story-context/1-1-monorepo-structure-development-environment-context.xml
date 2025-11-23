@@ -1,0 +1,718 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context id="1-1-monorepo-structure-development-environment" version="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1-1-monorepo-structure-development-environment</storyId>
+    <title>Initialize Monorepo Structure and Development Environment</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-22</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/1-1-monorepo-structure-development-environment.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>developer</asA>
+    <iWant>the project scaffolded with all three components (mobile, web, backend) and local development services configured</iWant>
+    <soThat>I can begin implementing features across the stack with a consistent, reproducible development environment</soThat>
+    <tasks>
+      <task id="1" ac="1">
+        <name>Create Monorepo Root Structure</name>
+        <subtasks>
+          <subtask id="1.1">Create root directory structure: apps/, packages/, backend/, infrastructure/, docs/</subtask>
+          <subtask id="1.2">Initialize root package.json with workspaces configuration</subtask>
+          <subtask id="1.3">Create root .gitignore with node_modules, .env, ios/, build artifacts</subtask>
+        </subtasks>
+      </task>
+      <task id="2" ac="1,5">
+        <name>Initialize Expo Mobile App</name>
+        <subtasks>
+          <subtask id="2.1">Run bunx create-expo-app@latest apps/mobile --template blank-typescript</subtask>
+          <subtask id="2.2">Configure app.config.ts with bundle identifier for iOS</subtask>
+          <subtask id="2.3">Install Expo dependencies: expo-camera, expo-crypto, expo-secure-store, expo-file-system, expo-router</subtask>
+          <subtask id="2.4">Install @expo/app-integrity (~1.0.0)</subtask>
+          <subtask id="2.5">Install zustand for state management</subtask>
+          <subtask id="2.6">Configure Expo for iOS-only prebuild in app.config.ts</subtask>
+          <subtask id="2.7">Create placeholder app/(tabs)/_layout.tsx, capture.tsx, history.tsx</subtask>
+          <subtask id="2.8">Create apps/mobile/.env.example with API_URL</subtask>
+        </subtasks>
+      </task>
+      <task id="3" ac="1,6">
+        <name>Initialize Next.js Web App</name>
+        <subtasks>
+          <subtask id="3.1">Run npx create-next-app@latest apps/web --typescript --tailwind --app --turbopack</subtask>
+          <subtask id="3.2">Verify Next.js 16 with Turbopack is default</subtask>
+          <subtask id="3.3">Create placeholder pages: app/page.tsx, app/verify/[id]/page.tsx</subtask>
+          <subtask id="3.4">Create lib/api.ts stub for backend client</subtask>
+          <subtask id="3.5">Configure TypeScript path aliases</subtask>
+          <subtask id="3.6">Create apps/web/.env.example with NEXT_PUBLIC_API_URL</subtask>
+        </subtasks>
+      </task>
+      <task id="4" ac="1,4">
+        <name>Initialize Rust Backend</name>
+        <subtasks>
+          <subtask id="4.1">Run cargo new backend from project root</subtask>
+          <subtask id="4.2">Configure Cargo.toml with dependencies per architecture spec</subtask>
+          <subtask id="4.3">Add axum, tokio, sqlx, c2pa, serde, aws-sdk-s3, etc.</subtask>
+          <subtask id="4.4">Create basic src/main.rs with placeholder</subtask>
+          <subtask id="4.5">Create src/config.rs for environment loading</subtask>
+          <subtask id="4.6">Create backend/.env.example with DATABASE_URL, S3_ENDPOINT, S3_BUCKET, RUST_LOG</subtask>
+          <subtask id="4.7">Run cargo build to verify compilation</subtask>
+        </subtasks>
+      </task>
+      <task id="5" ac="1,7">
+        <name>Create Shared Types Package</name>
+        <subtasks>
+          <subtask id="5.1">Create packages/shared/ directory structure</subtask>
+          <subtask id="5.2">Initialize package.json with @realitycam/shared name</subtask>
+          <subtask id="5.3">Create src/types/api.ts with ApiResponse, ApiError types</subtask>
+          <subtask id="5.4">Create src/types/evidence.ts with ConfidenceLevel, EvidenceStatus, Evidence types</subtask>
+          <subtask id="5.5">Create src/types/capture.ts with Capture type</subtask>
+          <subtask id="5.6">Configure TypeScript tsconfig.json</subtask>
+          <subtask id="5.7">Create index.ts barrel export</subtask>
+        </subtasks>
+      </task>
+      <task id="6" ac="2">
+        <name>Configure Docker Infrastructure</name>
+        <subtasks>
+          <subtask id="6.1">Create infrastructure/docker-compose.yml</subtask>
+          <subtask id="6.2">Add PostgreSQL 16 service on port 5432</subtask>
+          <subtask id="6.3">Configure PostgreSQL health check</subtask>
+          <subtask id="6.4">Configure PostgreSQL to create realitycam database on init</subtask>
+          <subtask id="6.5">Add LocalStack service on port 4566</subtask>
+          <subtask id="6.6">Configure LocalStack to create realitycam-media-dev bucket on startup</subtask>
+          <subtask id="6.7">Configure LocalStack health check</subtask>
+          <subtask id="6.8">Add volume persistence for PostgreSQL data</subtask>
+        </subtasks>
+      </task>
+      <task id="7" ac="3">
+        <name>Configure Environment Files</name>
+        <subtasks>
+          <subtask id="7.1">Create .env.example files in backend/, apps/mobile/, apps/web/</subtask>
+          <subtask id="7.2">Add all .env files to root .gitignore</subtask>
+          <subtask id="7.3">Verify .env files not committed to git</subtask>
+        </subtasks>
+      </task>
+      <task id="8" ac="1-7">
+        <name>Create Setup Documentation</name>
+        <subtasks>
+          <subtask id="8.1">Update README.md with setup instructions</subtask>
+          <subtask id="8.2">Document prerequisites: Docker, Node.js 22+, Rust 1.82+, Xcode 16+</subtask>
+          <subtask id="8.3">Document step-by-step setup: docker-compose, backend, mobile, web</subtask>
+          <subtask id="8.4">Add troubleshooting section</subtask>
+        </subtasks>
+      </task>
+      <task id="9" ac="1-7">
+        <name>Verification Testing</name>
+        <subtasks>
+          <subtask id="9.1">Test docker-compose up -d and verify health checks</subtask>
+          <subtask id="9.2">Test backend cargo build completes</subtask>
+          <subtask id="9.3">Test mobile npm install and expo prebuild --platform ios</subtask>
+          <subtask id="9.4">Test web npm install and npm run dev</subtask>
+          <subtask id="9.5">Test shared types import from mobile/web</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-1" name="Monorepo Directory Structure">
+      <given>a fresh clone of the repository</given>
+      <when>the developer inspects the directory structure</when>
+      <then>the following paths exist: apps/mobile/ with Expo SDK 53 configuration, apps/web/ with Next.js 16 configuration, backend/ with Cargo.toml matching architecture spec, packages/shared/src/types/ with evidence.ts, capture.ts, api.ts, infrastructure/docker-compose.yml</then>
+    </criterion>
+    <criterion id="AC-2" name="Docker Services Operational">
+      <given>Docker is installed and running</given>
+      <when>the developer runs docker-compose up -d from project root</when>
+      <then>PostgreSQL 16 is accessible on localhost:5432, LocalStack S3 is accessible on localhost:4566, both services pass health checks within 30 seconds, realitycam database exists in PostgreSQL, realitycam-media-dev bucket exists in LocalStack</then>
+    </criterion>
+    <criterion id="AC-3" name="Environment Configuration Files">
+      <given>the project is set up</given>
+      <when>the developer inspects environment configuration</when>
+      <then>backend/.env.example contains DATABASE_URL, S3_ENDPOINT, S3_BUCKET, RUST_LOG; apps/mobile/.env.example contains API_URL; apps/web/.env.example contains NEXT_PUBLIC_API_URL; all .env files are in .gitignore</then>
+    </criterion>
+    <criterion id="AC-4" name="Backend Compiles and Starts">
+      <given>the developer copies .env.example to .env</given>
+      <when>the developer runs cargo build from backend directory</when>
+      <then>the project compiles successfully with all dependencies resolved</then>
+    </criterion>
+    <criterion id="AC-5" name="Mobile App Initializes">
+      <given>Node.js 22+ is installed</given>
+      <when>the developer runs npm install from apps/mobile</when>
+      <then>all dependencies install successfully, npx expo prebuild --platform ios generates iOS project in ios/ directory, Android project is NOT generated</then>
+    </criterion>
+    <criterion id="AC-6" name="Web App Initializes">
+      <given>Node.js 22+ is installed</given>
+      <when>the developer runs npm install and npm run dev from apps/web</when>
+      <then>the development server starts with Turbopack on localhost:3000, TailwindCSS is configured and working</then>
+    </criterion>
+    <criterion id="AC-7" name="Shared Types Package Importable">
+      <given>the shared package is built</given>
+      <when>mobile or web imports from @realitycam/shared</when>
+      <then>TypeScript types are available, no runtime dependencies required</then>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <artifact path="docs/prd.md" relevance="high">
+        <description>Product Requirements Document defining RealityCam MVP scope, technical requirements, and functional requirements. Key sections: Tech Stack (Expo SDK 53, Next.js 16, Rust/Axum), Project Classification (iPhone Pro only), API endpoints, authentication model.</description>
+        <sections>
+          <section name="Tech Stack" lines="543-577"/>
+          <section name="API Endpoints" lines="510-516"/>
+          <section name="Data Model" lines="499-509"/>
+        </sections>
+      </artifact>
+      <artifact path="docs/architecture.md" relevance="high">
+        <description>Architecture document with definitive technical decisions, project structure, dependencies, and implementation patterns. Contains exact Cargo.toml dependencies, package.json dependencies, and folder structure to implement.</description>
+        <sections>
+          <section name="Project Structure" lines="82-181"/>
+          <section name="Technology Stack Details" lines="200-300"/>
+          <section name="Backend Dependencies (Cargo.toml)" lines="203-247"/>
+          <section name="Mobile Dependencies (package.json)" lines="249-263"/>
+          <section name="Development Environment" lines="663-700"/>
+          <section name="ADR-001: iPhone Pro Only" lines="705-720"/>
+        </sections>
+      </artifact>
+      <artifact path="docs/sprint-artifacts/tech-spec-epic-1.md" relevance="high">
+        <description>Epic 1 Technical Specification with detailed acceptance criteria, data models, API contracts, and test strategy. Contains authoritative acceptance criteria AC-1.1 through AC-1.11, database schema, and API route definitions.</description>
+        <sections>
+          <section name="Database Schema" lines="93-145"/>
+          <section name="Rust Entity Models" lines="148-176"/>
+          <section name="TypeScript Types" lines="178-243"/>
+          <section name="API Routes (Stubs)" lines="249-280"/>
+          <section name="Acceptance Criteria" lines="483-597"/>
+          <section name="Dependencies" lines="423-482"/>
+        </sections>
+      </artifact>
+      <artifact path="docs/epics.md" relevance="medium">
+        <description>Epic breakdown document with story summaries and FR mapping. Provides context for how Story 1.1 fits into the larger Epic 1 scope.</description>
+        <sections>
+          <section name="Epic 1: Foundation and Project Setup" lines="98-175"/>
+          <section name="Story 1.1: Initialize Monorepo Structure" lines="106-145"/>
+        </sections>
+      </artifact>
+    </docs>
+    <code>
+      <note>This is the first story in the project. No existing code artifacts exist. The story creates the foundational project structure from scratch.</note>
+    </code>
+    <dependencies>
+      <dependency type="runtime" component="backend">
+        <name>axum</name>
+        <version>0.8</version>
+        <purpose>Web framework</purpose>
+      </dependency>
+      <dependency type="runtime" component="backend">
+        <name>axum-extra</name>
+        <version>0.10</version>
+        <features>typed-header</features>
+        <purpose>Extended Axum features</purpose>
+      </dependency>
+      <dependency type="runtime" component="backend">
+        <name>tower</name>
+        <version>0.5</version>
+        <purpose>Service traits</purpose>
+      </dependency>
+      <dependency type="runtime" component="backend">
+        <name>tower-http</name>
+        <version>0.6</version>
+        <features>cors, trace, request-id</features>
+        <purpose>HTTP middleware</purpose>
+      </dependency>
+      <dependency type="runtime" component="backend">
+        <name>tokio</name>
+        <version>1</version>
+        <features>full</features>
+        <purpose>Async runtime</purpose>
+      </dependency>
+      <dependency type="runtime" component="backend">
+        <name>sqlx</name>
+        <version>0.8</version>
+        <features>runtime-tokio, postgres, uuid, chrono, json</features>
+        <purpose>Database ORM</purpose>
+      </dependency>
+      <dependency type="runtime" component="backend">
+        <name>c2pa</name>
+        <version>0.51</version>
+        <features>file_io</features>
+        <purpose>C2PA SDK</purpose>
+      </dependency>
+      <dependency type="runtime" component="backend">
+        <name>ed25519-dalek</name>
+        <version>2</version>
+        <purpose>Cryptography</purpose>
+      </dependency>
+      <dependency type="runtime" component="backend">
+        <name>sha2</name>
+        <version>0.10</version>
+        <purpose>SHA-256 hashing</purpose>
+      </dependency>
+      <dependency type="runtime" component="backend">
+        <name>x509-parser</name>
+        <version>0.16</version>
+        <purpose>Certificate parsing</purpose>
+      </dependency>
+      <dependency type="runtime" component="backend">
+        <name>serde</name>
+        <version>1</version>
+        <features>derive</features>
+        <purpose>Serialization</purpose>
+      </dependency>
+      <dependency type="runtime" component="backend">
+        <name>serde_json</name>
+        <version>1</version>
+        <purpose>JSON handling</purpose>
+      </dependency>
+      <dependency type="runtime" component="backend">
+        <name>aws-sdk-s3</name>
+        <version>1</version>
+        <purpose>S3 operations</purpose>
+      </dependency>
+      <dependency type="runtime" component="backend">
+        <name>aws-config</name>
+        <version>1</version>
+        <purpose>AWS configuration</purpose>
+      </dependency>
+      <dependency type="runtime" component="backend">
+        <name>uuid</name>
+        <version>1</version>
+        <features>v4, serde</features>
+        <purpose>UUID generation</purpose>
+      </dependency>
+      <dependency type="runtime" component="backend">
+        <name>chrono</name>
+        <version>0.4</version>
+        <features>serde</features>
+        <purpose>Date/time handling</purpose>
+      </dependency>
+      <dependency type="runtime" component="backend">
+        <name>thiserror</name>
+        <version>2</version>
+        <purpose>Error handling</purpose>
+      </dependency>
+      <dependency type="runtime" component="backend">
+        <name>tracing</name>
+        <version>0.1</version>
+        <purpose>Instrumentation</purpose>
+      </dependency>
+      <dependency type="runtime" component="backend">
+        <name>tracing-subscriber</name>
+        <version>0.3</version>
+        <features>json</features>
+        <purpose>Logging</purpose>
+      </dependency>
+      <dependency type="runtime" component="backend">
+        <name>dotenvy</name>
+        <version>0.15</version>
+        <purpose>Environment loading</purpose>
+      </dependency>
+      <dependency type="runtime" component="mobile">
+        <name>expo</name>
+        <version>~53.0.0</version>
+        <purpose>Expo framework</purpose>
+      </dependency>
+      <dependency type="runtime" component="mobile">
+        <name>@expo/app-integrity</name>
+        <version>~1.0.0</version>
+        <purpose>DCAppAttest integration</purpose>
+      </dependency>
+      <dependency type="runtime" component="mobile">
+        <name>expo-camera</name>
+        <version>~17.0.0</version>
+        <purpose>Camera access</purpose>
+      </dependency>
+      <dependency type="runtime" component="mobile">
+        <name>expo-crypto</name>
+        <version>~15.0.0</version>
+        <purpose>Cryptography</purpose>
+      </dependency>
+      <dependency type="runtime" component="mobile">
+        <name>expo-secure-store</name>
+        <version>~15.0.0</version>
+        <purpose>Secure storage</purpose>
+      </dependency>
+      <dependency type="runtime" component="mobile">
+        <name>expo-file-system</name>
+        <version>~19.0.0</version>
+        <purpose>File operations</purpose>
+      </dependency>
+      <dependency type="runtime" component="mobile">
+        <name>expo-router</name>
+        <version>^4.0.0</version>
+        <purpose>File-based routing</purpose>
+      </dependency>
+      <dependency type="runtime" component="mobile">
+        <name>zustand</name>
+        <version>^5.0.0</version>
+        <purpose>State management</purpose>
+      </dependency>
+      <dependency type="runtime" component="web">
+        <name>next</name>
+        <version>^16.0.0</version>
+        <purpose>Next.js framework</purpose>
+      </dependency>
+      <dependency type="runtime" component="web">
+        <name>react</name>
+        <version>^19.2.0</version>
+        <purpose>UI library</purpose>
+      </dependency>
+      <dependency type="runtime" component="web">
+        <name>tailwindcss</name>
+        <version>^4.x</version>
+        <purpose>CSS framework</purpose>
+      </dependency>
+      <dependency type="infrastructure">
+        <name>PostgreSQL</name>
+        <version>16</version>
+        <purpose>Primary database</purpose>
+      </dependency>
+      <dependency type="infrastructure">
+        <name>LocalStack</name>
+        <version>3.8.x</version>
+        <purpose>S3-compatible storage (dev)</purpose>
+      </dependency>
+      <dependency type="tooling">
+        <name>Node.js</name>
+        <version>22+</version>
+        <purpose>JavaScript runtime</purpose>
+      </dependency>
+      <dependency type="tooling">
+        <name>Rust</name>
+        <version>1.82+</version>
+        <purpose>Backend language (required for c2pa-rs 0.51)</purpose>
+      </dependency>
+      <dependency type="tooling">
+        <name>Xcode</name>
+        <version>16+</version>
+        <purpose>iOS development</purpose>
+      </dependency>
+      <dependency type="tooling">
+        <name>Docker</name>
+        <version>24+</version>
+        <purpose>Container runtime</purpose>
+      </dependency>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture" source="ADR-001">
+      <title>iPhone Pro Only (MVP)</title>
+      <description>Mobile app targets iPhone Pro exclusively. iOS-only prebuild required - do NOT generate Android project. All Pro models (12+) have Secure Enclave + LiDAR.</description>
+    </constraint>
+    <constraint type="architecture" source="ADR-003">
+      <title>Rust Backend with Axum</title>
+      <description>Backend must use Rust with Axum framework version 0.8.x. c2pa-rs is the official C2PA SDK and requires Rust 1.82+.</description>
+    </constraint>
+    <constraint type="architecture" source="ADR-006">
+      <title>JSONB for Evidence Storage</title>
+      <description>Evidence structure stored as JSONB column in PostgreSQL. Allows flexible schema evolution for new check types.</description>
+    </constraint>
+    <constraint type="version">
+      <title>Expo SDK Version</title>
+      <description>Must use Expo SDK 53 with React Native 0.79. Newer versions may not be compatible.</description>
+    </constraint>
+    <constraint type="version">
+      <title>Next.js Version</title>
+      <description>Must use Next.js 16 with Turbopack enabled by default. App Router required (not Pages Router).</description>
+    </constraint>
+    <constraint type="naming" source="architecture.md">
+      <title>Naming Conventions</title>
+      <description>REST endpoints: plural nouns, kebab-case. Database tables: plural, snake_case. TypeScript files: PascalCase for components. Rust files: snake_case. Environment vars: SCREAMING_SNAKE_CASE.</description>
+    </constraint>
+    <constraint type="structure" source="architecture.md">
+      <title>Project Structure</title>
+      <description>Must follow exact structure: apps/mobile/, apps/web/, packages/shared/, backend/, infrastructure/, docs/. No deviation allowed.</description>
+    </constraint>
+    <constraint type="testing">
+      <title>Testing Framework Standards</title>
+      <description>Backend: cargo test. Mobile: Jest for unit tests. Web: Vitest for unit tests. E2E deferred to later stories (Maestro for mobile, Playwright for web).</description>
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface type="directory-structure">
+      <title>Expected Project Structure</title>
+      <description>Final directory structure this story must create</description>
+      <content><![CDATA[
+realitycam/
+  apps/
+    mobile/                          # Expo SDK 53 + React Native 0.79
+      app/                           # Expo Router file-based routing
+        (tabs)/
+          _layout.tsx
+          capture.tsx                # Placeholder capture screen
+          history.tsx                # Placeholder history screen
+        _layout.tsx
+      app.config.ts                  # Expo configuration
+      package.json
+      .env.example
+    web/                             # Next.js 16 + Turbopack
+      app/
+        page.tsx                     # Landing placeholder
+        verify/[id]/page.tsx         # Verification placeholder
+        layout.tsx
+      lib/
+        api.ts                       # API client stub
+      package.json
+      .env.example
+  packages/
+    shared/                          # TypeScript types
+      src/types/
+        evidence.ts
+        capture.ts
+        api.ts
+      index.ts
+      package.json
+      tsconfig.json
+  backend/                           # Rust/Axum
+    src/
+      main.rs                        # Placeholder main
+      config.rs                      # Environment config
+    Cargo.toml
+    .env.example
+  infrastructure/
+    docker-compose.yml               # PostgreSQL + LocalStack
+  docs/
+  README.md
+  package.json                       # Root with workspaces
+  .gitignore
+      ]]></content>
+    </interface>
+    <interface type="typescript">
+      <title>Shared Types - api.ts</title>
+      <description>API response types from tech-spec-epic-1.md</description>
+      <content><![CDATA[
+export interface ApiResponse<T> {
+  data: T;
+  meta: {
+    request_id: string;
+    timestamp: string;
+  };
+}
+
+export interface ApiError {
+  error: {
+    code: string;
+    message: string;
+    details?: Record<string, unknown>;
+  };
+  meta: {
+    request_id: string;
+    timestamp: string;
+  };
+}
+      ]]></content>
+    </interface>
+    <interface type="typescript">
+      <title>Shared Types - evidence.ts</title>
+      <description>Evidence types from tech-spec-epic-1.md</description>
+      <content><![CDATA[
+export type ConfidenceLevel = 'high' | 'medium' | 'low' | 'suspicious';
+export type EvidenceStatus = 'pass' | 'fail' | 'unavailable';
+
+export interface HardwareAttestation {
+  status: EvidenceStatus;
+  level: 'secure_enclave' | 'unverified';
+  device_model: string;
+}
+
+export interface DepthAnalysis {
+  status: EvidenceStatus;
+  depth_variance: number;
+  depth_layers: number;
+  edge_coherence: number;
+  min_depth: number;
+  max_depth: number;
+  is_likely_real_scene: boolean;
+}
+
+export interface Evidence {
+  hardware_attestation: HardwareAttestation;
+  depth_analysis: DepthAnalysis;
+  metadata: {
+    timestamp_valid: boolean;
+    model_verified: boolean;
+    location_available: boolean;
+    location_coarse?: string;
+  };
+}
+      ]]></content>
+    </interface>
+    <interface type="typescript">
+      <title>Shared Types - capture.ts</title>
+      <description>Capture types from tech-spec-epic-1.md</description>
+      <content><![CDATA[
+import { ConfidenceLevel, Evidence } from './evidence';
+
+export interface Capture {
+  id: string;
+  confidence_level: ConfidenceLevel;
+  captured_at: string;
+  media_url: string;
+  evidence: Evidence;
+  c2pa_manifest_url?: string;
+  depth_visualization_url?: string;
+}
+      ]]></content>
+    </interface>
+    <interface type="toml">
+      <title>Backend Cargo.toml Dependencies</title>
+      <description>Exact dependencies from architecture.md</description>
+      <content><![CDATA[
+[package]
+name = "realitycam-api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = "0.8"
+axum-extra = { version = "0.10", features = ["typed-header"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace", "request-id"] }
+tokio = { version = "1", features = ["full"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono", "json"] }
+c2pa = { version = "0.51", features = ["file_io"] }
+ed25519-dalek = "2"
+sha2 = "0.10"
+x509-parser = "0.16"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+aws-sdk-s3 = "1"
+aws-config = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json"] }
+dotenvy = "0.15"
+      ]]></content>
+    </interface>
+    <interface type="yaml">
+      <title>Docker Compose Configuration</title>
+      <description>PostgreSQL and LocalStack services</description>
+      <content><![CDATA[
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: realitycam
+      POSTGRES_USER: realitycam
+      POSTGRES_PASSWORD: localdev
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U realitycam -d realitycam"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  localstack:
+    image: localstack/localstack:3.8
+    environment:
+      SERVICES: s3
+      AWS_DEFAULT_REGION: us-east-1
+    ports:
+      - "4566:4566"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - ./init-localstack.sh:/etc/localstack/init/ready.d/init.sh
+
+volumes:
+  postgres_data:
+  localstack_data:
+      ]]></content>
+    </interface>
+    <interface type="env">
+      <title>Backend .env.example</title>
+      <description>Required environment variables for backend</description>
+      <content><![CDATA[
+DATABASE_URL=postgres://realitycam:localdev@localhost:5432/realitycam
+S3_ENDPOINT=http://localhost:4566
+S3_BUCKET=realitycam-media-dev
+RUST_LOG=info,sqlx=warn
+      ]]></content>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      <standard framework="cargo test" component="backend">
+        <description>Rust unit and integration tests. For this story, verify Cargo.toml compiles with all dependencies. No functional tests yet.</description>
+      </standard>
+      <standard framework="jest" component="mobile">
+        <description>Jest for React Native unit tests. For this story, placeholder test file to verify Jest setup works.</description>
+      </standard>
+      <standard framework="vitest" component="web">
+        <description>Vitest for Next.js unit tests. For this story, placeholder test file to verify Vitest setup works.</description>
+      </standard>
+      <standard framework="tsc" component="shared">
+        <description>TypeScript compilation check. Run tsc --noEmit to verify types are valid.</description>
+      </standard>
+    </standards>
+    <locations>
+      <location component="backend">backend/src/*.rs (adjacent to source)</location>
+      <location component="backend">backend/tests/ (integration tests)</location>
+      <location component="mobile">apps/mobile/__tests__/</location>
+      <location component="web">apps/web/__tests__/</location>
+      <location component="shared">packages/shared/ (tsc --noEmit)</location>
+    </locations>
+    <ideas>
+      <idea priority="high" ac="AC-1">Verify directory structure matches expected layout using filesystem checks</idea>
+      <idea priority="high" ac="AC-2">Run docker-compose up -d and verify health checks pass within 30 seconds</idea>
+      <idea priority="high" ac="AC-2">Verify PostgreSQL connection: psql -h localhost -U realitycam -d realitycam -c "SELECT 1"</idea>
+      <idea priority="high" ac="AC-2">Verify LocalStack S3 bucket exists: aws --endpoint-url=http://localhost:4566 s3 ls s3://realitycam-media-dev</idea>
+      <idea priority="high" ac="AC-4">Run cargo build in backend directory and verify exit code 0</idea>
+      <idea priority="high" ac="AC-5">Run npm install in apps/mobile and verify exit code 0</idea>
+      <idea priority="high" ac="AC-5">Run npx expo prebuild --platform ios and verify ios/ directory exists but android/ does not</idea>
+      <idea priority="high" ac="AC-6">Run npm run dev in apps/web and verify server starts on port 3000</idea>
+      <idea priority="high" ac="AC-7">Import @realitycam/shared from mobile and web and verify TypeScript compiles</idea>
+      <idea priority="medium" ac="AC-3">Verify .env.example files exist with required variables</idea>
+      <idea priority="medium" ac="AC-3">Verify .gitignore includes .env patterns</idea>
+    </ideas>
+  </tests>
+
+  <implementationNotes>
+    <note priority="high" category="sequencing">
+      <title>Task Execution Order</title>
+      <content>Execute tasks in order: 1 (root structure), then 2-5 (apps/packages) in parallel, then 6 (docker), then 7 (env files), then 8 (docs), then 9 (verification). Tasks 2-5 have no dependencies on each other.</content>
+    </note>
+    <note priority="high" category="tooling">
+      <title>Expo Initialization</title>
+      <content>Use bunx create-expo-app@latest for mobile app initialization. This ensures Expo SDK 53 is installed. After creation, install additional dependencies via npm/bun.</content>
+    </note>
+    <note priority="high" category="tooling">
+      <title>Next.js Initialization</title>
+      <content>Use npx create-next-app@latest with flags: --typescript --tailwind --app --turbopack. This creates Next.js 16 with all required features.</content>
+    </note>
+    <note priority="high" category="tooling">
+      <title>Rust Backend Initialization</title>
+      <content>Use cargo new backend (not cargo init). After creation, replace Cargo.toml with the exact dependencies from architecture.md. Run cargo build to verify compilation.</content>
+    </note>
+    <note priority="medium" category="configuration">
+      <title>iOS-Only Prebuild</title>
+      <content>In app.config.ts, configure: expo.plugins = [["expo-build-properties", { ios: { deploymentTarget: "14.0" } }]]. When running prebuild, always use --platform ios flag.</content>
+    </note>
+    <note priority="medium" category="configuration">
+      <title>LocalStack S3 Bucket Creation</title>
+      <content>Create init-localstack.sh script in infrastructure/ that runs: awslocal s3 mb s3://realitycam-media-dev. This script is mounted and executed on LocalStack startup.</content>
+    </note>
+    <note priority="medium" category="monorepo">
+      <title>Root Package.json Workspaces</title>
+      <content>Configure root package.json with workspaces: ["apps/*", "packages/*"]. This enables @realitycam/shared to be importable without publishing.</content>
+    </note>
+    <note priority="low" category="warning">
+      <title>Rust Compilation Time</title>
+      <content>First cargo build will take several minutes due to dependency compilation. c2pa-rs in particular has many transitive dependencies. This is expected.</content>
+    </note>
+    <note priority="low" category="warning">
+      <title>Next.js 16 Bleeding Edge</title>
+      <content>Next.js 16 is recent. If major issues encountered, fallback to 15.x is acceptable per architecture risks section.</content>
+    </note>
+  </implementationNotes>
+</story-context>
