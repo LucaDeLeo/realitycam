@@ -1,0 +1,477 @@
+<story-context id="1-4-ios-app-shell-navigation" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1-4-ios-app-shell-navigation</storyId>
+    <title>iOS App Shell with Navigation</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-22</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/1-4-ios-app-shell-navigation.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>mobile developer</asA>
+    <iWant>the Expo app configured with polished tab navigation, iOS-specific app configuration, proper app icons, splash screen, and consistent navigation styling</iWant>
+    <soThat>the app has a professional appearance and is ready for iOS prebuild and TestFlight distribution</soThat>
+    <tasks>
+      <task id="1" name="Install and Configure Icon Dependencies" acs="1,2">
+        <subtask>1.1: Install @expo/vector-icons (already in Expo SDK)</subtask>
+        <subtask>1.2: Select appropriate icons for Capture tab (camera icon)</subtask>
+        <subtask>1.3: Select appropriate icons for History tab (clock-history icon)</subtask>
+        <subtask>1.4: Test icon availability in iOS</subtask>
+      </task>
+      <task id="2" name="Enhance Tab Navigation Styling" acs="1,2">
+        <subtask>2.1: Update app/(tabs)/_layout.tsx with tab bar icons</subtask>
+        <subtask>2.2: Configure tabBarActiveTintColor with brand primary color</subtask>
+        <subtask>2.3: Configure tabBarInactiveTintColor with muted gray</subtask>
+        <subtask>2.4: Add headerShown configuration for screen headers</subtask>
+        <subtask>2.5: Configure tab bar style for iOS appearance</subtask>
+        <subtask>2.6: Test light/dark mode appearance</subtask>
+      </task>
+      <task id="3" name="Update App Configuration for iOS" acs="3,10">
+        <subtask>3.1: Verify app.config.ts iOS configuration is complete</subtask>
+        <subtask>3.2: Ensure supportsTablet is set to false</subtask>
+        <subtask>3.3: Verify bundleIdentifier is com.realitycam.app</subtask>
+        <subtask>3.4: Confirm iOS deployment target is 14.0+</subtask>
+        <subtask>3.5: Configure expo-status-bar settings</subtask>
+        <subtask>3.6: Verify no Android-specific configuration exists</subtask>
+      </task>
+      <task id="4" name="Configure App Icons" acs="4">
+        <subtask>4.1: Create or obtain app icon source (1024x1024 minimum)</subtask>
+        <subtask>4.2: Replace default icon at assets/icon.png</subtask>
+        <subtask>4.3: Update adaptive-icon.png for consistency</subtask>
+        <subtask>4.4: Verify icon has no transparency</subtask>
+        <subtask>4.5: Configure icon in app.config.ts</subtask>
+      </task>
+      <task id="5" name="Configure Splash Screen" acs="5">
+        <subtask>5.1: Create or obtain splash screen image</subtask>
+        <subtask>5.2: Update assets/splash-icon.png</subtask>
+        <subtask>5.3: Configure splash screen in app.config.ts</subtask>
+        <subtask>5.4: Set appropriate background color</subtask>
+        <subtask>5.5: Configure resizeMode (contain or cover)</subtask>
+        <subtask>5.6: Test splash screen appearance on launch</subtask>
+      </task>
+      <task id="6" name="Implement Safe Area Handling" acs="6">
+        <subtask>6.1: Verify react-native-safe-area-context is installed</subtask>
+        <subtask>6.2: Wrap root layout with SafeAreaProvider if needed</subtask>
+        <subtask>6.3: Update screen components to use SafeAreaView or useSafeAreaInsets</subtask>
+        <subtask>6.4: Test on various iPhone models (notch, Dynamic Island)</subtask>
+        <subtask>6.5: Verify tab bar respects bottom safe area</subtask>
+      </task>
+      <task id="7" name="Enhance Screen Placeholders" acs="7">
+        <subtask>7.1: Update capture.tsx with enhanced placeholder content</subtask>
+        <subtask>7.2: Add camera icon or illustration to Capture screen</subtask>
+        <subtask>7.3: Add descriptive text for Capture screen purpose</subtask>
+        <subtask>7.4: Update history.tsx with enhanced placeholder content</subtask>
+        <subtask>7.5: Add history icon or illustration to History screen</subtask>
+        <subtask>7.6: Add descriptive text for History screen purpose</subtask>
+        <subtask>7.7: Apply consistent styling across both screens</subtask>
+      </task>
+      <task id="8" name="iOS Prebuild and Verification" acs="8,9">
+        <subtask>8.1: Run npx expo prebuild --platform ios --clean</subtask>
+        <subtask>8.2: Verify ios/ directory is created</subtask>
+        <subtask>8.3: Verify no android/ directory exists</subtask>
+        <subtask>8.4: Open Xcode project and verify build settings</subtask>
+        <subtask>8.5: Start app with npx expo start</subtask>
+        <subtask>8.6: Launch in iOS simulator</subtask>
+        <subtask>8.7: Test tab navigation functionality</subtask>
+        <subtask>8.8: Verify no console errors or warnings</subtask>
+      </task>
+      <task id="9" name="Final Testing and Documentation" acs="all">
+        <subtask>9.1: Test app on multiple iOS simulator devices</subtask>
+        <subtask>9.2: Test light mode appearance</subtask>
+        <subtask>9.3: Test dark mode appearance</subtask>
+        <subtask>9.4: Verify all acceptance criteria are met</subtask>
+        <subtask>9.5: Document any configuration changes in README if needed</subtask>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-1" name="Tab Navigation with Icons">
+      <given>the user launches the app</given>
+      <when>the app loads on iOS simulator or device</when>
+      <then>
+        - A bottom tab bar is displayed with two tabs: "Capture" tab with camera icon, "History" tab with clock/history icon
+        - Tab icons use SF Symbols or equivalent React Native vector icons
+        - Active tab is visually distinguished from inactive tabs
+      </then>
+    </criterion>
+    <criterion id="AC-2" name="Navigation Styling Consistent with iOS Design">
+      <given>the app is running</given>
+      <when>the user views any screen</when>
+      <then>
+        - Tab bar has appropriate background color (light/dark mode aware)
+        - Active tab tint color is the app's primary brand color (#007AFF)
+        - Inactive tab tint color is a muted gray (#8E8E93)
+        - Tab bar height matches iOS standard (~49pt + safe area)
+        - Header styling is consistent across screens
+      </then>
+    </criterion>
+    <criterion id="AC-3" name="iOS-Only App Configuration">
+      <given>the developer inspects app.config.ts</given>
+      <when>reviewing iOS configuration</when>
+      <then>
+        - ios.supportsTablet: false (iPhone only)
+        - ios.bundleIdentifier set to com.realitycam.app
+        - ios.infoPlist includes camera and location permission descriptions
+        - Deployment target is iOS 14.0+ (for DCAppAttest support)
+        - No Android configuration is present (iOS-only MVP)
+      </then>
+    </criterion>
+    <criterion id="AC-4" name="App Icon Configuration">
+      <given>the project has app icon assets</given>
+      <when>iOS prebuild is run</when>
+      <then>
+        - App icon is generated at all required iOS sizes (1024x1024 App Store icon, device-specific sizes)
+        - Icon has no transparency (iOS requirement)
+        - Icon appears in iOS home screen after installation
+      </then>
+    </criterion>
+    <criterion id="AC-5" name="Splash Screen Configuration">
+      <given>the app is installed</given>
+      <when>the app is launched</when>
+      <then>
+        - A splash screen is displayed showing app logo/icon centered
+        - Uses appropriate background color
+        - Supports both light and dark mode
+        - Splash screen transitions smoothly to app content
+      </then>
+    </criterion>
+    <criterion id="AC-6" name="Safe Area Handling">
+      <given>the app is running on any iPhone model</given>
+      <when>viewing screens</when>
+      <then>
+        - Content does not overlap with notch/Dynamic Island
+        - Content does not overlap with home indicator
+        - Tab bar is positioned above home indicator area
+        - Safe areas work correctly on all supported iPhone Pro models
+      </then>
+    </criterion>
+    <criterion id="AC-7" name="Screen Placeholder Content Enhanced">
+      <given>the user navigates to each tab</given>
+      <when>viewing the Capture/History screens</when>
+      <then>
+        - Capture screen displays: title "Capture", descriptive text, visual placeholder/icon
+        - History screen displays: title "History", descriptive text, visual placeholder/icon
+      </then>
+    </criterion>
+    <criterion id="AC-8" name="iOS Prebuild Succeeds">
+      <given>the developer runs npx expo prebuild --platform ios</given>
+      <when>prebuild completes</when>
+      <then>
+        - iOS project is generated in ios/ directory
+        - Android project is NOT generated
+        - Xcode project can be opened successfully
+        - Build configuration targets iOS 14.0+
+      </then>
+    </criterion>
+    <criterion id="AC-9" name="App Runs in iOS Simulator">
+      <given>Xcode is installed and iOS simulator available</given>
+      <when>the developer runs npx expo start and opens in iOS simulator</when>
+      <then>
+        - App launches without errors
+        - Tab navigation works (switching between tabs)
+        - Both placeholder screens render correctly
+        - No console errors or warnings related to navigation
+      </then>
+    </criterion>
+    <criterion id="AC-10" name="Status Bar Configuration">
+      <given>the app is running</given>
+      <when>viewing any screen</when>
+      <then>
+        - Status bar style adapts to light/dark mode automatically
+        - Status bar does not overlap with content
+        - expo-status-bar is properly configured
+      </then>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc path="docs/prd.md" relevance="high">
+        <description>Product Requirements Document - contains iOS App Requirements section (lines 214-258), platform support table for iPhone Pro models, MVP scope constraints (iPhone Pro only, iOS 14.0+), and tech stack specifications (Expo SDK 53 + React Native)</description>
+      </doc>
+      <doc path="docs/architecture.md" relevance="high">
+        <description>Architecture Document - defines project structure for apps/mobile/, mobile dependencies including expo-router ~6.0.0, expo-status-bar ~3.0.0, react-native-safe-area-context ~5.4.0. Contains ADR-001 (iPhone Pro Only MVP) and mobile app file structure patterns</description>
+      </doc>
+      <doc path="docs/sprint-artifacts/tech-spec-epic-1.md" relevance="high">
+        <description>Epic 1 Technical Specification - contains AC-1.7 (Mobile App Runs with Tab Navigation), AC-1.8 (Mobile App Prebuilds for iOS Only), detailed workflow sequences for mobile navigation, and test strategy for mobile components</description>
+      </doc>
+      <doc path="docs/epics.md" relevance="medium">
+        <description>Epic Breakdown - Story 1.5 (Mobile App Skeleton with Navigation) requirements and acceptance criteria that inform this story's implementation scope</description>
+      </doc>
+    </docs>
+
+    <code>
+      <file path="apps/mobile/app.config.ts" relevance="high">
+        <description>Expo app configuration - MODIFY: Current config has basic iOS setup. Need to verify/update supportsTablet, bundleIdentifier, infoPlist permissions, deployment target. Already has splash screen config with contain resizeMode. Uses expo-router and expo-build-properties plugins.</description>
+        <currentState>
+          - name: RealityCam, slug: realitycam, version: 0.1.0
+          - ios.supportsTablet: false (correct)
+          - ios.bundleIdentifier: com.realitycam.app (correct)
+          - ios.infoPlist: has camera and location permissions (correct)
+          - deploymentTarget: 14.0 via expo-build-properties (correct)
+          - splash: configured with contain resizeMode
+          - newArchEnabled: true
+        </currentState>
+      </file>
+      <file path="apps/mobile/package.json" relevance="high">
+        <description>Mobile app dependencies - REFERENCE: Contains current versions. Key dependencies: expo ~54.0.25, expo-router ~6.0.0, expo-status-bar ~3.0.0, react-native-safe-area-context ~5.4.0, react-native-screens ~4.11.0. Note: @expo/vector-icons is bundled with Expo SDK (no separate install needed)</description>
+        <currentState>
+          - expo: ~54.0.25 (newer than arch doc's 53.0.0)
+          - expo-router: ~6.0.0
+          - react-native: 0.81.5 (newer than arch doc's 0.79)
+          - expo-status-bar: ~3.0.0
+          - react-native-safe-area-context: ~5.4.0
+        </currentState>
+      </file>
+      <file path="apps/mobile/app/_layout.tsx" relevance="high">
+        <description>Root layout - REFERENCE/MODIFY: Current implementation uses Stack navigator with StatusBar. May need SafeAreaProvider wrapper. Currently passes headerShown: false to (tabs) screen.</description>
+        <currentState>
+          - Uses expo-router Stack component
+          - StatusBar with style="auto"
+          - (tabs) screen has headerShown: false
+        </currentState>
+      </file>
+      <file path="apps/mobile/app/(tabs)/_layout.tsx" relevance="critical">
+        <description>Tab layout - PRIMARY MODIFY TARGET: Add tab bar icons using @expo/vector-icons (Ionicons), configure tabBarActiveTintColor (#007AFF), tabBarInactiveTintColor (#8E8E93), tabBarStyle for iOS appearance, headerStyle for consistent headers</description>
+        <currentState>
+          - Basic Tabs component with screenOptions headerShown: true
+          - Two tabs: capture (title: Capture), history (title: History)
+          - NO tab bar icons configured
+          - NO color styling configured
+        </currentState>
+        <targetState>
+          - Import Ionicons from @expo/vector-icons
+          - Add tabBarIcon to each screen (camera for Capture, time for History)
+          - Set tabBarActiveTintColor: #007AFF
+          - Set tabBarInactiveTintColor: #8E8E93
+          - Add tabBarStyle with backgroundColor
+          - Add headerStyle with backgroundColor and headerTitleStyle
+        </targetState>
+      </file>
+      <file path="apps/mobile/app/(tabs)/capture.tsx" relevance="high">
+        <description>Capture screen - MODIFY: Enhance placeholder with camera icon illustration, descriptive text about camera capture functionality coming, apply consistent styling with safe area handling</description>
+        <currentState>
+          - Basic View/Text placeholder
+          - Title: "Capture"
+          - Subtitle: "Camera capture screen placeholder"
+          - Simple centered layout with white background
+        </currentState>
+        <targetState>
+          - Add Ionicons camera-outline icon as visual placeholder
+          - Update subtitle to "Capture authenticated photos with LiDAR verification"
+          - Consider adding SafeAreaView or useSafeAreaInsets
+          - Support light/dark mode
+        </targetState>
+      </file>
+      <file path="apps/mobile/app/(tabs)/history.tsx" relevance="high">
+        <description>History screen - MODIFY: Enhance placeholder with history/clock icon illustration, descriptive text about capture history functionality coming, apply consistent styling with safe area handling</description>
+        <currentState>
+          - Basic View/Text placeholder
+          - Title: "History"
+          - Subtitle: "Capture history screen placeholder"
+          - Simple centered layout with white background
+        </currentState>
+        <targetState>
+          - Add Ionicons time-outline icon as visual placeholder
+          - Update subtitle to "View your verified capture history"
+          - Consider adding SafeAreaView or useSafeAreaInsets
+          - Support light/dark mode
+        </targetState>
+      </file>
+    </code>
+
+    <dependencies>
+      <dependency name="@expo/vector-icons" version="bundled" type="icons">
+        <description>Bundled with Expo SDK - provides Ionicons, MaterialIcons, Feather for tab bar icons. Recommended: Ionicons for iOS-native appearance (camera, time icons)</description>
+        <usage>import { Ionicons } from '@expo/vector-icons'</usage>
+      </dependency>
+      <dependency name="expo-router" version="~6.0.0" type="navigation">
+        <description>File-based routing with Tabs component for tab navigation. Already installed.</description>
+      </dependency>
+      <dependency name="expo-status-bar" version="~3.0.0" type="ui">
+        <description>Status bar control - already in use in _layout.tsx with style="auto"</description>
+      </dependency>
+      <dependency name="react-native-safe-area-context" version="~5.4.0" type="layout">
+        <description>Safe area handling - provides SafeAreaProvider, SafeAreaView, useSafeAreaInsets. Already installed but may need to add SafeAreaProvider to root layout.</description>
+      </dependency>
+      <dependency name="react-native-screens" version="~4.11.0" type="navigation">
+        <description>Native screen optimization - already installed, used by expo-router internally</description>
+      </dependency>
+      <dependency name="expo-build-properties" version="~0.14.0" type="config">
+        <description>Build properties plugin - already configured with ios.deploymentTarget: 14.0</description>
+      </dependency>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="platform" source="architecture.md">iPhone Pro only for MVP - iOS 14.0+ minimum deployment target for DCAppAttest support</constraint>
+    <constraint type="platform" source="prd.md">No Android configuration - iOS-only prebuild (npx expo prebuild --platform ios)</constraint>
+    <constraint type="design" source="story">iOS Human Interface Guidelines compliance - tab bar height ~49pt + safe area, appropriate colors for light/dark mode</constraint>
+    <constraint type="visual" source="story">App icon must have no transparency (iOS App Store requirement)</constraint>
+    <constraint type="visual" source="story">Brand colors: primary #007AFF (iOS system blue), inactive #8E8E93 (iOS system gray)</constraint>
+    <constraint type="framework" source="architecture.md">Expo SDK 53+ with React Native 0.79+ (actual: 54.0.25 / 0.81.5)</constraint>
+    <constraint type="routing" source="architecture.md">File-based routing with Expo Router - app/(tabs)/ structure</constraint>
+    <constraint type="verification" source="story">TypeScript compilation must pass: npx tsc --noEmit</constraint>
+  </constraints>
+
+  <interfaces>
+    <interface type="component" name="Tabs">
+      <source>expo-router</source>
+      <description>Tab navigation container providing iOS-style bottom tab bar</description>
+      <props>
+        <prop name="screenOptions">Object with tabBarActiveTintColor, tabBarInactiveTintColor, tabBarStyle, headerStyle, headerTitleStyle</prop>
+      </props>
+      <children>
+        <child name="Tabs.Screen">Individual tab screen with name, options (title, tabBarLabel, tabBarIcon)</child>
+      </children>
+    </interface>
+    <interface type="component" name="Ionicons">
+      <source>@expo/vector-icons</source>
+      <description>Vector icon component with iOS-native SF Symbol-style icons</description>
+      <props>
+        <prop name="name">Icon name: camera, camera-outline, time, time-outline</prop>
+        <prop name="size">Icon size in pixels (default tab bar icon: 24-28)</prop>
+        <prop name="color">Icon color (provided by tabBarIcon render prop)</prop>
+      </props>
+    </interface>
+    <interface type="component" name="StatusBar">
+      <source>expo-status-bar</source>
+      <description>Status bar styling component</description>
+      <props>
+        <prop name="style">auto | light | dark - currently auto for theme adaptation</prop>
+      </props>
+    </interface>
+    <interface type="component" name="SafeAreaView">
+      <source>react-native-safe-area-context</source>
+      <description>View that respects device safe areas (notch, Dynamic Island, home indicator)</description>
+      <props>
+        <prop name="edges">Array of edges to apply safe area: top, bottom, left, right</prop>
+        <prop name="style">Standard View style props</prop>
+      </props>
+    </interface>
+    <interface type="hook" name="useSafeAreaInsets">
+      <source>react-native-safe-area-context</source>
+      <description>Hook returning safe area inset values for custom handling</description>
+      <returns>{ top: number, bottom: number, left: number, right: number }</returns>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      <standard source="tech-spec-epic-1.md">TypeScript compilation check with npx tsc --noEmit</standard>
+      <standard source="tech-spec-epic-1.md">Manual verification with specific test steps documented</standard>
+      <standard source="tech-spec-epic-1.md">Use --clean flag for prebuild to avoid stale artifacts</standard>
+      <standard source="story">Jest for unit tests of mobile components (if applicable)</standard>
+      <standard source="story">Maestro for E2E tests on real devices (optional for this story)</standard>
+    </standards>
+    <locations>
+      <location>apps/mobile/__tests__/ (if creating unit tests)</location>
+      <location>Manual testing in iOS Simulator</location>
+    </locations>
+    <ideas>
+      <testIdea ac="1,2" type="manual">Launch app in iOS Simulator, verify tab bar displays with camera and clock icons, verify active tab has blue (#007AFF) tint, inactive has gray (#8E8E93)</testIdea>
+      <testIdea ac="2" type="manual">Toggle iOS Simulator between light and dark appearance (Device > Appearance), verify tab bar and headers adapt colors appropriately</testIdea>
+      <testIdea ac="3" type="verification">Review app.config.ts output, verify ios.supportsTablet: false, bundleIdentifier matches, no android config present</testIdea>
+      <testIdea ac="4" type="manual">After prebuild, check ios/ directory for generated icon assets, install on simulator and verify home screen icon appearance</testIdea>
+      <testIdea ac="5" type="manual">Force-quit and relaunch app, observe splash screen displays centered logo/icon with appropriate background, transitions smoothly</testIdea>
+      <testIdea ac="6" type="manual">Test on iPhone 14 Pro simulator (Dynamic Island), iPhone 12 Pro (notch), verify content does not overlap safe areas, tab bar above home indicator</testIdea>
+      <testIdea ac="7" type="manual">Navigate to Capture tab, verify title, descriptive text, and camera icon visible. Navigate to History tab, verify same pattern with history content</testIdea>
+      <testIdea ac="8" type="command">Run: cd apps/mobile &amp;&amp; npx expo prebuild --platform ios --clean. Verify ios/ created, no android/ directory, open ios/RealityCam.xcworkspace in Xcode</testIdea>
+      <testIdea ac="9" type="command">Run: cd apps/mobile &amp;&amp; npx expo start, press 'i' for iOS Simulator, verify app launches, tab navigation works, no console errors</testIdea>
+      <testIdea ac="10" type="manual">Observe status bar in simulator, verify it shows and does not overlap content, adapts to light/dark mode</testIdea>
+      <testIdea ac="all" type="command">TypeScript check: cd apps/mobile &amp;&amp; npx tsc --noEmit - should complete with no errors</testIdea>
+    </ideas>
+  </tests>
+
+  <implementationNotes>
+    <note type="pattern" title="Tab Layout Enhancement Pattern">
+      From story dev notes - recommended implementation pattern for _layout.tsx:
+      ```typescript
+      import { Tabs } from 'expo-router';
+      import { Ionicons } from '@expo/vector-icons';
+
+      export default function TabLayout() {
+        return (
+          &lt;Tabs
+            screenOptions={{
+              tabBarActiveTintColor: '#007AFF',
+              tabBarInactiveTintColor: '#8E8E93',
+              tabBarStyle: { backgroundColor: '#FFFFFF' },
+              headerStyle: { backgroundColor: '#FFFFFF' },
+              headerTitleStyle: { fontWeight: '600' },
+            }}
+          &gt;
+            &lt;Tabs.Screen
+              name="capture"
+              options={{
+                title: 'Capture',
+                tabBarIcon: ({ color, size }) =&gt; (
+                  &lt;Ionicons name="camera" size={size} color={color} /&gt;
+                ),
+              }}
+            /&gt;
+            &lt;Tabs.Screen
+              name="history"
+              options={{
+                title: 'History',
+                tabBarIcon: ({ color, size }) =&gt; (
+                  &lt;Ionicons name="time" size={size} color={color} /&gt;
+                ),
+              }}
+            /&gt;
+          &lt;/Tabs&gt;
+        );
+      }
+      ```
+    </note>
+    <note type="pattern" title="Safe Area Implementation">
+      Two options for safe area handling:
+      1. SafeAreaView wrapper: &lt;SafeAreaView style={{ flex: 1 }} edges={['top']}&gt;
+      2. Hook for custom handling: const insets = useSafeAreaInsets();
+      Expo Router's Tabs component typically handles bottom safe area for tab bar automatically.
+    </note>
+    <note type="learning" title="Previous Story Learnings from Story 1-3">
+      1. Always verify TypeScript compiles with npx tsc --noEmit
+      2. Keep .env.example and configuration files updated
+      3. Manual verification with specific test steps documented
+      4. Use --clean flag for prebuild to avoid stale artifacts
+    </note>
+    <note type="icon" title="Icon Selection">
+      Recommended Ionicons for iOS consistency:
+      - Capture tab: "camera" (filled) or "camera-outline"
+      - History tab: "time" (filled) or "time-outline"
+      Use filled icons for active state visual weight.
+    </note>
+    <note type="colors" title="Brand Color Constants">
+      Consider creating apps/mobile/constants/colors.ts (optional):
+      ```typescript
+      export const colors = {
+        primary: '#007AFF',        // iOS system blue
+        tabBarActive: '#007AFF',
+        tabBarInactive: '#8E8E93', // iOS system gray
+        background: '#FFFFFF',
+        backgroundDark: '#000000',
+      };
+      ```
+    </note>
+    <note type="prebuild" title="iOS Prebuild Verification Steps">
+      1. cd apps/mobile
+      2. npx expo prebuild --platform ios --clean
+      3. ls -la ios/ (verify directory exists)
+      4. Verify no android/ directory
+      5. open ios/RealityCam.xcworkspace (verify opens in Xcode)
+    </note>
+    <note type="current-state" title="Current Mobile App State">
+      From Story 1-1:
+      - Expo SDK 54.0.25 (package.json shows ~54.0.25)
+      - React Native 0.81.5
+      - Expo Router ~6.0.0
+      - Basic tab navigation exists (Capture, History)
+      - Placeholder screens present
+      - Basic app.config.ts with iOS configuration
+    </note>
+  </implementationNotes>
+</story-context>
