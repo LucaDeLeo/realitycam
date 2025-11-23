@@ -39,6 +39,11 @@
     "react-native-vision-camera": "^4.7.3",
     "zustand": "^5.0.0"
   },
+  "expo": {
+    "autolinking": {
+      "nativeModulesDir": "./modules"
+    }
+  },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@expo/ngrok": "^4.1.0",

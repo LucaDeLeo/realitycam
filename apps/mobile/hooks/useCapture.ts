@@ -19,7 +19,7 @@
  * @see Story 3.4 - Capture Attestation Signature
  */
 
-import { useCallback, useState, useRef } from 'react';
+import { useCallback, useState, useRef, useEffect } from 'react';
 import { Camera } from 'react-native-vision-camera';
 import * as Crypto from 'expo-crypto';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -152,7 +152,14 @@ function parseExifTimestamp(exifDateTime: string | undefined, fallback: number):
 export function useCapture(): UseCaptureReturn {
   // Get depth capture from useLiDAR hook
   // In development mode (Expo Go), LiDAR may not be available
-  const { captureDepthFrame, isReady: isDepthReady, isAvailable: isLiDARAvailable } = useLiDAR();
+  const {
+    captureDepthFrame,
+    isReady: isDepthReady,
+    isAvailable: isLiDARAvailable,
+    startDepthCapture,
+    stopDepthCapture,
+    isCapturing: isDepthCapturing,
+  } = useLiDAR();
 
   // Get location capture from useLocation hook
   const {
@@ -176,11 +183,36 @@ export function useCapture(): UseCaptureReturn {
   // Camera ref for vision-camera takePhoto
   const cameraRef = useRef<Camera | null>(null);
 
+  // Track if depth capture session has been started
+  const depthSessionStarted = useRef(false);
+
   // Derived state
   const isCapturing = state === 'capturing';
   // In development mode, allow capture without LiDAR
   // Camera is ready if we have a camera ref, regardless of LiDAR status
   const isReady = cameraRef.current !== null;
+
+  /**
+   * Start depth capture session when LiDAR is available
+   */
+  useEffect(() => {
+    if (isLiDARAvailable && !depthSessionStarted.current) {
+      console.log('[useCapture] Starting LiDAR depth capture session...');
+      depthSessionStarted.current = true;
+      startDepthCapture().catch((err) => {
+        console.error('[useCapture] Failed to start depth capture:', err);
+        depthSessionStarted.current = false;
+      });
+    }
+
+    return () => {
+      if (depthSessionStarted.current) {
+        console.log('[useCapture] Stopping LiDAR depth capture session...');
+        stopDepthCapture().catch(() => {});
+        depthSessionStarted.current = false;
+      }
+    };
+  }, [isLiDARAvailable, startDepthCapture, stopDepthCapture]);
 
   /**
    * Register camera ref
@@ -272,8 +304,8 @@ export function useCapture(): UseCaptureReturn {
         throw captureError;
       }
 
-      // vision-camera returns path without 'file://' prefix
-      const photoUri = `file://${photo.path}`;
+      // vision-camera may return path with or without 'file://' prefix depending on version
+      const photoUri = photo.path.startsWith('file://') ? photo.path : `file://${photo.path}`;
 
       // Capture a timestamp as close as possible to when the photo finished writing
       const photoCapturedAt = Date.now();
@@ -287,9 +319,13 @@ export function useCapture(): UseCaptureReturn {
 
       // Extract depth result (required, but create mock if LiDAR unavailable)
       let depthFrame: DepthFrame;
+      let usedMockDepth = false;
       if (depthResult.status === 'rejected' || !isLiDARAvailable || depthResult.value === null) {
         // Create mock depth frame for development/testing without LiDAR
-        console.log('[useCapture] LiDAR unavailable, creating mock depth frame');
+        const reason = !isLiDARAvailable ? 'LiDAR unavailable' :
+          depthResult.status === 'rejected' ? 'depth capture failed' : 'no depth data';
+        console.log(`[useCapture] Creating mock depth frame (${reason})`);
+        usedMockDepth = true;
         const mockDepthData = new Float32Array(256 * 192).fill(2.0); // 2 meters default depth
         // Convert Float32Array to Uint8Array, then to base64
         const uint8Array = new Uint8Array(mockDepthData.buffer);
@@ -307,10 +343,12 @@ export function useCapture(): UseCaptureReturn {
           },
         };
       } else if (depthResult.status === 'fulfilled' && depthResult.value) {
+        console.log('[useCapture] Real LiDAR depth frame captured');
         depthFrame = depthResult.value;
       } else {
         // Fallback: create mock if we somehow get here
         console.log('[useCapture] Unexpected depth result, creating mock depth frame');
+        usedMockDepth = true;
         const mockDepthData = new Float32Array(256 * 192).fill(2.0);
         const uint8Array = new Uint8Array(mockDepthData.buffer);
         const mockDepthBase64 = uint8ArrayToBase64(uint8Array);
@@ -345,8 +383,8 @@ export function useCapture(): UseCaptureReturn {
       const syncDeltaMs = Math.abs(photoTime - depthFrame.timestamp);
 
       // Validate sync window (skip validation for mock depth frames)
-      // Only validate if we have real LiDAR data
-      if (isLiDARAvailable && syncDeltaMs > MAX_SYNC_DELTA_MS) {
+      // Only validate if we have REAL LiDAR data, not mock
+      if (!usedMockDepth && syncDeltaMs > MAX_SYNC_DELTA_MS) {
         const captureError: CaptureError = {
           code: 'SYNC_TIMEOUT',
           message: `Photo and depth capture timing mismatch (${syncDeltaMs}ms). Please try again.`,

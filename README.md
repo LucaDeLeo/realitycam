@@ -131,6 +131,43 @@ Opens at http://localhost:3000
 |----------|-------------|---------|
 | `NEXT_PUBLIC_API_URL` | Backend API URL | `http://localhost:8080` |
 
+## Hardware Attestation (Why captures show "Unverified")
+
+In development builds, captures will display as **"Unverified"** on the verification page. This is expected and correct behavior.
+
+### Why This Happens
+
+RealityCam uses Apple's **DCAppAttest** (App Attest) for hardware-backed device verification. This cryptographic attestation:
+
+1. Proves the capture came from a genuine Apple device with Secure Enclave
+2. Binds each photo to the specific device that captured it
+3. Prevents spoofing or tampering with device identity
+
+**However, App Attest only works with App Store/TestFlight distribution:**
+
+- Requires proper Apple provisioning profile (not development signing)
+- Certificate chain must anchor to Apple's App Attest Root CA
+- Development builds cannot generate valid attestation
+
+### What This Means for Demo
+
+| Build Type | Attestation Status | Captures Marked |
+|------------|-------------------|-----------------|
+| Development (Xcode) | Fails | "Unverified" |
+| TestFlight | Works | "Verified" |
+| App Store | Works | "Verified" |
+
+The system is working correctly - it accurately identifies that hardware attestation is not available in development mode. In production with proper App Store distribution, captures would show as "Verified" with full cryptographic proof.
+
+### Enabling Full Attestation
+
+To see verified captures, distribute via TestFlight:
+
+1. Archive the app in Xcode
+2. Upload to App Store Connect
+3. Enable TestFlight testing (~30 min processing)
+4. Install TestFlight build on device
+
 ## Troubleshooting
 
 ### Docker Services Not Starting

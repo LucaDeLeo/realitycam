@@ -235,15 +235,20 @@ export async function uploadCapture(
   capture: ProcessedCapture,
   onProgress?: UploadProgressCallback
 ): Promise<UploadOutcome> {
-  console.log('[uploadService] Starting upload for capture:', capture.id);
+  console.log('[uploadService] ========== UPLOAD START ==========');
+  console.log('[uploadService] Capture ID:', capture.id);
+  console.log('[uploadService] Photo URI:', capture.photoUri);
+  console.log('[uploadService] Depth map length:', capture.compressedDepthMap?.length || 0);
+  console.log('[uploadService] API URL:', API_BASE_URL);
 
   try {
     // Build metadata JSON
     const metadataJson = JSON.stringify(capture.metadata);
+    console.log('[uploadService] Metadata:', metadataJson.substring(0, 200) + '...');
 
     // Build auth headers
     const authHeaders = await buildDeviceAuthHeaders(metadataJson);
-    console.log('[uploadService] Auth headers built for device:', authHeaders['X-Device-Id']);
+    console.log('[uploadService] Auth headers:', JSON.stringify(authHeaders, null, 2));
 
     // Create FormData using React Native compatible format
     // RN FormData expects {uri, type, name} objects for files, not Blobs
@@ -258,9 +263,12 @@ export async function uploadCapture(
 
     // Save depth_map to temp file for FormData (RN doesn't support Blob from ArrayBuffer)
     const depthTempPath = `${FileSystem.cacheDirectory}depth_${capture.id}.gz`;
+    console.log('[uploadService] Writing depth to:', depthTempPath);
     await FileSystem.writeAsStringAsync(depthTempPath, capture.compressedDepthMap, {
       encoding: 'base64',
     });
+    const depthInfo = await FileSystem.getInfoAsync(depthTempPath);
+    console.log('[uploadService] Depth file created:', depthInfo);
     formData.append('depth_map', {
       uri: depthTempPath,
       type: 'application/gzip',
@@ -269,16 +277,23 @@ export async function uploadCapture(
 
     // Save metadata to temp file for FormData
     const metadataTempPath = `${FileSystem.cacheDirectory}metadata_${capture.id}.json`;
+    console.log('[uploadService] Writing metadata to:', metadataTempPath);
     await FileSystem.writeAsStringAsync(metadataTempPath, metadataJson, {
       encoding: 'utf8',
     });
+    const metaInfo = await FileSystem.getInfoAsync(metadataTempPath);
+    console.log('[uploadService] Metadata file created:', metaInfo);
     formData.append('metadata', {
       uri: metadataTempPath,
       type: 'application/json',
       name: 'metadata.json',
     } as unknown as Blob);
 
-    console.log('[uploadService] FormData prepared, starting upload...');
+    // Check photo file exists
+    const photoInfo = await FileSystem.getInfoAsync(capture.photoUri);
+    console.log('[uploadService] Photo file info:', photoInfo);
+
+    console.log('[uploadService] FormData prepared, starting fetch to:', `${API_BASE_URL}/api/v1/captures`);
 
     // Report initial progress
     onProgress?.(5);
@@ -288,6 +303,7 @@ export async function uploadCapture(
     const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
 
     try {
+      console.log('[uploadService] Sending fetch request...');
       // Make upload request
       const response = await fetch(`${API_BASE_URL}/api/v1/captures`, {
         method: 'POST',
@@ -300,6 +316,12 @@ export async function uploadCapture(
       });
 
       clearTimeout(timeoutId);
+      console.log('[uploadService] Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries()),
+      });
 
       // Report upload complete, waiting for response
       onProgress?.(90);
@@ -345,6 +367,10 @@ export async function uploadCapture(
       };
     } catch (fetchError) {
       clearTimeout(timeoutId);
+      console.error('[uploadService] ========== FETCH ERROR ==========');
+      console.error('[uploadService] Error type:', fetchError?.constructor?.name);
+      console.error('[uploadService] Error message:', fetchError instanceof Error ? fetchError.message : String(fetchError));
+      console.error('[uploadService] Full error:', fetchError);
 
       // Handle abort (timeout)
       if (fetchError instanceof Error && fetchError.name === 'AbortError') {
