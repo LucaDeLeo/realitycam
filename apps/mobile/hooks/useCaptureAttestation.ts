@@ -16,7 +16,6 @@
  */
 
 import { useCallback, useState } from 'react';
-import * as AppIntegrity from '@expo/app-integrity';
 import * as Crypto from 'expo-crypto';
 import type {
   AssertionMetadata,
@@ -25,6 +24,14 @@ import type {
   CaptureAssertionErrorCode,
 } from '@realitycam/shared';
 import { useDeviceStore } from '../store/deviceStore';
+
+// Safe import of AppIntegrity module (handles Expo Go case)
+let AppIntegrity: typeof import('@expo/app-integrity') | null = null;
+try {
+  AppIntegrity = require('@expo/app-integrity');
+} catch (error) {
+  console.warn('[useCaptureAttestation] @expo/app-integrity not available (likely Expo Go)');
+}
 
 /**
  * useCaptureAttestation hook return type
@@ -155,6 +162,20 @@ export function useCaptureAttestation(): UseCaptureAttestationReturn {
         );
 
         // Step 2: Generate assertion using @expo/app-integrity
+        if (!AppIntegrity) {
+          console.warn(
+            '[useCaptureAttestation] AppIntegrity module not available (likely Expo Go). Skipping assertion.'
+          );
+          setError(
+            createAssertionError(
+              'MODULE_UNAVAILABLE',
+              'Device attestation module not available. Capture will proceed without hardware verification.'
+            )
+          );
+          setIsGenerating(false);
+          return null;
+        }
+
         console.log('[useCaptureAttestation] Calling generateAssertionAsync...');
         const assertionResult = await AppIntegrity.generateAssertionAsync(
           keyId,

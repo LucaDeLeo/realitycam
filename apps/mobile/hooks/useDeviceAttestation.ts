@@ -21,7 +21,6 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import * as AppIntegrity from '@expo/app-integrity';
 import type { AttestationStatus } from '@realitycam/shared';
 import { useDeviceStore } from '../store/deviceStore';
 import {
@@ -30,6 +29,14 @@ import {
   ApiError,
   API_ERROR_CODES,
 } from '../services/api';
+
+// Safe import of AppIntegrity module (handles Expo Go case)
+let AppIntegrity: typeof import('@expo/app-integrity') | null = null;
+try {
+  AppIntegrity = require('@expo/app-integrity');
+} catch (error) {
+  // Module not available - likely Expo Go
+}
 
 /**
  * Attestation timeout in milliseconds (5 seconds as per spec)
@@ -101,6 +108,12 @@ async function attestWithTimeout(
     const timeoutId = setTimeout(() => {
       reject(new Error(ATTESTATION_ERROR_MESSAGES.ATTESTATION_TIMEOUT));
     }, ATTESTATION_TIMEOUT_MS);
+
+    if (!AppIntegrity) {
+      clearTimeout(timeoutId);
+      reject(new Error('AppIntegrity module not available'));
+      return;
+    }
 
     // Convert Uint8Array to string for the API (base64 encode the challenge bytes)
     // The @expo/app-integrity API expects the challenge as a string

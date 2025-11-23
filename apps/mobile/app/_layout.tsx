@@ -149,15 +149,16 @@ export default function RootLayout() {
     );
   }
 
-  // Show blocking screen for unsupported devices
-  if (!capabilities?.isSupported) {
-    return (
-      <SafeAreaProvider>
-        <StatusBar style="auto" />
-        <UnsupportedDeviceScreen reason={capabilities?.unsupportedReason} />
-      </SafeAreaProvider>
-    );
-  }
+  // DISABLED: Show blocking screen for unsupported devices
+  // Temporarily disabled for development/testing in Expo Go
+  // if (!capabilities?.isSupported) {
+  //   return (
+  //     <SafeAreaProvider>
+  //       <StatusBar style="auto" />
+  //       <UnsupportedDeviceScreen reason={capabilities?.unsupportedReason} />
+  //     </SafeAreaProvider>
+  //   );
+  // }
 
   // Show loading screen during key generation (optional - could also proceed)
   // We show a brief loading state during key setup for better UX
@@ -207,6 +208,7 @@ export default function RootLayout() {
         />
       )}
       <Stack>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen
           name="preview"

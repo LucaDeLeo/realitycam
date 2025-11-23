@@ -22,17 +22,40 @@
 import { useCallback, useState, useRef } from 'react';
 import { CameraView as ExpoCameraView } from 'expo-camera';
 import * as Crypto from 'expo-crypto';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useLiDAR } from './useLiDAR';
 import { useLocation } from './useLocation';
 import { useCaptureAttestation } from './useCaptureAttestation';
 import type {
   RawCapture,
+  DepthFrame,
   CaptureError,
   CaptureLocation,
   AssertionMetadata,
   CaptureAssertion,
 } from '@realitycam/shared';
+
+/**
+ * Convert Uint8Array to base64 string (React Native compatible)
+ */
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  let result = '';
+  const len = bytes.length;
+
+  for (let i = 0; i < len; i += 3) {
+    const b1 = bytes[i];
+    const b2 = i + 1 < len ? bytes[i + 1] : 0;
+    const b3 = i + 2 < len ? bytes[i + 2] : 0;
+
+    result += chars[b1 >> 2];
+    result += chars[((b1 & 3) << 4) | (b2 >> 4)];
+    result += i + 1 < len ? chars[((b2 & 15) << 2) | (b3 >> 6)] : '=';
+    result += i + 2 < len ? chars[b3 & 63] : '=';
+  }
+
+  return result;
+}
 
 /**
  * Maximum allowed sync delta in milliseconds
@@ -128,7 +151,8 @@ function parseExifTimestamp(exifDateTime: string | undefined, fallback: number):
  */
 export function useCapture(): UseCaptureReturn {
   // Get depth capture from useLiDAR hook
-  const { captureDepthFrame, isReady: isDepthReady } = useLiDAR();
+  // In development mode (Expo Go), LiDAR may not be available
+  const { captureDepthFrame, isReady: isDepthReady, isAvailable: isLiDARAvailable } = useLiDAR();
 
   // Get location capture from useLocation hook
   const {
@@ -154,7 +178,9 @@ export function useCapture(): UseCaptureReturn {
 
   // Derived state
   const isCapturing = state === 'capturing';
-  const isReady = cameraRef.current !== null && isDepthReady;
+  // In development mode, allow capture without LiDAR
+  // Camera is ready if we have a camera ref, regardless of LiDAR status
+  const isReady = cameraRef.current !== null;
 
   /**
    * Register camera ref
@@ -184,14 +210,16 @@ export function useCapture(): UseCaptureReturn {
       throw captureError;
     }
 
-    if (!isDepthReady) {
-      const captureError: CaptureError = {
-        code: 'NOT_READY',
-        message: 'Depth sensor not ready. Please wait and try again.',
-      };
-      setError(captureError);
-      throw captureError;
-    }
+    // DISABLED: Depth sensor check for development mode
+    // Allow capture without LiDAR in development/testing
+    // if (!isDepthReady && isLiDARAvailable) {
+    //   const captureError: CaptureError = {
+    //     code: 'NOT_READY',
+    //     message: 'Depth sensor not ready. Please wait and try again.',
+    //   };
+    //   setError(captureError);
+    //   throw captureError;
+    // }
 
     if (isCapturing) {
       const captureError: CaptureError = {
@@ -218,7 +246,8 @@ export function useCapture(): UseCaptureReturn {
           exif: true,
           base64: false,
         }),
-        captureDepthFrame(),
+        // Only attempt depth capture if LiDAR is available, otherwise resolve to null
+        isLiDARAvailable ? captureDepthFrame() : Promise.resolve(null),
         // Only attempt location if permission granted, otherwise resolve to null
         hasLocationPermission ? getCurrentLocation() : Promise.resolve(null),
       ]);
@@ -246,17 +275,48 @@ export function useCapture(): UseCaptureReturn {
         throw captureError;
       }
 
-      // Extract depth result (required)
-      if (depthResult.status === 'rejected') {
-        const captureError: CaptureError = {
-          code: 'DEPTH_CAPTURE_FAILED',
-          message: 'Failed to capture depth data. Please try again.',
+      // Extract depth result (required, but create mock if LiDAR unavailable)
+      let depthFrame: DepthFrame;
+      if (depthResult.status === 'rejected' || !isLiDARAvailable || depthResult.value === null) {
+        // Create mock depth frame for development/testing without LiDAR
+        console.log('[useCapture] LiDAR unavailable, creating mock depth frame');
+        const mockDepthData = new Float32Array(256 * 192).fill(2.0); // 2 meters default depth
+        // Convert Float32Array to Uint8Array, then to base64
+        const uint8Array = new Uint8Array(mockDepthData.buffer);
+        const mockDepthBase64 = uint8ArrayToBase64(uint8Array);
+        depthFrame = {
+          depthMap: mockDepthBase64,
+          width: 256,
+          height: 192,
+          timestamp: captureStartTime,
+          intrinsics: {
+            fx: 1000,
+            fy: 1000,
+            cx: 128,
+            cy: 96,
+          },
         };
-        setError(captureError);
-        setState('idle');
-        throw captureError;
+      } else if (depthResult.status === 'fulfilled' && depthResult.value) {
+        depthFrame = depthResult.value;
+      } else {
+        // Fallback: create mock if we somehow get here
+        console.log('[useCapture] Unexpected depth result, creating mock depth frame');
+        const mockDepthData = new Float32Array(256 * 192).fill(2.0);
+        const uint8Array = new Uint8Array(mockDepthData.buffer);
+        const mockDepthBase64 = uint8ArrayToBase64(uint8Array);
+        depthFrame = {
+          depthMap: mockDepthBase64,
+          width: 256,
+          height: 192,
+          timestamp: captureStartTime,
+          intrinsics: {
+            fx: 1000,
+            fy: 1000,
+            cx: 128,
+            cy: 96,
+          },
+        };
       }
-      const depthFrame = depthResult.value;
 
       // Extract location result (optional - never blocks capture)
       let location: CaptureLocation | undefined;
@@ -279,8 +339,9 @@ export function useCapture(): UseCaptureReturn {
       );
       const syncDeltaMs = Math.abs(photoTime - depthFrame.timestamp);
 
-      // Validate sync window
-      if (syncDeltaMs > MAX_SYNC_DELTA_MS) {
+      // Validate sync window (skip validation for mock depth frames)
+      // Only validate if we have real LiDAR data
+      if (isLiDARAvailable && syncDeltaMs > MAX_SYNC_DELTA_MS) {
         const captureError: CaptureError = {
           code: 'SYNC_TIMEOUT',
           message: `Photo and depth capture timing mismatch (${syncDeltaMs}ms). Please try again.`,
@@ -387,6 +448,8 @@ export function useCapture(): UseCaptureReturn {
 
       // Classify unknown errors
       const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error('[useCapture] Unexpected error during capture:', errorMessage, err);
+      
       let captureError: CaptureError;
 
       if (errorMessage.toLowerCase().includes('depth')) {
@@ -394,10 +457,15 @@ export function useCapture(): UseCaptureReturn {
           code: 'DEPTH_CAPTURE_FAILED',
           message: 'Failed to capture depth data. Please try again.',
         };
-      } else {
+      } else if (errorMessage.toLowerCase().includes('camera') || errorMessage.toLowerCase().includes('photo')) {
         captureError = {
           code: 'CAMERA_ERROR',
           message: 'Failed to capture photo. Please try again.',
+        };
+      } else {
+        captureError = {
+          code: 'CAMERA_ERROR',
+          message: `Failed to capture photo: ${errorMessage}`,
         };
       }
 

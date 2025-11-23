@@ -15,7 +15,7 @@
 
 import { useCallback, useState } from 'react';
 import * as Crypto from 'expo-crypto';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import pako from 'pako';
 
 import { useDeviceStore } from '../store/deviceStore';

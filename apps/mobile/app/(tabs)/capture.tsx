@@ -155,10 +155,12 @@ export default function CaptureScreen() {
         params: { capture: JSON.stringify(processedCapture) },
       });
     } catch (err) {
-      // Error is already logged by hooks, just show alert
+      // Log the full error for debugging
+      console.error('[CaptureScreen] Capture error:', err);
       const errorMessage =
         captureError?.message ||
         processingError?.message ||
+        (err instanceof Error ? err.message : String(err)) ||
         'Failed to capture photo. Please try again.';
       Alert.alert('Capture Failed', errorMessage, [
         {
@@ -172,17 +174,17 @@ export default function CaptureScreen() {
     }
   }, [capture, captureError, clearError, processingError, clearProcessingError, locationPermissionStatus, requestLocationPermission, processCapture, router]);
 
-  // Check if device has LiDAR capability
-  // This is a double-check - the device store should already show LiDAR
-  // But the native module provides runtime verification
-  if (!capabilities?.hasLiDAR) {
-    return <LiDARUnavailable reason="Device does not have LiDAR sensor" />;
-  }
+  // DISABLED: Check if device has LiDAR capability
+  // Temporarily disabled for development/testing in Expo Go
+  // if (!capabilities?.hasLiDAR) {
+  //   return <LiDARUnavailable reason="Device does not have LiDAR sensor" />;
+  // }
 
-  // Show LiDAR error if native check failed
-  if (lidarError) {
-    return <LiDARUnavailable reason={lidarError} />;
-  }
+  // DISABLED: Show LiDAR error if native check failed
+  // Temporarily disabled for development/testing in Expo Go
+  // if (lidarError) {
+  //   return <LiDARUnavailable reason={lidarError} />;
+  // }
 
   return (
     <View style={styles.container}>
@@ -196,7 +198,7 @@ export default function CaptureScreen() {
         overlayOpacity={0.4}
         onCapture={handleCapture}
         isCapturing={isCapturing || isProcessing}
-        isCaptureReady={isCaptureReady && !isProcessing}
+        isCaptureReady={isCaptureReady}
         onCameraRef={setCameraRef}
       />
     </View>

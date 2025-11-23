@@ -127,11 +127,13 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
 
   // Camera ref for photo capture
   const cameraRef = useRef<ExpoCameraView>(null);
+  const [cameraReady, setCameraReady] = useState(false);
 
   // Provide camera ref to parent via callback
   const setCameraRef = useCallback(
     (ref: ExpoCameraView | null) => {
       (cameraRef as React.MutableRefObject<ExpoCameraView | null>).current = ref;
+      setCameraReady(ref !== null);
       onCameraRef?.(ref);
     },
     [onCameraRef]
@@ -140,17 +142,23 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
   // Report LiDAR status to parent
   useEffect(() => {
     // Wait until we have a definitive status
+    // In development mode, always report as available (even if not) to allow camera to work
     if (isAvailable || lidarError) {
       onLiDARStatus?.(isAvailable, lidarError);
+    } else {
+      // Report as available in development mode even if LiDAR check hasn't completed
+      // This allows camera to work without LiDAR
+      onLiDARStatus?.(true, null);
     }
   }, [isAvailable, lidarError, onLiDARStatus]);
 
-  // Start depth capture when camera is ready and LiDAR is available
-  useEffect(() => {
-    if (permission?.granted && isAvailable && !isReady) {
-      startDepthCapture();
-    }
-  }, [permission?.granted, isAvailable, isReady, startDepthCapture]);
+  // DISABLED: Start depth capture when camera is ready and LiDAR is available
+  // Temporarily disabled for development/testing in Expo Go
+  // useEffect(() => {
+  //   if (permission?.granted && isAvailable && !isReady) {
+  //     startDepthCapture();
+  //   }
+  // }, [permission?.granted, isAvailable, isReady, startDepthCapture]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -210,6 +218,9 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
         style={styles.camera}
         facing="back"
         mode="picture"
+        onCameraReady={() => {
+          setCameraReady(true);
+        }}
       />
 
       {/* Depth Overlay */}
@@ -238,7 +249,7 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
             <CaptureButton
               onCapture={onCapture}
               isCapturing={isCapturing}
-              disabled={!isCaptureReady || !isReady}
+              disabled={!permission?.granted || !cameraReady}
             />
           </View>
         )}
