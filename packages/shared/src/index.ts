@@ -44,3 +44,16 @@ export type {
   AttestationStatus,
   ChallengeResponse,
 } from './types/device';
+
+// Upload Queue Types (Story 4.2)
+export type {
+  QueuedCaptureStatus,
+  UploadErrorCode,
+  UploadError,
+  QueuedCapture,
+  UploadQueueState,
+  UploadQueueActions,
+  CaptureUploadResponse,
+  RetryConfig,
+} from './types/upload';
+export { DEFAULT_RETRY_CONFIG } from './types/upload';

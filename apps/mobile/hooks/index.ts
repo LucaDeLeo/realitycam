@@ -16,8 +16,14 @@ export { useLocation } from './useLocation';
 export { useCaptureAttestation } from './useCaptureAttestation';
 export { useCaptureProcessing } from './useCaptureProcessing';
 
+// Upload hooks (Story 4.2)
+export { useNetworkStatus } from './useNetworkStatus';
+export { useUploadQueue, useUploadQueueStatus } from './useUploadQueue';
+
 // Re-export types for convenience
 export type { UseCaptureReturn } from './useCapture';
 export type { UseLocationReturn } from './useLocation';
 export type { UseCaptureAttestationReturn } from './useCaptureAttestation';
 export type { UseCaptureProcessingReturn } from './useCaptureProcessing';
+export type { NetworkStatus, UseNetworkStatusReturn } from './useNetworkStatus';
+export type { UseUploadQueueReturn } from './useUploadQueue';
