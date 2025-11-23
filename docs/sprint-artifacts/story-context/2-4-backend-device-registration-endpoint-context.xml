@@ -1,0 +1,755 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context id="2-4-backend-device-registration-endpoint" version="1.0">
+  <metadata>
+    <epicId>2</epicId>
+    <storyId>2-4-backend-device-registration-endpoint</storyId>
+    <title>Backend Device Registration Endpoint</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-23</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/2-4-backend-device-registration-endpoint.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>mobile app</asA>
+    <iWant>to register my device with the backend by sending device information, public key, and attestation object</iWant>
+    <soThat>the backend can store my device identity for future attestation verification and authenticated API requests</soThat>
+    <acceptanceCriteria>
+      <criterion id="AC-1">POST /api/v1/devices/register Endpoint Exists</criterion>
+      <criterion id="AC-2">Request Validation - Required Fields</criterion>
+      <criterion id="AC-3">Request Validation - Base64 Decoding</criterion>
+      <criterion id="AC-4">Conflict Detection - Duplicate Device</criterion>
+      <criterion id="AC-5">Successful Registration - Device Created</criterion>
+      <criterion id="AC-6">Successful Registration - Response Format</criterion>
+      <criterion id="AC-7">Database Transaction Safety</criterion>
+      <criterion id="AC-8">Request Type Definitions</criterion>
+      <criterion id="AC-9">Logging and Observability</criterion>
+      <criterion id="AC-10">Request ID in Response</criterion>
+    </acceptanceCriteria>
+    <tasks>
+      <task id="1" ac="8">
+        <name>Define Request/Response Types</name>
+        <subtasks>
+          <subtask id="1.1">Create DeviceRegistrationRequest struct in backend/src/routes/devices.rs</subtask>
+          <subtask id="1.2">Add #[derive(Debug, Deserialize)] to request struct</subtask>
+          <subtask id="1.3">Create DeviceRegistrationResponse struct with device_id, attestation_level, has_lidar</subtask>
+          <subtask id="1.4">Add #[derive(Debug, Serialize)] to response struct</subtask>
+          <subtask id="1.5">Create or update types in backend/src/types/mod.rs if needed for reuse</subtask>
+        </subtasks>
+      </task>
+      <task id="2" ac="4">
+        <name>Add DEVICE_ALREADY_REGISTERED Error Code</name>
+        <subtasks>
+          <subtask id="2.1">Add DEVICE_ALREADY_REGISTERED constant to backend/src/error.rs codes module</subtask>
+          <subtask id="2.2">Add DeviceAlreadyRegistered variant to ApiError enum</subtask>
+          <subtask id="2.3">Implement code() mapping returning DEVICE_ALREADY_REGISTERED</subtask>
+          <subtask id="2.4">Implement status_code() mapping returning StatusCode::CONFLICT (409)</subtask>
+          <subtask id="2.5">Implement safe_message() returning user-friendly message</subtask>
+        </subtasks>
+      </task>
+      <task id="3" ac="2,3">
+        <name>Implement Request Validation</name>
+        <subtasks>
+          <subtask id="3.1">Create validate_registration_request() function</subtask>
+          <subtask id="3.2">Validate all required fields are present and non-empty</subtask>
+          <subtask id="3.3">Validate platform is "ios" (only supported platform for MVP)</subtask>
+          <subtask id="3.4">Validate public_key is valid base64 encoding</subtask>
+          <subtask id="3.5">Validate attestation_object is valid base64 encoding</subtask>
+          <subtask id="3.6">Return ApiError::Validation with specific field errors</subtask>
+        </subtasks>
+      </task>
+      <task id="4" ac="5,7">
+        <name>Implement Database Operations</name>
+        <subtasks>
+          <subtask id="4.1">Create insert_device() function in backend/src/routes/devices.rs</subtask>
+          <subtask id="4.2">Use sqlx::query! or sqlx::query_as! for compile-time checked query</subtask>
+          <subtask id="4.3">INSERT INTO devices with all required fields</subtask>
+          <subtask id="4.4">Handle unique constraint violation on attestation_key_id</subtask>
+          <subtask id="4.5">Return the created device record or appropriate error</subtask>
+        </subtasks>
+      </task>
+      <task id="5" ac="4">
+        <name>Implement Conflict Detection</name>
+        <subtasks>
+          <subtask id="5.1">Check if device with same attestation_key_id exists before insert</subtask>
+          <subtask id="5.2">Or catch PostgreSQL unique constraint violation (error code 23505)</subtask>
+          <subtask id="5.3">Map constraint violation to ApiError::DeviceAlreadyRegistered</subtask>
+          <subtask id="5.4">Return HTTP 409 with appropriate error response</subtask>
+        </subtasks>
+      </task>
+      <task id="6" ac="1,5,6,10">
+        <name>Implement Registration Handler</name>
+        <subtasks>
+          <subtask id="6.1">Update register_device() handler in backend/src/routes/devices.rs</subtask>
+          <subtask id="6.2">Add State&lt;PgPool&gt; extractor for database access</subtask>
+          <subtask id="6.3">Add Extension&lt;Uuid&gt; extractor for request ID</subtask>
+          <subtask id="6.4">Add Json&lt;DeviceRegistrationRequest&gt; extractor for request body</subtask>
+          <subtask id="6.5">Call validation function</subtask>
+          <subtask id="6.6">Decode base64 fields to bytes</subtask>
+          <subtask id="6.7">Call database insert function</subtask>
+          <subtask id="6.8">Return ApiResponse::new() with DeviceRegistrationResponse on success</subtask>
+          <subtask id="6.9">Return appropriate error responses on failure</subtask>
+        </subtasks>
+      </task>
+      <task id="7" ac="1">
+        <name>Update Router Configuration</name>
+        <subtasks>
+          <subtask id="7.1">Update devices::router() to accept and pass PgPool state</subtask>
+          <subtask id="7.2">Ensure route handler receives database pool via state extractor</subtask>
+          <subtask id="7.3">Update routes/mod.rs to pass pool to devices router</subtask>
+        </subtasks>
+      </task>
+      <task id="8" ac="9">
+        <name>Add Logging</name>
+        <subtasks>
+          <subtask id="8.1">Add tracing::info! for successful registration with device_id, model</subtask>
+          <subtask id="8.2">Add tracing::warn! for validation failures</subtask>
+          <subtask id="8.3">Add tracing::error! for database errors (sanitized)</subtask>
+          <subtask id="8.4">Include request_id in all log spans</subtask>
+        </subtasks>
+      </task>
+      <task id="9" ac="all">
+        <name>Testing and Verification</name>
+        <subtasks>
+          <subtask id="9.1">Verify cargo build succeeds</subtask>
+          <subtask id="9.2">Verify cargo clippy passes without errors</subtask>
+          <subtask id="9.3">Test successful registration with curl</subtask>
+          <subtask id="9.4">Test validation errors (missing fields, invalid base64)</subtask>
+          <subtask id="9.5">Test conflict detection (duplicate device_id)</subtask>
+          <subtask id="9.6">Verify database record created correctly</subtask>
+          <subtask id="9.7">Verify response format matches AC-6</subtask>
+          <subtask id="9.8">Verify request ID propagation</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <epicContext>
+    <epicId>2</epicId>
+    <epicTitle>Device Registration and Hardware Attestation</epicTitle>
+    <epicGoal>Enable iPhone Pro devices to register with the backend using hardware attestation (DCAppAttest), establishing a trusted device identity for future authenticated API requests.</epicGoal>
+    <techSpecPath>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-2.md</techSpecPath>
+    <relatedAcs>
+      <ac id="AC-2.5.1">POST /api/v1/devices/register accepts device registration requests</ac>
+      <ac id="AC-2.5.8">Device registration stores attestation_key_id in devices table</ac>
+      <ac id="AC-2.5.9">Duplicate device_id returns 409 Conflict</ac>
+      <ac id="AC-2.5.10">Registration response includes device_id and attestation_level</ac>
+    </relatedAcs>
+  </epicContext>
+
+  <documentationArtifacts>
+    <artifact type="prd" relevance="high">
+      <path>docs/prd.md</path>
+      <description>Product requirements document defining MVP scope, API endpoints, device registration flow</description>
+      <relevantSections>
+        <section>FR43 - Device registration stores attestation key ID and capability flags</section>
+        <section>API Endpoints (MVP) - POST /api/v1/devices/register</section>
+        <section>Authentication Model (MVP) - Device-based auth pattern</section>
+      </relevantSections>
+    </artifact>
+    <artifact type="architecture" relevance="high">
+      <path>docs/architecture.md</path>
+      <description>Architecture document defining API response formats, error codes, database schema, and implementation patterns</description>
+      <relevantSections>
+        <section>API Contracts - Device Registration request/response format</section>
+        <section>Implementation Patterns - API Response Format with data/meta structure</section>
+        <section>Error Codes - VALIDATION_ERROR (400), CONFLICT (409)</section>
+        <section>Data Architecture - devices table schema</section>
+        <section>ADR-005 - Device-Based Authentication (No Tokens)</section>
+        <section>ADR-007 - @expo/app-integrity for DCAppAttest</section>
+      </relevantSections>
+    </artifact>
+    <artifact type="story" relevance="high">
+      <path>docs/sprint-artifacts/stories/2-4-backend-device-registration-endpoint.md</path>
+      <description>The story being implemented with full acceptance criteria and task breakdown</description>
+    </artifact>
+    <artifact type="related-story" relevance="medium">
+      <path>docs/sprint-artifacts/stories/1-2-database-schema-migrations.md</path>
+      <description>Database schema story that created the devices table this story writes to</description>
+    </artifact>
+    <artifact type="related-story" relevance="medium">
+      <path>docs/sprint-artifacts/stories/1-3-backend-api-skeleton.md</path>
+      <description>Backend skeleton that established error handling, routing, and middleware patterns</description>
+    </artifact>
+  </documentationArtifacts>
+
+  <existingCodeInterfaces>
+    <interface type="route-handler" relevance="high">
+      <path>backend/src/routes/devices.rs</path>
+      <description>Current device routes with 501 stub implementation. This story replaces the register_device stub with full implementation.</description>
+      <currentState>Returns 501 Not Implemented for both /challenge and /register routes</currentState>
+      <requiredChanges>
+        <change>Add DeviceRegistrationRequest struct with device_id, public_key, attestation_object, platform, model, has_lidar fields</change>
+        <change>Add DeviceRegistrationResponse struct with device_id, attestation_level, has_lidar fields</change>
+        <change>Implement register_device handler with State&lt;PgPool&gt; extractor</change>
+        <change>Add validation function for request fields</change>
+        <change>Add insert_device database function</change>
+        <change>Update router() to accept state</change>
+      </requiredChanges>
+      <codeSnippet><![CDATA[
+//! Device registration routes
+//!
+//! Stub implementations for device challenge and registration endpoints.
+
+use axum::{
+    extract::Extension,
+    routing::{get, post},
+    Json, Router,
+};
+use uuid::Uuid;
+
+use crate::error::ApiError;
+use crate::types::ApiErrorResponse;
+
+/// Creates the device routes router.
+pub fn router() -> Router {
+    Router::new()
+        .route("/challenge", get(get_challenge))
+        .route("/register", post(register_device))
+}
+
+/// POST /api/v1/devices/register - Register a new device
+///
+/// Registers a device with its attestation data.
+/// Currently returns 501 Not Implemented.
+async fn register_device(
+    Extension(request_id): Extension<Uuid>,
+) -> (axum::http::StatusCode, Json<ApiErrorResponse>) {
+    let error = ApiError::NotImplemented;
+    let response = ApiErrorResponse::new(error.code(), error.safe_message(), request_id);
+    (error.status_code(), Json(response))
+}
+]]></codeSnippet>
+    </interface>
+    <interface type="error-handling" relevance="high">
+      <path>backend/src/error.rs</path>
+      <description>API error handling module with error codes and HTTP status mappings. Needs new DEVICE_ALREADY_REGISTERED error code.</description>
+      <currentState>Has error codes: NOT_IMPLEMENTED, VALIDATION_ERROR, INTERNAL_ERROR, ATTESTATION_FAILED, DEVICE_NOT_FOUND, etc. Missing DEVICE_ALREADY_REGISTERED.</currentState>
+      <requiredChanges>
+        <change>Add DEVICE_ALREADY_REGISTERED constant to codes module</change>
+        <change>Add DeviceAlreadyRegistered variant to ApiError enum</change>
+        <change>Map DeviceAlreadyRegistered to StatusCode::CONFLICT (409)</change>
+        <change>Add safe_message for DeviceAlreadyRegistered</change>
+      </requiredChanges>
+      <codeSnippet><![CDATA[
+/// Error codes as defined in the architecture document.
+pub mod codes {
+    pub const NOT_IMPLEMENTED: &str = "NOT_IMPLEMENTED";
+    pub const VALIDATION_ERROR: &str = "VALIDATION_ERROR";
+    pub const INTERNAL_ERROR: &str = "INTERNAL_ERROR";
+    // ... add DEVICE_ALREADY_REGISTERED
+}
+
+/// API error type with associated HTTP status codes.
+#[derive(Debug, Error)]
+pub enum ApiError {
+    #[error("Validation error: {0}")]
+    Validation(String),
+
+    #[error("Database error")]
+    Database(#[from] sqlx::Error),
+
+    // Add: DeviceAlreadyRegistered
+}
+
+impl ApiError {
+    pub fn status_code(&self) -> StatusCode {
+        match self {
+            ApiError::Validation(_) => StatusCode::BAD_REQUEST,
+            // Add: DeviceAlreadyRegistered => StatusCode::CONFLICT,
+        }
+    }
+}
+]]></codeSnippet>
+    </interface>
+    <interface type="types" relevance="high">
+      <path>backend/src/types/mod.rs</path>
+      <description>API request/response types with standard wrappers. Used for consistent response formatting.</description>
+      <currentState>Has ApiResponse&lt;T&gt;, ApiErrorResponse, Meta structs</currentState>
+      <usage>Use ApiResponse::new(data, request_id) for successful registration response</usage>
+      <codeSnippet><![CDATA[
+/// Standard API success response wrapper.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiResponse<T> {
+    pub data: T,
+    pub meta: Meta,
+}
+
+impl<T> ApiResponse<T> {
+    /// Creates a new API response with the given data and request ID.
+    pub fn new(data: T, request_id: Uuid) -> Self {
+        Self {
+            data,
+            meta: Meta::new(request_id),
+        }
+    }
+}
+]]></codeSnippet>
+    </interface>
+    <interface type="router" relevance="high">
+      <path>backend/src/routes/mod.rs</path>
+      <description>Route modules and router assembly. Currently creates stateless v1 API routes - needs to pass PgPool state to devices router.</description>
+      <currentState>Creates v1_router without passing state to devices::router()</currentState>
+      <requiredChanges>
+        <change>Pass db pool state to devices::router()</change>
+        <change>Update devices router nesting to include state</change>
+      </requiredChanges>
+      <codeSnippet><![CDATA[
+pub fn api_router(db: PgPool) -> Router {
+    // Currently stateless v1 API routes - needs state
+    let v1_router = Router::new()
+        .nest("/devices", devices::router())  // Needs state
+        .nest("/captures", captures::router())
+        .merge(verify::router());
+
+    Router::new()
+        .merge(health_router)
+        .nest("/api/v1", v1_router)
+}
+]]></codeSnippet>
+    </interface>
+    <interface type="model" relevance="high">
+      <path>backend/src/models/device.rs</path>
+      <description>Device entity model matching database schema. Used for query results.</description>
+      <currentState>Has Device struct with sqlx::FromRow derive</currentState>
+      <usage>Use for query_as! return type or manual struct mapping</usage>
+      <codeSnippet><![CDATA[
+/// A registered device with attestation status and hardware capabilities.
+#[derive(Debug, sqlx::FromRow, Serialize)]
+pub struct Device {
+    pub id: Uuid,
+    pub attestation_level: String,
+    pub attestation_key_id: String,
+    pub attestation_chain: Option<Vec<u8>>,
+    pub platform: String,
+    pub model: String,
+    pub has_lidar: bool,
+    pub first_seen_at: DateTime<Utc>,
+    pub last_seen_at: DateTime<Utc>,
+}
+]]></codeSnippet>
+    </interface>
+    <interface type="database-schema" relevance="high">
+      <path>backend/migrations/20251122000001_create_devices.sql</path>
+      <description>Database migration that created the devices table. Defines column constraints including UNIQUE on attestation_key_id.</description>
+      <schema><![CDATA[
+CREATE TABLE devices (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    attestation_level   TEXT NOT NULL DEFAULT 'unverified',
+    attestation_key_id  TEXT NOT NULL UNIQUE,
+    attestation_chain   BYTEA,
+    platform            TEXT NOT NULL,
+    model               TEXT NOT NULL,
+    has_lidar           BOOLEAN NOT NULL DEFAULT false,
+    first_seen_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_seen_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_devices_attestation_key ON devices(attestation_key_id);
+]]></schema>
+    </interface>
+    <interface type="entry-point" relevance="medium">
+      <path>backend/src/main.rs</path>
+      <description>Application entry point with request ID middleware. Extracts request ID as extension for handlers.</description>
+      <currentState>Has extract_request_id middleware that adds Uuid to request extensions</currentState>
+      <usage>Handlers can use Extension&lt;Uuid&gt; to get request ID for logging and responses</usage>
+    </interface>
+    <interface type="database" relevance="medium">
+      <path>backend/src/db.rs</path>
+      <description>Database connection pool creation. Pool is passed to router for use in handlers.</description>
+      <usage>Handlers receive PgPool via State&lt;PgPool&gt; extractor</usage>
+    </interface>
+    <interface type="dependency-manifest" relevance="high">
+      <path>backend/Cargo.toml</path>
+      <description>Backend dependencies. Needs base64 crate for decoding attestation data.</description>
+      <currentDependencies>
+        <dep name="axum" version="0.8">Web framework with State, Extension, Json extractors</dep>
+        <dep name="sqlx" version="0.8">Database with query! and query_as! macros</dep>
+        <dep name="serde" version="1">Deserialize for request, Serialize for response</dep>
+        <dep name="uuid" version="1">UUID generation and parsing</dep>
+        <dep name="thiserror" version="2">Error derive macro</dep>
+        <dep name="tracing" version="0.1">Logging with info!, warn!, error!</dep>
+      </currentDependencies>
+      <missingDependencies>
+        <dep name="base64" version="0.22">Base64 decoding for public_key and attestation_object</dep>
+      </missingDependencies>
+    </interface>
+  </existingCodeInterfaces>
+
+  <developmentConstraints>
+    <constraint type="architecture" severity="must">
+      <description>API Response Format must match architecture spec with data/meta for success (201 Created)</description>
+      <source>docs/architecture.md#Implementation-Patterns, Story AC-6</source>
+      <example><![CDATA[
+// Success response (201 Created)
+{
+  "data": {
+    "device_id": "uuid",
+    "attestation_level": "unverified",
+    "has_lidar": true
+  },
+  "meta": {
+    "request_id": "uuid",
+    "timestamp": "2025-11-22T10:30:00Z"
+  }
+}
+]]></example>
+    </constraint>
+    <constraint type="architecture" severity="must">
+      <description>Error responses must follow architecture spec with error/meta structure</description>
+      <source>docs/architecture.md#Implementation-Patterns</source>
+      <example><![CDATA[
+// Error response (400, 409, 500)
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Validation error: missing required field: device_id"
+  },
+  "meta": {
+    "request_id": "uuid",
+    "timestamp": "2025-11-22T10:30:00Z"
+  }
+}
+]]></example>
+    </constraint>
+    <constraint type="architecture" severity="must">
+      <description>Use HTTP 409 Conflict for duplicate device registration (DEVICE_ALREADY_REGISTERED error code)</description>
+      <source>Story AC-4, Architecture Error Codes</source>
+    </constraint>
+    <constraint type="architecture" severity="must">
+      <description>Store attestation_object as BYTEA in attestation_chain column after base64 decoding</description>
+      <source>Story AC-5, Database Schema</source>
+    </constraint>
+    <constraint type="architecture" severity="must">
+      <description>Initial attestation_level must be "unverified" (verification is Story 2.5)</description>
+      <source>Story AC-5</source>
+    </constraint>
+    <constraint type="pattern" severity="must">
+      <description>Request ID must be included in response header (X-Request-Id) AND response body (meta.request_id)</description>
+      <source>Story AC-10</source>
+    </constraint>
+    <constraint type="pattern" severity="must">
+      <description>Platform field must be validated as "ios" only (MVP constraint)</description>
+      <source>Story AC-5, Architecture ADR-001</source>
+    </constraint>
+    <constraint type="pattern" severity="must">
+      <description>Use PostgreSQL error code 23505 to detect unique constraint violations</description>
+      <source>Story Task 5.2</source>
+      <example><![CDATA[
+if let sqlx::Error::Database(db_err) = &e {
+    if db_err.code() == Some(std::borrow::Cow::Borrowed("23505")) {
+        return ApiError::DeviceAlreadyRegistered;
+    }
+}
+]]></example>
+    </constraint>
+    <constraint type="security" severity="must">
+      <description>Internal errors must not expose database details or stack traces in responses</description>
+      <source>Story AC-7, AC-9</source>
+    </constraint>
+    <constraint type="pattern" severity="should">
+      <description>Use structured logging with request_id in all log entries</description>
+      <source>Story AC-9</source>
+    </constraint>
+    <constraint type="convention" severity="should">
+      <description>Follow Rust naming conventions: snake_case for functions, PascalCase for types</description>
+      <source>docs/architecture.md#Naming-Conventions</source>
+    </constraint>
+  </developmentConstraints>
+
+  <dependencies>
+    <internal>
+      <dep name="backend/src/error.rs" status="exists">Error handling - needs DEVICE_ALREADY_REGISTERED addition</dep>
+      <dep name="backend/src/types/mod.rs" status="exists">ApiResponse wrapper - use for success response</dep>
+      <dep name="backend/src/routes/mod.rs" status="exists">Router assembly - needs state passing update</dep>
+      <dep name="backend/src/models/device.rs" status="exists">Device model - use for query results</dep>
+      <dep name="backend/src/db.rs" status="exists">Database pool - used via State extractor</dep>
+    </internal>
+    <external>
+      <dep name="axum" version="0.8" crate="true">Web framework with extractors (State, Extension, Json)</dep>
+      <dep name="sqlx" version="0.8" crate="true">Database with query_as! macro</dep>
+      <dep name="serde" version="1" crate="true">Derive Serialize/Deserialize</dep>
+      <dep name="base64" version="0.22" crate="true" status="needs-add">Base64 decoding - ADD TO Cargo.toml</dep>
+      <dep name="uuid" version="1" crate="true">UUID generation</dep>
+      <dep name="tracing" version="0.1" crate="true">Structured logging</dep>
+      <dep name="thiserror" version="2" crate="true">Error derive</dep>
+    </external>
+    <prerequisites>
+      <story id="1-2" status="done">Database Schema and Migrations - devices table exists</story>
+      <story id="1-3" status="done">Backend API Skeleton - routing and error handling patterns established</story>
+      <story id="2-1" status="done">iPhone Pro Detection - mobile device capability check</story>
+      <story id="2-2" status="done">Secure Enclave Key Generation - mobile key generation</story>
+      <story id="2-3" status="done">DCAppAttest Integration - mobile attestation flow</story>
+    </prerequisites>
+  </dependencies>
+
+  <testingContext>
+    <framework>Manual curl testing (cargo test available for future integration tests)</framework>
+    <patterns>
+      <pattern type="manual">curl commands to verify endpoint behavior</pattern>
+      <pattern type="integration">Future: testcontainers with real PostgreSQL</pattern>
+    </patterns>
+    <testIdeas>
+      <test ac="AC-1">POST /api/v1/devices/register endpoint exists and accepts JSON</test>
+      <test ac="AC-2">Missing device_id field returns 400 with VALIDATION_ERROR</test>
+      <test ac="AC-2">Missing public_key field returns 400 with VALIDATION_ERROR</test>
+      <test ac="AC-2">Missing attestation_object field returns 400 with VALIDATION_ERROR</test>
+      <test ac="AC-2">Missing platform field returns 400 with VALIDATION_ERROR</test>
+      <test ac="AC-3">Invalid base64 in public_key returns 400 with specific message</test>
+      <test ac="AC-3">Invalid base64 in attestation_object returns 400 with specific message</test>
+      <test ac="AC-4">Registering same device_id twice returns 409 with DEVICE_ALREADY_REGISTERED</test>
+      <test ac="AC-5">Successful registration creates device record with all fields</test>
+      <test ac="AC-5">Device record has attestation_level="unverified"</test>
+      <test ac="AC-5">Device record stores decoded attestation_object as BYTEA</test>
+      <test ac="AC-6">Success response is 201 with data.device_id, data.attestation_level, data.has_lidar</test>
+      <test ac="AC-6">Success response includes meta.request_id and meta.timestamp</test>
+      <test ac="AC-7">Database failure does not expose internal details</test>
+      <test ac="AC-10">Response includes X-Request-Id header</test>
+      <test ac="AC-10">X-Request-Id matches meta.request_id in body</test>
+    </testIdeas>
+    <verificationCommands><![CDATA[
+# Start services
+docker-compose -f infrastructure/docker-compose.yml up -d
+
+# Wait for PostgreSQL
+sleep 5
+
+# Build and run backend
+cd backend
+cargo build
+cargo clippy
+cargo run
+
+# In another terminal:
+
+# Test successful registration
+curl -X POST http://localhost:8080/api/v1/devices/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_id": "test-key-id-123",
+    "public_key": "dGVzdC1wdWJsaWMta2V5",
+    "attestation_object": "dGVzdC1hdHRlc3RhdGlvbg==",
+    "platform": "ios",
+    "model": "iPhone 15 Pro",
+    "has_lidar": true
+  }'
+# Expected: 201 Created with device_id in response
+
+# Test validation error (missing field)
+curl -X POST http://localhost:8080/api/v1/devices/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "ios",
+    "model": "iPhone 15 Pro"
+  }'
+# Expected: 400 Bad Request with VALIDATION_ERROR
+
+# Test invalid base64
+curl -X POST http://localhost:8080/api/v1/devices/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_id": "test-key-id-456",
+    "public_key": "not-valid-base64!!!",
+    "attestation_object": "dGVzdC1hdHRlc3RhdGlvbg==",
+    "platform": "ios",
+    "model": "iPhone 15 Pro",
+    "has_lidar": true
+  }'
+# Expected: 400 Bad Request with VALIDATION_ERROR
+
+# Test duplicate device (run first curl again)
+curl -X POST http://localhost:8080/api/v1/devices/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_id": "test-key-id-123",
+    "public_key": "dGVzdC1wdWJsaWMta2V5",
+    "attestation_object": "dGVzdC1hdHRlc3RhdGlvbg==",
+    "platform": "ios",
+    "model": "iPhone 15 Pro",
+    "has_lidar": true
+  }'
+# Expected: 409 Conflict with DEVICE_ALREADY_REGISTERED
+
+# Verify database record
+docker exec realitycam-postgres psql -U realitycam -c \
+  "SELECT id, attestation_key_id, platform, model, has_lidar, attestation_level FROM devices;"
+
+# Check response headers for X-Request-Id
+curl -v -X POST http://localhost:8080/api/v1/devices/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_id": "test-key-id-789",
+    "public_key": "dGVzdC1wdWJsaWMta2V5",
+    "attestation_object": "dGVzdC1hdHRlc3RhdGlvbg==",
+    "platform": "ios",
+    "model": "iPhone 15 Pro",
+    "has_lidar": true
+  }' 2>&1 | grep -i x-request-id
+]]></verificationCommands>
+  </testingContext>
+
+  <implementationNotes>
+    <note type="pattern" priority="high">
+      <title>Request/Response Structs</title>
+      <content>Define structs in devices.rs for request parsing and response formatting</content>
+      <example><![CDATA[
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Deserialize)]
+pub struct DeviceRegistrationRequest {
+    pub device_id: String,        // attestation key ID from mobile
+    pub public_key: String,       // base64-encoded public key
+    pub attestation_object: String, // base64-encoded CBOR attestation
+    pub platform: String,         // must be "ios"
+    pub model: String,            // e.g., "iPhone 15 Pro"
+    pub has_lidar: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct DeviceRegistrationResponse {
+    pub device_id: Uuid,
+    pub attestation_level: String,
+    pub has_lidar: bool,
+}
+]]></example>
+    </note>
+    <note type="pattern" priority="high">
+      <title>Base64 Decoding Pattern</title>
+      <content>Use base64 crate with STANDARD engine for decoding</content>
+      <example><![CDATA[
+use base64::{Engine as _, engine::general_purpose::STANDARD};
+
+fn decode_base64(input: &str, field_name: &str) -> Result<Vec<u8>, ApiError> {
+    STANDARD.decode(input)
+        .map_err(|_| ApiError::Validation(
+            format!("Invalid base64 encoding for {}", field_name)
+        ))
+}
+]]></example>
+    </note>
+    <note type="pattern" priority="high">
+      <title>Database Insert with Conflict Detection</title>
+      <content>Catch PostgreSQL error code 23505 for unique constraint violations</content>
+      <example><![CDATA[
+async fn insert_device(
+    pool: &PgPool,
+    req: &DeviceRegistrationRequest,
+    attestation_bytes: &[u8],
+) -> Result<Device, ApiError> {
+    sqlx::query_as!(
+        Device,
+        r#"
+        INSERT INTO devices (attestation_key_id, platform, model, has_lidar, attestation_chain)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING *
+        "#,
+        req.device_id,
+        req.platform,
+        req.model,
+        req.has_lidar,
+        attestation_bytes
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| {
+        if let sqlx::Error::Database(db_err) = &e {
+            if db_err.code() == Some(std::borrow::Cow::Borrowed("23505")) {
+                return ApiError::DeviceAlreadyRegistered;
+            }
+        }
+        ApiError::Database(e)
+    })
+}
+]]></example>
+    </note>
+    <note type="pattern" priority="high">
+      <title>Handler with Multiple Extractors</title>
+      <content>Combine State, Extension, and Json extractors for full handler</content>
+      <example><![CDATA[
+use axum::{
+    extract::{Extension, State},
+    http::StatusCode,
+    Json,
+};
+use sqlx::PgPool;
+use uuid::Uuid;
+
+async fn register_device(
+    State(pool): State<PgPool>,
+    Extension(request_id): Extension<Uuid>,
+    Json(req): Json<DeviceRegistrationRequest>,
+) -> Result<(StatusCode, Json<ApiResponse<DeviceRegistrationResponse>>), ApiErrorWithRequestId> {
+    // Validate request
+    validate_registration_request(&req)?;
+
+    // Decode base64 fields
+    let attestation_bytes = decode_base64(&req.attestation_object, "attestation_object")?;
+
+    // Insert device
+    let device = insert_device(&pool, &req, &attestation_bytes).await
+        .map_err(|e| ApiErrorWithRequestId { error: e, request_id })?;
+
+    // Build response
+    let response_data = DeviceRegistrationResponse {
+        device_id: device.id,
+        attestation_level: device.attestation_level,
+        has_lidar: device.has_lidar,
+    };
+
+    tracing::info!(
+        device_id = %device.id,
+        model = %device.model,
+        "Device registered successfully"
+    );
+
+    Ok((StatusCode::CREATED, Json(ApiResponse::new(response_data, request_id))))
+}
+]]></example>
+    </note>
+    <note type="pattern" priority="high">
+      <title>Router State Passing</title>
+      <content>Update devices::router() to accept and use PgPool state</content>
+      <example><![CDATA[
+// In backend/src/routes/devices.rs
+pub fn router() -> Router<PgPool> {
+    Router::new()
+        .route("/challenge", get(get_challenge))
+        .route("/register", post(register_device))
+}
+
+// In backend/src/routes/mod.rs
+pub fn api_router(db: PgPool) -> Router {
+    let v1_router = Router::new()
+        .nest("/devices", devices::router())
+        .nest("/captures", captures::router())
+        .merge(verify::router())
+        .with_state(db.clone());  // Pass state to v1 routes
+
+    Router::new()
+        .merge(health_router)
+        .nest("/api/v1", v1_router)
+}
+]]></example>
+    </note>
+    <note type="warning" priority="high">
+      <title>Add base64 Dependency</title>
+      <content>The base64 crate is NOT currently in Cargo.toml - must be added before implementation</content>
+      <action>Add to backend/Cargo.toml: base64 = "0.22"</action>
+    </note>
+    <note type="learning" priority="medium">
+      <title>Previous Story Learnings</title>
+      <content>From Stories 2.1-2.3: TypeScript strict mode requires compile verification, error handling should wrap all external calls, state transitions should be documented, request ID must be included in all responses</content>
+    </note>
+  </implementationNotes>
+
+  <filesToCreate>
+    <file>None - all implementation in existing files</file>
+  </filesToCreate>
+
+  <filesToModify>
+    <file path="backend/src/routes/devices.rs">Replace 501 stub with full registration implementation</file>
+    <file path="backend/src/error.rs">Add DEVICE_ALREADY_REGISTERED error code and variant</file>
+    <file path="backend/src/routes/mod.rs">Update router to pass PgPool state to devices router</file>
+    <file path="backend/Cargo.toml">Add base64 = "0.22" dependency</file>
+  </filesToModify>
+</story-context>

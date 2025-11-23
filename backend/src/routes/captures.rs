@@ -7,13 +7,16 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::error::ApiError;
 use crate::types::ApiErrorResponse;
 
 /// Creates the captures routes router.
-pub fn router() -> Router {
+///
+/// Returns a router that expects PgPool state (for future database operations).
+pub fn router() -> Router<PgPool> {
     Router::new()
         .route("/", post(upload_capture))
         .route("/{id}", get(get_capture))

@@ -49,8 +49,8 @@ development_status:
   epic-2: contexted
   2-1-iphone-pro-detection-capability-check: done
   2-2-secure-enclave-key-generation: done
-  2-3-dcappattest-integration: backlog
-  2-4-backend-device-registration-endpoint: backlog
+  2-3-dcappattest-integration: done
+  2-4-backend-device-registration-endpoint: done
   2-5-dcappattest-verification-backend: backlog
   2-6-device-authentication-middleware: backlog
   epic-2-retrospective: optional

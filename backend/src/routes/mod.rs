@@ -17,7 +17,7 @@ pub mod verify;
 /// Route structure:
 /// - `/health` - Health check (root level)
 /// - `/ready` - Readiness check (root level)
-/// - `/api/v1/devices/*` - Device routes
+/// - `/api/v1/devices/*` - Device routes (with database state)
 /// - `/api/v1/captures/*` - Capture routes
 /// - `/api/v1/verify-file` - Verification route
 pub fn api_router(db: PgPool) -> Router {
@@ -25,13 +25,16 @@ pub fn api_router(db: PgPool) -> Router {
     let health_router = Router::new()
         .route("/health", get(health::health_check))
         .route("/ready", get(health::readiness_check))
-        .with_state(db);
+        .with_state(db.clone());
 
-    // Create stateless v1 API routes (stubs don't need state)
+    // Create v1 API routes
+    // - devices router needs PgPool state for database operations
+    // - other routes are currently stubs (stateless)
     let v1_router = Router::new()
         .nest("/devices", devices::router())
         .nest("/captures", captures::router())
-        .merge(verify::router());
+        .merge(verify::router())
+        .with_state(db);
 
     // Combine all routes
     Router::new()

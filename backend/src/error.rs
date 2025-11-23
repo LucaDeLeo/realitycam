@@ -25,6 +25,7 @@ pub mod codes {
     pub const TIMESTAMP_EXPIRED: &str = "TIMESTAMP_EXPIRED";
     pub const PROCESSING_FAILED: &str = "PROCESSING_FAILED";
     pub const STORAGE_ERROR: &str = "STORAGE_ERROR";
+    pub const DEVICE_ALREADY_REGISTERED: &str = "DEVICE_ALREADY_REGISTERED";
 }
 
 /// API error type with associated HTTP status codes.
@@ -65,6 +66,9 @@ pub enum ApiError {
 
     #[error("Storage error: {0}")]
     StorageError(String),
+
+    #[error("Device already registered")]
+    DeviceAlreadyRegistered,
 }
 
 impl ApiError {
@@ -83,6 +87,7 @@ impl ApiError {
             ApiError::TimestampExpired => codes::TIMESTAMP_EXPIRED,
             ApiError::ProcessingFailed(_) => codes::PROCESSING_FAILED,
             ApiError::StorageError(_) => codes::STORAGE_ERROR,
+            ApiError::DeviceAlreadyRegistered => codes::DEVICE_ALREADY_REGISTERED,
         }
     }
 
@@ -101,6 +106,7 @@ impl ApiError {
             ApiError::TimestampExpired => StatusCode::UNAUTHORIZED,
             ApiError::ProcessingFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
             ApiError::StorageError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            ApiError::DeviceAlreadyRegistered => StatusCode::CONFLICT,
         }
     }
 
@@ -109,7 +115,7 @@ impl ApiError {
         match self {
             // These are safe to expose
             ApiError::NotImplemented => self.to_string(),
-            ApiError::Validation(msg) => format!("Validation error: {}", msg),
+            ApiError::Validation(msg) => format!("Validation error: {msg}"),
             ApiError::DeviceNotFound => self.to_string(),
             ApiError::CaptureNotFound => self.to_string(),
             ApiError::HashNotFound => "No capture matches the uploaded file hash".to_string(),
@@ -122,6 +128,9 @@ impl ApiError {
             ApiError::Database(_) => "A database error occurred".to_string(),
             ApiError::ProcessingFailed(_) => "Evidence processing failed".to_string(),
             ApiError::StorageError(_) => "A storage error occurred".to_string(),
+            ApiError::DeviceAlreadyRegistered => {
+                "A device with this attestation key is already registered".to_string()
+            }
         }
     }
 

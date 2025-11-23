@@ -2,18 +2,17 @@
 //!
 //! Stub implementation for file verification endpoint.
 
-use axum::{
-    extract::Extension,
-    routing::post,
-    Json, Router,
-};
+use axum::{extract::Extension, routing::post, Json, Router};
+use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::error::ApiError;
 use crate::types::ApiErrorResponse;
 
 /// Creates the verification routes router.
-pub fn router() -> Router {
+///
+/// Returns a router that expects PgPool state (for future database operations).
+pub fn router() -> Router<PgPool> {
     Router::new().route("/verify-file", post(verify_file))
 }
 
