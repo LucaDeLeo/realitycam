@@ -35,8 +35,8 @@ pub fn depth_map_s3_key(capture_id: Uuid) -> String {
 /// S3 storage service for capture file uploads
 #[derive(Clone)]
 pub struct StorageService {
-    client: S3Client,
-    bucket: String,
+    pub(crate) client: S3Client,
+    pub(crate) bucket: String,
 }
 
 impl StorageService {

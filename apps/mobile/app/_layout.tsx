@@ -216,6 +216,15 @@ export default function RootLayout() {
             presentation: 'fullScreenModal',
           }}
         />
+        <Stack.Screen
+          name="result"
+          options={{
+            title: 'Upload Complete',
+            headerShown: true,
+            presentation: 'fullScreenModal',
+            headerBackVisible: false,
+          }}
+        />
       </Stack>
     </SafeAreaProvider>
   );

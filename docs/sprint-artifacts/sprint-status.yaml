@@ -78,13 +78,13 @@ development_status:
   epic-4-retrospective: optional
 
   # Epic 5: C2PA Integration & Verification Interface (8 stories)
-  epic-5: backlog
-  5-1-c2pa-manifest-generation: backlog
-  5-2-c2pa-signing-ed25519: backlog
-  5-3-c2pa-embedding-storage: backlog
-  5-4-verification-page-summary-view: backlog
-  5-5-evidence-panel-component: backlog
-  5-6-file-upload-verification: backlog
-  5-7-file-verification-results-display: backlog
-  5-8-capture-result-screen-mobile: backlog
+  epic-5: contexted
+  5-1-c2pa-manifest-generation: done
+  5-2-c2pa-signing-ed25519: done
+  5-3-c2pa-embedding-storage: done
+  5-4-verification-page-summary-view: done
+  5-5-evidence-panel-component: done
+  5-6-file-upload-verification: done
+  5-7-file-verification-results-display: done
+  5-8-capture-result-screen-mobile: done
   epic-5-retrospective: optional

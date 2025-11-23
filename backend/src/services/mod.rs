@@ -3,6 +3,7 @@
 //! This module contains business logic services that are used by route handlers.
 
 pub mod attestation;
+pub mod c2pa;
 pub mod capture_attestation;
 pub mod challenge_store;
 pub mod depth_analysis;
@@ -15,6 +16,7 @@ pub use attestation::{
     verify_certificate_chain, AttestationError, AttestationObject, AuthenticatorData,
     VerificationResult,
 };
+pub use c2pa::{c2pa_manifest_s3_key, c2pa_photo_s3_key, C2paError, C2paManifest, C2paManifestInfo, C2paService};
 pub use capture_attestation::{verify_capture_assertion, CaptureAssertionError, CaptureAssertionResult};
 pub use challenge_store::{ChallengeEntry, ChallengeError, ChallengeStore};
 pub use depth_analysis::analyze_depth_map;
