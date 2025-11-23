@@ -1,0 +1,742 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML for: 3-1-camera-view-lidar-depth-overlay
+  Generated: 2025-11-23
+  Project: RealityCam
+  Epic: 3 - Photo Capture with LiDAR Depth
+-->
+<story-context>
+  <metadata>
+    <story-key>3-1-camera-view-lidar-depth-overlay</story-key>
+    <story-title>Camera View with LiDAR Depth Overlay</story-title>
+    <epic-id>3</epic-id>
+    <epic-title>Photo Capture with LiDAR Depth</epic-title>
+    <generated-date>2025-11-23</generated-date>
+    <status>ready-for-dev</status>
+    <context-version>1.0</context-version>
+  </metadata>
+
+  <!-- Story Reference -->
+  <story-reference>
+    <file-path>docs/sprint-artifacts/stories/3-1-camera-view-lidar-depth-overlay.md</file-path>
+    <description>Full story specification with acceptance criteria, tasks, and dev notes including Swift code examples for ARKit LiDAR integration</description>
+  </story-reference>
+
+  <!-- Epic Context -->
+  <epic-context>
+    <tech-spec-path>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-3.md</tech-spec-path>
+    <epics-path>docs/epics.md</epics-path>
+    <description>Epic 3 implements the core photo capture experience with simultaneous LiDAR depth sensing. This story (3.1) creates the foundation: custom Expo Module for ARKit LiDAR access, camera view with real-time depth overlay visualization, and the useLiDAR hook that subsequent capture stories depend on.</description>
+    <ac-mapping>
+      <item>AC-3.1: LiDAR Module Availability Check (isLiDARAvailable)</item>
+      <item>AC-3.2: Depth Capture Session Management (startDepthCapture, stopDepthCapture)</item>
+      <item>AC-3.3: Real-time Depth Overlay (30fps heatmap visualization)</item>
+    </ac-mapping>
+  </epic-context>
+
+  <!-- Documentation Artifacts -->
+  <documentation-artifacts>
+    <artifact>
+      <path>docs/architecture.md</path>
+      <description>System architecture with ADR-002 (Expo Modules API for LiDAR), ADR-004 (LiDAR as primary evidence), project structure, and custom module location conventions</description>
+      <relevance>Primary reference for LiDAR module architecture decisions, module location (apps/mobile/modules/lidar-depth/), and ARKit integration patterns</relevance>
+    </artifact>
+    <artifact>
+      <path>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-3.md</path>
+      <description>Technical specification for Epic 3 including LiDAR Module Swift implementation, DepthFrame interface, ARSession lifecycle, and performance requirements</description>
+      <relevance>Authoritative source for AC-3.1, AC-3.2, AC-3.3 acceptance criteria. Contains Swift code samples for LiDARDepthModule and DepthCaptureSession.</relevance>
+    </artifact>
+    <artifact>
+      <path>docs/prd.md</path>
+      <description>Product Requirements Document with FR6-FR13 covering capture flow requirements</description>
+      <relevance>Business context for LiDAR depth capture requirements and user experience</relevance>
+    </artifact>
+    <artifact>
+      <path>docs/sprint-artifacts/sprint-status.yaml</path>
+      <description>Sprint tracking file showing story statuses and epic progress</description>
+      <relevance>Status tracking and workflow progression - this story is first in Epic 3</relevance>
+    </artifact>
+  </documentation-artifacts>
+
+  <!-- Existing Code Interfaces -->
+  <existing-code-interfaces>
+    <interface>
+      <path>apps/mobile/store/deviceStore.ts</path>
+      <description>Zustand store managing device capabilities and attestation state. Provides hasLiDAR capability flag and attestation status needed for capture flow.</description>
+      <relevance>CRITICAL - Must check capabilities.hasLiDAR before initializing LiDAR module. Also provides keyId for future per-capture assertions.</relevance>
+      <exports>
+        <export>useDeviceStore() hook</export>
+        <export>capabilities: DeviceCapabilities | null (includes hasLiDAR)</export>
+        <export>keyId: string | null</export>
+        <export>isAttestationReady: boolean</export>
+        <export>isAttested: boolean</export>
+      </exports>
+    </interface>
+    <interface>
+      <path>apps/mobile/hooks/useDeviceCapabilities.ts</path>
+      <description>Device capability detection hook from Epic 2. Detects LiDAR via model string matching.</description>
+      <relevance>Provides capabilities.hasLiDAR flag. Can be supplemented by native ARKit check for more accuracy.</relevance>
+      <exports>
+        <export>useDeviceCapabilities() hook</export>
+        <export>capabilities.hasLiDAR: boolean</export>
+      </exports>
+    </interface>
+    <interface>
+      <path>apps/mobile/utils/lidarDetection.ts</path>
+      <description>LiDAR detection utility using model string matching for iPhone Pro models</description>
+      <relevance>Current detection method. Story may add native ARKit check (ARWorldTrackingConfiguration.supportsSceneReconstruction) for runtime verification.</relevance>
+      <exports>
+        <export>checkLiDARAvailability(modelName: string): boolean</export>
+        <export>getSupportedModels(): string[]</export>
+      </exports>
+    </interface>
+    <interface>
+      <path>apps/mobile/hooks/useDeviceAttestation.ts</path>
+      <description>DCAppAttest attestation hook from Epic 2. Pattern reference for hook lifecycle management.</description>
+      <relevance>PATTERN REFERENCE - Follow same hook structure: state machine, useRef for initialization guard, Zustand integration, error handling patterns</relevance>
+      <patterns>
+        <pattern>hasInitialized.current ref to prevent multiple inits</pattern>
+        <pattern>State machine with clear transitions</pattern>
+        <pattern>Error classification and user-friendly messages</pattern>
+        <pattern>Automatic retry with exponential backoff</pattern>
+      </patterns>
+    </interface>
+    <interface>
+      <path>apps/mobile/hooks/useSecureEnclaveKey.ts</path>
+      <description>Secure Enclave key management hook. Pattern reference for native API integration.</description>
+      <relevance>PATTERN REFERENCE - Similar async lifecycle management pattern needed for useLiDAR hook</relevance>
+    </interface>
+    <interface>
+      <path>apps/mobile/app/(tabs)/capture.tsx</path>
+      <description>Current capture screen placeholder. Must be updated to integrate CameraView and DepthOverlay components.</description>
+      <relevance>MODIFICATION TARGET - Replace placeholder with actual camera view implementation</relevance>
+      <current-state>Placeholder UI with icon and "coming soon" message</current-state>
+    </interface>
+    <interface>
+      <path>apps/mobile/app/(tabs)/_layout.tsx</path>
+      <description>Tab layout with Capture and History tabs</description>
+      <relevance>No changes needed - capture tab already configured</relevance>
+    </interface>
+    <interface>
+      <path>apps/mobile/app/_layout.tsx</path>
+      <description>Root layout orchestrating device capability check and attestation flow</description>
+      <relevance>LiDAR unavailable blocking should happen at screen level, not root layout. Root layout already blocks unsupported devices.</relevance>
+    </interface>
+    <interface>
+      <path>apps/mobile/app.config.ts</path>
+      <description>Expo app configuration with camera permission and iOS deployment target</description>
+      <relevance>Camera permission already configured. May need to add ARKit entitlement if required.</relevance>
+      <current-config>
+        <item>NSCameraUsageDescription configured</item>
+        <item>expo-camera plugin configured</item>
+        <item>iOS deploymentTarget: 15.1</item>
+      </current-config>
+    </interface>
+    <interface>
+      <path>apps/mobile/constants/colors.ts</path>
+      <description>Color constants including primary, background, and warning colors</description>
+      <relevance>Use for depth overlay toggle button and any UI elements</relevance>
+    </interface>
+    <interface>
+      <path>apps/mobile/services/api.ts</path>
+      <description>API client with error handling patterns</description>
+      <relevance>Pattern reference for error handling. No API calls needed for this story.</relevance>
+    </interface>
+    <interface>
+      <path>packages/shared/src/types/device.ts</path>
+      <description>Shared device types including DeviceCapabilities with hasLiDAR</description>
+      <relevance>DeviceCapabilities.hasLiDAR already defined. Add DepthFrame and LiDAR-related types.</relevance>
+    </interface>
+    <interface>
+      <path>packages/shared/src/types/capture.ts</path>
+      <description>Capture-related types (currently minimal)</description>
+      <relevance>EXTEND - Add DepthFrame, CameraIntrinsics, DepthColormap, DepthOverlayConfig interfaces</relevance>
+    </interface>
+    <interface>
+      <path>packages/shared/src/index.ts</path>
+      <description>Package exports</description>
+      <relevance>Update to export new depth-related types</relevance>
+    </interface>
+    <interface>
+      <path>apps/mobile/components/Device/UnsupportedDeviceScreen.tsx</path>
+      <description>Blocking screen for unsupported devices</description>
+      <relevance>Pattern reference for blocking UI. LiDAR unavailable message can follow similar style.</relevance>
+    </interface>
+  </existing-code-interfaces>
+
+  <!-- Development Constraints -->
+  <development-constraints>
+    <constraint>
+      <id>ARCH-001</id>
+      <category>Module Pattern</category>
+      <description>Use Expo Modules API (ExpoModulesCore) for custom LiDAR module. Follow Expo Module structure with expo-module.config.json, index.ts, and ios/ folder.</description>
+      <source>docs/architecture.md#ADR-002</source>
+    </constraint>
+    <constraint>
+      <id>ARCH-002</id>
+      <category>Module Location</category>
+      <description>Custom module MUST be at apps/mobile/modules/lidar-depth/ - this is the architecture-mandated location.</description>
+      <source>docs/architecture.md#Project-Structure</source>
+    </constraint>
+    <constraint>
+      <id>ARCH-003</id>
+      <category>ARKit Config</category>
+      <description>Use ARWorldTrackingConfiguration with .sceneDepth frameSemantics. Check supportsSceneReconstruction(.mesh) for LiDAR capability.</description>
+      <source>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-3.md#Swift-Implementation</source>
+    </constraint>
+    <constraint>
+      <id>ARCH-004</id>
+      <category>Performance</category>
+      <description>Depth overlay must render at >= 30 FPS. ARKit runs at 60fps - throttle to 30fps for overlay. Memory usage must stay below 200MB total.</description>
+      <source>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-3.md#Performance</source>
+    </constraint>
+    <constraint>
+      <id>ARCH-005</id>
+      <category>Lifecycle</category>
+      <description>ARSession MUST be paused when: (1) user navigates away from capture tab, (2) app goes to background. Prevents resource leaks and crashes.</description>
+      <source>Story AC-3 and Epic tech spec</source>
+    </constraint>
+    <constraint>
+      <id>ARCH-006</id>
+      <category>Memory Management</category>
+      <description>CVPixelBuffer must be properly locked/unlocked. Release depth buffers after processing to prevent memory leaks.</description>
+      <source>Story dev notes</source>
+    </constraint>
+    <constraint>
+      <id>ARCH-007</id>
+      <category>TypeScript</category>
+      <description>All code must pass pnpm typecheck. Use strict typing, no any types. Follow existing patterns from Epic 2 hooks.</description>
+      <source>Project conventions</source>
+    </constraint>
+    <constraint>
+      <id>ARCH-008</id>
+      <category>UI</category>
+      <description>All UI components must support dark mode via useColorScheme hook. Use colors from constants/colors.ts.</description>
+      <source>Project conventions</source>
+    </constraint>
+    <constraint>
+      <id>ARCH-009</id>
+      <category>iOS Only</category>
+      <description>LiDAR module is iOS-only. No Android support for MVP. Module config should specify platforms: ["ios"].</description>
+      <source>docs/architecture.md#ADR-001</source>
+    </constraint>
+    <constraint>
+      <id>ARCH-010</id>
+      <category>Simulator</category>
+      <description>ARKit LiDAR will NOT work on iOS Simulator. Must test on real iPhone Pro device. Handle gracefully in simulator.</description>
+      <source>ARKit requirements</source>
+    </constraint>
+    <constraint>
+      <id>ARCH-011</id>
+      <category>Hook Pattern</category>
+      <description>useLiDAR hook should follow useDeviceAttestation pattern: hasInitialized ref, state machine, cleanup on unmount, app state subscription.</description>
+      <source>apps/mobile/hooks/useDeviceAttestation.ts</source>
+    </constraint>
+    <constraint>
+      <id>ARCH-012</id>
+      <category>Camera Integration</category>
+      <description>Use expo-camera for photo preview. DepthOverlay renders on top of camera preview with opacity. Both must be synchronized in position/size.</description>
+      <source>Story AC-6</source>
+    </constraint>
+  </development-constraints>
+
+  <!-- Dependencies -->
+  <dependencies>
+    <dependency>
+      <name>expo-camera</name>
+      <version>~17.0.0</version>
+      <purpose>Camera preview and photo capture</purpose>
+      <already-installed>true</already-installed>
+    </dependency>
+    <dependency>
+      <name>expo-modules-core</name>
+      <version>Built into Expo SDK</version>
+      <purpose>Swift module foundation for custom LiDAR module</purpose>
+      <already-installed>true</already-installed>
+    </dependency>
+    <dependency>
+      <name>zustand</name>
+      <version>^5.0.0</version>
+      <purpose>State management for capture state</purpose>
+      <already-installed>true</already-installed>
+    </dependency>
+    <dependency>
+      <name>@realitycam/shared</name>
+      <version>workspace:*</version>
+      <purpose>Shared TypeScript types for DepthFrame, CameraIntrinsics</purpose>
+      <already-installed>true</already-installed>
+    </dependency>
+    <dependency>
+      <name>ARKit framework</name>
+      <version>iOS system framework</version>
+      <purpose>Native LiDAR depth capture</purpose>
+      <already-installed>true (iOS system)</already-installed>
+    </dependency>
+    <dependency>
+      <name>react-native-canvas (optional)</name>
+      <version>To be determined</version>
+      <purpose>May be needed for efficient depth overlay rendering if Image/View approach is too slow</purpose>
+      <already-installed>false</already-installed>
+      <notes>Start with Canvas approach, add if needed</notes>
+    </dependency>
+  </dependencies>
+
+  <!-- Testing Context -->
+  <testing-context>
+    <test-framework>
+      <name>Manual Device Testing (Primary)</name>
+      <description>LiDAR features require real iPhone Pro device. Simulator cannot test ARKit depth.</description>
+    </test-framework>
+    <test-framework>
+      <name>Jest (Unit Tests)</name>
+      <description>Unit test useLiDAR hook with mock module, depth-to-color mapping function</description>
+    </test-framework>
+    <test-requirements>
+      <requirement>TypeScript compilation: pnpm typecheck in packages/shared and apps/mobile</requirement>
+      <requirement>Build verification: npx expo prebuild --platform ios</requirement>
+      <requirement>Manual test: LiDAR availability check on Pro vs non-Pro device</requirement>
+      <requirement>Manual test: ARSession start/stop on tab navigation</requirement>
+      <requirement>Manual test: ARSession pause on app background</requirement>
+      <requirement>Manual test: Depth overlay visibility at >= 30 FPS</requirement>
+      <requirement>Manual test: Depth toggle button functionality</requirement>
+      <requirement>Manual test: Memory usage during continuous depth capture (< 200MB)</requirement>
+      <requirement>Manual test: Camera preview + depth overlay synchronization</requirement>
+    </test-requirements>
+    <test-commands>
+      <command>cd packages/shared and pnpm typecheck</command>
+      <command>cd apps/mobile and pnpm typecheck</command>
+      <command>cd apps/mobile and npx expo prebuild --platform ios</command>
+      <command>cd apps/mobile and npx expo run:ios --device (requires real iPhone Pro)</command>
+    </test-commands>
+    <device-matrix>
+      <device model="iPhone 15 Pro" ios="17.x" purpose="Primary test device" />
+      <device model="iPhone 12 Pro" ios="17.x" purpose="Minimum supported Pro device" />
+      <device model="iPhone 15" ios="17.x" purpose="LiDAR not available test" />
+      <device model="iOS Simulator" purpose="Non-LiDAR path only" />
+    </device-matrix>
+  </testing-context>
+
+  <!-- Implementation Notes -->
+  <implementation-notes>
+    <note>
+      <id>IMP-001</id>
+      <category>Module Structure</category>
+      <content>Create Expo Module at apps/mobile/modules/lidar-depth/ with: expo-module.config.json, index.ts (TypeScript interface), ios/LiDARDepthModule.swift, ios/DepthCaptureSession.swift</content>
+    </note>
+    <note>
+      <id>IMP-002</id>
+      <category>Swift Module Pattern</category>
+      <content>LiDARDepthModule extends Module from ExpoModulesCore. Use definition() method with Name(), AsyncFunction(), and Events() builders.</content>
+    </note>
+    <note>
+      <id>IMP-003</id>
+      <category>ARKit Session</category>
+      <content>Create ARSession with ARWorldTrackingConfiguration. Set config.frameSemantics = .sceneDepth. ARSessionDelegate receives frame updates.</content>
+    </note>
+    <note>
+      <id>IMP-004</id>
+      <category>Depth Extraction</category>
+      <content>From ARFrame.sceneDepth.depthMap (CVPixelBuffer), extract Float32 depth values. Lock buffer, read pointer, copy to Data, unlock. Base64 encode for JS bridge.</content>
+    </note>
+    <note>
+      <id>IMP-005</id>
+      <category>Frame Throttling</category>
+      <content>ARKit runs at 60fps. For overlay, emit events every 2nd frame (30fps). Use frameCount counter in delegate.</content>
+    </note>
+    <note>
+      <id>IMP-006</id>
+      <category>Event Streaming</category>
+      <content>Use Events("onDepthFrame") in module definition. Send lightweight event {timestamp, hasDepth}. Store full depth frame for on-demand captureDepthFrame() calls.</content>
+    </note>
+    <note>
+      <id>IMP-007</id>
+      <category>Depth Colormap</category>
+      <content>Convert depth (meters) to color using viridis-inspired colormap. Near (0m) = warm red/orange, Far (5m) = cool blue/purple. Normalize: (depth - min) / (max - min).</content>
+    </note>
+    <note>
+      <id>IMP-008</id>
+      <category>Hook Lifecycle</category>
+      <content>useLiDAR hook: check availability on mount, subscribe to onDepthFrame events, manage currentFrame state, cleanup on unmount, handle app state changes (background pause).</content>
+    </note>
+    <note>
+      <id>IMP-009</id>
+      <category>Camera Integration</category>
+      <content>CameraView wraps expo-camera with DepthOverlay positioned absolutely on top. Both share same dimensions. Handle camera permissions before rendering.</content>
+    </note>
+    <note>
+      <id>IMP-010</id>
+      <category>Capture Tab Integration</category>
+      <content>Update capture.tsx to use CameraView. Add DepthToggle button. Show LiDAR unavailable message if capabilities.hasLiDAR is false.</content>
+    </note>
+  </implementation-notes>
+
+  <!-- File Changes Summary -->
+  <file-changes>
+    <files-to-create>
+      <file>
+        <path>apps/mobile/modules/lidar-depth/expo-module.config.json</path>
+        <description>Expo module configuration specifying iOS platform and module name</description>
+      </file>
+      <file>
+        <path>apps/mobile/modules/lidar-depth/index.ts</path>
+        <description>TypeScript exports: DepthFrame interface, LiDARModule interface, module import</description>
+      </file>
+      <file>
+        <path>apps/mobile/modules/lidar-depth/ios/LiDARDepthModule.swift</path>
+        <description>Main Swift module with isLiDARAvailable, startDepthCapture, stopDepthCapture, captureDepthFrame functions</description>
+      </file>
+      <file>
+        <path>apps/mobile/modules/lidar-depth/ios/DepthCaptureSession.swift</path>
+        <description>ARSessionDelegate implementation for receiving and processing depth frames</description>
+      </file>
+      <file>
+        <path>apps/mobile/hooks/useLiDAR.ts</path>
+        <description>React hook wrapping LiDAR module with lifecycle management and state</description>
+      </file>
+      <file>
+        <path>apps/mobile/components/Camera/CameraView.tsx</path>
+        <description>Container component integrating expo-camera with DepthOverlay</description>
+      </file>
+      <file>
+        <path>apps/mobile/components/Camera/DepthOverlay.tsx</path>
+        <description>Depth visualization component rendering heatmap from depth frame</description>
+      </file>
+      <file>
+        <path>apps/mobile/components/Camera/DepthToggle.tsx</path>
+        <description>Toggle button component for depth overlay visibility</description>
+      </file>
+    </files-to-create>
+    <files-to-modify>
+      <file>
+        <path>packages/shared/src/types/capture.ts</path>
+        <description>Add DepthFrame, CameraIntrinsics, DepthColormap, DepthOverlayConfig interfaces</description>
+      </file>
+      <file>
+        <path>packages/shared/src/index.ts</path>
+        <description>Export new depth-related types</description>
+      </file>
+      <file>
+        <path>apps/mobile/app/(tabs)/capture.tsx</path>
+        <description>Replace placeholder with CameraView, DepthToggle, and LiDAR unavailable handling</description>
+      </file>
+    </files-to-modify>
+  </file-changes>
+
+  <!-- Type Definitions to Add -->
+  <type-definitions>
+    <type>
+      <name>DepthFrame</name>
+      <location>packages/shared/src/types/capture.ts</location>
+      <definition><![CDATA[
+export interface DepthFrame {
+  /** Base64-encoded Float32Array of depth values in meters */
+  depthMap: string;
+  /** Width of depth map (typically 256) */
+  width: number;
+  /** Height of depth map (typically 192) */
+  height: number;
+  /** Unix timestamp in milliseconds */
+  timestamp: number;
+  /** Camera intrinsics for depth-to-3D conversion */
+  intrinsics: CameraIntrinsics;
+}
+      ]]></definition>
+    </type>
+    <type>
+      <name>CameraIntrinsics</name>
+      <location>packages/shared/src/types/capture.ts</location>
+      <definition><![CDATA[
+export interface CameraIntrinsics {
+  /** Focal length X */
+  fx: number;
+  /** Focal length Y */
+  fy: number;
+  /** Principal point X */
+  cx: number;
+  /** Principal point Y */
+  cy: number;
+}
+      ]]></definition>
+    </type>
+    <type>
+      <name>DepthColormap</name>
+      <location>packages/shared/src/types/capture.ts</location>
+      <definition><![CDATA[
+export interface DepthColormap {
+  name: 'viridis' | 'plasma' | 'thermal';
+  minDepth: number;  // Meters (default 0)
+  maxDepth: number;  // Meters (default 5)
+  opacity: number;   // 0-1 (default 0.4)
+}
+      ]]></definition>
+    </type>
+    <type>
+      <name>DepthOverlayConfig</name>
+      <location>packages/shared/src/types/capture.ts</location>
+      <definition><![CDATA[
+export interface DepthOverlayConfig {
+  enabled: boolean;
+  colormap: DepthColormap;
+  showDepthValues: boolean;  // Show numeric depth on tap
+}
+      ]]></definition>
+    </type>
+    <type>
+      <name>LiDARError</name>
+      <location>apps/mobile/modules/lidar-depth/index.ts</location>
+      <definition><![CDATA[
+export type LiDARError =
+  | 'NOT_AVAILABLE'
+  | 'NO_DEPTH_DATA'
+  | 'SESSION_FAILED'
+  | 'PERMISSION_DENIED';
+      ]]></definition>
+    </type>
+  </type-definitions>
+
+  <!-- Swift Code Reference -->
+  <swift-code-reference>
+    <snippet>
+      <name>LiDAR Availability Check</name>
+      <description>Check if device supports LiDAR depth capture</description>
+      <code><![CDATA[
+AsyncFunction("isLiDARAvailable") { () -> Bool in
+  return ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh)
+}
+      ]]></code>
+    </snippet>
+    <snippet>
+      <name>ARKit Configuration</name>
+      <description>Configure ARSession for scene depth capture</description>
+      <code><![CDATA[
+let config = ARWorldTrackingConfiguration()
+config.frameSemantics = .sceneDepth
+
+guard ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) else {
+  throw LiDARError.notAvailable
+}
+
+self.session = ARSession()
+self.session?.delegate = self.depthDelegate
+self.session?.run(config)
+      ]]></code>
+    </snippet>
+    <snippet>
+      <name>Depth Map Extraction</name>
+      <description>Extract Float32 depth values from CVPixelBuffer</description>
+      <code><![CDATA[
+private func extractDepthMap(from pixelBuffer: CVPixelBuffer) -> Data {
+  CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
+  defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
+
+  let width = CVPixelBufferGetWidth(pixelBuffer)
+  let height = CVPixelBufferGetHeight(pixelBuffer)
+  let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer)!
+
+  let floatPointer = baseAddress.assumingMemoryBound(to: Float32.self)
+  let count = width * height
+  let data = Data(bytes: floatPointer, count: count * MemoryLayout<Float32>.size)
+
+  return data
+}
+      ]]></code>
+    </snippet>
+    <snippet>
+      <name>Camera Intrinsics Extraction</name>
+      <description>Extract camera intrinsics from ARFrame for depth-to-3D conversion</description>
+      <code><![CDATA[
+let intrinsics = frame.camera.intrinsics
+// intrinsics is 3x3 matrix:
+// [fx,  0, cx]
+// [ 0, fy, cy]
+// [ 0,  0,  1]
+return [
+  "fx": intrinsics[0][0],
+  "fy": intrinsics[1][1],
+  "cx": intrinsics[2][0],
+  "cy": intrinsics[2][1]
+]
+      ]]></code>
+    </snippet>
+  </swift-code-reference>
+
+  <!-- TypeScript Code Reference -->
+  <typescript-code-reference>
+    <snippet>
+      <name>Depth to Color Mapping</name>
+      <description>Convert depth value to RGB color for heatmap visualization</description>
+      <code><![CDATA[
+function depthToColor(depth: number, minDepth = 0, maxDepth = 5): [number, number, number] {
+  const normalized = Math.max(0, Math.min(1, (depth - minDepth) / (maxDepth - minDepth)));
+
+  // Near = warm (red/orange), Far = cool (blue/purple)
+  const r = Math.floor(255 * (1 - normalized));
+  const g = Math.floor(255 * Math.abs(normalized - 0.5) * 2);
+  const b = Math.floor(255 * normalized);
+
+  return [r, g, b];
+}
+      ]]></code>
+    </snippet>
+    <snippet>
+      <name>useLiDAR Hook Interface</name>
+      <description>Expected return type for useLiDAR hook</description>
+      <code><![CDATA[
+interface UseLiDARReturn {
+  /** LiDAR hardware present on device */
+  isAvailable: boolean;
+  /** ARSession active and streaming depth */
+  isReady: boolean;
+  /** Start ARSession and begin depth capture */
+  startDepthCapture: () => Promise<void>;
+  /** Stop ARSession and release resources */
+  stopDepthCapture: () => Promise<void>;
+  /** Capture single depth frame for photo */
+  captureDepthFrame: () => Promise<DepthFrame>;
+  /** Latest frame for real-time overlay */
+  currentFrame: DepthFrame | null;
+  /** Current error state if any */
+  error: string | null;
+}
+      ]]></code>
+    </snippet>
+  </typescript-code-reference>
+
+  <!-- Code Patterns -->
+  <code-patterns>
+    <pattern>
+      <name>Hook State Machine Pattern</name>
+      <description>Pattern from useDeviceAttestation for managing async lifecycle with state transitions</description>
+      <reference>apps/mobile/hooks/useDeviceAttestation.ts</reference>
+    </pattern>
+    <pattern>
+      <name>Zustand Store Pattern</name>
+      <description>Persist middleware with partialize and onRehydrateStorage</description>
+      <reference>apps/mobile/store/deviceStore.ts</reference>
+    </pattern>
+    <pattern>
+      <name>Dark Mode Support Pattern</name>
+      <description>useColorScheme with conditional styling</description>
+      <reference>apps/mobile/app/_layout.tsx</reference>
+    </pattern>
+    <pattern>
+      <name>Expo Module Pattern</name>
+      <description>ExpoModulesCore Module class with definition(), AsyncFunction, Events</description>
+      <reference>Expo Modules API documentation</reference>
+    </pattern>
+    <pattern>
+      <name>App State Subscription</name>
+      <description>Subscribe to AppState changes to pause ARSession on background</description>
+      <reference>React Native AppState API</reference>
+    </pattern>
+  </code-patterns>
+
+  <!-- Error Messages -->
+  <error-messages>
+    <message>
+      <type>LiDAR not available</type>
+      <user-message>This app requires iPhone Pro with LiDAR</user-message>
+    </message>
+    <message>
+      <type>Camera permission denied</type>
+      <user-message>Camera access is required to capture photos</user-message>
+    </message>
+    <message>
+      <type>Depth capture failed</type>
+      <user-message>Unable to capture depth data. Please try again.</user-message>
+    </message>
+    <message>
+      <type>ARSession failed</type>
+      <user-message>Depth sensor initialization failed. Please restart the app.</user-message>
+    </message>
+  </error-messages>
+
+  <!-- Integration Points -->
+  <integration-points>
+    <integration>
+      <story>3-2 - Photo Capture with Depth Map</story>
+      <description>Story 3.2 will use captureDepthFrame() from useLiDAR hook to capture depth synchronized with photo</description>
+      <data-handoff>
+        <field>DepthFrame from captureDepthFrame()</field>
+        <field>isReady flag to gate capture button</field>
+      </data-handoff>
+    </integration>
+    <integration>
+      <story>3-4 - Capture Attestation Signature</story>
+      <description>Story 3.4 will include depth frame hash in per-capture assertion</description>
+      <data-handoff>
+        <field>DepthFrame for hashing</field>
+      </data-handoff>
+    </integration>
+    <integration>
+      <story>3-5 - Local Processing Pipeline</story>
+      <description>Story 3.5 will compress depth map and construct capture payload</description>
+      <data-handoff>
+        <field>DepthFrame.depthMap for compression</field>
+        <field>DepthFrame.width, height, intrinsics for metadata</field>
+      </data-handoff>
+    </integration>
+  </integration-points>
+
+  <!-- Performance Guidelines -->
+  <performance-guidelines>
+    <guideline>
+      <metric>Frame Rate</metric>
+      <target>>= 30 FPS for depth overlay</target>
+      <strategy>Throttle ARKit 60fps to 30fps by processing every 2nd frame</strategy>
+    </guideline>
+    <guideline>
+      <metric>Memory Usage</metric>
+      <target>< 200MB total during capture</target>
+      <strategy>Release previous depth buffers before allocating new ones</strategy>
+    </guideline>
+    <guideline>
+      <metric>Depth Extraction Time</metric>
+      <target>< 16ms per frame</target>
+      <strategy>Efficient CVPixelBuffer access with proper lock/unlock</strategy>
+    </guideline>
+    <guideline>
+      <metric>Overlay Rendering</metric>
+      <target>No UI jank</target>
+      <strategy>Consider Canvas or Skia for direct pixel manipulation if Image approach is slow</strategy>
+    </guideline>
+  </performance-guidelines>
+
+  <!-- Open Questions -->
+  <open-questions>
+    <question>
+      <id>Q1</id>
+      <question>Should depth overlay use Skia, GL, or Canvas?</question>
+      <recommendation>Start with Canvas (simplest), optimize later if needed</recommendation>
+    </question>
+    <question>
+      <id>Q2</id>
+      <question>What colormap provides best visibility?</question>
+      <recommendation>Use viridis (perceptually uniform), allow user toggle later</recommendation>
+    </question>
+    <question>
+      <id>Q3</id>
+      <question>Should we cache depth frames for smoother overlay?</question>
+      <recommendation>Cache last frame, but prioritize memory over smoothness</recommendation>
+    </question>
+  </open-questions>
+
+  <!-- External References -->
+  <external-references>
+    <reference>
+      <name>Apple ARKit Depth Documentation</name>
+      <url>https://developer.apple.com/documentation/arkit/arkit_in_ios/environmental_analysis/capturing_depth_using_the_lidar_camera</url>
+      <description>Official Apple documentation for capturing depth using LiDAR</description>
+    </reference>
+    <reference>
+      <name>Expo Modules API</name>
+      <url>https://docs.expo.dev/modules/overview/</url>
+      <description>Expo documentation for creating custom native modules</description>
+    </reference>
+    <reference>
+      <name>expo-camera Documentation</name>
+      <url>https://docs.expo.dev/versions/latest/sdk/camera/</url>
+      <description>Expo camera module documentation</description>
+    </reference>
+  </external-references>
+</story-context>

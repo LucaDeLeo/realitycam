@@ -11,7 +11,13 @@ export type {
 } from './types/evidence';
 
 // Capture Types
-export type { Capture } from './types/capture';
+export type {
+  Capture,
+  CameraIntrinsics,
+  DepthFrame,
+  DepthColormap,
+  DepthOverlayConfig,
+} from './types/capture';
 
 // Device Types
 export type {

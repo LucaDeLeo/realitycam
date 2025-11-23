@@ -1,43 +1,107 @@
+/**
+ * Capture Screen
+ *
+ * Main camera capture screen with LiDAR depth overlay.
+ * Displays camera preview with real-time depth visualization.
+ *
+ * @see Story 3.1 - Camera View with LiDAR Depth Overlay
+ */
+
+import { useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, useColorScheme } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { CameraView, CameraViewHandle } from '../../components/Camera';
+import { useDeviceStore } from '../../store/deviceStore';
 import { colors } from '../../constants/colors';
 
-export default function CaptureScreen() {
+/**
+ * LiDAR unavailable message component
+ */
+function LiDARUnavailable({ reason }: { reason?: string }) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
   return (
-    <View
+    <SafeAreaView
       style={[
         styles.container,
+        styles.centered,
         { backgroundColor: isDark ? colors.backgroundDark : colors.background },
       ]}
     >
-      <Ionicons
-        name="camera-outline"
-        size={80}
-        color={colors.primary}
-        style={styles.icon}
+      <View style={styles.unavailableContainer}>
+        <Text style={[styles.unavailableTitle, { color: isDark ? colors.textDark : colors.text }]}>
+          LiDAR Required
+        </Text>
+        <Text style={[styles.unavailableMessage, { color: isDark ? colors.textDark : colors.text }]}>
+          This app requires iPhone Pro with LiDAR sensor for authenticated photo capture.
+        </Text>
+        {reason && (
+          <Text style={[styles.unavailableReason, { color: colors.textSecondary }]}>
+            {reason}
+          </Text>
+        )}
+      </View>
+    </SafeAreaView>
+  );
+}
+
+/**
+ * Capture screen with camera and depth overlay
+ */
+export default function CaptureScreen() {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+
+  // Get device capabilities from store
+  const capabilities = useDeviceStore((state) => state.capabilities);
+
+  // Camera ref for future capture functionality
+  const cameraRef = useRef<CameraViewHandle>(null);
+
+  // Overlay visibility state
+  const [overlayEnabled, setOverlayEnabled] = useState(true);
+
+  // LiDAR status tracking
+  const [lidarError, setLidarError] = useState<string | null>(null);
+
+  // Handle LiDAR status callback
+  const handleLiDARStatus = useCallback((available: boolean, error: string | null) => {
+    if (!available && error) {
+      setLidarError(error);
+    } else {
+      setLidarError(null);
+    }
+  }, []);
+
+  // Handle overlay toggle
+  const handleOverlayToggle = useCallback((enabled: boolean) => {
+    setOverlayEnabled(enabled);
+  }, []);
+
+  // Check if device has LiDAR capability
+  // This is a double-check - the device store should already show LiDAR
+  // But the native module provides runtime verification
+  if (!capabilities?.hasLiDAR) {
+    return <LiDARUnavailable reason="Device does not have LiDAR sensor" />;
+  }
+
+  // Show LiDAR error if native check failed
+  if (lidarError) {
+    return <LiDARUnavailable reason={lidarError} />;
+  }
+
+  return (
+    <View style={styles.container}>
+      <CameraView
+        ref={cameraRef}
+        showOverlay={overlayEnabled}
+        onOverlayToggle={handleOverlayToggle}
+        onLiDARStatus={handleLiDARStatus}
+        minDepth={0}
+        maxDepth={5}
+        overlayOpacity={0.4}
       />
-      <Text style={[styles.title, { color: isDark ? colors.textDark : colors.text }]}>
-        Capture
-      </Text>
-      <Text
-        style={[
-          styles.subtitle,
-          { color: isDark ? colors.tabBarInactive : colors.textSecondary },
-        ]}
-      >
-        Capture authenticated photos with LiDAR verification
-      </Text>
-      <Text
-        style={[
-          styles.hint,
-          { color: isDark ? colors.tabBarInactive : colors.textSecondary },
-        ]}
-      >
-        Camera functionality coming soon
-      </Text>
     </View>
   );
 }
@@ -45,25 +109,30 @@ export default function CaptureScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  centered: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
   },
-  icon: {
-    marginBottom: 24,
+  unavailableContainer: {
+    alignItems: 'center',
+    paddingHorizontal: 24,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 12,
+  unavailableTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 16,
   },
-  subtitle: {
+  unavailableMessage: {
     fontSize: 16,
     textAlign: 'center',
-    marginBottom: 8,
-    lineHeight: 22,
+    marginBottom: 12,
+    lineHeight: 24,
+    opacity: 0.9,
   },
-  hint: {
+  unavailableReason: {
     fontSize: 14,
     textAlign: 'center',
     fontStyle: 'italic',
