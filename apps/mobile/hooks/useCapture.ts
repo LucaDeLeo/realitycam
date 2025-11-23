@@ -1,27 +1,38 @@
 /**
  * useCapture Hook
  *
- * Orchestrates synchronized photo + depth + location capture.
- * Manages capture state machine, camera ref, and integrates with useLiDAR and useLocation.
+ * Orchestrates synchronized photo + depth + location capture with per-capture attestation.
+ * Manages capture state machine, camera ref, and integrates with useLiDAR, useLocation,
+ * and useCaptureAttestation.
  *
  * Features:
  * - Parallel photo, depth, and location capture via Promise.allSettled
  * - 100ms synchronization window validation for photo/depth
  * - Location capture in parallel (optional, never blocks capture)
+ * - Per-capture attestation signature (optional, never blocks capture)
  * - State machine: idle -> capturing -> captured -> idle
  * - Error handling with typed CaptureError
  * - Camera ref management for expo-camera
  *
  * @see Story 3.2 - Photo Capture with Depth Map
  * @see Story 3.3 - GPS Metadata Collection
+ * @see Story 3.4 - Capture Attestation Signature
  */
 
 import { useCallback, useState, useRef } from 'react';
 import { CameraView as ExpoCameraView } from 'expo-camera';
 import * as Crypto from 'expo-crypto';
+import * as FileSystem from 'expo-file-system';
 import { useLiDAR } from './useLiDAR';
 import { useLocation } from './useLocation';
-import type { DepthFrame, RawCapture, CaptureError, CaptureLocation } from '@realitycam/shared';
+import { useCaptureAttestation } from './useCaptureAttestation';
+import type {
+  RawCapture,
+  CaptureError,
+  CaptureLocation,
+  AssertionMetadata,
+  CaptureAssertion,
+} from '@realitycam/shared';
 
 /**
  * Maximum allowed sync delta in milliseconds
@@ -126,6 +137,12 @@ export function useCapture(): UseCaptureReturn {
     hasPermission: hasLocationPermission,
     permissionStatus: locationPermissionStatus,
   } = useLocation();
+
+  // Get attestation generation from useCaptureAttestation hook
+  const {
+    generateAssertion,
+    isReady: isAttestationReady,
+  } = useCaptureAttestation();
 
   // Capture state machine
   const [state, setState] = useState<CaptureState>('idle');
@@ -274,16 +291,79 @@ export function useCapture(): UseCaptureReturn {
         throw captureError;
       }
 
-      // Construct RawCapture with optional location
+      // Generate capture ID and timestamp
+      const captureId = Crypto.randomUUID();
+      const capturedAt = new Date().toISOString();
+
+      // Generate per-capture attestation (optional - never blocks capture)
+      let assertion: CaptureAssertion | undefined;
+      if (isAttestationReady) {
+        try {
+          console.log('[useCapture] Generating per-capture attestation...');
+
+          // Compute photo hash from file
+          const photoBase64 = await FileSystem.readAsStringAsync(photo.uri, {
+            encoding: 'base64',
+          });
+          const photoHash = await Crypto.digestStringAsync(
+            Crypto.CryptoDigestAlgorithm.SHA256,
+            photoBase64,
+            { encoding: Crypto.CryptoEncoding.BASE64 }
+          );
+
+          // Compute depth map hash from base64 depth data
+          const depthHash = await Crypto.digestStringAsync(
+            Crypto.CryptoDigestAlgorithm.SHA256,
+            depthFrame.depthMap, // Already base64 encoded
+            { encoding: Crypto.CryptoEncoding.BASE64 }
+          );
+
+          // Compute optional location hash
+          let locationHash: string | undefined;
+          if (location) {
+            const locationString = `${location.latitude},${location.longitude},${location.timestamp}`;
+            locationHash = await Crypto.digestStringAsync(
+              Crypto.CryptoDigestAlgorithm.SHA256,
+              locationString,
+              { encoding: Crypto.CryptoEncoding.BASE64 }
+            );
+          }
+
+          // Build assertion metadata
+          const metadata: AssertionMetadata = {
+            photoHash,
+            depthHash,
+            timestamp: capturedAt,
+            locationHash,
+          };
+
+          // Generate assertion
+          assertion = await generateAssertion(metadata) ?? undefined;
+
+          if (assertion) {
+            console.log('[useCapture] Attestation generated successfully');
+          } else {
+            console.log('[useCapture] Attestation not generated (device may not be attested)');
+          }
+        } catch (attestationError) {
+          // Log and continue without assertion (graceful degradation)
+          console.warn('[useCapture] Attestation generation failed:', attestationError);
+        }
+      } else {
+        console.log('[useCapture] Skipping attestation (device not attested)');
+      }
+
+      // Construct RawCapture with optional location and assertion
       const rawCapture: RawCapture = {
-        id: Crypto.randomUUID(),
+        id: captureId,
         photoUri: photo.uri,
         photoWidth: photo.width,
         photoHeight: photo.height,
         depthFrame,
-        capturedAt: new Date().toISOString(),
+        capturedAt,
         syncDeltaMs,
         location,
+        assertion,
       };
 
       // Update state
@@ -294,7 +374,7 @@ export function useCapture(): UseCaptureReturn {
       setTimeout(() => setState('idle'), 100);
 
       console.log(
-        `[useCapture] Capture complete: id=${rawCapture.id}, syncDelta=${syncDeltaMs}ms, hasLocation=${!!location}`
+        `[useCapture] Capture complete: id=${rawCapture.id}, syncDelta=${syncDeltaMs}ms, hasLocation=${!!location}, hasAssertion=${!!assertion}`
       );
 
       return rawCapture;
@@ -325,7 +405,7 @@ export function useCapture(): UseCaptureReturn {
       setState('idle');
       throw captureError;
     }
-  }, [isDepthReady, isCapturing, captureDepthFrame, hasLocationPermission, getCurrentLocation]);
+  }, [isDepthReady, isCapturing, captureDepthFrame, hasLocationPermission, getCurrentLocation, isAttestationReady, generateAssertion]);
 
   return {
     capture,

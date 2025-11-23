@@ -60,7 +60,7 @@ development_status:
   3-1-camera-view-lidar-depth-overlay: done
   3-2-photo-capture-depth-map: done
   3-3-gps-metadata-collection: done
-  3-4-capture-attestation-signature: backlog
+  3-4-capture-attestation-signature: done
   3-5-local-processing-pipeline: backlog
   3-6-capture-preview-screen: backlog
   epic-3-retrospective: optional

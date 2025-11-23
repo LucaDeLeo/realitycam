@@ -23,6 +23,10 @@ export type {
   CaptureLocation,
   LocationErrorCode,
   LocationError,
+  AssertionMetadata,
+  CaptureAssertion,
+  CaptureAssertionErrorCode,
+  CaptureAssertionError,
 } from './types/capture';
 
 // Device Types

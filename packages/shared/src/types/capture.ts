@@ -97,6 +97,8 @@ export interface RawCapture {
   syncDeltaMs: number;
   /** Optional GPS location data (undefined if permission denied or unavailable) */
   location?: CaptureLocation;
+  /** Optional per-capture attestation (undefined if device not attested or assertion failed) */
+  assertion?: CaptureAssertion;
 }
 
 /**
@@ -157,6 +159,57 @@ export type LocationErrorCode =
 export interface LocationError {
   /** Error classification */
   code: LocationErrorCode;
+  /** User-friendly error message */
+  message: string;
+}
+
+// ============================================================================
+// Capture Attestation Types (Story 3.4)
+// ============================================================================
+
+/**
+ * Metadata included in per-capture assertion hash
+ * This data is hashed and signed to bind capture to attested device
+ */
+export interface AssertionMetadata {
+  /** SHA-256 hash of photo bytes (base64) */
+  photoHash: string;
+  /** SHA-256 hash of depth map bytes (base64) */
+  depthHash: string;
+  /** ISO timestamp of capture */
+  timestamp: string;
+  /** SHA-256 hash of location string (if available) */
+  locationHash?: string;
+}
+
+/**
+ * Per-capture device attestation assertion
+ * Cryptographically binds capture to attested device
+ */
+export interface CaptureAssertion {
+  /** Base64-encoded assertion from @expo/app-integrity generateAssertionAsync */
+  assertion: string;
+  /** Base64-encoded SHA-256 hash of AssertionMetadata JSON */
+  clientDataHash: string;
+  /** ISO timestamp when assertion was generated */
+  timestamp: string;
+}
+
+/**
+ * Error codes for capture assertion failures (informational only)
+ */
+export type CaptureAssertionErrorCode =
+  | 'NOT_ATTESTED'       // Device not attested (keyId missing)
+  | 'ASSERTION_FAILED'   // generateAssertionAsync threw
+  | 'HASH_FAILED'        // SHA-256 computation failed
+  | 'UNKNOWN';           // Unknown error
+
+/**
+ * Capture assertion error (informational - does not prevent capture)
+ */
+export interface CaptureAssertionError {
+  /** Error classification */
+  code: CaptureAssertionErrorCode;
   /** User-friendly error message */
   message: string;
 }

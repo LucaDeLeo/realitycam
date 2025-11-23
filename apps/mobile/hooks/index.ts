@@ -13,7 +13,9 @@ export { useDeviceAttestation } from './useDeviceAttestation';
 export { useLiDAR } from './useLiDAR';
 export { useCapture } from './useCapture';
 export { useLocation } from './useLocation';
+export { useCaptureAttestation } from './useCaptureAttestation';
 
 // Re-export types for convenience
 export type { UseCaptureReturn } from './useCapture';
 export type { UseLocationReturn } from './useLocation';
+export type { UseCaptureAttestationReturn } from './useCaptureAttestation';
