@@ -1,0 +1,580 @@
+<story-context id="1-2-database-schema-migrations" v="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1-2</storyId>
+    <title>Database Schema and SQLx Migrations Setup</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-22</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/1-2-database-schema-migrations.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>backend developer</asA>
+    <iWant>the PostgreSQL database schema defined with SQLx migrations and compile-time checked queries configured</iWant>
+    <soThat>I have a type-safe, production-ready database layer with proper indexing, connection pooling, and migration tooling for all core entities</soThat>
+    <tasks>
+      <task id="1" title="Install and Configure SQLx CLI">
+        <subtasks>
+          <subtask>1.1: Install SQLx CLI via `cargo install sqlx-cli --features postgres`</subtask>
+          <subtask>1.2: Verify SQLx CLI installation with `cargo sqlx --version`</subtask>
+          <subtask>1.3: Ensure `DATABASE_URL` is correctly set in backend/.env</subtask>
+          <subtask>1.4: Create `.sqlx/` directory for offline query cache</subtask>
+          <subtask>1.5: Add `.sqlx/` to `.gitignore` (or commit for CI - decide per team preference)</subtask>
+        </subtasks>
+        <acceptanceCriteria>AC-1, AC-8</acceptanceCriteria>
+      </task>
+      <task id="2" title="Create Initial Migration Files">
+        <subtasks>
+          <subtask>2.1: Create `backend/migrations/` directory</subtask>
+          <subtask>2.2: Create `20251122000001_create_extensions.sql` for uuid-ossp</subtask>
+          <subtask>2.3: Create `20251122000002_create_devices.sql` for devices table</subtask>
+          <subtask>2.4: Create `20251122000003_create_captures.sql` for captures table</subtask>
+          <subtask>2.5: Create `20251122000004_create_verification_logs.sql` for verification_logs table</subtask>
+        </subtasks>
+        <acceptanceCriteria>AC-2</acceptanceCriteria>
+      </task>
+      <task id="3" title="Implement Devices Table Migration">
+        <subtasks>
+          <subtask>3.1: Write CREATE EXTENSION IF NOT EXISTS "uuid-ossp"</subtask>
+          <subtask>3.2: Write CREATE TABLE devices with all columns per tech-spec</subtask>
+          <subtask>3.3: Add DEFAULT gen_random_uuid() for id column</subtask>
+          <subtask>3.4: Add DEFAULT 'unverified' for attestation_level</subtask>
+          <subtask>3.5: Add DEFAULT NOW() for first_seen_at and last_seen_at</subtask>
+          <subtask>3.6: Create index idx_devices_attestation_key on attestation_key_id</subtask>
+        </subtasks>
+        <acceptanceCriteria>AC-3</acceptanceCriteria>
+      </task>
+      <task id="4" title="Implement Captures Table Migration">
+        <subtasks>
+          <subtask>4.1: Write CREATE TABLE captures with all columns per tech-spec</subtask>
+          <subtask>4.2: Add FOREIGN KEY constraint to devices(id)</subtask>
+          <subtask>4.3: Add UNIQUE constraint on target_media_hash</subtask>
+          <subtask>4.4: Add DEFAULT '{}' for evidence JSONB</subtask>
+          <subtask>4.5: Add DEFAULT 'low' for confidence_level</subtask>
+          <subtask>4.6: Add DEFAULT 'pending' for status</subtask>
+          <subtask>4.7: Create HASH index idx_captures_hash on target_media_hash</subtask>
+          <subtask>4.8: Create B-tree index idx_captures_device on device_id</subtask>
+          <subtask>4.9: Create B-tree index idx_captures_status on status</subtask>
+        </subtasks>
+        <acceptanceCriteria>AC-4</acceptanceCriteria>
+      </task>
+      <task id="5" title="Implement Verification Logs Table Migration">
+        <subtasks>
+          <subtask>5.1: Write CREATE TABLE verification_logs with all columns</subtask>
+          <subtask>5.2: Add FOREIGN KEY constraint to captures(id)</subtask>
+          <subtask>5.3: Create B-tree index idx_verification_logs_capture on capture_id</subtask>
+        </subtasks>
+        <acceptanceCriteria>AC-5</acceptanceCriteria>
+      </task>
+      <task id="6" title="Configure Database Connection Pool">
+        <subtasks>
+          <subtask>6.1: Update backend/src/config.rs with database pool settings</subtask>
+          <subtask>6.2: Add DB_MAX_CONNECTIONS, DB_MIN_CONNECTIONS env vars</subtask>
+          <subtask>6.3: Create backend/src/db.rs module for pool initialization</subtask>
+          <subtask>6.4: Configure PgPoolOptions with connection limits and timeouts</subtask>
+          <subtask>6.5: Add pool creation function that returns PgPool</subtask>
+          <subtask>6.6: Export db module from lib.rs or main.rs</subtask>
+        </subtasks>
+        <acceptanceCriteria>AC-6</acceptanceCriteria>
+      </task>
+      <task id="7" title="Create Rust Entity Models">
+        <subtasks>
+          <subtask>7.1: Create backend/src/models/mod.rs with module exports</subtask>
+          <subtask>7.2: Create backend/src/models/device.rs with Device struct</subtask>
+          <subtask>7.3: Create backend/src/models/capture.rs with Capture struct</subtask>
+          <subtask>7.4: Create backend/src/models/verification_log.rs with VerificationLog struct</subtask>
+          <subtask>7.5: Derive sqlx::FromRow, Debug, Serialize for all models</subtask>
+          <subtask>7.6: Add proper type mappings (UUID, DateTime&lt;Utc&gt;, serde_json::Value, Vec&lt;u8&gt;)</subtask>
+          <subtask>7.7: Export models module from main.rs</subtask>
+        </subtasks>
+        <acceptanceCriteria>AC-7</acceptanceCriteria>
+      </task>
+      <task id="8" title="Setup Compile-Time Query Verification">
+        <subtasks>
+          <subtask>8.1: Ensure sqlx feature "offline" is enabled in Cargo.toml</subtask>
+          <subtask>8.2: Create sample query in db.rs or models to test compile-time checking</subtask>
+          <subtask>8.3: Run `cargo sqlx prepare` to generate query cache</subtask>
+          <subtask>8.4: Verify build works with SQLX_OFFLINE=true</subtask>
+        </subtasks>
+        <acceptanceCriteria>AC-8</acceptanceCriteria>
+      </task>
+      <task id="9" title="Test and Verify Migrations">
+        <subtasks>
+          <subtask>9.1: Start PostgreSQL via docker-compose</subtask>
+          <subtask>9.2: Run `sqlx database create` (if database doesn't exist)</subtask>
+          <subtask>9.3: Run `sqlx migrate run` and verify success</subtask>
+          <subtask>9.4: Run `sqlx migrate info` to confirm all migrations applied</subtask>
+          <subtask>9.5: Query database to verify tables and indexes exist</subtask>
+          <subtask>9.6: Test foreign key constraints work correctly</subtask>
+        </subtasks>
+        <acceptanceCriteria>AC-9</acceptanceCriteria>
+      </task>
+      <task id="10" title="Update Environment and Documentation">
+        <subtasks>
+          <subtask>10.1: Update backend/.env.example with pool configuration vars</subtask>
+          <subtask>10.2: Update README.md with migration instructions</subtask>
+          <subtask>10.3: Document SQLx CLI commands in README.md</subtask>
+        </subtasks>
+        <acceptanceCriteria>AC-1, AC-6</acceptanceCriteria>
+      </task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC-1" title="SQLx CLI Installed and Configured">
+      <given>the backend directory with Cargo.toml</given>
+      <when>the developer runs `cargo sqlx --help`</when>
+      <then>the SQLx CLI is available and operational</then>
+      <and>the `.env` file contains a valid `DATABASE_URL` pointing to PostgreSQL</and>
+    </criterion>
+    <criterion id="AC-2" title="Migration Directory Structure">
+      <given>the backend project</given>
+      <when>the developer inspects the migrations folder</when>
+      <then>`backend/migrations/` exists with timestamp-prefixed `.sql` files</then>
+      <and>migrations are numbered sequentially (e.g., `20251122000001_create_devices.sql`)</and>
+    </criterion>
+    <criterion id="AC-3" title="Devices Table Created">
+      <given>PostgreSQL is running and migrations are applied</given>
+      <when>the developer queries the database schema</when>
+      <then>the `devices` table exists with all specified columns</then>
+      <columns>
+        <column name="id" type="UUID" constraints="PRIMARY KEY" default="gen_random_uuid()"/>
+        <column name="attestation_level" type="TEXT" constraints="NOT NULL" default="unverified"/>
+        <column name="attestation_key_id" type="TEXT" constraints="NOT NULL UNIQUE"/>
+        <column name="attestation_chain" type="BYTEA" constraints="nullable"/>
+        <column name="platform" type="TEXT" constraints="NOT NULL"/>
+        <column name="model" type="TEXT" constraints="NOT NULL"/>
+        <column name="has_lidar" type="BOOLEAN" constraints="NOT NULL" default="false"/>
+        <column name="first_seen_at" type="TIMESTAMPTZ" constraints="NOT NULL" default="NOW()"/>
+        <column name="last_seen_at" type="TIMESTAMPTZ" constraints="NOT NULL" default="NOW()"/>
+      </columns>
+      <indexes>
+        <index name="idx_devices_attestation_key" column="attestation_key_id"/>
+      </indexes>
+    </criterion>
+    <criterion id="AC-4" title="Captures Table Created">
+      <given>PostgreSQL is running and migrations are applied</given>
+      <when>the developer queries the database schema</when>
+      <then>the `captures` table exists with all specified columns</then>
+      <columns>
+        <column name="id" type="UUID" constraints="PRIMARY KEY" default="gen_random_uuid()"/>
+        <column name="device_id" type="UUID" constraints="NOT NULL REFERENCES devices(id)"/>
+        <column name="target_media_hash" type="BYTEA" constraints="NOT NULL UNIQUE"/>
+        <column name="depth_map_key" type="TEXT" constraints="nullable"/>
+        <column name="evidence" type="JSONB" constraints="NOT NULL" default="'{}'"/>
+        <column name="confidence_level" type="TEXT" constraints="NOT NULL" default="low"/>
+        <column name="status" type="TEXT" constraints="NOT NULL" default="pending"/>
+        <column name="captured_at" type="TIMESTAMPTZ" constraints="NOT NULL"/>
+        <column name="uploaded_at" type="TIMESTAMPTZ" constraints="NOT NULL" default="NOW()"/>
+      </columns>
+      <indexes>
+        <index name="idx_captures_hash" column="target_media_hash" type="HASH"/>
+        <index name="idx_captures_device" column="device_id" type="B-tree"/>
+        <index name="idx_captures_status" column="status" type="B-tree"/>
+      </indexes>
+    </criterion>
+    <criterion id="AC-5" title="Verification Logs Table Created">
+      <given>PostgreSQL is running and migrations are applied</given>
+      <when>the developer queries the database schema</when>
+      <then>the `verification_logs` table exists with all specified columns</then>
+      <columns>
+        <column name="id" type="UUID" constraints="PRIMARY KEY" default="gen_random_uuid()"/>
+        <column name="capture_id" type="UUID" constraints="REFERENCES captures(id), nullable"/>
+        <column name="action" type="TEXT" constraints="NOT NULL"/>
+        <column name="client_ip" type="INET" constraints="nullable"/>
+        <column name="user_agent" type="TEXT" constraints="nullable"/>
+        <column name="created_at" type="TIMESTAMPTZ" constraints="NOT NULL" default="NOW()"/>
+      </columns>
+      <indexes>
+        <index name="idx_verification_logs_capture" column="capture_id" type="B-tree"/>
+      </indexes>
+    </criterion>
+    <criterion id="AC-6" title="Database Connection Pool Configured">
+      <given>the backend with SQLx configured</given>
+      <when>the developer runs `cargo build`</when>
+      <then>SQLx compiles with PostgreSQL runtime</then>
+      <and>connection pool is configured with specified settings</and>
+      <poolSettings>
+        <setting name="max_connections" value="10" configurable="true"/>
+        <setting name="min_connections" value="2"/>
+        <setting name="acquire_timeout" value="30 seconds"/>
+        <setting name="idle_timeout" value="10 minutes"/>
+      </poolSettings>
+    </criterion>
+    <criterion id="AC-7" title="Rust Entity Models Defined">
+      <given>the database schema is applied</given>
+      <when>the developer inspects `backend/src/models/`</when>
+      <then>Rust entity models exist for Device, Capture, VerificationLog</then>
+      <models>
+        <model name="Device" file="device.rs" derives="sqlx::FromRow, Debug, Serialize"/>
+        <model name="Capture" file="capture.rs" derives="sqlx::FromRow, Debug, Serialize"/>
+        <model name="VerificationLog" file="verification_log.rs" derives="sqlx::FromRow, Debug, Serialize"/>
+      </models>
+    </criterion>
+    <criterion id="AC-8" title="Compile-Time Query Checking Works">
+      <given>the database is running with schema applied</given>
+      <when>the developer runs `cargo sqlx prepare`</when>
+      <then>SQLx query cache is generated in `.sqlx/` directory</then>
+      <and>subsequent `cargo build` can verify queries without live database (offline mode)</and>
+    </criterion>
+    <criterion id="AC-9" title="Migrations Run Successfully">
+      <given>Docker PostgreSQL is running</given>
+      <when>the developer runs `sqlx migrate run` from backend directory</when>
+      <then>all migrations complete without errors</then>
+      <and>`sqlx migrate info` shows all migrations as applied</and>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <artifact path="docs/prd.md" relevance="high">
+        <description>Product Requirements Document defining data model, core entities (devices, captures, verification_logs), and functional requirements for database layer</description>
+        <sections>
+          <section name="Data Model (MVP)" line="501">Defines core entities: devices, captures, verification_logs with key fields</section>
+          <section name="Tech Stack" line="543">Specifies SQLx 0.8 + PostgreSQL 16 for database</section>
+          <section name="Non-Functional Requirements" line="427">Performance and reliability targets for database operations</section>
+        </sections>
+      </artifact>
+      <artifact path="docs/architecture.md" relevance="high">
+        <description>Architecture document with complete database schema, Cargo.toml dependencies, and ADRs for JSONB evidence storage</description>
+        <sections>
+          <section name="Database Schema" line="456">Complete SQL schema for devices, captures tables</section>
+          <section name="Backend Dependencies" line="203">Full Cargo.toml with SQLx 0.8 and all required features</section>
+          <section name="ADR-006" line="786">JSONB for Evidence Storage decision and rationale</section>
+          <section name="Naming Conventions" line="383">Database column naming (snake_case) and table naming (plural)</section>
+        </sections>
+      </artifact>
+      <artifact path="docs/sprint-artifacts/tech-spec-epic-1.md" relevance="critical">
+        <description>Epic 1 Technical Specification with authoritative database schema, Rust entity models, and acceptance criteria</description>
+        <sections>
+          <section name="Data Models and Contracts" line="92">Complete SQL CREATE TABLE statements for all three tables</section>
+          <section name="Rust Entity Models" line="146">Device, Capture struct definitions with sqlx::FromRow</section>
+          <section name="AC-1.3" line="507">Database Schema Applied acceptance criteria</section>
+          <section name="Reliability/Availability NFRs" line="401">Connection pooling requirements</section>
+        </sections>
+      </artifact>
+    </docs>
+    <code>
+      <artifact path="backend/Cargo.toml" relevance="critical">
+        <description>Backend dependencies including SQLx 0.8 with postgres, uuid, chrono, json features. Story must add offline feature.</description>
+        <content><![CDATA[
+[dependencies]
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono", "json"] }
+# Need to add "offline" feature for compile-time query checking
+]]></content>
+      </artifact>
+      <artifact path="backend/src/main.rs" relevance="medium">
+        <description>Main application entry point. Will need to integrate database pool initialization and models module.</description>
+        <existingCode>
+          <imports>mod config;</imports>
+          <integration>Database pool must be initialized in main() and passed to router state</integration>
+        </existingCode>
+      </artifact>
+      <artifact path="backend/src/config.rs" relevance="high">
+        <description>Configuration module already loading DATABASE_URL. Needs extension for pool settings.</description>
+        <existingCode><![CDATA[
+pub struct Config {
+    pub database_url: String,
+    pub s3_endpoint: String,
+    pub s3_bucket: String,
+    pub port: u16,
+}
+// Needs: db_max_connections, db_min_connections, db_acquire_timeout, db_idle_timeout
+]]></existingCode>
+      </artifact>
+      <artifact path="backend/.env.example" relevance="high">
+        <description>Environment template with DATABASE_URL already configured. Needs pool configuration vars.</description>
+        <existingContent>DATABASE_URL=postgres://realitycam:localdev@localhost:5432/realitycam</existingContent>
+        <additions>DB_MAX_CONNECTIONS, DB_MIN_CONNECTIONS, DB_ACQUIRE_TIMEOUT_SECS, DB_IDLE_TIMEOUT_SECS</additions>
+      </artifact>
+      <artifact path="infrastructure/docker-compose.yml" relevance="high">
+        <description>Docker Compose with PostgreSQL 16 service configured and ready for migrations</description>
+        <dbConfig>
+          <database>realitycam</database>
+          <user>realitycam</user>
+          <password>localdev</password>
+          <port>5432</port>
+        </dbConfig>
+      </artifact>
+    </code>
+    <dependencies>
+      <dependency name="sqlx" version="0.8" type="rust-crate">
+        <features>runtime-tokio, postgres, uuid, chrono, json, offline</features>
+        <purpose>Database connectivity, migrations, compile-time query checking</purpose>
+        <notes>Add "offline" feature for SQLX_OFFLINE=true builds</notes>
+      </dependency>
+      <dependency name="sqlx-cli" version="0.8" type="cargo-tool">
+        <installCommand>cargo install sqlx-cli --features postgres</installCommand>
+        <purpose>Migration management, offline query cache generation</purpose>
+        <commands>
+          <command>sqlx database create</command>
+          <command>sqlx migrate run</command>
+          <command>sqlx migrate info</command>
+          <command>sqlx prepare</command>
+        </commands>
+      </dependency>
+      <dependency name="uuid" version="1" type="rust-crate">
+        <features>v4, serde</features>
+        <purpose>UUID generation and serialization for entity IDs</purpose>
+      </dependency>
+      <dependency name="chrono" version="0.4" type="rust-crate">
+        <features>serde</features>
+        <purpose>DateTime&lt;Utc&gt; for timestamp fields</purpose>
+      </dependency>
+      <dependency name="serde_json" version="1" type="rust-crate">
+        <purpose>serde_json::Value for JSONB evidence column</purpose>
+      </dependency>
+      <dependency name="postgresql" version="16" type="service">
+        <dockerImage>postgres:16</dockerImage>
+        <port>5432</port>
+        <connectionUrl>postgres://realitycam:localdev@localhost:5432/realitycam</connectionUrl>
+      </dependency>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint source="architecture.md" category="schema-design">
+      <rule>Use PostgreSQL 16 native UUID generation (gen_random_uuid()) - no uuid-ossp extension required</rule>
+      <rationale>PostgreSQL 13+ includes gen_random_uuid() natively</rationale>
+    </constraint>
+    <constraint source="architecture.md#ADR-006" category="schema-design">
+      <rule>Store evidence as JSONB column for flexible schema evolution</rule>
+      <rationale>Evidence structure will evolve as new checks are added; JSONB provides native indexing and flexibility</rationale>
+    </constraint>
+    <constraint source="tech-spec-epic-1.md" category="indexing">
+      <rule>Use HASH index on target_media_hash for O(1) exact match lookups</rule>
+      <rationale>File verification requires fast hash lookups</rationale>
+    </constraint>
+    <constraint source="tech-spec-epic-1.md" category="indexing">
+      <rule>Use B-tree indexes on foreign keys and status columns</rule>
+      <rationale>Support efficient filtering and joins</rationale>
+    </constraint>
+    <constraint source="prd.md#NFR" category="reliability">
+      <rule>Connection pool: max=10, min=2, acquire_timeout=30s, idle_timeout=10min</rule>
+      <rationale>Balance resource usage with availability</rationale>
+    </constraint>
+    <constraint source="architecture.md" category="naming">
+      <rule>Database tables: plural, snake_case (devices, captures, verification_logs)</rule>
+    </constraint>
+    <constraint source="architecture.md" category="naming">
+      <rule>Database columns: snake_case (device_id, captured_at, attestation_level)</rule>
+    </constraint>
+    <constraint source="story-1-1" category="compatibility">
+      <rule>Maintain compatibility with existing config.rs structure</rule>
+      <rationale>Story 1-1 established the Config struct pattern</rationale>
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface type="database-models">
+      <name>Device Entity</name>
+      <definition><![CDATA[
+#[derive(Debug, sqlx::FromRow, Serialize)]
+pub struct Device {
+    pub id: Uuid,
+    pub attestation_level: String,
+    pub attestation_key_id: String,
+    pub attestation_chain: Option<Vec<u8>>,
+    pub platform: String,
+    pub model: String,
+    pub has_lidar: bool,
+    pub first_seen_at: DateTime<Utc>,
+    pub last_seen_at: DateTime<Utc>,
+}
+]]></definition>
+    </interface>
+    <interface type="database-models">
+      <name>Capture Entity</name>
+      <definition><![CDATA[
+#[derive(Debug, sqlx::FromRow, Serialize)]
+pub struct Capture {
+    pub id: Uuid,
+    pub device_id: Uuid,
+    pub target_media_hash: Vec<u8>,
+    pub depth_map_key: Option<String>,
+    pub evidence: serde_json::Value,
+    pub confidence_level: String,
+    pub status: String,
+    pub captured_at: DateTime<Utc>,
+    pub uploaded_at: DateTime<Utc>,
+}
+]]></definition>
+    </interface>
+    <interface type="database-models">
+      <name>VerificationLog Entity</name>
+      <definition><![CDATA[
+#[derive(Debug, sqlx::FromRow, Serialize)]
+pub struct VerificationLog {
+    pub id: Uuid,
+    pub capture_id: Option<Uuid>,
+    pub action: String,
+    pub client_ip: Option<String>,  // INET stored as String
+    pub user_agent: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+]]></definition>
+    </interface>
+    <interface type="database-pool">
+      <name>Database Pool Module</name>
+      <definition><![CDATA[
+// backend/src/db.rs
+use sqlx::postgres::{PgPool, PgPoolOptions};
+use std::time::Duration;
+
+pub async fn create_pool(config: &Config) -> Result<PgPool, sqlx::Error> {
+    PgPoolOptions::new()
+        .max_connections(config.db_max_connections)
+        .min_connections(config.db_min_connections)
+        .acquire_timeout(Duration::from_secs(config.db_acquire_timeout))
+        .idle_timeout(Duration::from_secs(config.db_idle_timeout))
+        .connect(&config.database_url)
+        .await
+}
+]]></definition>
+    </interface>
+    <interface type="sql-schema">
+      <name>Devices Table DDL</name>
+      <definition><![CDATA[
+CREATE TABLE devices (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    attestation_level   TEXT NOT NULL DEFAULT 'unverified',
+    attestation_key_id  TEXT NOT NULL UNIQUE,
+    attestation_chain   BYTEA,
+    platform            TEXT NOT NULL,
+    model               TEXT NOT NULL,
+    has_lidar           BOOLEAN NOT NULL DEFAULT false,
+    first_seen_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_seen_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_devices_attestation_key ON devices(attestation_key_id);
+]]></definition>
+    </interface>
+    <interface type="sql-schema">
+      <name>Captures Table DDL</name>
+      <definition><![CDATA[
+CREATE TABLE captures (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    device_id           UUID NOT NULL REFERENCES devices(id),
+    target_media_hash   BYTEA NOT NULL UNIQUE,
+    depth_map_key       TEXT,
+    evidence            JSONB NOT NULL DEFAULT '{}',
+    confidence_level    TEXT NOT NULL DEFAULT 'low',
+    status              TEXT NOT NULL DEFAULT 'pending',
+    captured_at         TIMESTAMPTZ NOT NULL,
+    uploaded_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_captures_hash ON captures USING hash(target_media_hash);
+CREATE INDEX idx_captures_device ON captures(device_id);
+CREATE INDEX idx_captures_status ON captures(status);
+]]></definition>
+    </interface>
+    <interface type="sql-schema">
+      <name>Verification Logs Table DDL</name>
+      <definition><![CDATA[
+CREATE TABLE verification_logs (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    capture_id  UUID REFERENCES captures(id),
+    action      TEXT NOT NULL,
+    client_ip   INET,
+    user_agent  TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_verification_logs_capture ON verification_logs(capture_id);
+]]></definition>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      <standard source="tech-spec-epic-1.md#test-strategy">
+        <framework>cargo test with testcontainers for integration tests</framework>
+        <pattern>Unit tests alongside source files (e.g., pipeline_test.rs)</pattern>
+        <integrationPath>tests/ directory for API integration tests</integrationPath>
+      </standard>
+      <standard source="architecture.md">
+        <commandBackend>cd backend &amp;&amp; cargo test</commandBackend>
+        <commandIntegration>cd backend &amp;&amp; cargo test --features integration</commandIntegration>
+      </standard>
+    </standards>
+    <locations>
+      <location purpose="unit-tests">backend/src/models/*_test.rs</location>
+      <location purpose="unit-tests">backend/src/db_test.rs</location>
+      <location purpose="integration-tests">backend/tests/database_test.rs</location>
+    </locations>
+    <ideas>
+      <idea category="schema-validation" priority="high">
+        <description>Verify all tables exist after migrations with correct column types</description>
+        <approach>Query pg_catalog.pg_tables and information_schema.columns</approach>
+      </idea>
+      <idea category="index-validation" priority="high">
+        <description>Verify all indexes are created with correct types (HASH vs B-tree)</description>
+        <approach>Query pg_indexes system table</approach>
+      </idea>
+      <idea category="foreign-key-validation" priority="high">
+        <description>Test foreign key constraints enforce referential integrity</description>
+        <approach>Attempt to insert capture with non-existent device_id, expect error</approach>
+      </idea>
+      <idea category="default-values" priority="medium">
+        <description>Verify DEFAULT values are applied correctly for all columns</description>
+        <approach>Insert minimal record, verify generated values</approach>
+      </idea>
+      <idea category="unique-constraints" priority="high">
+        <description>Test UNIQUE constraints on attestation_key_id and target_media_hash</description>
+        <approach>Attempt duplicate inserts, expect unique violation</approach>
+      </idea>
+      <idea category="pool-configuration" priority="medium">
+        <description>Verify connection pool respects configured limits</description>
+        <approach>Create pool with custom config, verify settings</approach>
+      </idea>
+      <idea category="offline-mode" priority="medium">
+        <description>Verify SQLX_OFFLINE=true build succeeds after cargo sqlx prepare</description>
+        <approach>Run cargo build with SQLX_OFFLINE=true environment variable</approach>
+      </idea>
+      <idea category="model-mapping" priority="high">
+        <description>Verify Rust models correctly map to database columns</description>
+        <approach>Insert test record via model, retrieve and verify all fields</approach>
+      </idea>
+    </ideas>
+  </tests>
+
+  <devNotes>
+    <note category="learnings-from-story-1-1">
+      Story 1-1 established the basic backend structure with config.rs already loading DATABASE_URL.
+      Extend this pattern rather than replacing it. The Config struct already exists and loads .env files.
+    </note>
+    <note category="migration-naming">
+      Use format: YYYYMMDDHHMMSS_description.sql (e.g., 20251122000001_create_devices.sql)
+      SQLx orders migrations by filename, so timestamp prefix ensures correct ordering.
+    </note>
+    <note category="uuid-generation">
+      PostgreSQL 16 includes gen_random_uuid() natively - no need for uuid-ossp extension.
+      The tech-spec mentions CREATE EXTENSION uuid-ossp but this is optional/legacy.
+    </note>
+    <note category="inet-type-mapping">
+      PostgreSQL INET type maps to String in Rust via SQLx.
+      Use Option&lt;String&gt; for nullable INET columns like client_ip.
+    </note>
+    <note category="sqlx-offline">
+      For CI builds without database, add "offline" feature to sqlx in Cargo.toml.
+      Run `cargo sqlx prepare` after creating queries to generate .sqlx/ cache.
+    </note>
+    <note category="verification-workflow">
+      After migrations: Start docker-compose, run sqlx migrate run, verify with psql or sqlx migrate info.
+      Test commands are in the story file under "Testing Checklist" section.
+    </note>
+  </devNotes>
+
+  <references>
+    <reference type="documentation" priority="critical">docs/sprint-artifacts/tech-spec-epic-1.md#Data-Models-and-Contracts</reference>
+    <reference type="documentation" priority="critical">docs/sprint-artifacts/tech-spec-epic-1.md#AC-1.3</reference>
+    <reference type="documentation" priority="high">docs/architecture.md#Data-Architecture</reference>
+    <reference type="documentation" priority="high">docs/architecture.md#ADR-006-JSONB-for-Evidence-Storage</reference>
+    <reference type="documentation" priority="medium">docs/prd.md#Data-Model-MVP</reference>
+    <reference type="external" priority="high">https://docs.rs/sqlx/latest/sqlx/</reference>
+    <reference type="external" priority="medium">https://github.com/launchbadge/sqlx/blob/main/sqlx-cli/README.md</reference>
+  </references>
+</story-context>

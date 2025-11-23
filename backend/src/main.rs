@@ -4,6 +4,8 @@ use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod config;
+pub mod db;
+pub mod models;
 
 #[tokio::main]
 async fn main() {
@@ -15,6 +17,14 @@ async fn main() {
     // Load configuration
     let config = config::Config::load();
     tracing::info!("Starting RealityCam API server");
+
+    // Initialize database connection pool
+    let pool = db::create_pool(&config).await.expect("Failed to create database pool");
+    tracing::info!("Database connection pool created");
+
+    // Run pending migrations
+    db::run_migrations(&pool).await.expect("Failed to run database migrations");
+    tracing::info!("Database migrations completed");
 
     // Build the router
     let app = Router::new()
