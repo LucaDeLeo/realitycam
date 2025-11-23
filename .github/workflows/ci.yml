@@ -308,11 +308,24 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check if Playwright is configured
+        id: check-playwright
+        working-directory: apps/web
+        run: |
+          if grep -q "@playwright/test" package.json; then
+            echo "configured=true" >> $GITHUB_OUTPUT
+          else
+            echo "configured=false" >> $GITHUB_OUTPUT
+            echo "Playwright not configured, skipping browser install"
+          fi
+
       - name: Install Playwright Browsers
+        if: steps.check-playwright.outputs.configured == 'true'
         working-directory: apps/web
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Build Web App
+        if: steps.check-playwright.outputs.configured == 'true'
         working-directory: apps/web
         run: pnpm run build
 
@@ -325,14 +338,14 @@ jobs:
 
       - name: Upload E2E Report
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.check-playwright.outputs.configured == 'true'
         with:
           name: web-e2e-report
           path: apps/web/test-results/
 
       - name: Upload Playwright Screenshots
         uses: actions/upload-artifact@v4
-        if: failure()
+        if: failure() && steps.check-playwright.outputs.configured == 'true'
         with:
           name: playwright-screenshots
           path: apps/web/test-results/screenshots/

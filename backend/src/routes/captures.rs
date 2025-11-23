@@ -594,6 +594,24 @@ async fn upload_capture(
                 request_id,
             })?;
 
+    // Cap confidence for unverified devices (Phase 3 hardening)
+    // Devices that haven't passed full attestation verification cannot achieve High confidence
+    let confidence_level = if !device_ctx.is_verified {
+        match confidence_level {
+            crate::models::ConfidenceLevel::High => {
+                tracing::info!(
+                    request_id = %request_id,
+                    capture_id = %capture_id,
+                    "Capping confidence from High to Medium for unverified device"
+                );
+                crate::models::ConfidenceLevel::Medium
+            }
+            other => other,
+        }
+    } else {
+        confidence_level
+    };
+
     // Create database record with evidence
     let confidence_str = match confidence_level {
         crate::models::ConfidenceLevel::High => "high",
