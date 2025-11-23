@@ -17,6 +17,9 @@ pub struct Config {
     /// S3 bucket name for media storage
     pub s3_bucket: String,
 
+    /// HTTP server host (default: 0.0.0.0)
+    pub host: String,
+
     /// HTTP server port
     pub port: u16,
 
@@ -31,6 +34,15 @@ pub struct Config {
 
     /// Idle timeout in seconds before connections are closed (default: 600 = 10min)
     pub db_idle_timeout_secs: u64,
+
+    /// CORS allowed origins (comma-separated, default: localhost dev ports)
+    pub cors_origins: Vec<String>,
+
+    /// Log format: "json" for structured, "pretty" for human-readable (default: pretty)
+    pub log_format: String,
+
+    /// Graceful shutdown timeout in seconds (default: 30)
+    pub shutdown_timeout_secs: u64,
 }
 
 impl Config {
@@ -41,6 +53,14 @@ impl Config {
         // Load .env file if it exists
         dotenv().ok();
 
+        let cors_origins_str = env::var("CORS_ORIGINS")
+            .unwrap_or_else(|_| "http://localhost:3000,http://localhost:8081".to_string());
+        let cors_origins: Vec<String> = cors_origins_str
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+
         Self {
             database_url: env::var("DATABASE_URL")
                 .unwrap_or_else(|_| "postgres://realitycam:localdev@localhost:5432/realitycam".to_string()),
@@ -48,6 +68,8 @@ impl Config {
                 .unwrap_or_else(|_| "http://localhost:4566".to_string()),
             s3_bucket: env::var("S3_BUCKET")
                 .unwrap_or_else(|_| "realitycam-media-dev".to_string()),
+            host: env::var("HOST")
+                .unwrap_or_else(|_| "0.0.0.0".to_string()),
             port: env::var("PORT")
                 .unwrap_or_else(|_| "8080".to_string())
                 .parse()
@@ -68,6 +90,13 @@ impl Config {
                 .unwrap_or_else(|_| "600".to_string())
                 .parse()
                 .expect("DB_IDLE_TIMEOUT_SECS must be a number"),
+            cors_origins,
+            log_format: env::var("LOG_FORMAT")
+                .unwrap_or_else(|_| "pretty".to_string()),
+            shutdown_timeout_secs: env::var("SHUTDOWN_TIMEOUT_SECS")
+                .unwrap_or_else(|_| "30".to_string())
+                .parse()
+                .expect("SHUTDOWN_TIMEOUT_SECS must be a number"),
         }
     }
 }

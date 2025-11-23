@@ -1,0 +1,563 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context id="1-3-backend-api-skeleton" version="1.0">
+  <metadata>
+    <epicId>1</epicId>
+    <storyId>1-3-backend-api-skeleton</storyId>
+    <title>Backend API Skeleton with Health Check</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-22</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/1-3-backend-api-skeleton.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>backend developer</asA>
+    <iWant>a running Axum server with modular routing, health endpoints, error handling middleware, and API versioning</iWant>
+    <soThat>I can verify the backend is operational, have a foundation for adding feature routes, and ensure consistent API responses across all endpoints</soThat>
+    <acceptanceCriteria>
+      <criterion id="AC-1">Axum Server Starts on Port 8080</criterion>
+      <criterion id="AC-2">Health Check Endpoint Returns Status</criterion>
+      <criterion id="AC-3">Readiness Check Endpoint</criterion>
+      <criterion id="AC-4">API Versioning with /api/v1 Prefix</criterion>
+      <criterion id="AC-5">Route Stubs Return 501 Not Implemented</criterion>
+      <criterion id="AC-6">Request ID Middleware</criterion>
+      <criterion id="AC-7">Request Logging Middleware</criterion>
+      <criterion id="AC-8">CORS Configuration for Development</criterion>
+      <criterion id="AC-9">Error Handling Middleware</criterion>
+      <criterion id="AC-10">Modular Route Organization</criterion>
+      <criterion id="AC-11">Request/Response Types Defined</criterion>
+      <criterion id="AC-12">Graceful Shutdown</criterion>
+    </acceptanceCriteria>
+    <tasks>
+      <task id="1" ac="1,4">
+        <name>Create Router Foundation</name>
+        <subtasks>
+          <subtask id="1.1">Create backend/src/routes/mod.rs with router assembly</subtask>
+          <subtask id="1.2">Configure Axum Router with /api/v1 nested router</subtask>
+          <subtask id="1.3">Update main.rs to use modular router</subtask>
+          <subtask id="1.4">Add graceful shutdown handler using tokio signal</subtask>
+          <subtask id="1.5">Configure server to bind to 0.0.0.0:8080</subtask>
+        </subtasks>
+      </task>
+      <task id="2" ac="2,3">
+        <name>Implement Health Check Routes</name>
+        <subtasks>
+          <subtask id="2.1">Create backend/src/routes/health.rs</subtask>
+          <subtask id="2.2">Implement GET /health endpoint with database ping</subtask>
+          <subtask id="2.3">Implement GET /ready endpoint returning 200/503 based on DB</subtask>
+          <subtask id="2.4">Create HealthResponse struct with status, database, version, timestamp</subtask>
+          <subtask id="2.5">Add database connectivity check using sqlx::query("SELECT 1")</subtask>
+        </subtasks>
+      </task>
+      <task id="3" ac="5,10">
+        <name>Create Route Stubs</name>
+        <subtasks>
+          <subtask id="3.1">Create backend/src/routes/devices.rs with challenge and register stubs</subtask>
+          <subtask id="3.2">Create backend/src/routes/captures.rs with upload and get stubs</subtask>
+          <subtask id="3.3">Create backend/src/routes/verify.rs with verify-file stub</subtask>
+          <subtask id="3.4">Implement 501 Not Implemented handler for all stubs</subtask>
+          <subtask id="3.5">Wire all route modules into main router</subtask>
+        </subtasks>
+      </task>
+      <task id="4" ac="6,7,8">
+        <name>Implement Middleware Stack</name>
+        <subtasks>
+          <subtask id="4.1">Add tower-http RequestIdLayer middleware</subtask>
+          <subtask id="4.2">Add tower-http TraceLayer for request logging</subtask>
+          <subtask id="4.3">Configure tracing-subscriber for structured JSON logs</subtask>
+          <subtask id="4.4">Add tower-http CorsLayer with localhost origins</subtask>
+          <subtask id="4.5">Configure CORS for allowed methods and headers</subtask>
+        </subtasks>
+      </task>
+      <task id="5" ac="9">
+        <name>Implement Error Handling</name>
+        <subtasks>
+          <subtask id="5.1">Create backend/src/error.rs with ApiError enum</subtask>
+          <subtask id="5.2">Implement IntoResponse for ApiError</subtask>
+          <subtask id="5.3">Create error response wrapper matching architecture spec</subtask>
+          <subtask id="5.4">Add error codes for NOT_IMPLEMENTED, VALIDATION_ERROR, INTERNAL_ERROR</subtask>
+          <subtask id="5.5">Implement From traits for common error types (sqlx, etc.)</subtask>
+        </subtasks>
+      </task>
+      <task id="6" ac="11">
+        <name>Define Request/Response Types</name>
+        <subtasks>
+          <subtask id="6.1">Create backend/src/types/mod.rs or add to routes</subtask>
+          <subtask id="6.2">Define ApiResponse wrapper with data and meta fields</subtask>
+          <subtask id="6.3">Define ApiError response with error and meta fields</subtask>
+          <subtask id="6.4">Define Meta struct with request_id and timestamp</subtask>
+          <subtask id="6.5">Implement response builders for consistent formatting</subtask>
+        </subtasks>
+      </task>
+      <task id="7" ac="12">
+        <name>Implement Graceful Shutdown</name>
+        <subtasks>
+          <subtask id="7.1">Add tokio signal handler for SIGINT/SIGTERM</subtask>
+          <subtask id="7.2">Configure axum server with graceful shutdown</subtask>
+          <subtask id="7.3">Add shutdown timeout (default 30 seconds)</subtask>
+          <subtask id="7.4">Log shutdown initiation and completion</subtask>
+          <subtask id="7.5">Ensure database pool closes on shutdown</subtask>
+        </subtasks>
+      </task>
+      <task id="8" ac="1">
+        <name>Update Dependencies and Configuration</name>
+        <subtasks>
+          <subtask id="8.1">Verify tower-http features in Cargo.toml (cors, trace, request-id)</subtask>
+          <subtask id="8.2">Add hyper with server feature if needed for graceful shutdown</subtask>
+          <subtask id="8.3">Update config.rs with server settings (port, host)</subtask>
+          <subtask id="8.4">Add CORS_ORIGINS environment variable support</subtask>
+          <subtask id="8.5">Update .env.example with new configuration options</subtask>
+        </subtasks>
+      </task>
+      <task id="9" ac="2,3,5">
+        <name>Test and Verify Endpoints</name>
+        <subtasks>
+          <subtask id="9.1">Start backend and verify startup logs</subtask>
+          <subtask id="9.2">Test GET /health returns 200 with correct JSON</subtask>
+          <subtask id="9.3">Test GET /ready returns 200 when DB connected</subtask>
+          <subtask id="9.4">Test all stub endpoints return 501 with correct format</subtask>
+          <subtask id="9.5">Verify request IDs in responses and logs</subtask>
+          <subtask id="9.6">Test CORS preflight requests</subtask>
+          <subtask id="9.7">Test graceful shutdown with active requests</subtask>
+        </subtasks>
+      </task>
+    </tasks>
+  </story>
+
+  <epicContext>
+    <epicId>1</epicId>
+    <epicTitle>Foundation and Project Setup</epicTitle>
+    <epicGoal>Establish development infrastructure enabling all subsequent work. Creates monorepo structure, local dev environment, and deployment pipeline basics.</epicGoal>
+    <techSpecPath>docs/sprint-artifacts/tech-spec-epic-1.md</techSpecPath>
+    <relatedAcs>
+      <ac id="AC-1.4">Backend Health Check Operational</ac>
+      <ac id="AC-1.5">Backend Route Stubs Return 501</ac>
+      <ac id="AC-1.6">Request Logging and IDs Active</ac>
+    </relatedAcs>
+  </epicContext>
+
+  <documentationArtifacts>
+    <artifact type="prd" relevance="high">
+      <path>docs/prd.md</path>
+      <description>Product requirements document defining MVP scope, API endpoints, authentication model, and technical stack</description>
+      <relevantSections>
+        <section>API Endpoints (MVP) - Defines routes this story implements as stubs</section>
+        <section>Authentication Model (MVP) - Device-based auth pattern for future implementation</section>
+        <section>Tech Stack - Backend uses Rust 1.82+ / Axum 0.8.x</section>
+        <section>Performance (MVP) - Capture to processing complete under 15s target</section>
+      </relevantSections>
+    </artifact>
+    <artifact type="architecture" relevance="high">
+      <path>docs/architecture.md</path>
+      <description>Architecture document defining project structure, API response formats, error codes, and implementation patterns</description>
+      <relevantSections>
+        <section>Project Structure - backend/src/routes/ organization</section>
+        <section>Implementation Patterns - API Response Format with data/meta and error/meta</section>
+        <section>Error Codes - NOT_IMPLEMENTED (501), VALIDATION_ERROR (400), etc.</section>
+        <section>Backend Dependencies (Cargo.toml) - tower-http with cors, trace, request-id features</section>
+        <section>ADR-003 - Rust Backend with Axum decision</section>
+      </relevantSections>
+    </artifact>
+    <artifact type="tech-spec" relevance="high">
+      <path>docs/sprint-artifacts/tech-spec-epic-1.md</path>
+      <description>Epic 1 technical specification with detailed acceptance criteria and API contract definitions</description>
+      <relevantSections>
+        <section>AC-1.4 - Backend Health Check Operational with exact response format</section>
+        <section>AC-1.5 - Backend Route Stubs Return 501 with error body format</section>
+        <section>AC-1.6 - Request Logging and IDs Active requirements</section>
+        <section>APIs and Interfaces - Route stubs table with methods and paths</section>
+        <section>Non-Functional Requirements - Performance, Security, Observability</section>
+      </relevantSections>
+    </artifact>
+    <artifact type="epics" relevance="medium">
+      <path>docs/epics.md</path>
+      <description>Epic breakdown document with story dependencies and functional requirements mapping</description>
+      <relevantSections>
+        <section>Epic 1 Story 1.3 - Initialize Database Schema context</section>
+        <section>Epic 1 Story 1.4 - API skeleton foundation for frontend apps</section>
+      </relevantSections>
+    </artifact>
+    <artifact type="story" relevance="high">
+      <path>docs/sprint-artifacts/stories/1-3-backend-api-skeleton.md</path>
+      <description>The story being implemented with full acceptance criteria and task breakdown</description>
+    </artifact>
+  </documentationArtifacts>
+
+  <existingCodeInterfaces>
+    <interface type="entry-point" relevance="high">
+      <path>backend/src/main.rs</path>
+      <description>Current application entry point with basic health check. This story extends main.rs with modular routing, middleware stack, and graceful shutdown.</description>
+      <currentState>Basic Axum server with /health and /api/v1/status routes, TraceLayer middleware, database pool initialization</currentState>
+      <requiredChanges>
+        <change>Replace inline routes with modular router from routes/mod.rs</change>
+        <change>Add middleware stack (RequestIdLayer, CorsLayer, TraceLayer)</change>
+        <change>Add graceful shutdown signal handler</change>
+        <change>Pass database pool as shared state to routes</change>
+      </requiredChanges>
+      <codeSnippet><![CDATA[
+// Current implementation to be extended
+let app = Router::new()
+    .route("/health", get(health_check))
+    .route("/api/v1/status", get(api_status))
+    .layer(TraceLayer::new_for_http());
+]]></codeSnippet>
+    </interface>
+    <interface type="config" relevance="high">
+      <path>backend/src/config.rs</path>
+      <description>Configuration module loading from environment. Needs extension for CORS and server settings.</description>
+      <currentState>Loads DATABASE_URL, S3_ENDPOINT, S3_BUCKET, PORT, and pool settings</currentState>
+      <requiredChanges>
+        <change>Add CORS_ORIGINS field for allowed origins</change>
+        <change>Add HOST field for server binding (default 0.0.0.0)</change>
+        <change>Consider LOG_FORMAT for JSON vs pretty logging</change>
+      </requiredChanges>
+      <codeSnippet><![CDATA[
+pub struct Config {
+    pub database_url: String,
+    pub s3_endpoint: String,
+    pub s3_bucket: String,
+    pub port: u16,
+    pub db_max_connections: u32,
+    // ... add CORS_ORIGINS, HOST
+}
+]]></codeSnippet>
+    </interface>
+    <interface type="database" relevance="high">
+      <path>backend/src/db.rs</path>
+      <description>Database connection pool creation and migration runner. Health endpoints will use pool for connectivity checks.</description>
+      <currentState>create_pool() and run_migrations() functions implemented</currentState>
+      <usage>Health check will execute SELECT 1 against the pool to verify connectivity</usage>
+      <codeSnippet><![CDATA[
+pub async fn create_pool(config: &Config) -> Result<PgPool, sqlx::Error> {
+    PgPoolOptions::new()
+        .max_connections(config.db_max_connections)
+        .connect(&config.database_url)
+        .await
+}
+]]></codeSnippet>
+    </interface>
+    <interface type="models" relevance="medium">
+      <path>backend/src/models/mod.rs</path>
+      <description>Database entity models. Routes will interact with these models when implementing actual functionality.</description>
+      <exports>Device, Capture, VerificationLog</exports>
+    </interface>
+    <interface type="model" relevance="medium">
+      <path>backend/src/models/device.rs</path>
+      <description>Device entity for device registration routes (stub for now)</description>
+      <structure>id, attestation_level, attestation_key_id, attestation_chain, platform, model, has_lidar, timestamps</structure>
+    </interface>
+    <interface type="model" relevance="medium">
+      <path>backend/src/models/capture.rs</path>
+      <description>Capture entity for capture routes (stub for now)</description>
+      <structure>id, device_id, target_media_hash, depth_map_key, evidence, confidence_level, status, timestamps</structure>
+    </interface>
+    <interface type="dependency-manifest" relevance="high">
+      <path>backend/Cargo.toml</path>
+      <description>Backend dependencies already configured with required packages</description>
+      <relevantDependencies>
+        <dep name="axum" version="0.8">Web framework</dep>
+        <dep name="axum-extra" version="0.10">Typed headers feature</dep>
+        <dep name="tower" version="0.5">Service traits</dep>
+        <dep name="tower-http" version="0.6" features="cors,trace,request-id">Middleware layers</dep>
+        <dep name="tokio" version="1" features="full">Async runtime with signal support</dep>
+        <dep name="sqlx" version="0.8" features="runtime-tokio,postgres,uuid,chrono,json">Database</dep>
+        <dep name="serde" version="1" features="derive">Serialization</dep>
+        <dep name="serde_json" version="1">JSON handling</dep>
+        <dep name="uuid" version="1" features="v4,serde">UUID generation</dep>
+        <dep name="chrono" version="0.4" features="serde">Timestamps</dep>
+        <dep name="thiserror" version="2">Error handling</dep>
+        <dep name="tracing" version="0.1">Instrumentation</dep>
+        <dep name="tracing-subscriber" version="0.3" features="json">Structured logging</dep>
+      </relevantDependencies>
+    </interface>
+  </existingCodeInterfaces>
+
+  <developmentConstraints>
+    <constraint type="architecture" severity="must">
+      <description>API Response Format must match architecture spec with data/meta for success and error/meta for errors</description>
+      <source>docs/architecture.md#Implementation-Patterns</source>
+      <example><![CDATA[
+// Success response
+{
+  "data": { /* payload */ },
+  "meta": { "request_id": "uuid", "timestamp": "2025-11-22T10:00:00Z" }
+}
+
+// Error response
+{
+  "error": { "code": "NOT_IMPLEMENTED", "message": "..." },
+  "meta": { "request_id": "uuid", "timestamp": "2025-11-22T10:00:00Z" }
+}
+]]></example>
+    </constraint>
+    <constraint type="architecture" severity="must">
+      <description>Route organization must follow architecture spec structure with routes in src/routes/ directory</description>
+      <source>docs/architecture.md#Project-Structure</source>
+      <structure>
+        <file>routes/mod.rs - Router assembly</file>
+        <file>routes/health.rs - Health check routes</file>
+        <file>routes/devices.rs - Device routes</file>
+        <file>routes/captures.rs - Capture routes</file>
+        <file>routes/verify.rs - Verification routes</file>
+      </structure>
+    </constraint>
+    <constraint type="architecture" severity="must">
+      <description>Health endpoints remain at root level, feature endpoints under /api/v1/ prefix</description>
+      <source>Story AC-4, docs/sprint-artifacts/tech-spec-epic-1.md</source>
+      <routes>
+        <route>/health - Root level health check</route>
+        <route>/ready - Root level readiness check</route>
+        <route>/api/v1/devices/* - Versioned device routes</route>
+        <route>/api/v1/captures/* - Versioned capture routes</route>
+        <route>/api/v1/verify-file - Versioned verification</route>
+      </routes>
+    </constraint>
+    <constraint type="architecture" severity="must">
+      <description>Error codes must use predefined codes from architecture document</description>
+      <source>docs/architecture.md#Error-Codes</source>
+      <codes>
+        <code name="NOT_IMPLEMENTED" status="501">Endpoint not yet implemented</code>
+        <code name="VALIDATION_ERROR" status="400">Request payload invalid</code>
+        <code name="INTERNAL_ERROR" status="500">Internal server error (generic)</code>
+        <code name="ATTESTATION_FAILED" status="401">Device attestation verification failed</code>
+        <code name="DEVICE_NOT_FOUND" status="404">Unknown device ID</code>
+        <code name="CAPTURE_NOT_FOUND" status="404">Unknown capture ID</code>
+      </codes>
+    </constraint>
+    <constraint type="pattern" severity="should">
+      <description>Use tower-http middleware layers for cross-cutting concerns</description>
+      <source>docs/architecture.md#Backend-Dependencies</source>
+      <layers>
+        <layer>RequestIdLayer - Generate X-Request-Id header</layer>
+        <layer>TraceLayer - Request logging with duration</layer>
+        <layer>CorsLayer - CORS handling for development</layer>
+      </layers>
+    </constraint>
+    <constraint type="pattern" severity="must">
+      <description>Request ID must be included in both response headers and error response bodies</description>
+      <source>Story AC-6</source>
+    </constraint>
+    <constraint type="pattern" severity="should">
+      <description>Logs should be structured JSON in production mode for observability</description>
+      <source>Story AC-7, docs/sprint-artifacts/tech-spec-epic-1.md#Observability</source>
+    </constraint>
+    <constraint type="pattern" severity="should">
+      <description>Follow Axum 0.8.x patterns - use State extractor for shared state</description>
+      <source>Architecture decision ADR-003</source>
+      <example><![CDATA[
+async fn health_check(State(state): State<AppState>) -> impl IntoResponse {
+    // Access state.db_pool
+}
+]]></example>
+    </constraint>
+    <constraint type="security" severity="must">
+      <description>Internal errors must not expose stack traces or sensitive details in responses</description>
+      <source>Story AC-9</source>
+    </constraint>
+    <constraint type="convention" severity="should">
+      <description>Use Rust naming conventions: snake_case for files and functions, PascalCase for types</description>
+      <source>docs/architecture.md#Naming-Conventions</source>
+    </constraint>
+  </developmentConstraints>
+
+  <dependencies>
+    <internal>
+      <dep name="backend/src/config.rs" status="exists">Configuration loading - will be extended</dep>
+      <dep name="backend/src/db.rs" status="exists">Database pool - used for health checks</dep>
+      <dep name="backend/src/models/" status="exists">Entity models - referenced but not used in stubs</dep>
+    </internal>
+    <external>
+      <dep name="axum" version="0.8" crate="true">Web framework</dep>
+      <dep name="tower-http" version="0.6" crate="true">CORS, tracing, request-id middleware</dep>
+      <dep name="tokio" version="1" crate="true">Signal handling for graceful shutdown</dep>
+      <dep name="sqlx" version="0.8" crate="true">Database connectivity check</dep>
+      <dep name="serde" version="1" crate="true">Response serialization</dep>
+      <dep name="uuid" version="1" crate="true">Request ID generation</dep>
+      <dep name="chrono" version="0.4" crate="true">Timestamps in responses</dep>
+      <dep name="thiserror" version="2" crate="true">Error type derivation</dep>
+      <dep name="tracing" version="0.1" crate="true">Logging macros</dep>
+      <dep name="tracing-subscriber" version="0.3" crate="true">Log formatting</dep>
+    </external>
+    <prerequisites>
+      <story id="1-1" status="done">Monorepo Structure and Development Environment</story>
+      <story id="1-2" status="done">Database Schema and Migrations</story>
+    </prerequisites>
+  </dependencies>
+
+  <testingContext>
+    <framework>cargo test with testcontainers for integration tests</framework>
+    <patterns>
+      <pattern type="unit">Test individual route handlers with mock state</pattern>
+      <pattern type="integration">Test full request/response cycle with real database</pattern>
+      <pattern type="manual">curl commands to verify endpoints</pattern>
+    </patterns>
+    <testIdeas>
+      <test ac="AC-2">GET /health returns 200 with status ok and database connected</test>
+      <test ac="AC-2">GET /health returns database disconnected when DB unavailable</test>
+      <test ac="AC-3">GET /ready returns 200 when DB is connected</test>
+      <test ac="AC-3">GET /ready returns 503 when DB is unreachable</test>
+      <test ac="AC-5">GET /api/v1/devices/challenge returns 501 with NOT_IMPLEMENTED code</test>
+      <test ac="AC-5">POST /api/v1/devices/register returns 501 with correct error format</test>
+      <test ac="AC-5">POST /api/v1/captures returns 501</test>
+      <test ac="AC-5">GET /api/v1/captures/{id} returns 501</test>
+      <test ac="AC-5">POST /api/v1/verify-file returns 501</test>
+      <test ac="AC-6">All responses include X-Request-Id header</test>
+      <test ac="AC-6">Error responses include request_id in meta</test>
+      <test ac="AC-8">OPTIONS preflight from localhost:3000 returns CORS headers</test>
+      <test ac="AC-9">Validation errors return 400 with VALIDATION_ERROR code</test>
+      <test ac="AC-12">Server shuts down gracefully on SIGINT</test>
+    </testIdeas>
+    <verificationCommands><![CDATA[
+# Start services
+docker-compose -f infrastructure/docker-compose.yml up -d
+
+# Wait for PostgreSQL
+sleep 5
+
+# Run backend
+cd backend && cargo run
+
+# In another terminal, test endpoints
+curl http://localhost:8080/health
+curl http://localhost:8080/ready
+curl http://localhost:8080/api/v1/devices/challenge
+curl -X POST http://localhost:8080/api/v1/devices/register
+curl -X POST http://localhost:8080/api/v1/captures
+curl http://localhost:8080/api/v1/captures/test-id
+curl -X POST http://localhost:8080/api/v1/verify-file
+
+# Check response headers
+curl -v http://localhost:8080/health 2>&1 | grep -i x-request-id
+
+# Test CORS preflight
+curl -X OPTIONS http://localhost:8080/api/v1/captures \
+  -H "Origin: http://localhost:3000" \
+  -H "Access-Control-Request-Method: POST" -v
+
+# Test graceful shutdown
+# In terminal running cargo run, press Ctrl+C and verify clean shutdown
+]]></verificationCommands>
+  </testingContext>
+
+  <implementationNotes>
+    <note type="pattern" priority="high">
+      <title>AppState Structure</title>
+      <content>Create an AppState struct to hold shared state (db_pool). Use Arc for cheap cloning in handlers.</content>
+      <example><![CDATA[
+#[derive(Clone)]
+pub struct AppState {
+    pub db: PgPool,
+}
+]]></example>
+    </note>
+    <note type="pattern" priority="high">
+      <title>Router Assembly Pattern</title>
+      <content>Follow the architecture reference for router structure with nested /api/v1 router</content>
+      <example><![CDATA[
+// backend/src/routes/mod.rs
+pub fn api_router(state: AppState) -> Router {
+    Router::new()
+        .nest("/api/v1", v1_router(state.clone()))
+        .route("/health", get(health::health_check))
+        .route("/ready", get(health::readiness_check))
+        .with_state(state)
+}
+
+fn v1_router(state: AppState) -> Router<AppState> {
+    Router::new()
+        .nest("/devices", devices::router())
+        .nest("/captures", captures::router())
+        .merge(verify::router())
+}
+]]></example>
+    </note>
+    <note type="pattern" priority="high">
+      <title>Graceful Shutdown Implementation</title>
+      <content>Use tokio::signal for cross-platform shutdown handling</content>
+      <example><![CDATA[
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c().await.expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+
+    tracing::info!("Shutdown signal received");
+}
+]]></example>
+    </note>
+    <note type="learning" priority="medium">
+      <title>Previous Story Learnings</title>
+      <content>From Story 1-2: PostgreSQL 16 uses gen_random_uuid() natively, SQLx 0.8 patterns established, always verify cargo build succeeds</content>
+    </note>
+    <note type="warning" priority="high">
+      <title>Request ID Propagation</title>
+      <content>The X-Request-Id header must be captured from RequestIdLayer and included in both error responses and logs for traceability. Consider using tower_http::request_id::RequestId extractor or propagating via request extensions.</content>
+    </note>
+    <note type="warning" priority="medium">
+      <title>CORS Origins Configuration</title>
+      <content>For development, allow localhost:3000 (web) and localhost:8081 (metro bundler). In production, CORS should be configurable via environment.</content>
+    </note>
+  </implementationNotes>
+
+  <filesToCreate>
+    <file>backend/src/routes/mod.rs</file>
+    <file>backend/src/routes/health.rs</file>
+    <file>backend/src/routes/devices.rs</file>
+    <file>backend/src/routes/captures.rs</file>
+    <file>backend/src/routes/verify.rs</file>
+    <file>backend/src/error.rs</file>
+    <file>backend/src/types/mod.rs (optional - can be in routes)</file>
+  </filesToCreate>
+
+  <filesToModify>
+    <file>backend/src/main.rs - Use modular router, add middleware stack, graceful shutdown</file>
+    <file>backend/src/config.rs - Add CORS_ORIGINS, HOST settings</file>
+    <file>backend/.env.example - Add CORS_ORIGINS, HOST</file>
+  </filesToModify>
+
+  <relatedTypeDefinitions>
+    <type source="packages/shared/src/types/api.ts">
+      <name>ApiResponse</name>
+      <definition><![CDATA[
+export interface ApiResponse<T> {
+  data: T;
+  meta: {
+    request_id: string;
+    timestamp: string;
+  };
+}
+]]></definition>
+    </type>
+    <type source="packages/shared/src/types/api.ts">
+      <name>ApiError</name>
+      <definition><![CDATA[
+export interface ApiError {
+  error: {
+    code: string;
+    message: string;
+    details?: Record<string, unknown>;
+  };
+  meta: {
+    request_id: string;
+    timestamp: string;
+  };
+}
+]]></definition>
+    </type>
+  </relatedTypeDefinitions>
+</story-context>
