@@ -1,0 +1,781 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML
+  Story: 1-5-verification-web-shell
+  Generated: 2025-11-22
+  Purpose: Comprehensive context for implementing Verification Web Shell story
+-->
+<story-context>
+  <metadata>
+    <story-key>1-5-verification-web-shell</story-key>
+    <story-title>Verification Web Shell</story-title>
+    <epic>Epic 1: Foundation and Project Setup</epic>
+    <generated>2025-11-22</generated>
+    <status>drafted</status>
+  </metadata>
+
+  <story-reference>
+    <file-path>docs/sprint-artifacts/stories/1-5-verification-web-shell.md</file-path>
+    <description>Full story file with acceptance criteria, tasks, and dev notes</description>
+  </story-reference>
+
+  <epic-context>
+    <tech-spec-path>docs/sprint-artifacts/tech-spec-epic-1.md</tech-spec-path>
+    <epics-path>docs/epics.md</epics-path>
+    <relevant-ac>
+      <ac id="AC-1.9" title="Web App Runs with Verification Route">
+        <description>
+          Given Node.js 22+ is installed
+          When the developer runs `npm run dev` from apps/web
+          Then:
+          - Development server starts with Turbopack
+          - `http://localhost:3000/` shows landing placeholder
+          - `http://localhost:3000/verify/test-123` shows "Verifying capture: test-123"
+          - TailwindCSS styles are applied
+        </description>
+        <note>This story extends AC-1.9 with comprehensive UI placeholders for file upload, verification results, and evidence panels</note>
+      </ac>
+    </relevant-ac>
+  </epic-context>
+
+  <documentation-artifacts>
+    <artifact type="prd" priority="high">
+      <path>docs/prd.md</path>
+      <description>Product Requirements Document defining verification interface requirements</description>
+      <relevant-sections>
+        <section name="Verification Interface (MVP)" lines="98-103">
+          - Summary view with confidence level (HIGH/MEDIUM/LOW/SUSPICIOUS)
+          - Depth analysis visualization (depth map preview)
+          - Hardware attestation status display
+          - Expandable evidence panel with per-check details
+          - File upload for hash verification
+        </section>
+        <section name="User Experience Principles" lines="156-211">
+          - UC3: Verify Received Media flow
+          - UC4: Upload External File for Hash Lookup
+          - Evidence Legibility Scales with Viewer Expertise
+        </section>
+        <section name="Verification Frontend" lines="569-573">
+          - Next.js 16 (Turbopack, App Router, React 19)
+          - TailwindCSS, TypeScript
+        </section>
+        <section name="Functional Requirements FR31-FR40" lines="384-400">
+          - FR31: Users can view capture verification via shareable URL
+          - FR32: Verification page displays confidence summary
+          - FR33: Verification page displays depth analysis visualization
+          - FR34: Users can expand detailed evidence panel
+          - FR35: Each check displays pass/fail with relevant metrics
+          - FR36-FR40: File verification requirements
+        </section>
+      </relevant-sections>
+    </artifact>
+
+    <artifact type="architecture" priority="high">
+      <path>docs/architecture.md</path>
+      <description>Architecture document with project structure and implementation patterns</description>
+      <relevant-sections>
+        <section name="Project Structure - Web App" lines="121-137">
+          apps/web/
+          - app/page.tsx
+          - app/verify/[id]/page.tsx
+          - app/layout.tsx
+          - components/Evidence/EvidencePanel.tsx
+          - components/Evidence/DepthAnalysis.tsx
+          - components/Evidence/ConfidenceSummary.tsx
+          - components/Media/SecureImage.tsx
+          - components/Upload/FileDropzone.tsx
+          - lib/api.ts
+        </section>
+        <section name="API Response Format" lines="395-420">
+          Standard API response format for success and error responses
+        </section>
+        <section name="Verification Page Data API" lines="556-589">
+          GET /api/v1/captures/{id} response structure including evidence, confidence_level, media_url
+        </section>
+        <section name="Web App API Client Interface" lines="299-306">
+          WebApiClient interface with getCapture and verifyFile methods
+        </section>
+      </relevant-sections>
+    </artifact>
+
+    <artifact type="tech-spec" priority="high">
+      <path>docs/sprint-artifacts/tech-spec-epic-1.md</path>
+      <description>Epic 1 Technical Specification with detailed design</description>
+      <relevant-sections>
+        <section name="Web App Routing Flow" lines="369-379">
+          - / (Landing page) with placeholder
+          - /verify/[id] (Verification page) showing "Verifying capture: {id}"
+        </section>
+        <section name="Web Dependencies" lines="462-470">
+          - next ^16.0.0
+          - react ^19.2.0
+          - react-dom ^19.2.0
+          - tailwindcss ^4.x
+          - typescript ^5.x
+        </section>
+        <section name="TypeScript Types" lines="179-243">
+          - ApiResponse, ApiError interfaces
+          - ConfidenceLevel, EvidenceStatus types
+          - Evidence interface with hardware_attestation, depth_analysis, metadata
+          - Capture interface
+        </section>
+      </relevant-sections>
+    </artifact>
+
+    <artifact type="epics" priority="medium">
+      <path>docs/epics.md</path>
+      <description>Epic breakdown with Story 1.6 Web App Skeleton</description>
+      <relevant-sections>
+        <section name="Story 1.6: Web App Skeleton with Verification Route" lines="273-299">
+          Original story definition with acceptance criteria for web app skeleton
+        </section>
+        <section name="Epic 5: C2PA and Verification Experience" lines="1233-1588">
+          Future stories for full verification interface implementation (5.3-5.8)
+        </section>
+      </relevant-sections>
+    </artifact>
+  </documentation-artifacts>
+
+  <existing-code-interfaces>
+    <interface type="web-package-config" priority="high">
+      <path>apps/web/package.json</path>
+      <description>Web app package configuration with dependencies</description>
+      <content><![CDATA[
+{
+  "name": "@realitycam/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@realitycam/shared": "workspace:*",
+    "next": "16.0.3",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.0.3",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
+      ]]></content>
+      <note>TailwindCSS 4.x is already configured; @realitycam/shared provides shared types</note>
+    </interface>
+
+    <interface type="web-layout" priority="high">
+      <path>apps/web/src/app/layout.tsx</path>
+      <description>Root layout component - needs dark mode support</description>
+      <content><![CDATA[
+import type { Metadata } from 'next';
+import { Geist, Geist_Mono } from 'next/font/google';
+import './globals.css';
+
+const geistSans = Geist({
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
+});
+
+const geistMono = Geist_Mono({
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
+});
+
+export const metadata: Metadata = {
+  title: 'RealityCam - Photo Verification',
+  description: 'Verify the authenticity of photos with RealityCam',
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en">
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        {children}
+      </body>
+    </html>
+  );
+}
+      ]]></content>
+      <note>Already has Geist fonts configured; needs dark mode class support on html element</note>
+    </interface>
+
+    <interface type="web-landing-page" priority="high">
+      <path>apps/web/src/app/page.tsx</path>
+      <description>Landing page - needs file upload placeholder</description>
+      <content><![CDATA[
+export default function Home() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
+      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-center gap-8 px-16 py-32">
+        <h1 className="text-4xl font-bold tracking-tight text-black dark:text-white">
+          RealityCam
+        </h1>
+        <p className="max-w-md text-center text-lg text-zinc-600 dark:text-zinc-400">
+          Verify the authenticity of photos captured with RealityCam
+        </p>
+        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
+          <a
+            href="/verify/demo"
+            className="flex h-12 items-center justify-center rounded-full bg-black px-6 text-white transition-colors hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+          >
+            Verify a Photo
+          </a>
+        </div>
+      </main>
+    </div>
+  );
+}
+      ]]></content>
+      <note>Has basic branding and dark mode support; needs FileDropzone placeholder component</note>
+    </interface>
+
+    <interface type="web-verify-page" priority="high">
+      <path>apps/web/src/app/verify/[id]/page.tsx</path>
+      <description>Verification route - needs results and evidence placeholders</description>
+      <content><![CDATA[
+interface VerifyPageProps {
+  params: Promise<{ id: string }>;
+}
+
+export default async function VerifyPage({ params }: VerifyPageProps) {
+  const { id } = await params;
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
+      <main className="flex min-h-screen w-full max-w-4xl flex-col items-center justify-center gap-8 px-8 py-16">
+        <h1 className="text-3xl font-bold tracking-tight text-black dark:text-white">
+          Photo Verification
+        </h1>
+        <p className="text-lg text-zinc-600 dark:text-zinc-400">
+          Verification ID: {id}
+        </p>
+        <div className="w-full max-w-2xl rounded-xl border border-zinc-200 bg-white p-8 dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-center text-zinc-500 dark:text-zinc-400">
+            Verification results will appear here
+          </p>
+        </div>
+      </main>
+    </div>
+  );
+}
+      ]]></content>
+      <note>Has dynamic ID extraction pattern per Next.js 16; needs verification results and evidence panel placeholders</note>
+    </interface>
+
+    <interface type="web-api-client" priority="high">
+      <path>apps/web/src/lib/api.ts</path>
+      <description>API client stub - needs WebApiClient interface expansion</description>
+      <content><![CDATA[
+import type { ApiResponse, ApiError, Capture } from '@realitycam/shared';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
+
+export class ApiClient {
+  private baseUrl: string;
+
+  constructor(baseUrl: string = API_URL) {
+    this.baseUrl = baseUrl;
+  }
+
+  async getCapture(id: string): Promise<ApiResponse<Capture>> {
+    const response = await fetch(`${this.baseUrl}/api/v1/captures/${id}`);
+    if (!response.ok) {
+      const error: ApiError = await response.json();
+      throw new Error(error.error.message);
+    }
+    return response.json();
+  }
+
+  async verifyCapture(id: string): Promise<ApiResponse<Capture>> {
+    const response = await fetch(`${this.baseUrl}/api/v1/captures/${id}/verify`);
+    if (!response.ok) {
+      const error: ApiError = await response.json();
+      throw new Error(error.error.message);
+    }
+    return response.json();
+  }
+}
+
+export const apiClient = new ApiClient();
+      ]]></content>
+      <note>Has getCapture; needs verifyFile method for file upload verification</note>
+    </interface>
+
+    <interface type="web-global-styles" priority="medium">
+      <path>apps/web/src/app/globals.css</path>
+      <description>Global CSS with TailwindCSS 4 configuration</description>
+      <content><![CDATA[
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+      ]]></content>
+      <note>TailwindCSS 4 uses @import syntax; dark mode via prefers-color-scheme media query</note>
+    </interface>
+
+    <interface type="shared-types-api" priority="high">
+      <path>packages/shared/src/types/api.ts</path>
+      <description>Shared API types for request/response contracts</description>
+      <content><![CDATA[
+export interface ApiResponse<T> {
+  data: T;
+  meta: {
+    request_id: string;
+    timestamp: string;
+  };
+}
+
+export interface ApiError {
+  error: {
+    code: string;
+    message: string;
+    details?: Record<string, unknown>;
+  };
+  meta: {
+    request_id: string;
+    timestamp: string;
+  };
+}
+      ]]></content>
+    </interface>
+
+    <interface type="shared-types-evidence" priority="high">
+      <path>packages/shared/src/types/evidence.ts</path>
+      <description>Evidence types for verification display</description>
+      <content><![CDATA[
+export type ConfidenceLevel = 'high' | 'medium' | 'low' | 'suspicious';
+export type EvidenceStatus = 'pass' | 'fail' | 'unavailable';
+
+export interface HardwareAttestation {
+  status: EvidenceStatus;
+  level: 'secure_enclave' | 'unverified';
+  device_model: string;
+}
+
+export interface DepthAnalysis {
+  status: EvidenceStatus;
+  depth_variance: number;
+  depth_layers: number;
+  edge_coherence: number;
+  min_depth: number;
+  max_depth: number;
+  is_likely_real_scene: boolean;
+}
+
+export interface Evidence {
+  hardware_attestation: HardwareAttestation;
+  depth_analysis: DepthAnalysis;
+  metadata: {
+    timestamp_valid: boolean;
+    model_verified: boolean;
+    location_available: boolean;
+    location_coarse?: string;
+  };
+}
+      ]]></content>
+      <note>ConfidenceLevel and EvidenceStatus used for badge styling; Evidence structure for panel rows</note>
+    </interface>
+
+    <interface type="shared-types-capture" priority="high">
+      <path>packages/shared/src/types/capture.ts</path>
+      <description>Capture type for verification data</description>
+      <content><![CDATA[
+import { ConfidenceLevel, Evidence } from './evidence';
+
+export interface Capture {
+  id: string;
+  confidence_level: ConfidenceLevel;
+  captured_at: string;
+  media_url: string;
+  evidence: Evidence;
+  c2pa_manifest_url?: string;
+  depth_visualization_url?: string;
+}
+      ]]></content>
+      <note>Used by API client responses; provides structure for verification display</note>
+    </interface>
+
+    <interface type="web-tsconfig" priority="medium">
+      <path>apps/web/tsconfig.json</path>
+      <description>TypeScript configuration with strict mode</description>
+      <content><![CDATA[
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [{ "name": "next" }],
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", ".next/dev/types/**/*.ts", "**/*.mts"],
+  "exclude": ["node_modules"]
+}
+      ]]></content>
+      <note>Strict mode enabled; path alias @/* maps to src/*</note>
+    </interface>
+  </existing-code-interfaces>
+
+  <development-constraints>
+    <constraint type="framework" priority="critical">
+      <title>Next.js 16 with App Router</title>
+      <description>Use App Router pattern with file-based routing in app/ directory. Server components by default. Turbopack enabled for dev server.</description>
+      <source>Architecture Document</source>
+    </constraint>
+
+    <constraint type="styling" priority="critical">
+      <title>TailwindCSS 4.x with Dark Mode</title>
+      <description>TailwindCSS 4 uses @import "tailwindcss" syntax. Dark mode via 'media' strategy (prefers-color-scheme). Use dark: variants for all UI elements.</description>
+      <source>Architecture Document, Story Dev Notes</source>
+    </constraint>
+
+    <constraint type="typescript" priority="critical">
+      <title>Strict TypeScript</title>
+      <description>TypeScript strict mode enabled. Import types from @realitycam/shared. No any types without justification.</description>
+      <source>Tech Spec</source>
+    </constraint>
+
+    <constraint type="responsive" priority="high">
+      <title>Mobile-First Responsive Design</title>
+      <description>Mobile breakpoint: &lt;640px (single column). Tablet: 640-1024px. Desktop: &gt;1024px (max-width container). Use TailwindCSS breakpoint utilities.</description>
+      <source>Story AC-4</source>
+    </constraint>
+
+    <constraint type="component-organization" priority="high">
+      <title>Component Directory Structure</title>
+      <description>
+        Components organized by feature:
+        - components/Upload/ for FileDropzone
+        - components/Evidence/ for ConfidenceBadge, EvidencePanel, EvidenceRow
+        - components/Media/ for ImagePlaceholder
+      </description>
+      <source>Architecture Document, Story File List</source>
+    </constraint>
+
+    <constraint type="api-patterns" priority="high">
+      <title>API Client Mock Pattern</title>
+      <description>API client should return mock/placeholder data for development. Use WebApiClient interface. Support getCapture and verifyFile methods.</description>
+      <source>Story AC-9</source>
+    </constraint>
+
+    <constraint type="placeholder-design" priority="high">
+      <title>Placeholder UI Pattern</title>
+      <description>All functional components are placeholders in this story. Show visual structure without backend connectivity. Include "Pending" or placeholder text to indicate non-functional state.</description>
+      <source>Story Acceptance Criteria</source>
+    </constraint>
+  </development-constraints>
+
+  <dependencies>
+    <dependency type="npm-package" installed="true">
+      <name>next</name>
+      <version>16.0.3</version>
+      <purpose>Web framework with App Router and Turbopack</purpose>
+    </dependency>
+
+    <dependency type="npm-package" installed="true">
+      <name>react</name>
+      <version>19.2.0</version>
+      <purpose>UI library</purpose>
+    </dependency>
+
+    <dependency type="npm-package" installed="true">
+      <name>tailwindcss</name>
+      <version>^4</version>
+      <purpose>Utility-first CSS framework</purpose>
+    </dependency>
+
+    <dependency type="npm-package" installed="true">
+      <name>@realitycam/shared</name>
+      <version>workspace:*</version>
+      <purpose>Shared TypeScript types for API contracts</purpose>
+    </dependency>
+
+    <dependency type="npm-package" installed="true">
+      <name>typescript</name>
+      <version>^5</version>
+      <purpose>Type checking</purpose>
+    </dependency>
+  </dependencies>
+
+  <testing-context>
+    <framework>TypeScript compilation (npx tsc --noEmit)</framework>
+    <framework>npm run build for production build verification</framework>
+    <framework>Manual browser testing for responsive and dark mode</framework>
+
+    <test-commands>
+      <command>cd apps/web && npx tsc --noEmit</command>
+      <command>cd apps/web && npm run build</command>
+      <command>cd apps/web && npm run dev</command>
+    </test-commands>
+
+    <manual-tests>
+      <test name="Landing Page">Navigate to http://localhost:3000 - verify branding, file dropzone placeholder, dark mode</test>
+      <test name="Verify Route">Navigate to http://localhost:3000/verify/test-123 - verify ID display, results placeholder, evidence panel</test>
+      <test name="Responsive Mobile">Browser dev tools mobile viewport (&lt;640px) - single column layout</test>
+      <test name="Responsive Desktop">Desktop viewport (&gt;1024px) - max-width container</test>
+      <test name="Dark Mode">Toggle OS dark mode - all elements adapt colors</test>
+    </manual-tests>
+
+    <acceptance-criteria-checklist>
+      <ac id="AC-1" description="Next.js 16 Project Structure verified" />
+      <ac id="AC-2" description="Landing Page with File Upload Placeholder" />
+      <ac id="AC-3" description="Verification Route Structure /verify/[id]" />
+      <ac id="AC-4" description="Responsive Design with TailwindCSS" />
+      <ac id="AC-5" description="Dark Mode Support" />
+      <ac id="AC-6" description="File Upload Component Placeholder" />
+      <ac id="AC-7" description="Verification Results Display Placeholder" />
+      <ac id="AC-8" description="Evidence Panel Placeholder" />
+      <ac id="AC-9" description="API Client Stub" />
+      <ac id="AC-10" description="TypeScript Compilation and Build" />
+    </acceptance-criteria-checklist>
+  </testing-context>
+
+  <implementation-notes>
+    <note type="pattern" priority="high">
+      <title>FileDropzone Component Pattern</title>
+      <description>
+        Create a dashed border dropzone with upload icon. Use cursor-pointer and hover states.
+        Include "Drop a file here or click to upload" text and "Supports JPEG, PNG, HEIC" format text.
+        Component is visual placeholder - click opens file picker but doesn't process files.
+      </description>
+      <code-example><![CDATA[
+// FileDropzone.tsx pattern from story dev notes
+export function FileDropzone() {
+  return (
+    <div className="border-2 border-dashed border-gray-300 dark:border-gray-600
+                    rounded-lg p-8 text-center hover:border-blue-500
+                    dark:hover:border-blue-400 transition-colors cursor-pointer">
+      <CloudUploadIcon className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" />
+      <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+        Drop a file here or click to upload
+      </p>
+      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+        Supports JPEG, PNG, HEIC
+      </p>
+    </div>
+  );
+}
+      ]]></code-example>
+    </note>
+
+    <note type="pattern" priority="high">
+      <title>ConfidenceBadge Component Pattern</title>
+      <description>
+        Color-coded badge based on confidence level. Use rounded-full pill shape with semantic colors.
+        GREEN for high, YELLOW for medium, ORANGE for low, RED for suspicious, GRAY for pending.
+      </description>
+      <code-example><![CDATA[
+// ConfidenceBadge.tsx pattern from story dev notes
+type ConfidenceLevel = 'high' | 'medium' | 'low' | 'suspicious' | 'pending';
+
+const badgeColors = {
+  high: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+  medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
+  low: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
+  suspicious: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+  pending: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
+};
+
+export function ConfidenceBadge({ level }: { level: ConfidenceLevel }) {
+  return (
+    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${badgeColors[level]}`}>
+      {level.toUpperCase()}
+    </span>
+  );
+}
+      ]]></code-example>
+    </note>
+
+    <note type="pattern" priority="high">
+      <title>Evidence Panel with Expand/Collapse</title>
+      <description>
+        Expandable accordion panel for evidence details. Collapsed by default with expand indicator.
+        Each row shows evidence type, status icon, and "Pending" text for placeholder state.
+      </description>
+      <evidence-rows>
+        <row>Hardware Attestation - Pending</row>
+        <row>LiDAR Depth Analysis - Pending</row>
+        <row>Timestamp - Pending</row>
+        <row>Device Model - Pending</row>
+        <row>Location - Pending</row>
+      </evidence-rows>
+    </note>
+
+    <note type="pattern" priority="high">
+      <title>Verify Page Dynamic Route Pattern</title>
+      <description>
+        Next.js 16 uses Promise-based params. Extract ID using await params pattern.
+      </description>
+      <code-example><![CDATA[
+// app/verify/[id]/page.tsx pattern
+interface VerifyPageProps {
+  params: Promise<{ id: string }>;
+}
+
+export default async function VerifyPage({ params }: VerifyPageProps) {
+  const { id } = await params;
+  // Use id in component
+}
+      ]]></code-example>
+    </note>
+
+    <note type="pattern" priority="high">
+      <title>API Client Mock Implementation</title>
+      <description>
+        API client returns placeholder data for development. verifyFile method returns 'no_record' status.
+        getCapture returns null data with mock meta.
+      </description>
+      <code-example><![CDATA[
+// lib/api.ts mock pattern
+export interface CaptureDetailResponse {
+  data: Capture | null;
+  meta: { request_id: string; timestamp: string };
+}
+
+export interface VerifyResponse {
+  data: {
+    status: 'verified' | 'c2pa_only' | 'no_record';
+    capture_id?: string;
+    confidence_level?: ConfidenceLevel;
+    verification_url?: string;
+  };
+  meta: { request_id: string; timestamp: string };
+}
+
+// Mock implementation
+export const apiClient: WebApiClient = {
+  baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080',
+
+  async getCapture(id: string): Promise<CaptureDetailResponse> {
+    return {
+      data: null,
+      meta: { request_id: 'mock', timestamp: new Date().toISOString() },
+    };
+  },
+
+  async verifyFile(file: File): Promise<VerifyResponse> {
+    return {
+      data: { status: 'no_record' },
+      meta: { request_id: 'mock', timestamp: new Date().toISOString() },
+    };
+  },
+};
+      ]]></code-example>
+    </note>
+
+    <note type="architecture" priority="medium">
+      <title>Previous Story Learnings from Story 1-4</title>
+      <description>
+        1. Dark Mode Pattern: Use system preference detection (prefers-color-scheme)
+        2. TypeScript Verification: Always run npx tsc --noEmit before marking complete
+        3. Responsive Design: Mobile-first approach with TailwindCSS breakpoints
+        4. Clean Architecture: Centralized color/style constants when appropriate
+        5. Component Structure: Separate placeholder components for future implementation
+      </description>
+    </note>
+  </implementation-notes>
+
+  <files-to-create>
+    <file priority="high">
+      <path>apps/web/src/components/Upload/FileDropzone.tsx</path>
+      <description>File upload dropzone placeholder component</description>
+    </file>
+    <file priority="high">
+      <path>apps/web/src/components/Evidence/ConfidenceBadge.tsx</path>
+      <description>Confidence level badge component</description>
+    </file>
+    <file priority="high">
+      <path>apps/web/src/components/Evidence/EvidencePanel.tsx</path>
+      <description>Expandable evidence panel container</description>
+    </file>
+    <file priority="high">
+      <path>apps/web/src/components/Evidence/EvidenceRow.tsx</path>
+      <description>Individual evidence row component</description>
+    </file>
+    <file priority="high">
+      <path>apps/web/src/components/Media/ImagePlaceholder.tsx</path>
+      <description>Image thumbnail placeholder component</description>
+    </file>
+  </files-to-create>
+
+  <files-to-modify>
+    <file priority="high">
+      <path>apps/web/src/app/page.tsx</path>
+      <description>Update landing page with file upload placeholder and enhanced branding</description>
+    </file>
+    <file priority="high">
+      <path>apps/web/src/app/verify/[id]/page.tsx</path>
+      <description>Update with verification results and evidence panel placeholders</description>
+    </file>
+    <file priority="high">
+      <path>apps/web/src/app/layout.tsx</path>
+      <description>Add dark mode HTML class support if needed</description>
+    </file>
+    <file priority="medium">
+      <path>apps/web/src/app/globals.css</path>
+      <description>Add any additional CSS variables for dark mode if needed</description>
+    </file>
+    <file priority="high">
+      <path>apps/web/src/lib/api.ts</path>
+      <description>Expand with WebApiClient interface and verifyFile mock method</description>
+    </file>
+  </files-to-modify>
+
+  <validation-checklist>
+    <item status="pending">Next.js 16 with Turbopack starts without errors</item>
+    <item status="pending">TypeScript compilation passes (npx tsc --noEmit)</item>
+    <item status="pending">Production build succeeds (npm run build)</item>
+    <item status="pending">Landing page renders with branding and file dropzone</item>
+    <item status="pending">/verify/[id] route extracts and displays ID</item>
+    <item status="pending">Dark mode responds to system preference</item>
+    <item status="pending">Responsive layout at mobile/tablet/desktop breakpoints</item>
+    <item status="pending">Evidence panel expands and collapses</item>
+    <item status="pending">All components use TailwindCSS dark: variants</item>
+    <item status="pending">API client stub returns mock data</item>
+  </validation-checklist>
+</story-context>

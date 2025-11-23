@@ -42,7 +42,7 @@ development_status:
   1-2-database-schema-migrations: done
   1-3-backend-api-skeleton: done
   1-4-ios-app-shell-navigation: done
-  1-5-verification-web-shell: backlog
+  1-5-verification-web-shell: done
   epic-1-retrospective: optional
 
   # Epic 2: Device Registration & Hardware Attestation (6 stories)
