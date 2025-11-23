@@ -7,6 +7,10 @@
 use axum::{routing::get, Router};
 use sqlx::PgPool;
 use std::sync::Arc;
+use std::time::Duration;
+use tower_governor::{
+    governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor, GovernorLayer,
+};
 
 use crate::config::Config;
 use crate::middleware::{DeviceAuthConfig, DeviceAuthLayer};
@@ -53,12 +57,33 @@ pub fn api_router(state: AppState) -> Router {
         future_tolerance_secs: 60,     // 1 minute
     };
 
-    // Captures router with device authentication middleware
+    // Configure rate limiting for captures router
+    // Uses token bucket algorithm: refills at rate_limit_per_second, bursts up to rate_limit_burst
+    let governor_config = GovernorConfigBuilder::default()
+        .per_second(state.config.rate_limit_per_second)
+        .burst_size(state.config.rate_limit_burst)
+        .key_extractor(SmartIpKeyExtractor)
+        .finish()
+        .expect("Failed to build rate limiter config");
+    let governor_limiter = governor_config.limiter().clone();
+    let rate_limit_layer = GovernorLayer::new(Arc::new(governor_config));
+
+    // Spawn background task to clean up rate limiter state
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(60)).await;
+            tracing::debug!("[rate_limiter] Cleaning up expired rate limit entries");
+            governor_limiter.retain_recent();
+        }
+    });
+
+    // Captures router with device authentication and rate limiting middleware
     // This protects all capture-related endpoints
     // Pass full AppState for access to storage, config, and db
     let captures_router = captures::router()
         .with_state(state.clone())
-        .layer(DeviceAuthLayer::new(state.db.clone(), device_auth_config));
+        .layer(DeviceAuthLayer::new(state.db.clone(), device_auth_config))
+        .layer(rate_limit_layer);
 
     // Create v1 API routes
     // - devices router: public (registration, challenge)

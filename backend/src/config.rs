@@ -56,6 +56,12 @@ pub struct Config {
     /// Enable strict attestation verification (reject invalid certificate chains)
     /// When false (MVP mode), invalid chains are logged but allowed
     pub strict_attestation: bool,
+
+    /// Rate limit: requests per second per IP (default: 10)
+    pub rate_limit_per_second: u64,
+
+    /// Rate limit: burst size (default: 30)
+    pub rate_limit_burst: u32,
 }
 
 impl Config {
@@ -116,6 +122,14 @@ impl Config {
             strict_attestation: env::var("STRICT_ATTESTATION")
                 .map(|v| v.to_lowercase() == "true" || v == "1")
                 .unwrap_or(false), // MVP default: permissive mode
+            rate_limit_per_second: env::var("RATE_LIMIT_PER_SECOND")
+                .unwrap_or_else(|_| "10".to_string())
+                .parse()
+                .expect("RATE_LIMIT_PER_SECOND must be a number"),
+            rate_limit_burst: env::var("RATE_LIMIT_BURST")
+                .unwrap_or_else(|_| "30".to_string())
+                .parse()
+                .expect("RATE_LIMIT_BURST must be a number"),
         }
     }
 
@@ -139,6 +153,8 @@ impl Config {
             apple_bundle_id: "com.test.app".to_string(),
             verification_base_url: "https://test.realitycam.app/verify".to_string(),
             strict_attestation: false,
+            rate_limit_per_second: 100,
+            rate_limit_burst: 200,
         }
     }
 }

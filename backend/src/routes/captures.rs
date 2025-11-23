@@ -33,7 +33,8 @@ use crate::middleware::DeviceContext;
 use crate::models::{Device, EvidencePackage, HardwareAttestation, ProcessingInfo};
 use crate::routes::AppState;
 use crate::services::{
-    analyze_depth_map, process_location_for_evidence, validate_metadata, verify_capture_assertion,
+    analyze_depth_map_from_bytes, process_location_for_evidence, validate_metadata,
+    verify_capture_assertion,
 };
 
 /// Backend version for processing info (from Cargo.toml)
@@ -44,20 +45,9 @@ use crate::types::{
 };
 
 // ============================================================================
-// Configuration Constants
-// ============================================================================
-
-/// Rate limiting configuration flag (placeholder for MVP)
-/// TODO: Implement full rate limiting in Story 4-2
-const RATE_LIMITING_ENABLED: bool = false;
-
-/// Maximum captures per hour per device (not enforced in MVP)
-#[allow(dead_code)]
-const MAX_CAPTURES_PER_HOUR: u32 = 10;
-
-// ============================================================================
 // Router Setup
 // ============================================================================
+// Note: Rate limiting is handled by tower_governor middleware layer in routes/mod.rs
 
 /// Creates the captures routes router.
 ///
@@ -167,30 +157,6 @@ async fn parse_multipart(mut multipart: Multipart) -> Result<ParsedMultipart, Ap
         depth_map_bytes,
         metadata,
     })
-}
-
-// ============================================================================
-// Rate Limiting (Placeholder)
-// ============================================================================
-
-/// Checks rate limiting for the device (placeholder for MVP)
-///
-/// Returns Ok(()) if within limits, Err(ApiError::RateLimited) if exceeded.
-/// Currently always returns Ok(()) as rate limiting is not enforced in MVP.
-///
-/// TODO: Implement full rate limiting in Story 4-2
-#[allow(dead_code)]
-fn check_rate_limit(_device_id: Uuid) -> Result<(), ApiError> {
-    if !RATE_LIMITING_ENABLED {
-        return Ok(());
-    }
-
-    // TODO: Implement rate limiting logic
-    // - Track capture count per device per hour
-    // - Return 429 if exceeded MAX_CAPTURES_PER_HOUR
-    // - Include Retry-After header in response
-
-    Ok(())
 }
 
 // ============================================================================
@@ -328,11 +294,7 @@ async fn upload_capture(
         "Processing capture upload request"
     );
 
-    // Check rate limit (placeholder for MVP)
-    check_rate_limit(device_ctx.device_id).map_err(|e| ApiErrorWithRequestId {
-        error: e,
-        request_id,
-    })?;
+    // Note: Rate limiting is handled by tower_governor middleware layer
 
     // Parse multipart form data
     let parsed = parse_multipart(multipart)
@@ -490,8 +452,8 @@ async fn upload_capture(
         parsed.metadata.depth_map_dimensions.height,
     ));
 
-    // Perform depth analysis - downloads from S3, decompresses, analyzes
-    let depth_analysis = analyze_depth_map(storage, capture_id, depth_dimensions).await;
+    // Perform depth analysis - uses in-memory bytes to avoid redundant S3 download
+    let depth_analysis = analyze_depth_map_from_bytes(&parsed.depth_map_bytes, depth_dimensions);
 
     tracing::info!(
         request_id = %request_id,
@@ -691,17 +653,97 @@ async fn upload_capture(
 /// GET /api/v1/captures/{id} - Get capture by ID
 ///
 /// Retrieves capture details and evidence by ID.
-/// Currently returns 501 Not Implemented.
+/// Returns the capture metadata, evidence package, and verification URL.
 ///
-/// TODO: Implement in a future story
+/// Access control: Only the device that created the capture can retrieve it.
 async fn get_capture(
-    Path(_id): Path<String>,
+    State(state): State<AppState>,
+    Extension(device_ctx): Extension<DeviceContext>,
     Extension(request_id): Extension<Uuid>,
-) -> Result<(StatusCode, Json<crate::types::ApiErrorResponse>), ApiErrorWithRequestId> {
-    let error = ApiError::NotImplemented;
-    let response =
-        crate::types::ApiErrorResponse::new(error.code(), error.safe_message(), request_id);
-    Ok((error.status_code(), Json(response)))
+    Path(id): Path<String>,
+) -> Result<
+    (
+        StatusCode,
+        Json<ApiResponse<crate::types::CaptureDetailsResponse>>,
+    ),
+    ApiErrorWithRequestId,
+> {
+    // Parse capture ID from path
+    let capture_id = Uuid::parse_str(&id).map_err(|_| ApiErrorWithRequestId {
+        error: ApiError::Validation(format!("Invalid capture ID format: {id}")),
+        request_id,
+    })?;
+
+    tracing::info!(
+        request_id = %request_id,
+        capture_id = %capture_id,
+        device_id = %device_ctx.device_id,
+        "Looking up capture"
+    );
+
+    // Query the capture from database
+    let capture = sqlx::query_as!(
+        crate::models::Capture,
+        r#"
+        SELECT id, device_id, target_media_hash, photo_s3_key, depth_map_s3_key,
+               thumbnail_s3_key, evidence, confidence_level, status,
+               location_precise, location_coarse, captured_at, uploaded_at
+        FROM captures
+        WHERE id = $1
+        "#,
+        capture_id
+    )
+    .fetch_optional(&state.db)
+    .await
+    .map_err(|e| ApiErrorWithRequestId {
+        error: ApiError::Database(e),
+        request_id,
+    })?;
+
+    let capture = capture.ok_or_else(|| ApiErrorWithRequestId {
+        error: ApiError::CaptureNotFound,
+        request_id,
+    })?;
+
+    // Access control: only the owning device can retrieve the capture
+    if capture.device_id != device_ctx.device_id {
+        tracing::warn!(
+            request_id = %request_id,
+            capture_id = %capture_id,
+            capture_device_id = %capture.device_id,
+            requesting_device_id = %device_ctx.device_id,
+            "Access denied: device does not own capture"
+        );
+        return Err(ApiErrorWithRequestId {
+            error: ApiError::Forbidden("You do not have access to this capture".to_string()),
+            request_id,
+        });
+    }
+
+    // Build verification URL
+    let verification_url = format!("{}/{}", state.config.verification_base_url, capture_id);
+
+    // Build response
+    let response = crate::types::CaptureDetailsResponse {
+        capture_id: capture.id,
+        device_id: capture.device_id,
+        confidence_level: capture.confidence_level,
+        status: capture.status,
+        evidence: capture.evidence,
+        captured_at: capture.captured_at.to_rfc3339(),
+        uploaded_at: capture.uploaded_at.to_rfc3339(),
+        location_coarse: capture.location_coarse,
+        verification_url,
+    };
+
+    tracing::info!(
+        request_id = %request_id,
+        capture_id = %capture_id,
+        confidence_level = %response.confidence_level,
+        "Capture retrieved successfully"
+    );
+
+    Ok((StatusCode::OK, Json(ApiResponse::new(response, request_id))))
 }
 
 // ============================================================================
@@ -721,12 +763,5 @@ mod tests {
             url,
             "https://realitycam.app/verify/550e8400-e29b-41d4-a716-446655440000"
         );
-    }
-
-    #[test]
-    fn test_rate_limit_placeholder_passes() {
-        let device_id = Uuid::new_v4();
-        let result = check_rate_limit(device_id);
-        assert!(result.is_ok());
     }
 }

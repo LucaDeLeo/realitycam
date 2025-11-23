@@ -5,8 +5,9 @@
 pub mod capture;
 
 pub use capture::{
-    CaptureLocation, CaptureMetadataPayload, CaptureUploadResponse, DepthMapDimensions,
-    ParsedCaptureUpload, MAX_DEPTH_DIMENSION, MAX_DEPTH_MAP_SIZE, MAX_PHOTO_SIZE,
+    CaptureDetailsResponse, CaptureLocation, CaptureMetadataPayload, CaptureUploadResponse,
+    DepthMapDimensions, ParsedCaptureUpload, MAX_DEPTH_DIMENSION, MAX_DEPTH_MAP_SIZE,
+    MAX_PHOTO_SIZE,
 };
 
 use chrono::{DateTime, Utc};

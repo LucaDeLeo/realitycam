@@ -95,6 +95,30 @@ pub struct CaptureUploadResponse {
     pub verification_url: String,
 }
 
+/// Response data for GET /captures/{id}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CaptureDetailsResponse {
+    /// Unique capture identifier
+    pub capture_id: Uuid,
+    /// Device ID that created this capture
+    pub device_id: Uuid,
+    /// Computed confidence level: "low", "medium", "high", or "verified"
+    pub confidence_level: String,
+    /// Processing status: "pending", "processing", "complete", "failed"
+    pub status: String,
+    /// Evidence package from verification checks (JSONB)
+    pub evidence: serde_json::Value,
+    /// When the photo was originally captured
+    pub captured_at: String,
+    /// When the capture was uploaded
+    pub uploaded_at: String,
+    /// Coarse location (city/region) for privacy
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub location_coarse: Option<String>,
+    /// URL to view verification results
+    pub verification_url: String,
+}
+
 // ============================================================================
 // Validation Functions
 // ============================================================================

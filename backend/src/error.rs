@@ -35,6 +35,7 @@ pub mod codes {
     pub const REPLAY_DETECTED: &str = "REPLAY_DETECTED";
     pub const PAYLOAD_TOO_LARGE: &str = "PAYLOAD_TOO_LARGE";
     pub const RATE_LIMITED: &str = "RATE_LIMITED";
+    pub const FORBIDDEN: &str = "FORBIDDEN";
 }
 
 /// API error type with associated HTTP status codes.
@@ -104,6 +105,9 @@ pub enum ApiError {
 
     #[error("Rate limited")]
     RateLimited,
+
+    #[error("Access forbidden")]
+    Forbidden(String),
 }
 
 impl ApiError {
@@ -131,6 +135,7 @@ impl ApiError {
             ApiError::ReplayDetected => codes::REPLAY_DETECTED,
             ApiError::PayloadTooLarge(_) => codes::PAYLOAD_TOO_LARGE,
             ApiError::RateLimited => codes::RATE_LIMITED,
+            ApiError::Forbidden(_) => codes::FORBIDDEN,
         }
     }
 
@@ -158,6 +163,7 @@ impl ApiError {
             ApiError::ReplayDetected => StatusCode::UNAUTHORIZED,
             ApiError::PayloadTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
             ApiError::RateLimited => StatusCode::TOO_MANY_REQUESTS,
+            ApiError::Forbidden(_) => StatusCode::FORBIDDEN,
         }
     }
 
@@ -196,6 +202,7 @@ impl ApiError {
             ApiError::RateLimited => {
                 "Rate limit exceeded. Please wait before trying again.".to_string()
             }
+            ApiError::Forbidden(msg) => msg.clone(),
         }
     }
 

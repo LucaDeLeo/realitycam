@@ -1,0 +1,94 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, device_id, target_media_hash, photo_s3_key, depth_map_s3_key,\n               thumbnail_s3_key, evidence, confidence_level, status,\n               location_precise, location_coarse, captured_at, uploaded_at\n        FROM captures\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "device_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "target_media_hash",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 3,
+        "name": "photo_s3_key",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "depth_map_s3_key",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "thumbnail_s3_key",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "evidence",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 7,
+        "name": "confidence_level",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "status",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "location_precise",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 10,
+        "name": "location_coarse",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "captured_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "uploaded_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "88fe1e6f1bac5901b63452ecea61f058ccab2249a29930e6cf4f83554ad0b23e"
+}

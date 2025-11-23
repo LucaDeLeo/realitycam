@@ -22,10 +22,12 @@ pub struct Capture {
     pub target_media_hash: Vec<u8>,
 
     /// S3 object key for the stored photo (Story 4.1)
-    pub photo_s3_key: String,
+    /// Nullable for backward compatibility with pre-migration captures
+    pub photo_s3_key: Option<String>,
 
     /// S3 object key for the stored depth map (Story 4.1)
-    pub depth_map_s3_key: String,
+    /// Nullable for backward compatibility with pre-migration captures
+    pub depth_map_s3_key: Option<String>,
 
     /// S3 object key for the thumbnail (optional, generated later)
     pub thumbnail_s3_key: Option<String>,
