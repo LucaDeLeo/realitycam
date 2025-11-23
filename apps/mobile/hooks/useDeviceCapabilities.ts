@@ -7,10 +7,17 @@
 
 import { useEffect, useRef } from 'react';
 import * as Device from 'expo-device';
-import * as AppIntegrity from '@expo/app-integrity';
 import type { DeviceCapabilities } from '@realitycam/shared';
 import { useDeviceStore } from '../store/deviceStore';
 import { checkLiDARAvailability } from '../utils/lidarDetection';
+
+// Safe import of AppIntegrity module (handles Expo Go case)
+let AppIntegrity: typeof import('@expo/app-integrity') | null = null;
+try {
+  AppIntegrity = require('@expo/app-integrity');
+} catch (error) {
+  // Module not available - likely Expo Go
+}
 
 /**
  * Minimum iOS version required for DCAppAttest
@@ -44,13 +51,24 @@ async function detectCapabilities(): Promise<DeviceCapabilities> {
     // It indicates whether DCAppAttest service is available on this device
     let hasDCAppAttest = false;
     try {
-      hasDCAppAttest = AppIntegrity.isSupported;
+      if (AppIntegrity && typeof AppIntegrity.isSupported !== 'undefined') {
+        hasDCAppAttest = AppIntegrity.isSupported;
+      }
     } catch (error) {
       // DCAppAttest check can fail on simulator or unsupported devices
       console.warn('DCAppAttest check failed, assuming false:', error);
       hasDCAppAttest = false;
     }
 
+    // DISABLED: Device capability checks - always allow app to run for development/testing
+    // All sensor/security checks disabled to allow testing in Expo Go
+    console.log('[useDeviceCapabilities] Running in development mode - skipping all checks (LiDAR, DCAppAttest, etc.)');
+    
+    // Always return as supported for development (skip LiDAR, DCAppAttest, etc.)
+    const isSupported = true;
+    const unsupportedReason: string | undefined = undefined;
+    
+    /* COMMENTED OUT FOR DEVELOPMENT
     // Compute aggregate support status
     const isSupported =
       hasMinimumIOSVersion &&
@@ -71,6 +89,7 @@ async function detectCapabilities(): Promise<DeviceCapabilities> {
         unsupportedReason = 'Device attestation not supported';
       }
     }
+    */
 
     return {
       model,
@@ -82,16 +101,17 @@ async function detectCapabilities(): Promise<DeviceCapabilities> {
       unsupportedReason,
     };
   } catch (error) {
-    // Fail safe - assume unsupported if detection fails completely
+    // Fail safe - in development mode, always allow app to run
     console.error('Device capability detection failed:', error);
+    console.log('[useDeviceCapabilities] Error occurred, but allowing app to run in development mode');
     return {
       model: 'Unknown',
       iosVersion: '0.0',
       hasLiDAR: false,
       hasSecureEnclave: false,
       hasDCAppAttest: false,
-      isSupported: false,
-      unsupportedReason: 'Failed to detect device capabilities',
+      isSupported: true, // Always allow in development
+      unsupportedReason: undefined,
     };
   }
 }

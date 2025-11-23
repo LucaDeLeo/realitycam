@@ -153,8 +153,8 @@ export function MetadataDisplay({ metadata, style }: MetadataDisplayProps) {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
-    gap: 12,
+    padding: 24,
+    gap: 20,
   },
   row: {
     flexDirection: 'row',
@@ -162,11 +162,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   label: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 18,
+    fontWeight: '600',
   },
   value: {
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: '400',
   },
   unavailable: {
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF9500', // iOS orange
   },
   attestationText: {
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: '600',
   },
   attestedText: {

@@ -28,6 +28,7 @@ import { useDeviceCapabilities } from '../hooks/useDeviceCapabilities';
 import { useSecureEnclaveKey } from '../hooks/useSecureEnclaveKey';
 import { useDeviceAttestation } from '../hooks/useDeviceAttestation';
 import { UnsupportedDeviceScreen } from '../components/Device/UnsupportedDeviceScreen';
+import { LogoHeader } from '../components/Logo';
 import { colors } from '../constants/colors';
 
 /**
@@ -149,15 +150,16 @@ export default function RootLayout() {
     );
   }
 
-  // Show blocking screen for unsupported devices
-  if (!capabilities?.isSupported) {
-    return (
-      <SafeAreaProvider>
-        <StatusBar style="auto" />
-        <UnsupportedDeviceScreen reason={capabilities?.unsupportedReason} />
-      </SafeAreaProvider>
-    );
-  }
+  // DISABLED: Show blocking screen for unsupported devices
+  // Temporarily disabled for development/testing in Expo Go
+  // if (!capabilities?.isSupported) {
+  //   return (
+  //     <SafeAreaProvider>
+  //       <StatusBar style="auto" />
+  //       <UnsupportedDeviceScreen reason={capabilities?.unsupportedReason} />
+  //     </SafeAreaProvider>
+  //   );
+  // }
 
   // Show loading screen during key generation (optional - could also proceed)
   // We show a brief loading state during key setup for better UX
@@ -186,7 +188,8 @@ export default function RootLayout() {
   }
 
   // Determine which warning to show (key generation or attestation failure)
-  const showKeyWarning = isKeyFailed && keyGenerationError;
+  // DISABLED: Temporarily hide key generation warnings
+  const showKeyWarning = false; // isKeyFailed && keyGenerationError;
   const showAttestationWarning = isAttestationFailed && attestationError;
   // For attestation failures, show retry button if under max retries (3)
   const showRetryButton = showAttestationWarning && retryAttempt < 3;
@@ -196,9 +199,10 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <StatusBar style="auto" />
-      {showKeyWarning && (
+      {/* DISABLED: Key generation warning temporarily hidden */}
+      {/* {showKeyWarning && (
         <AttestationWarningBanner message={keyGenerationError} />
-      )}
+      )} */}
       {showAttestationWarning && !showKeyWarning && (
         <AttestationWarningBanner
           message={attestationError}
@@ -207,6 +211,7 @@ export default function RootLayout() {
         />
       )}
       <Stack>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen
           name="preview"
@@ -214,6 +219,21 @@ export default function RootLayout() {
             title: 'Preview',
             headerShown: true,
             presentation: 'fullScreenModal',
+            headerStyle: {
+              backgroundColor: '#000000', // Black background
+              height: 120, // Same height as tabs header
+            },
+            headerTitleContainerStyle: {
+              paddingHorizontal: 20, // Horizontal padding for logo
+              paddingBottom: 8, // Bottom padding (same as tabs)
+            },
+            headerTintColor: '#FFFFFF', // White text and icons
+            headerTitleStyle: {
+              color: '#FFFFFF', // White title text
+              fontWeight: '600',
+              fontSize: 0, // Hide default title since we use custom logo
+            },
+            headerTitle: () => <LogoHeader />,
           }}
         />
         <Stack.Screen
@@ -223,6 +243,21 @@ export default function RootLayout() {
             headerShown: true,
             presentation: 'fullScreenModal',
             headerBackVisible: false,
+            headerStyle: {
+              backgroundColor: '#000000', // Black background
+              height: 120, // Same height as tabs header
+            },
+            headerTitleContainerStyle: {
+              paddingHorizontal: 20, // Horizontal padding for logo
+              paddingBottom: 8, // Bottom padding (same as tabs)
+            },
+            headerTintColor: '#FFFFFF', // White text and icons
+            headerTitleStyle: {
+              color: '#FFFFFF', // White title text
+              fontWeight: '600',
+              fontSize: 0, // Hide default title since we use custom logo
+            },
+            headerTitle: () => <LogoHeader />,
           }}
         />
       </Stack>

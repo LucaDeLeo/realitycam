@@ -7,7 +7,7 @@
  * @see Story 4.2 - Upload Queue with Retry Logic (AC-7)
  */
 
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Crypto from 'expo-crypto';
 import type {
   ProcessedCapture,

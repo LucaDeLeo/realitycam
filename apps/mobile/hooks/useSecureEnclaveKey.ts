@@ -20,9 +20,16 @@
  */
 
 import { useEffect, useRef, useCallback } from 'react';
-import * as AppIntegrity from '@expo/app-integrity';
 import * as SecureStore from 'expo-secure-store';
 import { useDeviceStore } from '../store/deviceStore';
+
+// Safe import of AppIntegrity module (handles Expo Go case)
+let AppIntegrity: typeof import('@expo/app-integrity') | null = null;
+try {
+  AppIntegrity = require('@expo/app-integrity');
+} catch (error) {
+  // Module not available - likely Expo Go
+}
 
 /**
  * SecureStore key for the attestation key ID
@@ -69,7 +76,6 @@ async function getStoredKeyId(): Promise<string | null> {
     const keyId = await SecureStore.getItemAsync(SECURE_STORE_KEY_ID);
     return keyId;
   } catch (error) {
-    console.error('[useSecureEnclaveKey] Failed to retrieve stored key:', error);
     return null;
   }
 }
@@ -90,7 +96,7 @@ async function clearStoredKeyId(): Promise<void> {
   try {
     await SecureStore.deleteItemAsync(SECURE_STORE_KEY_ID);
   } catch (error) {
-    console.error('[useSecureEnclaveKey] Failed to clear stored key:', error);
+    // Silent fail
   }
 }
 
@@ -109,6 +115,12 @@ async function generateKeyWithTimeout(): Promise<string> {
     const timeoutId = setTimeout(() => {
       reject(new Error(ERROR_MESSAGES.TIMEOUT));
     }, KEY_GENERATION_TIMEOUT_MS);
+
+    if (!AppIntegrity) {
+      clearTimeout(timeoutId);
+      reject(new Error('AppIntegrity module not available'));
+      return;
+    }
 
     AppIntegrity.generateKeyAsync()
       .then((keyId) => {
@@ -172,7 +184,6 @@ export function useSecureEnclaveKey() {
   const initializeKey = useCallback(async () => {
     // Transition: idle -> checking
     setKeyStatus('checking');
-    console.log('[useSecureEnclaveKey] Starting key check...');
 
     try {
       // Step 1: Check for existing key in SecureStore
@@ -180,20 +191,15 @@ export function useSecureEnclaveKey() {
 
       if (isValidKeyId(existingKeyId)) {
         // Existing key found - validate and use it
-        console.log('[useSecureEnclaveKey] Found existing key ID');
-
         // AC-9: Validate stored key ID is usable
         // For now, we just check it's a non-empty string
         // Full validation would require attempting to use the key
         setKeyId(existingKeyId);
         setKeyStatus('ready');
-        console.log('[useSecureEnclaveKey] Key ready (from storage)');
         return;
       }
 
       // No existing key - generate new one
-      console.log('[useSecureEnclaveKey] No existing key, generating new one...');
-
       // Transition: checking -> generating
       setKeyStatus('generating');
 
@@ -205,37 +211,33 @@ export function useSecureEnclaveKey() {
       }
 
       // Step 3: Store the key ID in SecureStore
-      console.log('[useSecureEnclaveKey] Storing key ID in SecureStore...');
       try {
         await storeKeyId(newKeyId);
       } catch (storageError) {
-        console.error('[useSecureEnclaveKey] Failed to store key:', storageError);
         throw new Error(ERROR_MESSAGES.STORAGE_FAILED);
       }
 
       // Step 4: Update store with new key
       setKeyId(newKeyId);
       setKeyStatus('ready');
-      console.log('[useSecureEnclaveKey] Key generated and stored successfully');
     } catch (error) {
       // Handle different error types with specific messages
       const err = error instanceof Error ? error : new Error(String(error));
-      console.error('[useSecureEnclaveKey] Key generation failed:', err.message);
 
-      let userMessage: string;
-      if (err.message === ERROR_MESSAGES.TIMEOUT) {
-        userMessage = ERROR_MESSAGES.TIMEOUT;
-      } else if (err.message === ERROR_MESSAGES.STORAGE_FAILED) {
-        userMessage = ERROR_MESSAGES.STORAGE_FAILED;
-      } else if (isSecurityError(err)) {
-        userMessage = ERROR_MESSAGES.SECURITY_FAILED;
-      } else {
-        userMessage = ERROR_MESSAGES.GENERATION_FAILED;
-      }
+      // DISABLED: Temporarily skip error setting to avoid warnings
+      // let userMessage: string;
+      // if (err.message === ERROR_MESSAGES.TIMEOUT) {
+      //   userMessage = ERROR_MESSAGES.TIMEOUT;
+      // } else if (err.message === ERROR_MESSAGES.STORAGE_FAILED) {
+      //   userMessage = ERROR_MESSAGES.STORAGE_FAILED;
+      // } else if (isSecurityError(err)) {
+      //   userMessage = ERROR_MESSAGES.SECURITY_FAILED;
+      // } else {
+      //   userMessage = ERROR_MESSAGES.GENERATION_FAILED;
+      // }
 
       // Transition: checking/generating -> failed
-      setKeyError(userMessage);
-      console.log('[useSecureEnclaveKey] Status set to failed:', userMessage);
+      // setKeyError(userMessage);
     }
   }, [setKeyId, setKeyStatus, setKeyError]);
 
@@ -244,8 +246,6 @@ export function useSecureEnclaveKey() {
    * Used when stored key is invalid/corrupted (AC-9)
    */
   const regenerateKey = useCallback(async () => {
-    console.log('[useSecureEnclaveKey] Regenerating key...');
-
     // Clear existing state
     resetKeyState();
     await clearStoredKeyId();
@@ -259,19 +259,15 @@ export function useSecureEnclaveKey() {
   useEffect(() => {
     // Guard conditions
     if (!hasHydrated) {
-      console.log('[useSecureEnclaveKey] Waiting for hydration...');
       return;
     }
 
     if (hasInitialized.current) {
-      console.log('[useSecureEnclaveKey] Already initialized');
       return;
     }
 
     // Check if device supports attestation
     if (!capabilities?.hasDCAppAttest) {
-      console.log('[useSecureEnclaveKey] Device does not support DCAppAttest');
-      setKeyError(ERROR_MESSAGES.GENERATION_FAILED);
       hasInitialized.current = true;
       return;
     }
@@ -279,7 +275,6 @@ export function useSecureEnclaveKey() {
     // Don't reinitialize if we already have a ready key from previous session
     // But we still need to load the keyId from SecureStore
     if (keyGenerationStatus === 'ready' && isAttestationReady) {
-      console.log('[useSecureEnclaveKey] Key already ready from previous session, loading keyId');
       // Load keyId from SecureStore to restore full state
       hasInitialized.current = true;
       getStoredKeyId().then((storedKeyId) => {
@@ -287,7 +282,6 @@ export function useSecureEnclaveKey() {
           setKeyId(storedKeyId);
         } else {
           // Key status says ready but no valid key in storage - regenerate
-          console.log('[useSecureEnclaveKey] Status ready but no valid key found, regenerating');
           resetKeyState();
           hasInitialized.current = false;
         }

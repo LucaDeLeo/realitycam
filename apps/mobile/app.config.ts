@@ -26,7 +26,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   plugins: [
     'expo-router',
     'expo-secure-store',
-    'expo-haptics',
+    // expo-haptics doesn't need a config plugin, it works without one
     [
       'expo-camera',
       {
@@ -47,8 +47,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         },
       },
     ],
-    // LiDAR depth module
-    './modules/lidar-depth',
+    // LiDAR depth module - commented out until plugin is configured
+    // './modules/lidar-depth',
   ],
   experiments: {
     typedRoutes: true,

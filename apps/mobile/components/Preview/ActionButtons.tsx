@@ -122,15 +122,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   discardButton: {
-    backgroundColor: '#FF3B30', // iOS red
+    backgroundColor: 'transparent', // No background
   },
   discardButtonText: {
-    color: '#FFFFFF',
+    color: '#FFFFFF', // White text
   },
   uploadButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#FFFFFF', // White background
   },
   uploadButtonText: {
-    color: '#FFFFFF',
+    color: '#000000', // Black text
   },
 });
