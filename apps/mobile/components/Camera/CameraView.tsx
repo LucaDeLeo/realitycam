@@ -17,6 +17,7 @@ import {
   useColorScheme,
   ActivityIndicator,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import { CameraView as ExpoCameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
@@ -118,6 +119,12 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
   
   // Camera facing state (front/back)
   const [facing, setFacing] = useState<CameraType>('back');
+  
+  // Zoom state - actual zoom value for camera (0 to 1 where 0 = 1x, 0.5 = 2x, 1 = max zoom)
+  const [zoom, setZoom] = useState<number>(0);
+  
+  // Zoom level for display
+  const [zoomLevel, setZoomLevel] = useState<'0.5' | '1' | '2'>('1');
 
   // LiDAR hook
   const {
@@ -188,6 +195,29 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
       return newFacing;
     });
   }, []);
+  
+  // Handle zoom change
+  const handleZoomChange = useCallback((level: '0.5' | '1' | '2') => {
+    console.log(`[CameraView] Zoom change requested: ${level}x`);
+    setZoomLevel(level);
+    
+    // Map zoom level to camera zoom value (0-1)
+    // Note: Expo Camera zoom is 0-1 where 0 = no zoom, 1 = max zoom
+    // Ultra-wide (0.5x) is NOT supported in Expo Go - requires native development build
+    if (level === '0.5') {
+      // Ultra-wide not available in Expo Go - would need native module
+      console.warn('[CameraView] Ultra-wide (0.5x) not available in Expo Go. Use development build for native lens access.');
+      setZoom(0); // Keep at 1x for now
+    } else if (level === '1') {
+      // Default zoom (1x)
+      setZoom(0);
+      console.log('[CameraView] Zoom set to 1x (default)');
+    } else if (level === '2') {
+      // 2x digital zoom - use zoom value of ~0.5 (adjust as needed)
+      setZoom(0.5);
+      console.log('[CameraView] Zoom set to 2x (digital zoom: 0.5)');
+    }
+  }, []);
 
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
@@ -234,6 +264,7 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
         style={styles.camera}
         facing={facing}
         mode="picture"
+        zoom={zoom}
         onCameraReady={() => {
           setCameraReady(true);
         }}
@@ -250,37 +281,75 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
 
       {/* Controls Overlay */}
       <View style={styles.controls}>
-        {/* DISABLED: Depth Toggle Button - temporarily hidden */}
-        {/* <View style={styles.toggleContainer}>
-          <DepthToggle
-            enabled={overlayEnabled}
-            onToggle={handleOverlayToggle}
-            disabled={!isAvailable || !isReady}
-          />
-        </View> */}
-
-        {/* Capture Button and Flip Camera Button */}
-        {onCapture && (
-          <View style={styles.captureControlsContainer}>
-            <View style={styles.captureButtonContainer}>
-              <CaptureButton
-                onCapture={onCapture}
-                isCapturing={isCapturing}
-                disabled={!permission?.granted || !cameraReady}
-              />
-            </View>
-            {/* Flip Camera Button - Right side of capture button */}
+        {/* Bottom Controls */}
+        <View style={styles.bottomControls}>
+          {/* Zoom Buttons (0.5, 1×, 2×) */}
+          <View style={styles.zoomSelector}>
             <TouchableOpacity
-              style={styles.flipButton}
-              onPress={handleFlipCamera}
+              style={[
+                styles.zoomButton, 
+                zoomLevel === '0.5' && styles.zoomButtonActive,
+                styles.zoomButtonDisabled // Ultra-wide not available in Expo Go
+              ]}
+              onPress={() => handleZoomChange('0.5')}
               activeOpacity={0.7}
-              accessibilityLabel={facing === 'back' ? 'Switch to front camera' : 'Switch to back camera'}
-              accessibilityRole="button"
             >
-              <Ionicons name="camera-reverse-outline" size={28} color="#FFFFFF" />
+              <Text style={[
+                styles.zoomText, 
+                zoomLevel === '0.5' && styles.zoomTextActive,
+                styles.zoomTextDisabled
+              ]}>
+                0,5
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.zoomButton, zoomLevel === '1' && styles.zoomButtonActive]}
+              onPress={() => handleZoomChange('1')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.zoomText, zoomLevel === '1' && styles.zoomTextActive]}>
+                1×
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.zoomButton, zoomLevel === '2' && styles.zoomButtonActive]}
+              onPress={() => handleZoomChange('2')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.zoomText, zoomLevel === '2' && styles.zoomTextActive]}>
+                2×
+              </Text>
             </TouchableOpacity>
           </View>
-        )}
+
+          {/* Capture Controls - Capture Button and Flip Camera Button aligned horizontally */}
+          {onCapture && (
+            <View style={styles.captureRow}>
+              {/* Empty space on left for symmetry */}
+              <View style={styles.captureLeftSpace} />
+              
+              {/* Capture Button - Center */}
+              <View style={styles.captureButtonContainer}>
+                <CaptureButton
+                  onCapture={onCapture}
+                  isCapturing={isCapturing}
+                  disabled={!permission?.granted || !cameraReady}
+                />
+              </View>
+              
+              {/* Flip Camera Button - Right */}
+              <TouchableOpacity
+                style={styles.flipButton}
+                onPress={handleFlipCamera}
+                activeOpacity={0.7}
+                accessibilityLabel={facing === 'back' ? 'Switch to front camera' : 'Switch to back camera'}
+                accessibilityRole="button"
+              >
+                <Ionicons name="camera-reverse-outline" size={28} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
 
         {/* Status Indicator */}
         {!isReady && isAvailable && (
@@ -297,6 +366,7 @@ export const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(function
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000000',
   },
   centered: {
     alignItems: 'center',
@@ -310,41 +380,77 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 20,
   },
-  toggleContainer: {
+  bottomControls: {
     position: 'absolute',
-    top: 60,
-    right: 20,
-  },
-  captureControlsContainer: {
-    position: 'absolute',
-    bottom: 40,
+    bottom: 0,
     left: 0,
     right: 0,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 30,
+    alignItems: 'center',
+  },
+  zoomSelector: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 24,
+    gap: 12,
+    marginBottom: 20,
+  },
+  zoomButton: {
+    width: 48,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  zoomButtonActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+  },
+  zoomButtonDisabled: {
+    opacity: 0.5,
+  },
+  zoomText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  zoomTextActive: {
+    color: '#000000',
+    fontWeight: '700',
+  },
+  zoomTextDisabled: {
+    opacity: 0.6,
+  },
+  captureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: 40,
+  },
+  captureLeftSpace: {
+    width: 60,
   },
   captureButtonContainer: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   flipButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   statusContainer: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 200,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -364,10 +470,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 16,
+    color: '#FFFFFF',
   },
   permissionButton: {
     fontSize: 16,
     fontWeight: '600',
     padding: 12,
+    color: '#FFD60A',
   },
 });
