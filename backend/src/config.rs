@@ -49,6 +49,13 @@ pub struct Config {
 
     /// Apple Bundle ID for DCAppAttest verification (AC-6)
     pub apple_bundle_id: String,
+
+    /// Base URL for verification pages (e.g., https://realitycam.app/verify)
+    pub verification_base_url: String,
+
+    /// Enable strict attestation verification (reject invalid certificate chains)
+    /// When false (MVP mode), invalid chains are logged but allowed
+    pub strict_attestation: bool,
 }
 
 impl Config {
@@ -104,6 +111,11 @@ impl Config {
             apple_team_id: env::var("APPLE_TEAM_ID").unwrap_or_else(|_| "XXXXXXXXXX".to_string()),
             apple_bundle_id: env::var("APPLE_BUNDLE_ID")
                 .unwrap_or_else(|_| "com.realitycam.app".to_string()),
+            verification_base_url: env::var("VERIFICATION_BASE_URL")
+                .unwrap_or_else(|_| "https://realitycam.app/verify".to_string()),
+            strict_attestation: env::var("STRICT_ATTESTATION")
+                .map(|v| v.to_lowercase() == "true" || v == "1")
+                .unwrap_or(false), // MVP default: permissive mode
         }
     }
 
@@ -125,6 +137,8 @@ impl Config {
             shutdown_timeout_secs: 5,
             apple_team_id: "XXXXXXXXXX".to_string(),
             apple_bundle_id: "com.test.app".to_string(),
+            verification_base_url: "https://test.realitycam.app/verify".to_string(),
+            strict_attestation: false,
         }
     }
 }

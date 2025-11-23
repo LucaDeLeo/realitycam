@@ -9,7 +9,9 @@
     "prebuild:ios": "expo prebuild --platform ios",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "android": "expo run:android"
+    "android": "expo run:android",
+    "test": "echo \"No tests configured yet\"",
+    "test:ci": "echo \"No tests configured yet\""
   },
   "dependencies": {
     "@expo/app-integrity": "~0.1.0",

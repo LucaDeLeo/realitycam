@@ -69,17 +69,22 @@ async fn main() {
     let _cleanup_handle = services::ChallengeStore::spawn_cleanup_task(challenge_store.clone());
     tracing::info!("Challenge cleanup task spawned");
 
+    // Initialize S3 storage service (shared across all requests)
+    let storage = services::StorageService::new(&config).await;
+    tracing::info!("S3 storage service initialized");
+
     // Build CORS layer
     let cors = build_cors_layer(&config.cors_origins);
 
     // Request ID header
     let x_request_id = HeaderName::from_static(X_REQUEST_ID);
 
-    // Build the application state with database, challenge store, and config
+    // Build the application state with database, challenge store, storage, and config
     let app_state = routes::AppState {
         db: pool.clone(),
         challenge_store,
         config: std::sync::Arc::new(config.clone()),
+        storage: std::sync::Arc::new(storage),
     };
 
     // Build the router with middleware stack

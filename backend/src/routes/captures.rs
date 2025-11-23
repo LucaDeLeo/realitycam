@@ -24,15 +24,16 @@ use axum::{
 use axum_extra::extract::Multipart;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde_json::json;
+use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::error::{ApiError, ApiErrorWithRequestId};
 use crate::middleware::DeviceContext;
 use crate::models::{Device, EvidencePackage, HardwareAttestation, ProcessingInfo};
+use crate::routes::AppState;
 use crate::services::{
     analyze_depth_map, process_location_for_evidence, validate_metadata, verify_capture_assertion,
-    StorageService,
 };
 
 /// Backend version for processing info (from Cargo.toml)
@@ -45,9 +46,6 @@ use crate::types::{
 // ============================================================================
 // Configuration Constants
 // ============================================================================
-
-/// Base URL for verification pages (should come from config in production)
-const VERIFICATION_BASE_URL: &str = "https://realitycam.app/verify";
 
 /// Rate limiting configuration flag (placeholder for MVP)
 /// TODO: Implement full rate limiting in Story 4-2
@@ -66,7 +64,7 @@ const MAX_CAPTURES_PER_HOUR: u32 = 10;
 /// Routes:
 /// - POST / - Upload a new capture (protected by DeviceAuthLayer)
 /// - GET /{id} - Get capture by ID (protected by DeviceAuthLayer)
-pub fn router() -> Router<PgPool> {
+pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", post(upload_capture))
         .route("/{id}", get(get_capture))
@@ -315,7 +313,7 @@ async fn insert_capture_with_evidence(
 /// - 429 Too Many Requests: Rate limit exceeded (when enabled)
 /// - 500 Internal Server Error: Storage or database error
 async fn upload_capture(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Extension(request_id): Extension<Uuid>,
     Extension(device_ctx): Extension<DeviceContext>,
     multipart: Multipart,
@@ -353,17 +351,56 @@ async fn upload_capture(
         "Multipart data parsed successfully"
     );
 
+    // ========================================================================
+    // SECURITY FIX: Server-side hash verification
+    // ========================================================================
+    // Compute SHA256 of uploaded photo bytes and verify against client claim.
+    // This prevents attacks where client sends arbitrary content with a fake hash.
+    let computed_hash = Sha256::digest(&parsed.photo_bytes);
+    let claimed_hash_bytes = STANDARD.decode(&parsed.metadata.photo_hash).map_err(|e| {
+        tracing::warn!(
+            request_id = %request_id,
+            error = %e,
+            "Invalid base64 encoding in photo_hash"
+        );
+        ApiErrorWithRequestId {
+            error: ApiError::Validation("Invalid base64 encoding in photo_hash".to_string()),
+            request_id,
+        }
+    })?;
+
+    if computed_hash.as_slice() != claimed_hash_bytes.as_slice() {
+        tracing::warn!(
+            request_id = %request_id,
+            device_id = %device_ctx.device_id,
+            computed_hash = %STANDARD.encode(&computed_hash),
+            claimed_hash = %parsed.metadata.photo_hash,
+            "Photo hash mismatch - rejecting upload"
+        );
+        return Err(ApiErrorWithRequestId {
+            error: ApiError::Validation(
+                "Photo hash does not match uploaded content. Ensure hash is SHA256 of photo bytes.".to_string()
+            ),
+            request_id,
+        });
+    }
+
+    tracing::debug!(
+        request_id = %request_id,
+        hash = %parsed.metadata.photo_hash,
+        "Photo hash verified successfully"
+    );
+
     // Generate capture ID
     let capture_id = Uuid::new_v4();
 
-    // Initialize config and storage service
-    // Note: In production, these should be part of AppState for connection reuse
-    let config = crate::config::Config::load();
-    let storage = StorageService::new(&config).await;
+    // Use shared storage service and config from AppState (connection-pooled)
+    let storage = &state.storage;
+    let config = &state.config;
 
     // Upload files to S3
     let (photo_s3_key, depth_map_s3_key) = storage
-        .upload_capture_files(capture_id, parsed.photo_bytes, parsed.depth_map_bytes)
+        .upload_capture_files(capture_id, parsed.photo_bytes.clone(), parsed.depth_map_bytes.clone())
         .await
         .map_err(|e| ApiErrorWithRequestId {
             error: e,
@@ -385,7 +422,7 @@ async fn upload_capture(
     // This is NON-BLOCKING: failures do not reject the upload.
 
     // Lookup full device record (needed for public_key and assertion_counter)
-    let device = lookup_device(&pool, device_ctx.device_id)
+    let device = lookup_device(&state.db, device_ctx.device_id)
         .await
         .map_err(|e| ApiErrorWithRequestId {
             error: e,
@@ -414,7 +451,7 @@ async fn upload_capture(
 
     // Update device counter if verification succeeded
     if let Some(new_counter) = assertion_result.new_counter {
-        if let Err(e) = update_device_counter(&pool, device.id, new_counter as i64).await {
+        if let Err(e) = update_device_counter(&state.db, device.id, new_counter as i64).await {
             // Log error but continue - counter update failure is not fatal
             tracing::error!(
                 request_id = %request_id,
@@ -566,14 +603,9 @@ async fn upload_capture(
     // End Story 4.4 additions
     // ========================================================================
 
-    // Decode photo hash from base64
-    let photo_hash_bytes = STANDARD.decode(&parsed.metadata.photo_hash).map_err(|e| {
-        tracing::warn!(error = %e, "Invalid base64 in photo_hash");
-        ApiErrorWithRequestId {
-            error: ApiError::Validation("Invalid base64 encoding in photo_hash".to_string()),
-            request_id,
-        }
-    })?;
+    // Use the server-computed hash (already verified above) as the authoritative hash
+    // This ensures we store what we actually received, not what the client claimed
+    let photo_hash_bytes = computed_hash.to_vec();
 
     // Prepare location data if present
     let location_precise = parsed.metadata.location.as_ref().map(|loc| {
@@ -604,7 +636,7 @@ async fn upload_capture(
     };
 
     let db_capture_id = insert_capture_with_evidence(
-        &pool,
+        &state.db,
         InsertCaptureWithEvidenceParams {
             device_id: device_ctx.device_id,
             target_media_hash: photo_hash_bytes,
@@ -631,7 +663,7 @@ async fn upload_capture(
     );
 
     // Build response
-    let verification_url = format!("{VERIFICATION_BASE_URL}/{db_capture_id}");
+    let verification_url = format!("{}/{db_capture_id}", config.verification_base_url);
 
     let response_data = CaptureUploadResponse {
         capture_id: db_capture_id,
@@ -678,7 +710,8 @@ mod tests {
     #[test]
     fn test_verification_url_format() {
         let capture_id = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
-        let url = format!("{VERIFICATION_BASE_URL}/{capture_id}");
+        let base_url = "https://realitycam.app/verify";
+        let url = format!("{base_url}/{capture_id}");
         assert_eq!(
             url,
             "https://realitycam.app/verify/550e8400-e29b-41d4-a716-446655440000"

@@ -21,23 +21,14 @@ use crate::config::Config;
 // Apple App Attest Root CA
 // ============================================================================
 
-// Apple App Attest Root CA - Placeholder for MVP
-// TODO: Download actual certificate from https://www.apple.com/certificateauthority/
-// For now, we'll use a verification approach that logs a warning and allows
-// development/testing to proceed. In production, replace with actual embedded cert.
-//
-// The actual Apple App Attestation Root CA has:
-// - Subject: CN=Apple App Attestation Root CA, O=Apple Inc., ST=California, C=US
-// - Valid: 2020-03-18 to 2045-03-15
-// - SHA256 Fingerprint: ...
-//
-// For production:
-// 1. Download from Apple PKI
-// 2. Convert to DER: openssl x509 -in cert.pem -outform DER -out apple_app_attest_root_ca.der
-// 3. Embed: const APPLE_APP_ATTEST_ROOT_CA: &[u8] = include_bytes!("../certs/apple_app_attest_root_ca.der");
+/// Apple App Attestation Root CA certificate (DER format)
+/// Downloaded from https://www.apple.com/certificateauthority/
+/// Subject: CN=Apple App Attestation Root CA, O=Apple Inc., ST=California, C=US
+/// Valid: 2020-03-18 to 2045-03-15
+const APPLE_APP_ATTEST_ROOT_CA: &[u8] = include_bytes!("../../certs/apple_app_attest_root_ca.der");
 
-/// Placeholder flag indicating whether we have the real Apple CA embedded
-const APPLE_CA_EMBEDDED: bool = false;
+/// Flag indicating the Apple CA is embedded and available for verification
+const APPLE_CA_EMBEDDED: bool = true;
 
 // Apple nonce extension OID: 1.2.840.113635.100.8.2
 // This extension contains the nonce that must match SHA256(authData || clientDataHash)
@@ -310,12 +301,21 @@ pub fn parse_authenticator_data(data: &[u8]) -> Result<AuthenticatorData, Attest
 // Certificate Chain Verification (AC-4)
 // ============================================================================
 
-/// Verifies the certificate chain.
-/// For MVP, this validates certificate structure and chain hierarchy.
-/// TODO: Full cryptographic signature verification requires the embedded Apple Root CA.
+/// Verifies the certificate chain including cryptographic signature verification.
+///
+/// When `strict` is true, chain verification failures cause rejection.
+/// When `strict` is false (MVP mode), failures are logged but allowed.
+///
+/// Verification steps:
+/// 1. Parse all certificates in the chain
+/// 2. Verify validity periods (not expired)
+/// 3. Verify issuer/subject hierarchy
+/// 4. Verify intermediate cert is signed by Apple Root CA (cryptographic)
+/// 5. Verify leaf cert is signed by intermediate (cryptographic)
 pub fn verify_certificate_chain(
     certs: &[Vec<u8>],
-    _request_id: uuid::Uuid,
+    strict: bool,
+    request_id: uuid::Uuid,
 ) -> Result<(), AttestationError> {
     if certs.len() < 2 {
         return Err(AttestationError::IncompleteCertChain);
@@ -323,7 +323,7 @@ pub fn verify_certificate_chain(
 
     let now = chrono::Utc::now();
 
-    // Parse all certificates
+    // Parse all certificates from the attestation
     let mut parsed_certs = Vec::new();
     for (i, cert_der) in certs.iter().enumerate() {
         let (_, cert) = X509Certificate::from_der(cert_der)
@@ -331,16 +331,20 @@ pub fn verify_certificate_chain(
         parsed_certs.push(cert);
     }
 
+    // Parse the embedded Apple Root CA
+    let (_, apple_root) = X509Certificate::from_der(APPLE_APP_ATTEST_ROOT_CA)
+        .map_err(|e| AttestationError::InvalidCertificate(format!("Apple Root CA: {e:?}")))?;
+
     // Verify validity periods for all certificates
     for (i, cert) in parsed_certs.iter().enumerate() {
         let validity = cert.validity();
-        // x509-parser uses time crate, convert to timestamps for comparison
         let now_ts = now.timestamp();
         let not_before_ts = validity.not_before.timestamp();
         let not_after_ts = validity.not_after.timestamp();
 
         if now_ts < not_before_ts || now_ts > not_after_ts {
             tracing::warn!(
+                request_id = %request_id,
                 cert_index = i,
                 not_before = %validity.not_before,
                 not_after = %validity.not_after,
@@ -351,30 +355,91 @@ pub fn verify_certificate_chain(
         }
     }
 
-    // Verify chain hierarchy: leaf issued by intermediate
     // x5c[0] = leaf certificate, x5c[1] = intermediate certificate
     let leaf = &parsed_certs[0];
     let intermediate = &parsed_certs[1];
 
+    // Verify chain hierarchy: leaf issued by intermediate
     if leaf.issuer() != intermediate.subject() {
         tracing::warn!(
+            request_id = %request_id,
             leaf_issuer = ?leaf.issuer(),
             intermediate_subject = ?intermediate.subject(),
-            "Certificate chain hierarchy mismatch"
+            "Certificate chain hierarchy mismatch: leaf->intermediate"
         );
         return Err(AttestationError::ChainVerificationFailed(
             "Leaf certificate not issued by intermediate".to_string(),
         ));
     }
 
-    // TODO: Verify intermediate is signed by Apple Root CA
-    // This requires embedding the Apple App Attest Root CA certificate
-    if !APPLE_CA_EMBEDDED {
+    // Verify chain hierarchy: intermediate issued by Apple Root
+    if intermediate.issuer() != apple_root.subject() {
+        let msg = "Intermediate certificate not issued by Apple Root CA";
         tracing::warn!(
-            "Apple Root CA not embedded - skipping root verification for MVP. \
-             In production, embed the Apple App Attestation Root CA certificate."
+            request_id = %request_id,
+            intermediate_issuer = ?intermediate.issuer(),
+            apple_root_subject = ?apple_root.subject(),
+            "{}", msg
         );
+        if strict {
+            return Err(AttestationError::ChainVerificationFailed(msg.to_string()));
+        }
     }
+
+    // Cryptographic verification: verify intermediate signed by Apple Root CA
+    let root_verification = intermediate.verify_signature(Some(apple_root.public_key()));
+    match root_verification {
+        Ok(()) => {
+            tracing::debug!(
+                request_id = %request_id,
+                "Intermediate certificate signature verified against Apple Root CA"
+            );
+        }
+        Err(e) => {
+            tracing::warn!(
+                request_id = %request_id,
+                error = ?e,
+                strict = strict,
+                "Intermediate certificate signature verification failed against Apple Root CA"
+            );
+            if strict {
+                return Err(AttestationError::ChainVerificationFailed(format!(
+                    "Intermediate cert not signed by Apple Root CA: {e:?}"
+                )));
+            }
+        }
+    }
+
+    // Cryptographic verification: verify leaf signed by intermediate
+    let leaf_verification = leaf.verify_signature(Some(intermediate.public_key()));
+    match leaf_verification {
+        Ok(()) => {
+            tracing::debug!(
+                request_id = %request_id,
+                "Leaf certificate signature verified against intermediate"
+            );
+        }
+        Err(e) => {
+            tracing::warn!(
+                request_id = %request_id,
+                error = ?e,
+                strict = strict,
+                "Leaf certificate signature verification failed against intermediate"
+            );
+            if strict {
+                return Err(AttestationError::ChainVerificationFailed(format!(
+                    "Leaf cert not signed by intermediate: {e:?}"
+                )));
+            }
+        }
+    }
+
+    tracing::info!(
+        request_id = %request_id,
+        strict = strict,
+        chain_length = certs.len(),
+        "Certificate chain verification completed"
+    );
 
     Ok(())
 }
@@ -650,13 +715,14 @@ pub async fn verify_attestation(
         "Auth data parsed"
     );
 
-    // Step 3: Verify certificate chain
+    // Step 3: Verify certificate chain (with cryptographic verification)
     tracing::info!(
         request_id = %request_id,
         step = "cert_chain",
+        strict = config.strict_attestation,
         "Verifying certificate chain"
     );
-    verify_certificate_chain(&attestation.x5c, request_id)?;
+    verify_certificate_chain(&attestation.x5c, config.strict_attestation, request_id)?;
     tracing::info!(
         request_id = %request_id,
         step = "cert_chain",

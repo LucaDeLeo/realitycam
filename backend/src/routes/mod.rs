@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use crate::config::Config;
 use crate::middleware::{DeviceAuthConfig, DeviceAuthLayer};
-use crate::services::ChallengeStore;
+use crate::services::{ChallengeStore, StorageService};
 
 pub mod captures;
 pub mod devices;
@@ -26,6 +26,8 @@ pub struct AppState {
     pub challenge_store: Arc<ChallengeStore>,
     /// Application configuration
     pub config: Arc<Config>,
+    /// S3 storage service (shared, connection-pooled)
+    pub storage: Arc<StorageService>,
 }
 
 /// Creates the main API router with all routes.
@@ -53,8 +55,9 @@ pub fn api_router(state: AppState) -> Router {
 
     // Captures router with device authentication middleware
     // This protects all capture-related endpoints
+    // Pass full AppState for access to storage, config, and db
     let captures_router = captures::router()
-        .with_state(state.db.clone())
+        .with_state(state.clone())
         .layer(DeviceAuthLayer::new(state.db.clone(), device_auth_config));
 
     // Create v1 API routes
