@@ -1,0 +1,510 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML
+  Story: 2-6-device-authentication-middleware
+  Generated: 2025-11-23
+  Purpose: Single source of truth for story implementation
+-->
+<story-context>
+  <story-reference>
+    <key>2-6-device-authentication-middleware</key>
+    <title>Device Authentication Middleware</title>
+    <file>docs/sprint-artifacts/stories/2-6-device-authentication-middleware.md</file>
+    <epic>Epic 2: Device Registration and Hardware Attestation</epic>
+    <tech-spec>docs/sprint-artifacts/tech-spec-epic-2.md</tech-spec>
+    <status>drafted</status>
+  </story-reference>
+
+  <summary>
+    Implement Axum/Tower middleware to authenticate API requests using device signatures.
+    The middleware verifies requests come from registered, attested devices by:
+    1. Extracting device authentication headers (X-Device-Id, X-Device-Timestamp, X-Device-Signature)
+    2. Looking up device in database and verifying attestation level
+    3. Decoding CBOR assertion and verifying EC signature using stored public key
+    4. Checking replay protection via assertion counter
+    5. Injecting DeviceContext into request extensions for downstream handlers
+
+    This middleware protects capture endpoints (Epic 3) while keeping registration,
+    challenge, health, and verify routes public.
+  </summary>
+
+  <acceptance-criteria-summary>
+    <criterion id="AC-1">Create DeviceAuthMiddleware using Tower Layer pattern, selectively applied</criterion>
+    <criterion id="AC-2">Extract X-Device-Id header as UUID, return 401 DEVICE_AUTH_REQUIRED if missing</criterion>
+    <criterion id="AC-3">Extract X-Device-Timestamp, validate 5-min past / 1-min future window</criterion>
+    <criterion id="AC-4">Extract X-Device-Signature, decode base64 assertion</criterion>
+    <criterion id="AC-5">Lookup device by UUID, return 401 DEVICE_NOT_FOUND if missing</criterion>
+    <criterion id="AC-6">Check attestation level, return 403 DEVICE_UNVERIFIED on strict routes</criterion>
+    <criterion id="AC-7">Verify CBOR assertion: decode, check counter, verify P-256 EC signature</criterion>
+    <criterion id="AC-8">Skip signature verification for unverified devices on permissive routes</criterion>
+    <criterion id="AC-9">Inject DeviceContext into request extensions on success</criterion>
+    <criterion id="AC-10">Apply middleware to capture routes, keep registration/challenge/health public</criterion>
+    <criterion id="AC-11">Add structured logging with request_id correlation</criterion>
+    <criterion id="AC-12">Error responses match existing ApiErrorResponse format</criterion>
+  </acceptance-criteria-summary>
+
+  <documentation-artifacts>
+    <artifact type="tech-spec" relevance="primary">
+      <path>docs/sprint-artifacts/tech-spec-epic-2.md</path>
+      <description>Epic 2 technical specification with AC-2.7.5 through AC-2.7.11 defining middleware requirements, device signature flow diagrams, and assertion verification steps</description>
+      <sections>
+        <section>AC-2.7: Device Signature Authentication</section>
+        <section>Device Signature Flow (Per Request) diagram</section>
+        <section>Authenticated Request Format</section>
+        <section>DCAppAttest Verification Checklist</section>
+      </sections>
+    </artifact>
+
+    <artifact type="architecture" relevance="primary">
+      <path>docs/architecture.md</path>
+      <description>System architecture with Security Architecture section defining device authentication flow, error codes, and API response format</description>
+      <sections>
+        <section>Security Architecture - Authentication Flow</section>
+        <section>ADR-005: Device-Based Authentication (No Tokens)</section>
+        <section>Error Codes table</section>
+        <section>API Response Format</section>
+      </sections>
+    </artifact>
+
+    <artifact type="story" relevance="reference">
+      <path>docs/sprint-artifacts/stories/2-6-device-authentication-middleware.md</path>
+      <description>Full story file with detailed acceptance criteria, task breakdown, dev notes with middleware flow diagram, crate selection, and testing strategy</description>
+    </artifact>
+  </documentation-artifacts>
+
+  <existing-code-interfaces>
+    <!-- AppState - shared application state the middleware needs access to -->
+    <interface type="struct" relevance="critical">
+      <path>backend/src/routes/mod.rs</path>
+      <name>AppState</name>
+      <description>Shared application state containing db pool, challenge_store, and config. Middleware needs db pool for device lookup and counter updates.</description>
+      <code><![CDATA[
+/// Shared application state for all routes
+#[derive(Clone)]
+pub struct AppState {
+    /// Database connection pool
+    pub db: PgPool,
+    /// Challenge store for attestation verification
+    pub challenge_store: Arc<ChallengeStore>,
+    /// Application configuration
+    pub config: Arc<Config>,
+}
+]]></code>
+    </interface>
+
+    <!-- Device model - database entity for device lookup -->
+    <interface type="model" relevance="critical">
+      <path>backend/src/models/device.rs</path>
+      <name>Device</name>
+      <description>Device entity with attestation data, public_key for signature verification, and assertion_counter for replay protection</description>
+      <code><![CDATA[
+#[derive(Debug, sqlx::FromRow, Serialize)]
+pub struct Device {
+    pub id: Uuid,
+    pub attestation_level: String,  // "secure_enclave" | "unverified"
+    pub attestation_key_id: String,
+    pub attestation_chain: Option<Vec<u8>>,
+    pub platform: String,
+    pub model: String,
+    pub has_lidar: bool,
+    pub first_seen_at: DateTime<Utc>,
+    pub last_seen_at: DateTime<Utc>,
+    pub assertion_counter: i64,  // Replay protection counter
+    pub public_key: Option<Vec<u8>>,  // Uncompressed EC point (65 bytes)
+}
+]]></code>
+    </interface>
+
+    <!-- parse_authenticator_data - reusable function from attestation.rs -->
+    <interface type="function" relevance="critical">
+      <path>backend/src/services/attestation.rs</path>
+      <name>parse_authenticator_data</name>
+      <description>Parses binary authenticator data from CBOR assertion. Extracts rp_id_hash, flags, counter. REUSE this for assertion parsing.</description>
+      <code><![CDATA[
+/// Parses the binary authenticator data structure.
+/// AuthData layout:
+/// | Offset | Length | Field                    |
+/// | 0      | 32     | RP ID Hash (SHA256)      |
+/// | 32     | 1      | Flags                    |
+/// | 33     | 4      | Counter (big-endian u32) |
+/// | 37     | 16     | AAGUID (all zeros)       |
+/// | 53     | 2      | Credential ID Length (L) |
+/// | 55     | L      | Credential ID            |
+/// | 55+L   | var    | COSE Public Key (CBOR)   |
+pub fn parse_authenticator_data(data: &[u8]) -> Result<AuthenticatorData, AttestationError>
+]]></code>
+    </interface>
+
+    <!-- AuthenticatorData struct - result of parsing -->
+    <interface type="struct" relevance="high">
+      <path>backend/src/services/attestation.rs</path>
+      <name>AuthenticatorData</name>
+      <description>Parsed authenticator data with counter field needed for replay protection</description>
+      <code><![CDATA[
+#[derive(Debug)]
+pub struct AuthenticatorData {
+    pub rp_id_hash: [u8; 32],
+    pub flags: u8,
+    pub counter: u32,
+    pub aaguid: [u8; 16],
+    pub credential_id: Vec<u8>,
+    pub public_key_cbor: Vec<u8>,
+}
+]]></code>
+    </interface>
+
+    <!-- Error types and codes -->
+    <interface type="error" relevance="critical">
+      <path>backend/src/error.rs</path>
+      <name>ApiError / ApiErrorWithRequestId</name>
+      <description>Existing error handling pattern. Add new error codes and variants for middleware errors.</description>
+      <code><![CDATA[
+/// Error codes as defined in the architecture document.
+pub mod codes {
+    pub const NOT_IMPLEMENTED: &str = "NOT_IMPLEMENTED";
+    pub const VALIDATION_ERROR: &str = "VALIDATION_ERROR";
+    pub const DEVICE_NOT_FOUND: &str = "DEVICE_NOT_FOUND";
+    pub const SIGNATURE_INVALID: &str = "SIGNATURE_INVALID";
+    pub const TIMESTAMP_EXPIRED: &str = "TIMESTAMP_EXPIRED";
+    // ADD: DEVICE_AUTH_REQUIRED, DEVICE_UNVERIFIED, TIMESTAMP_INVALID, REPLAY_DETECTED
+}
+
+/// A wrapper that carries the request ID with an error for response generation.
+pub struct ApiErrorWithRequestId {
+    pub error: ApiError,
+    pub request_id: Uuid,
+}
+
+impl IntoResponse for ApiErrorWithRequestId {
+    fn into_response(self) -> Response {
+        self.error.into_response_with_request_id(self.request_id)
+    }
+}
+]]></code>
+    </interface>
+
+    <!-- API Response types -->
+    <interface type="types" relevance="high">
+      <path>backend/src/types/mod.rs</path>
+      <name>ApiErrorResponse</name>
+      <description>Standard API error response format that middleware errors must follow</description>
+      <code><![CDATA[
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiErrorResponse {
+    pub error: ErrorBody,
+    pub meta: Meta,
+}
+
+impl ApiErrorResponse {
+    pub fn new(code: impl Into<String>, message: impl Into<String>, request_id: Uuid) -> Self
+}
+]]></code>
+    </interface>
+
+    <!-- Router assembly - where middleware will be applied -->
+    <interface type="router" relevance="critical">
+      <path>backend/src/routes/mod.rs</path>
+      <name>api_router</name>
+      <description>Main router assembly function. Modify to apply DeviceAuthLayer to captures router while keeping health/devices/verify routes public.</description>
+      <code><![CDATA[
+pub fn api_router(state: AppState) -> Router {
+    let health_router = Router::new()
+        .route("/health", get(health::health_check))
+        .route("/ready", get(health::readiness_check))
+        .with_state(state.db.clone());
+
+    let v1_router = Router::new()
+        .nest("/devices", devices::router())
+        .nest("/captures", captures::router().with_state(state.db.clone()))
+        .merge(verify::router().with_state(state.db.clone()))
+        .with_state(state);
+
+    Router::new()
+        .merge(health_router)
+        .nest("/api/v1", v1_router)
+}
+]]></code>
+    </interface>
+
+    <!-- Main.rs middleware pattern -->
+    <interface type="middleware-pattern" relevance="high">
+      <path>backend/src/main.rs</path>
+      <name>Middleware Stack Pattern</name>
+      <description>Existing middleware application pattern using ServiceBuilder and layer(). Follow this pattern for DeviceAuthLayer.</description>
+      <code><![CDATA[
+use tower::ServiceBuilder;
+use tower_http::{
+    cors::{Any, CorsLayer},
+    request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
+    trace::TraceLayer,
+};
+
+let app = routes::api_router(app_state)
+    .layer(
+        ServiceBuilder::new()
+            .layer(SetRequestIdLayer::new(x_request_id.clone(), MakeRequestUuid))
+            .layer(PropagateRequestIdLayer::new(x_request_id))
+            .layer(TraceLayer::new_for_http()...)
+            .layer(cors)
+            .layer(axum::middleware::from_fn(extract_request_id)),
+    );
+]]></code>
+    </interface>
+
+    <!-- Request ID extraction pattern -->
+    <interface type="function" relevance="high">
+      <path>backend/src/main.rs</path>
+      <name>extract_request_id</name>
+      <description>Pattern for extracting request ID from headers and adding to extensions. Use similar pattern in device auth middleware.</description>
+      <code><![CDATA[
+const X_REQUEST_ID: &str = "x-request-id";
+
+async fn extract_request_id(
+    request: axum::http::Request<axum::body::Body>,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let request_id = request
+        .headers()
+        .get(X_REQUEST_ID)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .unwrap_or_else(Uuid::new_v4);
+
+    let mut request = request;
+    request.extensions_mut().insert(request_id);
+
+    next.run(request).await
+}
+]]></code>
+    </interface>
+
+    <!-- Config for timestamp tolerances -->
+    <interface type="config" relevance="medium">
+      <path>backend/src/config.rs</path>
+      <name>Config</name>
+      <description>Application configuration. May add timestamp_tolerance_secs and future_tolerance_secs if not hardcoded.</description>
+    </interface>
+  </existing-code-interfaces>
+
+  <development-constraints>
+    <constraint type="architecture" source="tech-spec-epic-2.md">
+      <title>Middleware Location</title>
+      <description>Create new module at backend/src/middleware/device_auth.rs with mod.rs exporting types</description>
+    </constraint>
+
+    <constraint type="architecture" source="architecture.md">
+      <title>Device-Based Authentication Pattern (ADR-005)</title>
+      <description>Sign every request with Secure Enclave-backed key. No bearer tokens. Each request independently verifiable via signature over timestamp|sha256(body).</description>
+    </constraint>
+
+    <constraint type="security" source="tech-spec-epic-2.md">
+      <title>Assertion Verification</title>
+      <description>
+        Per-request assertion structure (CBOR):
+        {
+          "authenticatorData": bytes,  // RP ID hash + flags + counter
+          "signature": bytes           // EC signature
+        }
+
+        Signature verification:
+        message = authenticatorData || sha256(clientDataHash)
+        clientDataHash = sha256(timestamp + "|" + sha256_hex(body))
+        verify_signature(message, signature, public_key)
+      </description>
+    </constraint>
+
+    <constraint type="security" source="story">
+      <title>Replay Protection</title>
+      <description>Counter in assertion must be strictly greater than stored assertion_counter. Update counter atomically on successful verification.</description>
+    </constraint>
+
+    <constraint type="security" source="story">
+      <title>Timestamp Window</title>
+      <description>Timestamp must be within 5 minutes in the past and 1 minute in the future of server time. Prevents request replay.</description>
+    </constraint>
+
+    <constraint type="api" source="architecture.md">
+      <title>Error Response Format</title>
+      <description>All errors must follow ApiErrorResponse format with error.code, error.message, and meta.request_id</description>
+    </constraint>
+
+    <constraint type="pattern" source="story">
+      <title>Body Buffering</title>
+      <description>Middleware must buffer request body to compute SHA256 hash for signature verification, then reconstruct body for downstream handlers. Use axum::body::to_bytes() with size limit.</description>
+    </constraint>
+
+    <constraint type="pattern" source="story">
+      <title>Selective Application</title>
+      <description>Apply middleware only to routes requiring authentication. Keep public: /health, /ready, /api/v1/devices/*, /api/v1/verify-file</description>
+    </constraint>
+  </development-constraints>
+
+  <dependencies>
+    <dependency type="crate" action="add">
+      <name>p256</name>
+      <version>0.13</version>
+      <features>["ecdsa"]</features>
+      <purpose>P-256/secp256r1 ECDSA signature verification for device assertions</purpose>
+      <usage><![CDATA[
+use p256::ecdsa::{Signature, VerifyingKey, signature::Verifier};
+
+// Parse stored public key (uncompressed EC point: 0x04 || x || y)
+let verifying_key = VerifyingKey::from_sec1_bytes(&public_key_bytes)?;
+
+// Parse signature from assertion (DER or raw r||s format)
+let signature = Signature::from_der(&signature_bytes)?;
+// OR: let signature = Signature::from_slice(&signature_bytes)?;
+
+// Verify signature over message
+verifying_key.verify(&message, &signature)?;
+]]></usage>
+    </dependency>
+
+    <dependency type="crate" action="existing">
+      <name>ciborium</name>
+      <version>0.2</version>
+      <purpose>CBOR parsing for assertion object decoding</purpose>
+    </dependency>
+
+    <dependency type="crate" action="existing">
+      <name>sha2</name>
+      <version>0.10</version>
+      <purpose>SHA-256 hashing for body hash and clientDataHash</purpose>
+    </dependency>
+
+    <dependency type="crate" action="existing">
+      <name>tower</name>
+      <version>0.5</version>
+      <purpose>Layer and Service traits for middleware implementation</purpose>
+    </dependency>
+
+    <dependency type="crate" action="existing">
+      <name>base64</name>
+      <version>0.22</version>
+      <purpose>Decode X-Device-Signature header</purpose>
+    </dependency>
+
+    <dependency type="crate" action="existing">
+      <name>axum</name>
+      <version>0.8</version>
+      <purpose>Body handling, request extensions, response types</purpose>
+    </dependency>
+
+    <dependency type="internal" action="use">
+      <name>services::attestation::parse_authenticator_data</name>
+      <purpose>Reuse for parsing authenticator data from assertion (simplified - no credential ID/public key needed)</purpose>
+    </dependency>
+  </dependencies>
+
+  <testing-context>
+    <framework>cargo test</framework>
+    <integration-db>testcontainers (PostgreSQL)</integration-db>
+
+    <test-patterns>
+      <pattern type="unit">
+        <description>Header extraction edge cases (missing, malformed UUID, invalid base64)</description>
+        <location>backend/src/middleware/device_auth.rs</location>
+      </pattern>
+      <pattern type="unit">
+        <description>Timestamp validation boundaries (exactly 5 min, exactly 1 min future)</description>
+        <location>backend/src/middleware/device_auth.rs</location>
+      </pattern>
+      <pattern type="unit">
+        <description>CBOR assertion parsing with test vectors</description>
+        <location>backend/src/middleware/device_auth.rs</location>
+      </pattern>
+      <pattern type="unit">
+        <description>Counter validation (equal fails, greater passes)</description>
+        <location>backend/src/middleware/device_auth.rs</location>
+      </pattern>
+      <pattern type="integration">
+        <description>Full middleware flow with real database</description>
+        <location>backend/tests/api_device_auth_test.rs</location>
+      </pattern>
+    </test-patterns>
+
+    <test-data-requirements>
+      <requirement>Test device in database with known P-256 public key</requirement>
+      <requirement>Generate valid assertion using known private key</requirement>
+      <requirement>Sample CBOR assertion structures (valid and malformed)</requirement>
+    </test-data-requirements>
+
+    <verification-commands>
+      <command>cargo build</command>
+      <command>cargo clippy -- -D warnings</command>
+      <command>cargo test</command>
+    </verification-commands>
+  </testing-context>
+
+  <implementation-notes>
+    <note type="critical" title="Assertion vs Attestation">
+      This story handles per-request ASSERTIONS, not one-time attestation (Story 2.5).
+      Assertion structure is simpler:
+      - authenticatorData: rpIdHash(32) + flags(1) + counter(4) = 37 bytes minimum
+      - signature: ECDSA signature bytes
+      NO credential ID or public key in assertion - those come from initial attestation.
+    </note>
+
+    <note type="critical" title="Signature Message Construction">
+      Per tech-spec, the signature is over:
+      authenticatorData || sha256(clientDataHash)
+
+      Where clientDataHash = sha256(timestamp_str + "|" + sha256_hex(request_body))
+
+      The mobile app creates this using AppIntegrity.generateAssertionAsync(keyId, clientDataHash)
+    </note>
+
+    <note type="pattern" title="Tower Layer Implementation">
+      Create two structs:
+      1. DeviceAuthLayer - implements tower::Layer, holds db pool and config
+      2. DeviceAuthMiddleware&lt;S&gt; - implements tower::Service, wraps inner service
+
+      The Layer creates new Middleware instances for each request.
+    </note>
+
+    <note type="pattern" title="Body Handling Strategy">
+      1. Extract body bytes: axum::body::to_bytes(body, MAX_SIZE).await
+      2. Compute SHA256 hash of body bytes
+      3. After verification, reconstruct body: Body::from(body_bytes)
+      4. Limit body size to prevent memory exhaustion (e.g., 20MB for photos)
+    </note>
+
+    <note type="pattern" title="Request Extension Injection">
+      On successful auth, insert DeviceContext into request extensions:
+      request.extensions_mut().insert(device_context);
+
+      Handlers extract via: Extension&lt;DeviceContext&gt;
+    </note>
+
+    <note type="warning" title="Assertion Counter Parsing">
+      The assertion authenticatorData is SHORTER than attestation authenticatorData.
+      For assertions: rpIdHash(32) + flags(1) + counter(4) = 37 bytes
+      NO AAGUID, credential ID length, credential ID, or public key.
+      May need separate parsing function or make existing one handle both cases.
+    </note>
+
+    <note type="reference" title="Error Codes to Add">
+      Add to error.rs codes module:
+      - DEVICE_AUTH_REQUIRED (401) - missing auth headers
+      - DEVICE_UNVERIFIED (403) - unverified device on strict route
+      - TIMESTAMP_INVALID (401) - timestamp in future
+      - REPLAY_DETECTED (401) - counter not increasing
+
+      DEVICE_NOT_FOUND, SIGNATURE_INVALID, TIMESTAMP_EXPIRED already exist.
+    </note>
+  </implementation-notes>
+
+  <file-manifest>
+    <files-to-create>
+      <file>backend/src/middleware/mod.rs</file>
+      <file>backend/src/middleware/device_auth.rs</file>
+    </files-to-create>
+
+    <files-to-modify>
+      <file reason="Add p256 dependency">backend/Cargo.toml</file>
+      <file reason="Register middleware module">backend/src/main.rs</file>
+      <file reason="Apply middleware to captures router">backend/src/routes/mod.rs</file>
+      <file reason="Add new error codes and variants">backend/src/error.rs</file>
+    </files-to-modify>
+  </file-manifest>
+</story-context>

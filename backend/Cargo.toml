@@ -31,3 +31,5 @@ ciborium = "0.2"
 coset = "0.3"
 rand = "0.8"
 der-parser = "9"
+p256 = { version = "0.13", features = ["ecdsa"] }
+hex = "0.4"

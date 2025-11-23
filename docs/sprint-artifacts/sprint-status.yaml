@@ -52,7 +52,7 @@ development_status:
   2-3-dcappattest-integration: done
   2-4-backend-device-registration-endpoint: done
   2-5-dcappattest-verification-backend: done
-  2-6-device-authentication-middleware: backlog
+  2-6-device-authentication-middleware: done
   epic-2-retrospective: optional
 
   # Epic 3: Photo Capture with LiDAR Depth (6 stories)

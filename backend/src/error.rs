@@ -28,6 +28,11 @@ pub mod codes {
     pub const DEVICE_ALREADY_REGISTERED: &str = "DEVICE_ALREADY_REGISTERED";
     pub const TOO_MANY_REQUESTS: &str = "TOO_MANY_REQUESTS";
     pub const CHALLENGE_INVALID: &str = "CHALLENGE_INVALID";
+    // Device authentication middleware error codes (Story 2.6)
+    pub const DEVICE_AUTH_REQUIRED: &str = "DEVICE_AUTH_REQUIRED";
+    pub const DEVICE_UNVERIFIED: &str = "DEVICE_UNVERIFIED";
+    pub const TIMESTAMP_INVALID: &str = "TIMESTAMP_INVALID";
+    pub const REPLAY_DETECTED: &str = "REPLAY_DETECTED";
 }
 
 /// API error type with associated HTTP status codes.
@@ -77,6 +82,19 @@ pub enum ApiError {
 
     #[error("Challenge invalid: {0}")]
     ChallengeInvalid(String),
+
+    // Device authentication middleware errors (Story 2.6)
+    #[error("Device authentication required")]
+    DeviceAuthRequired,
+
+    #[error("Device unverified")]
+    DeviceUnverified,
+
+    #[error("Timestamp invalid")]
+    TimestampInvalid,
+
+    #[error("Replay detected")]
+    ReplayDetected,
 }
 
 impl ApiError {
@@ -98,6 +116,10 @@ impl ApiError {
             ApiError::DeviceAlreadyRegistered => codes::DEVICE_ALREADY_REGISTERED,
             ApiError::TooManyRequests => codes::TOO_MANY_REQUESTS,
             ApiError::ChallengeInvalid(_) => codes::CHALLENGE_INVALID,
+            ApiError::DeviceAuthRequired => codes::DEVICE_AUTH_REQUIRED,
+            ApiError::DeviceUnverified => codes::DEVICE_UNVERIFIED,
+            ApiError::TimestampInvalid => codes::TIMESTAMP_INVALID,
+            ApiError::ReplayDetected => codes::REPLAY_DETECTED,
         }
     }
 
@@ -119,6 +141,10 @@ impl ApiError {
             ApiError::DeviceAlreadyRegistered => StatusCode::CONFLICT,
             ApiError::TooManyRequests => StatusCode::TOO_MANY_REQUESTS,
             ApiError::ChallengeInvalid(_) => StatusCode::UNAUTHORIZED,
+            ApiError::DeviceAuthRequired => StatusCode::UNAUTHORIZED,
+            ApiError::DeviceUnverified => StatusCode::FORBIDDEN,
+            ApiError::TimestampInvalid => StatusCode::UNAUTHORIZED,
+            ApiError::ReplayDetected => StatusCode::UNAUTHORIZED,
         }
     }
 
@@ -147,6 +173,12 @@ impl ApiError {
                 "Too many requests. Please wait before trying again.".to_string()
             }
             ApiError::ChallengeInvalid(_) => "Challenge is invalid or expired".to_string(),
+            ApiError::DeviceAuthRequired => {
+                "Device authentication headers required".to_string()
+            }
+            ApiError::DeviceUnverified => "Device is not verified".to_string(),
+            ApiError::TimestampInvalid => "Request timestamp is invalid".to_string(),
+            ApiError::ReplayDetected => "Request replay detected".to_string(),
         }
     }
 
