@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, confidence_level, captured_at, uploaded_at,\n               location_coarse, evidence\n        FROM captures\n        WHERE id = $1 AND status = 'complete'\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "confidence_level",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "captured_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "uploaded_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "location_coarse",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "evidence",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "72994243943af51e6ee25a6b2300e6a28f659c330539e1b2d0df1e28e374de7f"
+}
