@@ -1089,8 +1089,8 @@ mod tests {
         // Layers too few
         assert!(!is_real_scene(0.6, 2, 0.8, false, true));
 
-        // Coherence too low
-        assert!(!is_real_scene(0.6, 4, 0.6, false, true));
+        // Coherence too low (threshold is 0.3)
+        assert!(!is_real_scene(0.6, 4, 0.2, false, true));
 
         // Edge cases
         assert!(!is_real_scene(0.5, 3, 0.7, false, true)); // Exactly at thresholds = false
