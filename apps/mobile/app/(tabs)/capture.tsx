@@ -14,7 +14,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { CameraView, CameraViewHandle } from '../../components/Camera';
