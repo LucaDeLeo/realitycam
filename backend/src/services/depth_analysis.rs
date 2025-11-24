@@ -1152,7 +1152,13 @@ mod tests {
         let coherence = compute_edge_coherence(&depths, 256, 192);
         let (is_screen, _) = detect_screen_pattern(&depths, &stats);
         let (quadrant_ok, _) = check_quadrant_variance(&depths, 256, 192);
-        let is_real = is_real_scene(stats.variance, layers.layer_count, coherence, is_screen, quadrant_ok);
+        let is_real = is_real_scene(
+            stats.variance,
+            layers.layer_count,
+            coherence,
+            is_screen,
+            quadrant_ok,
+        );
 
         // Flat scene should NOT be detected as real
         assert!(
@@ -1170,7 +1176,13 @@ mod tests {
         let coherence = compute_edge_coherence(&depths, 256, 192);
         let (is_screen, _) = detect_screen_pattern(&depths, &stats);
         let (quadrant_ok, _) = check_quadrant_variance(&depths, 256, 192);
-        let _is_real = is_real_scene(stats.variance, layers.layer_count, coherence, is_screen, quadrant_ok);
+        let _is_real = is_real_scene(
+            stats.variance,
+            layers.layer_count,
+            coherence,
+            is_screen,
+            quadrant_ok,
+        );
 
         // Varied scene should be detected as real (or close to it)
         // Note: synthetic data may not perfectly match real scene characteristics

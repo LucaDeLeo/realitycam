@@ -627,7 +627,7 @@ async fn upload_capture(
     let db_capture_id = insert_capture_with_evidence(
         &state.db,
         InsertCaptureWithEvidenceParams {
-            capture_id,  // Use the same ID that was used for S3 upload
+            capture_id, // Use the same ID that was used for S3 upload
             device_id: device_ctx.device_id,
             target_media_hash: photo_hash_bytes,
             photo_s3_key,
