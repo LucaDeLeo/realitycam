@@ -8,6 +8,7 @@ Photo verification platform that captures authenticated photos with hardware att
 - **Rust** 1.82+
 - **Docker** 24+
 - **Xcode** 16+ (for iOS development)
+- **iPhone Pro** or newer (LiDAR required for depth capture)
 
 ## Project Structure
 
@@ -39,7 +40,7 @@ pnpm install
 
 ```bash
 # Start PostgreSQL and LocalStack
-docker-compose -f infrastructure/docker-compose.yml up -d
+pnpm docker:up
 
 # Verify services are healthy
 docker-compose -f infrastructure/docker-compose.yml ps
@@ -74,18 +75,34 @@ The API server starts at http://localhost:8080
 
 ### 5. Run Mobile App (iOS)
 
+> **Note:** The mobile app requires a **physical iPhone Pro** (or newer) with LiDAR. Simulator and Expo Go are not supported due to camera/LiDAR hardware requirements.
+
 ```bash
 cd apps/mobile
 pnpm install
 
-# Generate iOS project (first time only)
+# Generate iOS project (first time or after native changes)
 npx expo prebuild --platform ios
 
-# Start Expo dev server
+# Start Metro bundler
 pnpm start
 ```
 
-Press `i` to open in iOS Simulator or scan QR with Expo Go on device.
+Then build and run via Xcode:
+
+```bash
+# Open Xcode workspace
+open ios/realitycam.xcworkspace
+
+# In Xcode:
+# 1. Select your physical iPhone device (not simulator)
+# 2. Press Cmd+R to build and run
+```
+
+For device to connect to local backend, update `apps/mobile/.env`:
+```
+EXPO_PUBLIC_API_URL=http://<YOUR_MAC_IP>:8080
+```
 
 ### 6. Run Web App
 
@@ -123,7 +140,7 @@ Opens at http://localhost:3000
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `API_URL` | Backend API URL | `http://localhost:8080` |
+| `EXPO_PUBLIC_API_URL` | Backend API URL | `http://localhost:8080` |
 
 ### Web (`apps/web/.env`)
 

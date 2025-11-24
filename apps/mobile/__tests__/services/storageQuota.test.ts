@@ -21,10 +21,8 @@ jest.mock('../../services/captureIndex', () => ({
   getIndexedStorageUsed: jest.fn(),
 }));
 
-import { getStoredCaptures, getIndexedStorageUsed } from '../../services/captureIndex';
-
-const mockGetStoredCaptures = getStoredCaptures as jest.MockedFunction<typeof getStoredCaptures>;
-const mockGetIndexedStorageUsed = getIndexedStorageUsed as jest.MockedFunction<typeof getIndexedStorageUsed>;
+// Mocks are set up but tests use synchronous logic calculations only
+// Async functions that use these mocks are tested via integration tests
 
 describe('storageQuota', () => {
   beforeEach(() => {

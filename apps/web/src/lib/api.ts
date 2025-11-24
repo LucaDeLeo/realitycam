@@ -6,32 +6,24 @@
  * - verifyFile: Upload and verify a file against the database
  */
 
+import type {
+  ConfidenceLevel,
+  EvidenceStatus,
+  HardwareAttestation,
+  DepthAnalysis,
+} from '@realitycam/shared';
+
+// Re-export shared types for backwards compatibility
+export type { ConfidenceLevel, HardwareAttestation, DepthAnalysis };
+
+// Alias for backwards compatibility (CheckStatus was the old name)
+export type CheckStatus = EvidenceStatus;
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
 
 // ============================================================================
-// Types
+// Types (Web-specific extensions)
 // ============================================================================
-
-export type ConfidenceLevel = 'high' | 'medium' | 'low' | 'suspicious';
-export type CheckStatus = 'pass' | 'fail' | 'unavailable';
-
-export interface HardwareAttestation {
-  status: CheckStatus;
-  level: 'secure_enclave' | 'unverified';
-  device_model: string;
-  assertion_verified: boolean;
-  counter_valid: boolean;
-}
-
-export interface DepthAnalysis {
-  status: CheckStatus;
-  depth_variance: number;
-  depth_layers: number;
-  edge_coherence: number;
-  min_depth: number;
-  max_depth: number;
-  is_likely_real_scene: boolean;
-}
 
 export interface MetadataEvidence {
   timestamp_valid: boolean;
@@ -261,21 +253,6 @@ export function getConfidenceLabel(level: ConfidenceLevel): string {
   }
 }
 
-/**
- * Get check status icon and color
- */
-export function getStatusDisplay(status: CheckStatus): { icon: string; color: string; label: string } {
-  switch (status) {
-    case 'pass':
-      return { icon: 'check', color: 'text-green-600 dark:text-green-400', label: 'Pass' };
-    case 'fail':
-      return { icon: 'x', color: 'text-red-600 dark:text-red-400', label: 'Fail' };
-    case 'unavailable':
-      return { icon: 'minus', color: 'text-zinc-400 dark:text-zinc-500', label: 'Unavailable' };
-    default:
-      return { icon: 'minus', color: 'text-zinc-400', label: 'Unknown' };
-  }
-}
 
 /**
  * Format date for display

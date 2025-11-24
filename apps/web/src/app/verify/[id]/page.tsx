@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { ConfidenceBadge } from '@/components/Evidence/ConfidenceBadge';
 import { EvidencePanel } from '@/components/Evidence/EvidencePanel';
@@ -95,11 +96,15 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
                   Captured Image
                 </h2>
                 {capture?.photo_url ? (
-                  <img
-                    src={capture.photo_url}
-                    alt="Captured photo"
-                    className="w-full rounded-lg object-cover"
-                  />
+                  <div className="relative w-full aspect-[4/3]">
+                    <Image
+                      src={capture.photo_url}
+                      alt="Captured photo"
+                      fill
+                      className="rounded-lg object-cover"
+                      unoptimized
+                    />
+                  </div>
                 ) : (
                   <ImagePlaceholder aspectRatio="4:3" />
                 )}

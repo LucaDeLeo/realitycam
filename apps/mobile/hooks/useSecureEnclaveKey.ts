@@ -22,12 +22,13 @@
 import { useEffect, useRef, useCallback } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { useDeviceStore } from '../store/deviceStore';
+import { isSecurityError } from '../utils/securityCheck';
 
 // Safe import of AppIntegrity module (handles Expo Go case)
 let AppIntegrity: typeof import('@expo/app-integrity') | null = null;
 try {
   AppIntegrity = require('@expo/app-integrity');
-} catch (error) {
+} catch {
   // Module not available - likely Expo Go
 }
 
@@ -53,20 +54,6 @@ const ERROR_MESSAGES = {
   INVALID_KEY: 'Stored key is invalid. Regenerating...',
 } as const;
 
-/**
- * Checks if an error indicates a jailbreak or security restriction
- */
-function isSecurityError(error: Error): boolean {
-  const message = error.message.toLowerCase();
-  return (
-    message.includes('jailbreak') ||
-    message.includes('security') ||
-    message.includes('tamper') ||
-    message.includes('compromised') ||
-    message.includes('restriction') ||
-    message.includes('not supported')
-  );
-}
 
 /**
  * Retrieves the stored key ID from SecureStore
@@ -75,7 +62,7 @@ async function getStoredKeyId(): Promise<string | null> {
   try {
     const keyId = await SecureStore.getItemAsync(SECURE_STORE_KEY_ID);
     return keyId;
-  } catch (error) {
+  } catch {
     return null;
   }
 }
@@ -95,7 +82,7 @@ async function storeKeyId(keyId: string): Promise<void> {
 async function clearStoredKeyId(): Promise<void> {
   try {
     await SecureStore.deleteItemAsync(SECURE_STORE_KEY_ID);
-  } catch (error) {
+  } catch {
     // Silent fail
   }
 }
@@ -213,7 +200,7 @@ export function useSecureEnclaveKey() {
       // Step 3: Store the key ID in SecureStore
       try {
         await storeKeyId(newKeyId);
-      } catch (storageError) {
+      } catch {
         throw new Error(ERROR_MESSAGES.STORAGE_FAILED);
       }
 
@@ -224,20 +211,19 @@ export function useSecureEnclaveKey() {
       // Handle different error types with specific messages
       const err = error instanceof Error ? error : new Error(String(error));
 
-      // DISABLED: Temporarily skip error setting to avoid warnings
-      // let userMessage: string;
-      // if (err.message === ERROR_MESSAGES.TIMEOUT) {
-      //   userMessage = ERROR_MESSAGES.TIMEOUT;
-      // } else if (err.message === ERROR_MESSAGES.STORAGE_FAILED) {
-      //   userMessage = ERROR_MESSAGES.STORAGE_FAILED;
-      // } else if (isSecurityError(err)) {
-      //   userMessage = ERROR_MESSAGES.SECURITY_FAILED;
-      // } else {
-      //   userMessage = ERROR_MESSAGES.GENERATION_FAILED;
-      // }
+      let userMessage: string;
+      if (err.message === ERROR_MESSAGES.TIMEOUT) {
+        userMessage = ERROR_MESSAGES.TIMEOUT;
+      } else if (err.message === ERROR_MESSAGES.STORAGE_FAILED) {
+        userMessage = ERROR_MESSAGES.STORAGE_FAILED;
+      } else if (isSecurityError(err)) {
+        userMessage = ERROR_MESSAGES.SECURITY_FAILED;
+      } else {
+        userMessage = ERROR_MESSAGES.GENERATION_FAILED;
+      }
 
       // Transition: checking/generating -> failed
-      // setKeyError(userMessage);
+      setKeyError(userMessage);
     }
   }, [setKeyId, setKeyStatus, setKeyError]);
 

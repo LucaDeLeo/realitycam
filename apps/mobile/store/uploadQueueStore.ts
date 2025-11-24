@@ -18,7 +18,6 @@ import type {
   UploadQueueActions,
   UploadError,
   CaptureStorageLocation,
-  OfflineQueuedCapture,
 } from '@realitycam/shared';
 
 /**

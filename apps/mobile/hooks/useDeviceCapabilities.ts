@@ -15,7 +15,7 @@ import { checkLiDARAvailability } from '../utils/lidarDetection';
 let AppIntegrity: typeof import('@expo/app-integrity') | null = null;
 try {
   AppIntegrity = require('@expo/app-integrity');
-} catch (error) {
+} catch {
   // Module not available - likely Expo Go
 }
 
@@ -60,15 +60,6 @@ async function detectCapabilities(): Promise<DeviceCapabilities> {
       hasDCAppAttest = false;
     }
 
-    // DISABLED: Device capability checks - always allow app to run for development/testing
-    // All sensor/security checks disabled to allow testing in Expo Go
-    console.log('[useDeviceCapabilities] Running in development mode - skipping all checks (LiDAR, DCAppAttest, etc.)');
-    
-    // Always return as supported for development (skip LiDAR, DCAppAttest, etc.)
-    const isSupported = true;
-    const unsupportedReason: string | undefined = undefined;
-    
-    /* COMMENTED OUT FOR DEVELOPMENT
     // Compute aggregate support status
     const isSupported =
       hasMinimumIOSVersion &&
@@ -89,7 +80,6 @@ async function detectCapabilities(): Promise<DeviceCapabilities> {
         unsupportedReason = 'Device attestation not supported';
       }
     }
-    */
 
     return {
       model,
@@ -101,17 +91,16 @@ async function detectCapabilities(): Promise<DeviceCapabilities> {
       unsupportedReason,
     };
   } catch (error) {
-    // Fail safe - in development mode, always allow app to run
+    // Fail safe - return unsupported on detection failure
     console.error('Device capability detection failed:', error);
-    console.log('[useDeviceCapabilities] Error occurred, but allowing app to run in development mode');
     return {
       model: 'Unknown',
       iosVersion: '0.0',
       hasLiDAR: false,
       hasSecureEnclave: false,
       hasDCAppAttest: false,
-      isSupported: true, // Always allow in development
-      unsupportedReason: undefined,
+      isSupported: false,
+      unsupportedReason: 'Failed to detect device capabilities',
     };
   }
 }

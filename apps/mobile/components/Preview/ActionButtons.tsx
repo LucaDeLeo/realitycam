@@ -7,8 +7,7 @@
  * @see Story 3.6 - Capture Preview Screen
  */
 
-import { View, Text, StyleSheet, TouchableOpacity, Alert, useColorScheme, ActivityIndicator } from 'react-native';
-import { colors } from '../../constants/colors';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 
 interface ActionButtonsProps {
   /** Called when user confirms discard */
@@ -33,9 +32,6 @@ export function ActionButtons({
   isLoading = false,
   style,
 }: ActionButtonsProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-
   const isDisabled = disabled || isLoading;
 
   /**

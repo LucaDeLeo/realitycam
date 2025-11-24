@@ -19,7 +19,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 // Import after mocking
-import { useUploadQueueStore, selectQueueCounts, selectPendingItems, selectFailedItems, selectCompletedItems, selectCurrentUpload } from '../../store/uploadQueueStore';
+import { useUploadQueueStore, selectQueueCounts, selectPendingItems, selectCurrentUpload } from '../../store/uploadQueueStore';
 
 /**
  * Create a mock ProcessedCapture for testing
@@ -59,7 +59,7 @@ describe('uploadQueueStore', () => {
   describe('enqueue', () => {
     it('adds a capture to the queue with pending status', () => {
       const capture = createMockCapture();
-      const { enqueue, items } = useUploadQueueStore.getState();
+      const { enqueue } = useUploadQueueStore.getState();
 
       act(() => {
         enqueue(capture);

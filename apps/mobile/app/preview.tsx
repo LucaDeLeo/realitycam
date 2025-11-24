@@ -15,8 +15,6 @@ import {
   useColorScheme,
   ScrollView,
   Alert,
-  ActivityIndicator,
-  Text,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -25,7 +23,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { CapturePreview, MetadataDisplay, ActionButtons } from '../components/Preview';
 import { colors } from '../constants/colors';
 import { uploadCapture } from '../services/uploadService';
-import type { ProcessedCapture, CaptureMetadata } from '@realitycam/shared';
+import type { ProcessedCapture } from '@realitycam/shared';
 
 /**
  * Preview screen component
@@ -40,7 +38,6 @@ export default function PreviewScreen() {
   const [capture, setCapture] = useState<ProcessedCapture | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Parse capture data from navigation params
   useEffect(() => {
@@ -96,12 +93,9 @@ export default function PreviewScreen() {
 
     console.log('[PreviewScreen] Starting upload for capture:', capture.id);
     setIsUploading(true);
-    setUploadProgress(0);
 
     try {
-      const result = await uploadCapture(capture, (progress) => {
-        setUploadProgress(progress);
-      });
+      const result = await uploadCapture(capture);
 
       if (result.success) {
         console.log('[PreviewScreen] Upload successful:', result.data);
@@ -138,7 +132,6 @@ export default function PreviewScreen() {
       );
     } finally {
       setIsUploading(false);
-      setUploadProgress(0);
     }
   }, [capture, isUploading, router]);
 

@@ -46,7 +46,6 @@ export function StorageUsageIndicator({
     quota,
     storageUsedFormatted,
     quotaWarning,
-    offlineCount,
     hasStaleCaptures,
     staleCaptureCount,
     refreshQuota,

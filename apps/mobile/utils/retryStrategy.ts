@@ -16,15 +16,10 @@
  */
 
 import type { UploadError, UploadErrorCode, RetryConfig } from '@realitycam/shared';
+import { DEFAULT_RETRY_CONFIG } from '@realitycam/shared';
 
-/**
- * Default retry configuration
- */
-export const DEFAULT_RETRY_CONFIG: RetryConfig = {
-  maxAttempts: 10,
-  maxBackoffMs: 300_000, // 5 minutes
-  baseDelayMs: 1_000,    // 1 second
-};
+// Re-export for backwards compatibility
+export { DEFAULT_RETRY_CONFIG };
 
 /**
  * Error codes that should trigger automatic retry

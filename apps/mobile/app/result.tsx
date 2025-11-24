@@ -15,7 +15,6 @@ import {
   View,
   Text,
   StyleSheet,
-  useColorScheme,
   TouchableOpacity,
   Image,
   Share,
@@ -50,7 +49,7 @@ interface UploadResult {
 // Helper Functions
 // ============================================================================
 
-function getConfidenceColor(level: ConfidenceLevel, isDark: boolean): string {
+function getConfidenceColor(level: ConfidenceLevel, _isDark: boolean): string {
   switch (level) {
     case 'high':
       return '#34C759'; // iOS system green
@@ -80,18 +79,6 @@ function getConfidenceLabel(level: ConfidenceLevel): string {
   }
 }
 
-function getStatusIcon(status: CheckStatus): string {
-  switch (status) {
-    case 'pass':
-      return 'checkmark.circle.fill';
-    case 'fail':
-      return 'xmark.circle.fill';
-    case 'unavailable':
-      return 'minus.circle.fill';
-    default:
-      return 'questionmark.circle.fill';
-  }
-}
 
 function getStatusLabel(status: CheckStatus): string {
   switch (status) {
@@ -106,7 +93,7 @@ function getStatusLabel(status: CheckStatus): string {
   }
 }
 
-function getStatusColor(status: CheckStatus, isDark: boolean): string {
+function getStatusColor(status: CheckStatus, _isDark: boolean): string {
   switch (status) {
     case 'pass':
       return '#34C759';
@@ -124,7 +111,6 @@ function getStatusColor(status: CheckStatus, isDark: boolean): string {
 // ============================================================================
 
 export default function ResultScreen() {
-  const colorScheme = useColorScheme();
   // Force light mode for result screen to ensure text visibility
   const isDark = false;
   const router = useRouter();

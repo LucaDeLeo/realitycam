@@ -14,7 +14,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, useColorScheme, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { CameraView, CameraViewHandle } from '../../components/Camera';
@@ -22,7 +22,6 @@ import { useDeviceStore } from '../../store/deviceStore';
 import { useCapture } from '../../hooks/useCapture';
 import { useCaptureProcessing } from '../../hooks/useCaptureProcessing';
 import { colors } from '../../constants/colors';
-import type { RawCapture } from '@realitycam/shared';
 
 /**
  * LiDAR unavailable message component
@@ -60,8 +59,6 @@ function LiDARUnavailable({ reason }: { reason?: string }) {
  * Capture screen with camera and depth overlay
  */
 export default function CaptureScreen() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
   const router = useRouter();
 
   // Get device capabilities from store
@@ -81,12 +78,10 @@ export default function CaptureScreen() {
     capture,
     isCapturing,
     isReady: isCaptureReady,
-    lastCapture,
     error: captureError,
     setCameraRef,
     clearError,
     requestLocationPermission,
-    hasLocationPermission,
     locationPermissionStatus,
   } = useCapture();
 
@@ -174,17 +169,15 @@ export default function CaptureScreen() {
     }
   }, [capture, captureError, clearError, processingError, clearProcessingError, locationPermissionStatus, requestLocationPermission, processCapture, router]);
 
-  // DISABLED: Check if device has LiDAR capability
-  // Temporarily disabled for development/testing in Expo Go
-  // if (!capabilities?.hasLiDAR) {
-  //   return <LiDARUnavailable reason="Device does not have LiDAR sensor" />;
-  // }
+  // Check if device has LiDAR capability
+  if (!capabilities?.hasLiDAR) {
+    return <LiDARUnavailable reason="Device does not have LiDAR sensor" />;
+  }
 
-  // DISABLED: Show LiDAR error if native check failed
-  // Temporarily disabled for development/testing in Expo Go
-  // if (lidarError) {
-  //   return <LiDARUnavailable reason={lidarError} />;
-  // }
+  // Show LiDAR error if native check failed
+  if (lidarError) {
+    return <LiDARUnavailable reason={lidarError} />;
+  }
 
   return (
     <View style={styles.container}>

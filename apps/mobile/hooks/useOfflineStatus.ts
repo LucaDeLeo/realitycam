@@ -13,7 +13,6 @@ import {
   useUploadQueueStore,
   selectOfflineCaptures,
   selectOfflineCounts,
-  type ExtendedQueuedCapture,
 } from '../store/uploadQueueStore';
 import type { StorageQuotaInfo } from '@realitycam/shared';
 import { getStorageUsage, getQuotaWarning, formatAge, formatBytes } from '../services/storageQuota';
@@ -135,7 +134,6 @@ export function useOfflineStatus(): UseOfflineStatusReturn {
 
   // Process offline captures for display
   const offlineCaptures: OfflineCaptureInfo[] = offlineCaptureItems.map((item) => {
-    const extended = item as ExtendedQueuedCapture;
     const queuedAt = new Date(item.queuedAt).getTime();
     const ageMs = Date.now() - queuedAt;
     const ageHours = ageMs / (60 * 60 * 1000);

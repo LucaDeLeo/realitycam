@@ -48,12 +48,12 @@
     "@eslint/js": "^9.39.1",
     "@expo/ngrok": "^4.1.0",
     "@types/pako": "^2.0.4",
-    "@types/react": "~19.1.0",
+    "@types/react": "^19.1.0",
     "eslint": "^9",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "expo-modules-core": "^3.0.26",
-    "typescript": "~5.9.2",
+    "typescript": "^5.9.2",
     "typescript-eslint": "^8.47.0"
   }
 }

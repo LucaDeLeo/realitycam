@@ -8,9 +8,8 @@
  */
 
 import type { CaptureIndexEntry } from '@realitycam/shared';
-import { deleteCaptureFromStorage, cleanupTempFiles, loadCaptureFromStorage } from './offlineStorage';
-import { removeFromIndex, getStoredCaptures, updateIndexStatus } from './captureIndex';
-import { deleteEncryptionKey } from './captureEncryption';
+import { deleteCaptureFromStorage, cleanupTempFiles } from './offlineStorage';
+import { removeFromIndex, getStoredCaptures } from './captureIndex';
 import { suggestCleanup, getCapturesOlderThan24Hours } from './storageQuota';
 
 /**
@@ -53,12 +52,7 @@ export async function cleanupCapture(captureId: string): Promise<CleanupResult> 
       freedBytes = entry.totalSize;
     }
 
-    // Load metadata to get key ID before deletion
-    const captureData = await loadCaptureFromStorage(captureId);
-    const keyId: string | null = null;
-
-    // Note: We can't get keyId from captureData as it's reconstructed
-    // The key deletion is handled separately if needed
+    // Note: Key deletion is handled separately if needed
 
     // Delete capture files and directory
     const deleted = await deleteCaptureFromStorage(captureId);

@@ -65,3 +65,11 @@ export type {
   OfflineQueuedCapture,
 } from './types/upload';
 export { DEFAULT_RETRY_CONFIG, STORAGE_QUOTA_CONFIG } from './types/upload';
+
+// Utilities
+export {
+  bytesToBase64,
+  base64ToBytes,
+  uint8ArrayToBase64,
+  base64ToUint8Array,
+} from './utils/base64';

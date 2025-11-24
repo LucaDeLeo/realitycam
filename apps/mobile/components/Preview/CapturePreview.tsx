@@ -16,7 +16,6 @@ import {
   Dimensions,
   TouchableOpacity,
   Text,
-  useColorScheme,
 } from 'react-native';
 import pako from 'pako';
 import { colors } from '../../constants/colors';
@@ -210,9 +209,6 @@ export function CapturePreview({
   depthDimensions,
   style,
 }: CapturePreviewProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-
   // Depth overlay visibility state
   const [showDepthOverlay, setShowDepthOverlay] = useState(false);
 

@@ -150,16 +150,15 @@ export default function RootLayout() {
     );
   }
 
-  // DISABLED: Show blocking screen for unsupported devices
-  // Temporarily disabled for development/testing in Expo Go
-  // if (!capabilities?.isSupported) {
-  //   return (
-  //     <SafeAreaProvider>
-  //       <StatusBar style="auto" />
-  //       <UnsupportedDeviceScreen reason={capabilities?.unsupportedReason} />
-  //     </SafeAreaProvider>
-  //   );
-  // }
+  // Show blocking screen for unsupported devices
+  if (!capabilities?.isSupported) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="auto" />
+        <UnsupportedDeviceScreen reason={capabilities?.unsupportedReason} />
+      </SafeAreaProvider>
+    );
+  }
 
   // Show loading screen during key generation (optional - could also proceed)
   // We show a brief loading state during key setup for better UX
@@ -188,8 +187,7 @@ export default function RootLayout() {
   }
 
   // Determine which warning to show (key generation or attestation failure)
-  // DISABLED: Temporarily hide key generation warnings
-  const showKeyWarning = false; // isKeyFailed && keyGenerationError;
+  const showKeyWarning = isKeyFailed && keyGenerationError;
   const showAttestationWarning = isAttestationFailed && attestationError;
   // For attestation failures, show retry button if under max retries (3)
   const showRetryButton = showAttestationWarning && retryAttempt < 3;
@@ -199,10 +197,9 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <StatusBar style="auto" />
-      {/* DISABLED: Key generation warning temporarily hidden */}
-      {/* {showKeyWarning && (
+      {showKeyWarning && (
         <AttestationWarningBanner message={keyGenerationError} />
-      )} */}
+      )}
       {showAttestationWarning && !showKeyWarning && (
         <AttestationWarningBanner
           message={attestationError}

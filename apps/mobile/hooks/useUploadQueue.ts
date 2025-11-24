@@ -110,7 +110,6 @@ export function useUploadQueue(): UseUploadQueueReturn {
   const isNetworkAvailable = isConnected === true && isInternetReachable === true;
 
   // Processing state refs
-  const isProcessingRef = useRef(false);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const processingLockRef = useRef(false);
 

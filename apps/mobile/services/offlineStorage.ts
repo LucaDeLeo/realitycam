@@ -326,9 +326,6 @@ export async function deleteCaptureFromStorage(captureId: string): Promise<boole
       return true; // Already deleted
     }
 
-    // Load metadata to get key ID for cleanup
-    const metadata = await loadEncryptionMetadata(captureId);
-
     // Delete the capture directory and all contents
     await FileSystem.deleteAsync(captureDir, { idempotent: true });
 

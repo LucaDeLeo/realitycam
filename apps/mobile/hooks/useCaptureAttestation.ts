@@ -29,7 +29,7 @@ import { useDeviceStore } from '../store/deviceStore';
 let AppIntegrity: typeof import('@expo/app-integrity') | null = null;
 try {
   AppIntegrity = require('@expo/app-integrity');
-} catch (error) {
+} catch {
   console.warn('[useCaptureAttestation] @expo/app-integrity not available (likely Expo Go)');
 }
 

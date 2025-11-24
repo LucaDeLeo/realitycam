@@ -19,7 +19,7 @@
  * @see Story 3.4 - Capture Attestation Signature
  */
 
-import { useCallback, useState, useRef, useEffect } from 'react';
+import { useCallback, useState, useRef } from 'react';
 import { Camera } from 'react-native-vision-camera';
 import * as Crypto from 'expo-crypto';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -34,33 +34,9 @@ import type {
   AssertionMetadata,
   CaptureAssertion,
 } from '@realitycam/shared';
+import { uint8ArrayToBase64 } from '@realitycam/shared';
 
-/**
- * Convert Uint8Array to base64 string (React Native compatible)
- */
-function uint8ArrayToBase64(bytes: Uint8Array): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  let result = '';
-  const len = bytes.length;
 
-  for (let i = 0; i < len; i += 3) {
-    const b1 = bytes[i];
-    const b2 = i + 1 < len ? bytes[i + 1] : 0;
-    const b3 = i + 2 < len ? bytes[i + 2] : 0;
-
-    result += chars[b1 >> 2];
-    result += chars[((b1 & 3) << 4) | (b2 >> 4)];
-    result += i + 1 < len ? chars[((b2 & 15) << 2) | (b3 >> 6)] : '=';
-    result += i + 2 < len ? chars[b3 & 63] : '=';
-  }
-
-  return result;
-}
-
-/**
- * Maximum allowed sync delta in milliseconds
- */
-const MAX_SYNC_DELTA_MS = 250;
 
 /**
  * Capture state machine states
@@ -158,7 +134,6 @@ export function useCapture(): UseCaptureReturn {
     isAvailable: isLiDARAvailable,
     startDepthCapture,
     stopDepthCapture,
-    isCapturing: isDepthCapturing,
   } = useLiDAR();
 
   // Get location capture from useLocation hook
@@ -182,9 +157,6 @@ export function useCapture(): UseCaptureReturn {
 
   // Camera ref for vision-camera takePhoto
   const cameraRef = useRef<Camera | null>(null);
-
-  // Track if depth capture session has been started
-  const depthSessionStarted = useRef(false);
 
   // Derived state
   const isCapturing = state === 'capturing';
@@ -227,16 +199,15 @@ export function useCapture(): UseCaptureReturn {
       throw captureError;
     }
 
-    // DISABLED: Depth sensor check for development mode
-    // Allow capture without LiDAR in development/testing
-    // if (!isDepthReady && isLiDARAvailable) {
-    //   const captureError: CaptureError = {
-    //     code: 'NOT_READY',
-    //     message: 'Depth sensor not ready. Please wait and try again.',
-    //   };
-    //   setError(captureError);
-    //   throw captureError;
-    // }
+    // Check depth sensor readiness when LiDAR is available
+    if (!isDepthReady && isLiDARAvailable) {
+      const captureError: CaptureError = {
+        code: 'NOT_READY',
+        message: 'Depth sensor not ready. Please wait and try again.',
+      };
+      setError(captureError);
+      throw captureError;
+    }
 
     if (isCapturing) {
       const captureError: CaptureError = {
@@ -359,20 +330,19 @@ export function useCapture(): UseCaptureReturn {
 
       // Attempt to parse EXIF/metadata timestamp if present, otherwise fall back
       const metadata = (photo as unknown as { metadata?: Record<string, unknown> }).metadata;
-      const photoTime = parseExifTimestamp(
+      // Parse EXIF timestamp for potential future use in sync validation
+      parseExifTimestamp(
         (metadata?.DateTimeOriginal as string | undefined) ?? (metadata?.CreationDate as string | undefined),
         photoCapturedAt
       );
 
       // Extract depth result (required, but create mock if LiDAR unavailable)
       let depthFrame: DepthFrame;
-      let usedMockDepth = false;
       if (depthResult.status === 'rejected' || !isLiDARAvailable || depthResult.value === null) {
         // Create mock depth frame for development/testing without LiDAR
         const reason = !isLiDARAvailable ? 'LiDAR unavailable' :
           depthResult.status === 'rejected' ? 'depth capture failed' : 'no depth data';
         console.log(`[useCapture] Creating mock depth frame (${reason})`);
-        usedMockDepth = true;
         const mockDepthData = new Float32Array(256 * 192).fill(2.0); // 2 meters default depth
         // Convert Float32Array to Uint8Array, then to base64
         const uint8Array = new Uint8Array(mockDepthData.buffer);
@@ -395,7 +365,6 @@ export function useCapture(): UseCaptureReturn {
       } else {
         // Fallback: create mock if we somehow get here
         console.log('[useCapture] Unexpected depth result, creating mock depth frame');
-        usedMockDepth = true;
         const mockDepthData = new Float32Array(256 * 192).fill(2.0);
         const uint8Array = new Uint8Array(mockDepthData.buffer);
         const mockDepthBase64 = uint8ArrayToBase64(uint8Array);
@@ -554,7 +523,7 @@ export function useCapture(): UseCaptureReturn {
       setState('idle');
       throw captureError;
     }
-  }, [isCapturing, captureDepthFrame, hasLocationPermission, getCurrentLocation, isAttestationReady, generateAssertion, isLiDARAvailable, stopDepthCapture, startDepthCapture]);
+  }, [isCapturing, isDepthReady, captureDepthFrame, hasLocationPermission, getCurrentLocation, isAttestationReady, generateAssertion, isLiDARAvailable, stopDepthCapture, startDepthCapture]);
 
   return {
     capture,

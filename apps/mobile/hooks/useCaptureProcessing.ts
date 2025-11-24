@@ -24,7 +24,6 @@ import type {
   ProcessedCapture,
   CaptureMetadata,
   ProcessingError,
-  ProcessingErrorCode,
 } from '@realitycam/shared';
 
 /**

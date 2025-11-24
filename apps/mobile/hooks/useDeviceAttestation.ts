@@ -25,16 +25,17 @@ import type { AttestationStatus } from '@realitycam/shared';
 import { useDeviceStore } from '../store/deviceStore';
 import {
   fetchChallenge,
-  base64ToUint8Array,
   ApiError,
   API_ERROR_CODES,
 } from '../services/api';
+import { base64ToUint8Array } from '@realitycam/shared';
+import { isSecurityError } from '../utils/securityCheck';
 
 // Safe import of AppIntegrity module (handles Expo Go case)
 let AppIntegrity: typeof import('@expo/app-integrity') | null = null;
 try {
   AppIntegrity = require('@expo/app-integrity');
-} catch (error) {
+} catch {
   // Module not available - likely Expo Go
 }
 
@@ -71,22 +72,6 @@ export const ATTESTATION_ERROR_MESSAGES = {
     'Device verification timed out. Please try again.',
 } as const;
 
-/**
- * Checks if an error indicates a security/compromise issue
- * Based on pattern from useSecureEnclaveKey
- */
-function isSecurityError(error: Error): boolean {
-  const message = error.message.toLowerCase();
-  return (
-    message.includes('jailbreak') ||
-    message.includes('security') ||
-    message.includes('tamper') ||
-    message.includes('compromised') ||
-    message.includes('restriction') ||
-    message.includes('not supported') ||
-    message.includes('device not supported')
-  );
-}
 
 /**
  * Checks if the challenge has expired
@@ -205,7 +190,6 @@ export function useDeviceAttestation(): UseDeviceAttestationReturn {
     isAttestationReady,
     hasHydrated,
     attestationStatus,
-    attestationObject,
     challenge,
     challengeExpiresAt,
     attestationError,

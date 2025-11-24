@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 /**
  * Expo config plugin for LiDAR depth module
  *
