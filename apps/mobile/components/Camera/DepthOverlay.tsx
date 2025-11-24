@@ -270,9 +270,16 @@ const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   overlay: {
-    width: screenWidth,
-    height: screenHeight,
+    // ARKit depth is always 256×192 (landscape). For portrait mode,
+    // we rotate -90° and scale to fill the screen.
+    // After rotation, the depth's 256px width becomes vertical (height)
+    // and 192px height becomes horizontal (width).
+    width: screenHeight,  // Fills vertical after rotation
+    height: screenWidth,  // Fills horizontal after rotation
+    transform: [{ rotate: '90deg' }],
   },
 });
