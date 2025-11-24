@@ -449,7 +449,7 @@ pub fn detect_screen_pattern(depths: &[f32], stats: &DepthStatistics) -> (bool, 
     let mean_depth = valid.iter().sum::<f64>() / valid.len() as f64;
 
     // Check if in typical screen distance
-    let in_screen_distance = mean_depth >= SCREEN_DISTANCE_MIN && mean_depth <= SCREEN_DISTANCE_MAX;
+    let in_screen_distance = (SCREEN_DISTANCE_MIN..=SCREEN_DISTANCE_MAX).contains(&mean_depth);
 
     // Check depth uniformity - what % of pixels are within tight band of median
     let median_depth = {
@@ -506,7 +506,7 @@ pub fn check_quadrant_variance(depths: &[f32], width: usize, height: usize) -> (
             for y in (qy * half_h)..((qy + 1) * half_h).min(height) {
                 for x in (qx * half_w)..((qx + 1) * half_w).min(width) {
                     let d = depths[y * width + x];
-                    if d.is_finite() && d >= MIN_VALID_DEPTH && d <= MAX_VALID_DEPTH {
+                    if d.is_finite() && (MIN_VALID_DEPTH..=MAX_VALID_DEPTH).contains(&d) {
                         quadrant_depths.push(d as f64);
                     }
                 }
