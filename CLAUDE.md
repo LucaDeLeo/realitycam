@@ -32,6 +32,7 @@ cd apps/web
 pnpm dev                         # Next.js dev with Turbopack
 pnpm build                       # Production build
 pnpm typecheck                   # TypeScript check
+pnpm test                        # Run Playwright E2E tests
 ```
 
 ### Backend (Rust/Axum)
@@ -72,9 +73,10 @@ apps/mobile/
 apps/web/
   src/app/                # Next.js App Router
   src/components/         # Evidence/, Media/, Upload/
+  tests/                  # Playwright E2E tests + fixtures
 
 backend/
-  src/routes/             # API endpoints (captures, devices, verify, health)
+  src/routes/             # API endpoints (captures, devices, verify, health, test)
   src/services/           # c2pa, attestation, depth_analysis, storage
   src/middleware/         # device_auth (Ed25519 signature verification)
   src/models/             # SQLx models (capture, device, evidence)
@@ -127,7 +129,48 @@ sqlx migrate run
 
 ## Testing
 
-Mobile/Web tests not yet configured. Backend uses `cargo test` with testcontainers for integration tests.
+### Backend (Rust)
+```bash
+cd backend
+cargo test                       # Run all unit/integration tests
+cargo test <test_name>           # Run specific test
+```
+
+### Web App (Playwright E2E)
+```bash
+cd apps/web
+pnpm test                        # Run all E2E tests (Chromium, Firefox, WebKit, Mobile)
+pnpm test -- --project=chromium  # Run Chromium only (faster)
+pnpm exec playwright install     # Install browsers (first time)
+```
+
+**Test Infrastructure:**
+- **Framework**: Playwright with multi-browser support
+- **Browsers**: Chromium, Firefox, WebKit, Mobile Chrome
+- **Data Factories**: `EvidenceFactory` for API-based test data seeding
+- **Test Endpoints**: Backend has `/api/v1/test/evidence` endpoints (only enabled with `ENABLE_TEST_ENDPOINTS=true`)
+
+**Running E2E Tests:**
+1. Start infrastructure: `pnpm docker:up`
+2. Start backend with test endpoints: `cd backend && ENABLE_TEST_ENDPOINTS=true cargo run`
+3. Start web app: `cd apps/web && pnpm dev`
+4. Run tests: `cd apps/web && pnpm test`
+
+**Test Files:**
+```
+apps/web/tests/
+  e2e/                          # E2E test specs
+  support/
+    fixtures/                   # Playwright fixtures (page, apiHelper)
+    fixtures/factories/         # Data factories (EvidenceFactory)
+```
+
+### Mobile App (Jest + Maestro)
+```bash
+cd apps/mobile
+pnpm test                        # Run Jest unit tests
+```
+Maestro E2E tests scaffolded but require physical device.
 
 ## Running Everything (Full Stack)
 

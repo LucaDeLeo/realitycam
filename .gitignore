@@ -47,6 +47,12 @@ yarn-error.log*
 # Testing
 coverage/
 .nyc_output/
+test-results/
+playwright-report/
+junit.xml
+# Maestro output (flows should be committed)
+.maestro/.*.yaml
+.maestro/screenshots/
 
 # OS files
 .DS_Store

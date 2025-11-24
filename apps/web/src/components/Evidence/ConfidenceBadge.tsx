@@ -45,6 +45,7 @@ export function ConfidenceBadge({ level, className = '' }: ConfidenceBadgeProps)
       className={`inline-flex items-center px-3 py-1 rounded-full text-xs sm:text-sm font-semibold ${badgeColors[level]} ${className}`}
       role="status"
       aria-label={`Confidence level: ${badgeLabels[level]}`}
+      data-testid="confidence-badge"
     >
       {badgeLabels[level]}
     </span>

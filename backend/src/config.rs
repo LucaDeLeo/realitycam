@@ -67,6 +67,11 @@ pub struct Config {
     /// When true, devices with failed signature verification are rejected
     /// When false (MVP mode), they proceed with is_verified=false and capped confidence
     pub require_verified_devices: bool,
+
+    /// Enable test seeding endpoints (/api/v1/test/*)
+    /// SECURITY: Should ONLY be enabled in development/test environments
+    /// When false (default), test endpoints return 404
+    pub enable_test_endpoints: bool,
 }
 
 impl Config {
@@ -138,6 +143,9 @@ impl Config {
             require_verified_devices: env::var("REQUIRE_VERIFIED_DEVICES")
                 .map(|v| v.to_lowercase() == "true" || v == "1")
                 .unwrap_or(false), // MVP default: permissive mode
+            enable_test_endpoints: env::var("ENABLE_TEST_ENDPOINTS")
+                .map(|v| v.to_lowercase() == "true" || v == "1")
+                .unwrap_or(false), // Default: disabled for security
         }
     }
 
@@ -164,6 +172,7 @@ impl Config {
             rate_limit_per_second: 100,
             rate_limit_burst: 200,
             require_verified_devices: false,
+            enable_test_endpoints: true, // Enabled for tests
         }
     }
 }

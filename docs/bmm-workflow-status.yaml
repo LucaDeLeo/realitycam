@@ -86,10 +86,11 @@ workflow_status:
         output: "5 epics, 41 stories, 46 FRs covered"
 
       - id: "test-design"
-        status: "recommended"
+        status: "docs/test-design.md"
         agent: "tea"
         command: "test-design"
-        output: "System-level testability review"
+        output: "Comprehensive test design with 23 scenarios, risk matrix, coverage targets"
+        completed: "2025-11-24"
 
       - id: "validate-architecture"
         status: "optional"

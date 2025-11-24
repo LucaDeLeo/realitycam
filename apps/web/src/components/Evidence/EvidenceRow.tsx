@@ -108,12 +108,17 @@ function getStatusText(status: ExtendedEvidenceStatus): string {
  */
 export function EvidenceRow({ label, status, value, className = '' }: EvidenceRowProps) {
   const statusText = value || getStatusText(status);
+  // Generate testid from label: "LiDAR Depth Analysis" -> "depth-analysis"
+  const testId = label.toLowerCase()
+    .replace('lidar ', '')
+    .replace(/\s+/g, '-');
 
   return (
     <div
       className={`flex items-center justify-between py-3 px-4
                   border-b border-zinc-100 dark:border-zinc-800
                   last:border-b-0 ${className}`}
+      data-testid={testId}
     >
       <div className="flex items-center gap-3">
         <StatusIcon status={status} />

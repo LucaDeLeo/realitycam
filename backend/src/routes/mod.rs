@@ -15,6 +15,7 @@ use crate::services::{ChallengeStore, StorageService};
 pub mod captures;
 pub mod devices;
 pub mod health;
+pub mod test;
 pub mod verify;
 
 /// Shared application state for all routes
@@ -67,11 +68,19 @@ pub fn api_router(state: AppState) -> Router {
     // - devices router: public (registration, challenge)
     // - captures router: protected with device auth middleware
     // - verify router: public with rate limiting (file verification)
-    let v1_router = Router::new()
+    // - test router: conditionally enabled for E2E test seeding
+    let mut v1_router = Router::new()
         .nest("/devices", devices::router())
         .nest("/captures", captures_router)
-        .merge(verify_router)
-        .with_state(state);
+        .merge(verify_router);
+
+    // Conditionally add test routes (SECURITY: only enabled via ENABLE_TEST_ENDPOINTS)
+    if state.config.enable_test_endpoints {
+        tracing::warn!("Test endpoints enabled - DO NOT USE IN PRODUCTION");
+        v1_router = v1_router.nest("/test", test::router());
+    }
+
+    let v1_router = v1_router.with_state(state);
 
     // Combine all routes
     Router::new()

@@ -117,11 +117,13 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
                 </h2>
 
                 {/* Confidence Badge */}
-                <div className="mb-6">
+                <div className="mb-6" data-testid="confidence-score">
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
                     Confidence Level
                   </p>
-                  <ConfidenceBadge level={capture?.confidence_level as ConfidenceLevel || 'pending'} />
+                  <div data-testid="verification-status">
+                    <ConfidenceBadge level={capture?.confidence_level as ConfidenceLevel || 'pending'} />
+                  </div>
                 </div>
 
                 {/* Metadata */}
@@ -178,7 +180,7 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
 
             {/* Status Message */}
             {!capture && (
-              <div className="px-4 sm:px-6 py-4 bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-200 dark:border-zinc-800">
+              <div className="px-4 sm:px-6 py-4 bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-200 dark:border-zinc-800" data-testid="processing-indicator">
                 <p className="text-sm text-center text-zinc-500 dark:text-zinc-400">
                   Capture not found or still processing
                 </p>

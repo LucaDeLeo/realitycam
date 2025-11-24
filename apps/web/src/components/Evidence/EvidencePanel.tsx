@@ -53,6 +53,7 @@ export function EvidencePanel({
     <div
       className={`w-full rounded-xl border border-zinc-200 dark:border-zinc-800
                   bg-white dark:bg-zinc-900 overflow-hidden ${className}`}
+      data-testid="evidence-panel"
     >
       {/* Panel Header - Click to expand/collapse */}
       <button

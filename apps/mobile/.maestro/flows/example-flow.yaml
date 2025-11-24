@@ -1,0 +1,145 @@
+# RealityCam Mobile - Example Maestro E2E Flow
+#
+# Demonstrates patterns for mobile E2E testing.
+# Replace with real flows after running *test-design workflow.
+#
+# Run: maestro test .maestro/flows/example-flow.yaml
+# Debug: maestro test --debug .maestro/flows/example-flow.yaml
+#
+# @see https://maestro.mobile.dev/
+
+appId: com.realitycam.app
+
+---
+
+# Test: App Launch and Permission Handling
+- launchApp:
+    clearState: true
+    clearKeychain: true
+
+# Wait for app to load
+- assertVisible:
+    text: "RealityCam"
+    optional: true
+
+# Handle camera permission dialog (iOS)
+- tapOn:
+    text: "Allow"
+    optional: true
+
+# Handle location permission if shown
+- tapOn:
+    text: "Allow While Using App"
+    optional: true
+
+---
+
+# Test: Navigate to Camera Screen
+- assertVisible:
+    id: "home-screen"
+    optional: true
+
+- tapOn:
+    id: "capture-button"
+    optional: true
+
+# Camera screen should load
+- assertVisible:
+    id: "camera-view"
+    optional: true
+
+---
+
+# Test: Camera UI Elements Visible
+- assertVisible:
+    id: "capture-button"
+    label: "Capture button is visible"
+
+- assertVisible:
+    id: "flash-toggle"
+    label: "Flash toggle is visible"
+    optional: true
+
+- assertVisible:
+    id: "depth-indicator"
+    label: "LiDAR depth indicator is visible"
+    optional: true
+
+---
+
+# Test: Take Photo (simulated)
+# Note: Actual camera capture requires physical device
+- tapOn:
+    id: "capture-button"
+    label: "Tap capture button"
+
+# Wait for processing
+- extendedWaitUntil:
+    visible:
+      id: "photo-preview"
+    timeout: 10000
+
+# Preview should be visible
+- assertVisible:
+    id: "photo-preview"
+    label: "Photo preview is displayed"
+
+---
+
+# Test: Photo Metadata Display
+- assertVisible:
+    id: "depth-analysis-badge"
+    label: "Depth analysis badge visible"
+    optional: true
+
+- assertVisible:
+    id: "timestamp-display"
+    label: "Timestamp is shown"
+    optional: true
+
+---
+
+# Test: Upload Flow
+- tapOn:
+    id: "upload-button"
+    label: "Tap upload button"
+
+# Wait for upload to complete or show progress
+- extendedWaitUntil:
+    visible:
+      anyOf:
+        - id: "upload-success"
+        - id: "upload-progress"
+    timeout: 30000
+
+---
+
+# Test: Offline Queue Behavior
+# Simulate offline mode and verify queue
+- runFlow:
+    when:
+      visible:
+        id: "offline-indicator"
+    commands:
+      - assertVisible:
+          id: "queue-count"
+          label: "Offline queue count is visible"
+
+---
+
+# Test: Return to Home
+- tapOn:
+    id: "home-button"
+    optional: true
+
+- back
+
+- assertVisible:
+    id: "home-screen"
+    label: "Back on home screen"
+    optional: true
+
+---
+
+# Cleanup
+- stopApp

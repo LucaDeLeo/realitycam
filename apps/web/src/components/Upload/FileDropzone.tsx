@@ -132,7 +132,7 @@ export function FileDropzone({ onVerificationComplete, className = '' }: FileDro
   }
 
   return (
-    <div className={`w-full ${className}`}>
+    <div className={`w-full ${className}`} data-testid="file-upload">
       <div
         onClick={handleClick}
         onKeyDown={handleKeyDown}
