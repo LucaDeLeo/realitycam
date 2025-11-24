@@ -4,6 +4,7 @@
 //! Supports both AWS S3 and LocalStack for development/testing.
 
 use aws_config::BehaviorVersion;
+use aws_sdk_s3::config::Credentials;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::Client as S3Client;
 use tracing::{info, warn};
@@ -43,30 +44,38 @@ impl StorageService {
     /// Creates a new StorageService from application config
     pub async fn new(config: &Config) -> Self {
         // Load AWS config with custom endpoint for LocalStack
-        let aws_config = if config.s3_endpoint.contains("localhost")
+        let client = if config.s3_endpoint.contains("localhost")
             || config.s3_endpoint.contains("127.0.0.1")
             || config.s3_endpoint.contains("localstack")
         {
-            // LocalStack configuration
+            // LocalStack configuration - use explicit credentials and path-style
             info!(
                 endpoint = %config.s3_endpoint,
                 bucket = %config.s3_bucket,
                 "Configuring S3 client for LocalStack"
             );
-            aws_config::defaults(BehaviorVersion::latest())
+
+            // LocalStack accepts any credentials
+            let creds = Credentials::new("test", "test", None, None, "localstack");
+
+            let s3_config = aws_sdk_s3::Config::builder()
+                .behavior_version(BehaviorVersion::latest())
                 .endpoint_url(&config.s3_endpoint)
-                .load()
-                .await
+                .credentials_provider(creds)
+                .region(aws_sdk_s3::config::Region::new("us-east-1"))
+                .force_path_style(true)
+                .build();
+
+            S3Client::from_conf(s3_config)
         } else {
             // Production AWS configuration
             info!(
                 bucket = %config.s3_bucket,
                 "Configuring S3 client for AWS"
             );
-            aws_config::load_defaults(BehaviorVersion::latest()).await
+            let aws_config = aws_config::load_defaults(BehaviorVersion::latest()).await;
+            S3Client::new(&aws_config)
         };
-
-        let client = S3Client::new(&aws_config);
 
         Self {
             client,

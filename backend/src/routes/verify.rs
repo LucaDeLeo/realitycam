@@ -359,7 +359,14 @@ async fn get_capture_public(
         "Capture found for public verification"
     );
 
-    // Build response (no presigned URLs for MVP - just return the data)
+    // Build response with LocalStack S3 URL for hackathon demo
+    // Use local network IP so phone can access it (localhost won't work from phone)
+    // In production, this would be a presigned S3 URL
+    let photo_url = format!(
+        "http://192.168.0.90:4566/realitycam-media-dev/captures/{}/photo.jpg",
+        capture.id
+    );
+
     let response = CaptureDetailsPublic {
         capture_id: capture.id.to_string(),
         confidence_level: capture.confidence_level,
@@ -367,7 +374,7 @@ async fn get_capture_public(
         uploaded_at: capture.uploaded_at.to_rfc3339(),
         location_coarse: capture.location_coarse,
         evidence: capture.evidence.unwrap_or(serde_json::json!({})),
-        photo_url: None, // TODO: Generate presigned S3 URL
+        photo_url: Some(photo_url),
         depth_map_url: None,
     };
 

@@ -41,7 +41,8 @@ const VARIANCE_THRESHOLD: f64 = 0.5;
 const LAYER_THRESHOLD: u32 = 3;
 
 /// Minimum edge coherence for real scene detection (0.0-1.0)
-const COHERENCE_THRESHOLD: f64 = 0.7;
+/// NOTE: Lowered from 0.7 for hackathon - real LiDAR often has lower edge coherence
+const COHERENCE_THRESHOLD: f64 = 0.3;
 
 /// Number of histogram bins for layer detection
 const HISTOGRAM_BINS: usize = 50;

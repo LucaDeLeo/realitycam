@@ -125,7 +125,8 @@ function getStatusColor(status: CheckStatus, isDark: boolean): string {
 
 export default function ResultScreen() {
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  // Force light mode for result screen to ensure text visibility
+  const isDark = false;
   const router = useRouter();
   const params = useLocalSearchParams();
 

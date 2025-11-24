@@ -206,6 +206,7 @@ async fn update_device_counter(
 
 /// Parameters for inserting a capture with evidence
 struct InsertCaptureWithEvidenceParams {
+    pub capture_id: Uuid,
     pub device_id: Uuid,
     pub target_media_hash: Vec<u8>,
     pub photo_s3_key: String,
@@ -221,7 +222,8 @@ async fn insert_capture_with_evidence(
     pool: &PgPool,
     params: InsertCaptureWithEvidenceParams,
 ) -> Result<Uuid, ApiError> {
-    let capture_id = Uuid::new_v4();
+    // Use the capture_id from params (same ID used for S3 upload)
+    let capture_id = params.capture_id;
 
     // Using query_scalar with explicit SQL to avoid compile-time schema dependency
     // This allows the code to compile before the migration is applied
@@ -316,9 +318,11 @@ async fn upload_capture(
     // ========================================================================
     // SECURITY FIX: Server-side hash verification
     // ========================================================================
-    // Compute SHA256 of uploaded photo bytes and verify against client claim.
-    // This prevents attacks where client sends arbitrary content with a fake hash.
-    let computed_hash = Sha256::digest(&parsed.photo_bytes);
+    // Compute SHA256 to match mobile's method: hash the base64 STRING (not raw bytes).
+    // Mobile does: digestStringAsync(SHA256, base64EncodedPhoto) which hashes the base64 text.
+    // TODO: Fix mobile to hash raw bytes instead for proper security.
+    let photo_base64 = STANDARD.encode(&parsed.photo_bytes);
+    let computed_hash = Sha256::digest(photo_base64.as_bytes());
     let claimed_hash_bytes = STANDARD.decode(&parsed.metadata.photo_hash).map_err(|e| {
         tracing::warn!(
             request_id = %request_id,
@@ -623,6 +627,7 @@ async fn upload_capture(
     let db_capture_id = insert_capture_with_evidence(
         &state.db,
         InsertCaptureWithEvidenceParams {
+            capture_id,  // Use the same ID that was used for S3 upload
             device_id: device_ctx.device_id,
             target_media_hash: photo_hash_bytes,
             photo_s3_key,

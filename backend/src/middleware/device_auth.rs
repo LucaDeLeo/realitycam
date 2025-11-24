@@ -334,6 +334,7 @@ where
 
             // Reconstruct request with buffered body and device context
             let mut request = Request::from_parts(parts, Body::from(body_bytes));
+            request.extensions_mut().insert(request_id);
             request.extensions_mut().insert(device_context.clone());
 
             tracing::info!(

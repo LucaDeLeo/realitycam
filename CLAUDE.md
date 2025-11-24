@@ -128,3 +128,95 @@ sqlx migrate run
 ## Testing
 
 Mobile/Web tests not yet configured. Backend uses `cargo test` with testcontainers for integration tests.
+
+## Running Everything (Full Stack)
+
+### 1. Start Infrastructure
+```bash
+# From repo root
+docker-compose -f infrastructure/docker-compose.yml up -d
+
+# Verify services
+docker-compose -f infrastructure/docker-compose.yml ps
+# Should show: postgres (5432), localstack (4566)
+```
+
+### 2. Start Backend
+```bash
+cd backend
+cargo run
+# Server at http://localhost:8080
+# First run auto-runs migrations
+```
+
+### 3. Start Web App
+```bash
+cd apps/web
+pnpm dev
+# Server at http://localhost:3000
+```
+
+### 4. Start Mobile App
+```bash
+cd apps/mobile
+
+# First time OR after native module changes:
+npx expo prebuild --clean --platform ios
+
+# Start Metro bundler:
+pnpm start
+
+# Build & run in Xcode:
+# Open apps/mobile/ios/realitycam.xcworkspace
+# Select your device (not simulator)
+# Cmd+R to build and run
+```
+
+### 5. Configure Mobile API URL
+```bash
+# apps/mobile/.env
+EXPO_PUBLIC_API_URL=http://<YOUR_IP>:8080
+
+# Find your IP:
+ipconfig getifaddr en0
+```
+
+## When to Rebuild / Refresh
+
+| Change Type | Action Required |
+|-------------|-----------------|
+| **TypeScript/JS in mobile** | Hot reload (automatic) or shake device → Reload |
+| **TypeScript/JS in web** | Hot reload (automatic) |
+| **Rust backend code** | Restart `cargo run` |
+| **Native module Swift/ObjC** | `npx expo prebuild --clean --platform ios` + rebuild in Xcode |
+| **app.config.ts changes** | `npx expo prebuild --clean --platform ios` + rebuild in Xcode |
+| **package.json dependencies** | `pnpm install` + (if native deps) prebuild + Xcode rebuild |
+| **Database schema** | Add migration, restart backend |
+| **Environment variables** | Restart affected service |
+
+### Native Module Changes (LiDAR, etc.)
+```bash
+cd apps/mobile
+
+# Regenerate iOS project with native modules
+npx expo prebuild --clean --platform ios
+
+# Open in Xcode and rebuild
+open ios/realitycam.xcworkspace
+# Cmd+R to build and run
+```
+
+### Quick Troubleshooting
+```bash
+# Kill stuck backend process
+lsof -ti:8080 | xargs kill -9
+
+# Reset Metro cache
+cd apps/mobile && pnpm start --clear
+
+# Reset iOS build
+cd apps/mobile && rm -rf ios/ && npx expo prebuild --platform ios
+
+# Check if LiDAR module is linked
+npx expo-modules-autolinking resolve | grep -i lidar
+```

@@ -63,7 +63,7 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
               href="/"
               className="text-xl sm:text-2xl font-bold tracking-tight text-black dark:text-white hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
             >
-              RealityCam
+              rial.
             </Link>
             <span className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
               Photo Verification
@@ -218,7 +218,7 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
       <footer className="w-full border-t border-zinc-200 dark:border-zinc-800 mt-auto">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-6">
           <p className="text-center text-xs text-zinc-500 dark:text-zinc-400">
-            RealityCam - Authentic photo verification powered by hardware attestation and AI
+            rial. - Authentic photo verification powered by hardware attestation and AI
           </p>
         </div>
       </footer>

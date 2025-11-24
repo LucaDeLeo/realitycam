@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'RealityCam - Photo Verification',
-  description: 'Verify the authenticity of photos with RealityCam',
+  title: 'rial. - Photo Verification',
+  description: 'Verify the authenticity of photos with rial.',
 };
 
 export default function RootLayout({

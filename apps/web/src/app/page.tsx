@@ -9,7 +9,7 @@ export default function Home() {
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
           <div className="flex items-center justify-between">
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-black dark:text-white">
-              RealityCam
+              rial.
             </h1>
             <span className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
               Photo Verification
@@ -27,7 +27,7 @@ export default function Home() {
               Verify Photo Authenticity
             </h2>
             <p className="mt-4 max-w-xl text-base sm:text-lg text-zinc-600 dark:text-zinc-400">
-              Upload a photo to check if it was captured with RealityCam and view
+              Upload a photo to check if it was captured with rial. and view
               its verification evidence including hardware attestation, LiDAR depth
               analysis, and cryptographic signatures.
             </p>
@@ -136,7 +136,7 @@ export default function Home() {
       <footer className="w-full border-t border-zinc-200 dark:border-zinc-800 mt-auto">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-6">
           <p className="text-center text-xs text-zinc-500 dark:text-zinc-400">
-            RealityCam - Authentic photo verification powered by hardware attestation and AI
+            rial. - Authentic photo verification powered by hardware attestation and AI
           </p>
         </div>
       </footer>

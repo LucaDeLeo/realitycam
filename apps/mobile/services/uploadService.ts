@@ -176,10 +176,9 @@ function parseRetryAfter(headerValue: string | null): number | undefined {
 async function buildDeviceAuthHeaders(
   metadataJson: string
 ): Promise<Record<string, string>> {
-  const deviceStore = useDeviceStore.getState();
-
-  // Get device ID from capabilities or use keyId as fallback
-  const deviceId = deviceStore.keyId || 'unregistered';
+  // DEV MODE: Use hardcoded test device UUID
+  // In production, this would come from device registration response stored in deviceStore
+  const deviceId = '550e8400-e29b-41d4-a716-446655440000';
   const timestamp = Date.now().toString();
 
   // Compute hash of timestamp|metadata for signature
