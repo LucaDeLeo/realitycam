@@ -62,7 +62,8 @@ pub fn api_router(state: AppState) -> Router {
         .layer(DeviceAuthLayer::new(state.db.clone(), device_auth_config));
 
     // Verify router (rate limiting disabled for hackathon demo)
-    let verify_router = verify::router().with_state(state.db.clone());
+    // Pass full AppState for access to config (verification URLs, S3 endpoint)
+    let verify_router = verify::router().with_state(state.clone());
 
     // Create v1 API routes
     // - devices router: public (registration, challenge)

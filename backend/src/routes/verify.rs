@@ -24,6 +24,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::error::{ApiError, ApiErrorWithRequestId};
+use crate::routes::AppState;
 use crate::services::C2paManifestInfo;
 use crate::types::ApiResponse;
 
@@ -33,9 +34,6 @@ use crate::types::ApiResponse;
 
 /// Maximum file size for verification (20MB per PRD)
 const MAX_FILE_SIZE: usize = 20 * 1024 * 1024;
-
-/// Verification base URL
-const VERIFICATION_BASE_URL: &str = "https://realitycam.app/verify";
 
 // ============================================================================
 // Response Types
@@ -112,7 +110,7 @@ pub struct CaptureDetailsPublic {
 // ============================================================================
 
 /// Creates the verification routes router.
-pub fn router() -> Router<PgPool> {
+pub fn router() -> Router<AppState> {
     Router::new()
         .route("/verify-file", post(verify_file))
         .route("/verify/{id}", get(get_capture_public))
@@ -141,7 +139,7 @@ pub fn router() -> Router<PgPool> {
 /// - 429 Too Many Requests: Rate limit exceeded
 /// - 500 Internal Server Error: Processing failed
 async fn verify_file(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Extension(request_id): Extension<Uuid>,
     multipart: Multipart,
 ) -> Result<Json<ApiResponse<FileVerificationResponse>>, ApiErrorWithRequestId> {
@@ -164,20 +162,20 @@ async fn verify_file(
         "File received for verification"
     );
 
-    // Compute SHA-256 hash
-    let mut hasher = Sha256::new();
-    hasher.update(&file_bytes);
-    let hash_bytes = hasher.finalize().to_vec();
+    // Compute SHA-256 hash of base64-encoded file bytes
+    // This matches how the upload endpoint computes hashes (SHA256 of base64 string)
+    let file_base64 = STANDARD.encode(&file_bytes);
+    let hash_bytes = Sha256::digest(file_base64.as_bytes()).to_vec();
     let hash_base64 = STANDARD.encode(&hash_bytes);
 
     tracing::debug!(
         request_id = %request_id,
         file_hash = %hash_base64,
-        "File hash computed"
+        "File hash computed (base64 string hash to match upload)"
     );
 
     // Check database for matching capture
-    let capture = lookup_capture_by_hash(&pool, &hash_bytes)
+    let capture = lookup_capture_by_hash(&state.db, &hash_bytes)
         .await
         .map_err(|e| ApiErrorWithRequestId {
             error: e,
@@ -197,7 +195,7 @@ async fn verify_file(
             status: VerificationStatus::Verified,
             capture_id: Some(capture.id.to_string()),
             confidence_level: Some(capture.confidence_level),
-            verification_url: Some(format!("{}/{}", VERIFICATION_BASE_URL, capture.id)),
+            verification_url: Some(format!("{}/{}", state.config.verification_base_url, capture.id)),
             manifest_info: None,
             note: None,
             file_hash: hash_base64,
@@ -305,6 +303,8 @@ struct CaptureFullRecord {
     uploaded_at: chrono::DateTime<chrono::Utc>,
     location_coarse: Option<String>,
     evidence: Option<serde_json::Value>,
+    photo_s3_key: Option<String>,
+    depth_map_s3_key: Option<String>,
 }
 
 /// GET /api/v1/verify/{id} - Get public capture details
@@ -313,7 +313,7 @@ struct CaptureFullRecord {
 /// This is a PUBLIC endpoint - no authentication required.
 /// Only returns coarse location (not precise) for privacy.
 async fn get_capture_public(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Extension(request_id): Extension<Uuid>,
     Path(id): Path<String>,
 ) -> Result<Json<ApiResponse<CaptureDetailsPublic>>, ApiErrorWithRequestId> {
@@ -329,18 +329,18 @@ async fn get_capture_public(
         "Looking up capture for public verification"
     );
 
-    // Query capture from database
+    // Query capture from database (including photo_s3_key for URL construction)
     let capture = sqlx::query_as!(
         CaptureFullRecord,
         r#"
         SELECT id, confidence_level, captured_at, uploaded_at,
-               location_coarse, evidence
+               location_coarse, evidence, photo_s3_key, depth_map_s3_key
         FROM captures
         WHERE id = $1 AND status = 'complete'
         "#,
         capture_id
     )
-    .fetch_optional(&pool)
+    .fetch_optional(&state.db)
     .await
     .map_err(|e| ApiErrorWithRequestId {
         error: ApiError::Database(e),
@@ -359,13 +359,26 @@ async fn get_capture_public(
         "Capture found for public verification"
     );
 
-    // Build response with LocalStack S3 URL for hackathon demo
-    // Use local network IP so phone can access it (localhost won't work from phone)
-    // In production, this would be a presigned S3 URL
-    let photo_url = format!(
-        "http://192.168.0.90:4566/realitycam-media-dev/captures/{}/photo.jpg",
-        capture.id
-    );
+    // Build photo URL from config (s3_public_endpoint/bucket/key)
+    // In dev: configurable via S3_PUBLIC_ENDPOINT env var
+    // In production: would be a presigned S3 URL or CloudFront CDN
+    let photo_url = capture.photo_s3_key.as_ref().map(|key| {
+        format!(
+            "{}/{}/{}",
+            state.config.s3_public_endpoint,
+            state.config.s3_bucket,
+            key
+        )
+    });
+
+    let depth_map_url = capture.depth_map_s3_key.as_ref().map(|key| {
+        format!(
+            "{}/{}/{}",
+            state.config.s3_public_endpoint,
+            state.config.s3_bucket,
+            key
+        )
+    });
 
     let response = CaptureDetailsPublic {
         capture_id: capture.id.to_string(),
@@ -374,8 +387,8 @@ async fn get_capture_public(
         uploaded_at: capture.uploaded_at.to_rfc3339(),
         location_coarse: capture.location_coarse,
         evidence: capture.evidence.unwrap_or(serde_json::json!({})),
-        photo_url: Some(photo_url),
-        depth_map_url: None,
+        photo_url,
+        depth_map_url,
     };
 
     Ok(Json(ApiResponse::new(response, request_id)))

@@ -21,13 +21,40 @@ export interface DepthAnalysis {
   is_likely_real_scene: boolean;
 }
 
+/** Metadata validation evidence (Story 4-6) */
+export interface MetadataEvidence {
+  /** Whether the timestamp is within acceptable bounds (15 min window) */
+  timestamp_valid: boolean;
+  /** Delta between captured_at and server time in seconds */
+  timestamp_delta_seconds: number;
+  /** Whether the device model is verified (iPhone Pro whitelist) */
+  model_verified: boolean;
+  /** The device model name */
+  model_name: string;
+  /** Whether depth map resolution matches known LiDAR formats */
+  resolution_valid: boolean;
+  /** Whether valid location data is available */
+  location_available: boolean;
+  /** Whether user opted out of location sharing */
+  location_opted_out: boolean;
+  /** Coarse location (city/region level, for display) */
+  location_coarse?: string;
+}
+
+/** Processing information for evidence generation (Story 4-7) */
+export interface ProcessingInfo {
+  /** When processing completed (ISO 8601) */
+  processed_at: string;
+  /** Total processing time in milliseconds */
+  processing_time_ms: number;
+  /** Backend version that processed the capture */
+  backend_version: string;
+}
+
+/** Complete evidence package for a capture (Story 4-7) */
 export interface Evidence {
   hardware_attestation: HardwareAttestation;
   depth_analysis: DepthAnalysis;
-  metadata: {
-    timestamp_valid: boolean;
-    model_verified: boolean;
-    location_available: boolean;
-    location_coarse?: string;
-  };
+  metadata: MetadataEvidence;
+  processing: ProcessingInfo;
 }

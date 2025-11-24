@@ -7,6 +7,8 @@ export type {
   EvidenceStatus,
   HardwareAttestation,
   DepthAnalysis,
+  MetadataEvidence,
+  ProcessingInfo,
   Evidence,
 } from './types/evidence';
 

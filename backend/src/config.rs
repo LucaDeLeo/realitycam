@@ -72,6 +72,11 @@ pub struct Config {
     /// SECURITY: Should ONLY be enabled in development/test environments
     /// When false (default), test endpoints return 404
     pub enable_test_endpoints: bool,
+
+    /// Public S3 endpoint for client-accessible URLs (e.g., photo URLs in API responses)
+    /// In dev, this should be accessible from client devices (not localhost)
+    /// In production, this would typically be a CloudFront CDN URL
+    pub s3_public_endpoint: String,
 }
 
 impl Config {
@@ -146,6 +151,11 @@ impl Config {
             enable_test_endpoints: env::var("ENABLE_TEST_ENDPOINTS")
                 .map(|v| v.to_lowercase() == "true" || v == "1")
                 .unwrap_or(false), // Default: disabled for security
+            s3_public_endpoint: env::var("S3_PUBLIC_ENDPOINT").unwrap_or_else(|_| {
+                // In dev, default to LocalStack endpoint accessible from local network
+                // For production, this should be set to CloudFront/CDN URL
+                env::var("S3_ENDPOINT").unwrap_or_else(|_| "http://localhost:4566".to_string())
+            }),
         }
     }
 
@@ -173,6 +183,7 @@ impl Config {
             rate_limit_burst: 200,
             require_verified_devices: false,
             enable_test_endpoints: true, // Enabled for tests
+            s3_public_endpoint: "http://localhost:4566".to_string(),
         }
     }
 }
