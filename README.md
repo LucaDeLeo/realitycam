@@ -1,5 +1,11 @@
 # RealityCam
 
+> **Hackathon Note:** This repository has continued development after the hackathon deadline. The current version includes deployment to Railway/Vercel, a native Swift iOS rewrite, and various cleanups.
+>
+> **To view the code as it was at the hackathon deadline (~9pm Sunday, Nov 24, 2025 Argentina time), see commit [`2938e2e`](https://github.com/LucaDeLeo/realitycam/tree/2938e2e).**
+
+---
+
 Photo verification platform that captures authenticated photos with hardware attestation and LiDAR depth analysis.
 
 ## Prerequisites
