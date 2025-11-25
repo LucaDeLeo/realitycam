@@ -6,16 +6,17 @@
  * @see Story 4.2 - Upload Queue with Retry Logic (AC-1, AC-3, AC-5, AC-6)
  */
 
-import { act } from '@testing-library/react-hooks';
 import type { ProcessedCapture, UploadError } from '@realitycam/shared';
 
 // Mock AsyncStorage
+const mockAsyncStorage = {
+  getItem: jest.fn(() => Promise.resolve(null)),
+  setItem: jest.fn(() => Promise.resolve()),
+  removeItem: jest.fn(() => Promise.resolve()),
+};
 jest.mock('@react-native-async-storage/async-storage', () => ({
-  default: {
-    getItem: jest.fn(() => Promise.resolve(null)),
-    setItem: jest.fn(() => Promise.resolve()),
-    removeItem: jest.fn(() => Promise.resolve()),
-  },
+  __esModule: true,
+  default: mockAsyncStorage,
 }));
 
 // Import after mocking
@@ -61,9 +62,10 @@ describe('uploadQueueStore', () => {
       const capture = createMockCapture();
       const { enqueue } = useUploadQueueStore.getState();
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         enqueue(capture);
-      });
+      }
 
       const state = useUploadQueueStore.getState();
       expect(state.items).toHaveLength(1);
@@ -79,11 +81,12 @@ describe('uploadQueueStore', () => {
       const capture3 = createMockCapture('capture-3');
       const { enqueue } = useUploadQueueStore.getState();
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         enqueue(capture1);
         enqueue(capture2);
         enqueue(capture3);
-      });
+      }
 
       const state = useUploadQueueStore.getState();
       expect(state.items).toHaveLength(3);
@@ -98,10 +101,11 @@ describe('uploadQueueStore', () => {
       const capture = createMockCapture();
       const store = useUploadQueueStore.getState();
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.enqueue(capture);
         store.setUploading(capture.id);
-      });
+      }
 
       const state = useUploadQueueStore.getState();
       expect(state.items[0].status).toBe('uploading');
@@ -116,11 +120,12 @@ describe('uploadQueueStore', () => {
       const capture = createMockCapture();
       const store = useUploadQueueStore.getState();
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.enqueue(capture);
         store.setUploading(capture.id);
         store.updateProgress(capture.id, 50);
-      });
+      }
 
       const state = useUploadQueueStore.getState();
       expect(state.items[0].progress).toBe(50);
@@ -130,19 +135,22 @@ describe('uploadQueueStore', () => {
       const capture = createMockCapture();
       const store = useUploadQueueStore.getState();
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.enqueue(capture);
         store.setUploading(capture.id);
-      });
+      }
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.updateProgress(capture.id, -10);
-      });
+      }
       expect(useUploadQueueStore.getState().items[0].progress).toBe(0);
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.updateProgress(capture.id, 150);
-      });
+      }
       expect(useUploadQueueStore.getState().items[0].progress).toBe(100);
     });
   });
@@ -152,11 +160,12 @@ describe('uploadQueueStore', () => {
       const capture = createMockCapture();
       const store = useUploadQueueStore.getState();
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.enqueue(capture);
         store.setUploading(capture.id);
         store.setProcessing(capture.id);
-      });
+      }
 
       const state = useUploadQueueStore.getState();
       expect(state.items[0].status).toBe('processing');
@@ -171,11 +180,12 @@ describe('uploadQueueStore', () => {
       const captureId = 'server-capture-uuid';
       const verificationUrl = 'https://realitycam.app/verify/123';
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.enqueue(capture);
         store.setUploading(capture.id);
         store.markCompleted(capture.id, captureId, verificationUrl);
-      });
+      }
 
       const state = useUploadQueueStore.getState();
       expect(state.items[0].status).toBe('completed');
@@ -196,11 +206,12 @@ describe('uploadQueueStore', () => {
         message: 'No internet connection',
       };
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.enqueue(capture);
         store.setUploading(capture.id);
         store.markFailed(capture.id, error);
-      });
+      }
 
       const state = useUploadQueueStore.getState();
       expect(state.items[0].status).toBe('failed');
@@ -220,16 +231,18 @@ describe('uploadQueueStore', () => {
         statusCode: 500,
       };
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.enqueue(capture);
-      });
+      }
 
       // Fail 3 times
       for (let i = 0; i < 3; i++) {
-        act(() => {
+        // Zustand store updates don't need act() wrapper
+      {
           store.setUploading(capture.id);
           store.markFailed(capture.id, error);
-        });
+        }
         // Reset status to allow another retry
         useUploadQueueStore.setState((state) => ({
           items: state.items.map((item) =>
@@ -250,11 +263,12 @@ describe('uploadQueueStore', () => {
       const capture = createMockCapture();
       const store = useUploadQueueStore.getState();
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.enqueue(capture);
         store.setUploading(capture.id);
         store.markPermanentlyFailed(capture.id);
-      });
+      }
 
       const state = useUploadQueueStore.getState();
       expect(state.items[0].status).toBe('permanently_failed');
@@ -269,19 +283,21 @@ describe('uploadQueueStore', () => {
       const store = useUploadQueueStore.getState();
       const error: UploadError = { code: 'NETWORK_ERROR', message: 'No connection' };
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.enqueue(capture1);
         store.enqueue(capture2);
         store.setUploading(capture1.id);
         store.markFailed(capture1.id, error);
-      });
+      }
 
       // capture-1 is now at the end with failed status
       expect(useUploadQueueStore.getState().items[0].status).toBe('failed');
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.retry(capture1.id);
-      });
+      }
 
       const state = useUploadQueueStore.getState();
       // capture-1 should be at front with pending status
@@ -297,10 +313,11 @@ describe('uploadQueueStore', () => {
       const capture = createMockCapture();
       const store = useUploadQueueStore.getState();
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.enqueue(capture);
         store.retry(capture.id); // Should be ignored - item is pending not failed
-      });
+      }
 
       const state = useUploadQueueStore.getState();
       expect(state.items[0].status).toBe('pending');
@@ -312,10 +329,11 @@ describe('uploadQueueStore', () => {
       const capture = createMockCapture();
       const store = useUploadQueueStore.getState();
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.enqueue(capture);
         store.cancel(capture.id);
-      });
+      }
 
       const state = useUploadQueueStore.getState();
       expect(state.items).toHaveLength(0);
@@ -326,12 +344,13 @@ describe('uploadQueueStore', () => {
       const store = useUploadQueueStore.getState();
       const error: UploadError = { code: 'NETWORK_ERROR', message: 'No connection' };
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.enqueue(capture);
         store.setUploading(capture.id);
         store.markFailed(capture.id, error);
         store.cancel(capture.id);
-      });
+      }
 
       const state = useUploadQueueStore.getState();
       expect(state.items).toHaveLength(0);
@@ -341,11 +360,12 @@ describe('uploadQueueStore', () => {
       const capture = createMockCapture();
       const store = useUploadQueueStore.getState();
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.enqueue(capture);
         store.setUploading(capture.id);
         store.cancel(capture.id); // Should be ignored - item is uploading
-      });
+      }
 
       const state = useUploadQueueStore.getState();
       expect(state.items).toHaveLength(1);
@@ -356,12 +376,13 @@ describe('uploadQueueStore', () => {
       const capture = createMockCapture();
       const store = useUploadQueueStore.getState();
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.enqueue(capture);
         store.setUploading(capture.id);
         store.setProcessing(capture.id);
         store.cancel(capture.id); // Should be ignored - item is processing
-      });
+      }
 
       const state = useUploadQueueStore.getState();
       expect(state.items).toHaveLength(1);
@@ -375,10 +396,11 @@ describe('uploadQueueStore', () => {
       const capture2 = createMockCapture('capture-2');
       const store = useUploadQueueStore.getState();
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.enqueue(capture1);
         store.enqueue(capture2);
-      });
+      }
 
       const nextPending = store.getNextPending();
       expect(nextPending?.capture.id).toBe('capture-1');
@@ -389,11 +411,12 @@ describe('uploadQueueStore', () => {
       const capture2 = createMockCapture('capture-2');
       const store = useUploadQueueStore.getState();
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.enqueue(capture1);
         store.enqueue(capture2);
         store.setUploading(capture1.id);
-      });
+      }
 
       const nextPending = useUploadQueueStore.getState().getNextPending();
       expect(nextPending?.capture.id).toBe('capture-2');
@@ -412,7 +435,8 @@ describe('uploadQueueStore', () => {
       const capture3 = createMockCapture('capture-3');
       const store = useUploadQueueStore.getState();
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.enqueue(capture1);
         store.enqueue(capture2);
         store.enqueue(capture3);
@@ -420,13 +444,14 @@ describe('uploadQueueStore', () => {
         store.markCompleted(capture1.id, 'server-1', 'https://verify/1');
         store.setUploading(capture2.id);
         store.markCompleted(capture2.id, 'server-2', 'https://verify/2');
-      });
+      }
 
       expect(useUploadQueueStore.getState().items).toHaveLength(3);
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.clearCompleted();
-      });
+      }
 
       const state = useUploadQueueStore.getState();
       expect(state.items).toHaveLength(1);
@@ -439,7 +464,8 @@ describe('uploadQueueStore', () => {
       const store = useUploadQueueStore.getState();
       const error: UploadError = { code: 'NETWORK_ERROR', message: 'No connection' };
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.enqueue(createMockCapture('pending-1'));
         store.enqueue(createMockCapture('pending-2'));
         store.enqueue(createMockCapture('uploading-1'));
@@ -451,7 +477,7 @@ describe('uploadQueueStore', () => {
         store.markCompleted('completed-1', 'server-1', 'https://verify/1');
         store.setUploading('failed-1');
         store.markFailed('failed-1', error);
-      });
+      }
 
       const counts = selectQueueCounts(useUploadQueueStore.getState());
       expect(counts.pending).toBe(2);
@@ -464,11 +490,12 @@ describe('uploadQueueStore', () => {
     it('selectPendingItems returns only pending items', () => {
       const store = useUploadQueueStore.getState();
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.enqueue(createMockCapture('pending-1'));
         store.enqueue(createMockCapture('uploading-1'));
         store.setUploading('uploading-1');
-      });
+      }
 
       const pending = selectPendingItems(useUploadQueueStore.getState());
       expect(pending).toHaveLength(1);
@@ -478,10 +505,11 @@ describe('uploadQueueStore', () => {
     it('selectCurrentUpload returns current upload', () => {
       const store = useUploadQueueStore.getState();
 
-      act(() => {
+      // Zustand store updates don't need act() wrapper
+      {
         store.enqueue(createMockCapture('capture-1'));
         store.setUploading('capture-1');
-      });
+      }
 
       const current = selectCurrentUpload(useUploadQueueStore.getState());
       expect(current?.capture.id).toBe('capture-1');
