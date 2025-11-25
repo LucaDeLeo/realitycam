@@ -14,6 +14,8 @@
 		3089F9DB0005 /* RialTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1005 /* RialTests.swift */; };
 		3089F9DB0006 /* RialUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1006 /* RialUITests.swift */; };
 		3089F9DB0007 /* RialUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1007 /* RialUITestsLaunchTests.swift */; };
+		3089F9DB0008 /* CryptoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1013 /* CryptoService.swift */; };
+		3089F9DB0009 /* CryptoServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1014 /* CryptoServiceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -46,6 +48,8 @@
 		3089F9DB1010 /* RialUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RialUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3089F9DB1011 /* Rial.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Rial.entitlements; sourceTree = "<group>"; };
 		3089F9DB1012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		3089F9DB1013 /* CryptoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryptoService.swift; sourceTree = "<group>"; };
+		3089F9DB1014 /* CryptoServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryptoServiceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -137,6 +141,7 @@
 		3089F9DB5032 /* Crypto */ = {
 			isa = PBXGroup;
 			children = (
+				3089F9DB1013 /* CryptoService.swift */,
 			);
 			path = Crypto;
 			sourceTree = "<group>";
@@ -219,9 +224,18 @@
 		3089F9DB5009 /* RialTests */ = {
 			isa = PBXGroup;
 			children = (
+				3089F9DB5050 /* Crypto */,
 				3089F9DB1005 /* RialTests.swift */,
 			);
 			path = RialTests;
+			sourceTree = "<group>";
+		};
+		3089F9DB5050 /* Crypto */ = {
+			isa = PBXGroup;
+			children = (
+				3089F9DB1014 /* CryptoServiceTests.swift */,
+			);
+			path = Crypto;
 			sourceTree = "<group>";
 		};
 		3089F9DB5010 /* RialUITests */ = {
@@ -375,6 +389,7 @@
 				3089F9DB0001 /* RialApp.swift in Sources */,
 				3089F9DB0002 /* AppDelegate.swift in Sources */,
 				3089F9DB0003 /* ContentView.swift in Sources */,
+				3089F9DB0008 /* CryptoService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -383,6 +398,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				3089F9DB0005 /* RialTests.swift in Sources */,
+				3089F9DB0009 /* CryptoServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -1,0 +1,659 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-key>6-3-cryptokit-integration</story-key>
+    <epic-id>6</epic-id>
+    <epic-name>Native Swift Implementation</epic-name>
+    <generated-at>2025-11-25T06:40:00Z</generated-at>
+    <generator>story-context-builder</generator>
+  </metadata>
+
+  <story-reference>
+    <file>docs/sprint-artifacts/stories/6-3-cryptokit-integration.md</file>
+    <summary>
+      Implement native cryptographic operations using Apple's CryptoKit framework.
+      Provides SHA-256 hashing, AES-GCM encryption/decryption, symmetric key generation,
+      and secure random data generation. Replaces React Native expo-crypto with hardware-accelerated
+      native implementations that eliminate JavaScript bridge crossings.
+    </summary>
+  </story-reference>
+
+  <acceptance-criteria>
+    <criterion id="AC1">
+      <title>SHA-256 Hashing Operations</title>
+      <requirements>
+        <requirement>sha256(_ data: Data) -&gt; String returns hex-encoded digest</requirement>
+        <requirement>sha256Data(_ data: Data) -&gt; Data returns raw hash bytes</requirement>
+        <requirement>Hardware acceleration on A-series chips</requirement>
+        <requirement>SHA-256 of 10MB file completes in &lt; 100ms</requirement>
+        <requirement>Results match standard SHA-256 test vectors</requirement>
+        <requirement>sha256Stream(url: URL) -&gt; String for large files</requirement>
+      </requirements>
+    </criterion>
+    <criterion id="AC2">
+      <title>AES-GCM Encryption and Decryption</title>
+      <requirements>
+        <requirement>encrypt(_ data: Data, using key: SymmetricKey) throws -&gt; Data</requirement>
+        <requirement>decrypt(_ data: Data, using key: SymmetricKey) throws -&gt; Data</requirement>
+        <requirement>Encryption/decryption round-trip preserves data exactly</requirement>
+        <requirement>Uses AES-GCM with 256-bit keys</requirement>
+        <requirement>Ciphertext includes authentication tag</requirement>
+        <requirement>Nonce automatically generated and prepended to ciphertext</requirement>
+        <requirement>Decryption with wrong key throws CryptoError.decryptionFailed</requirement>
+        <requirement>Tampered ciphertext throws CryptoError.authenticationFailed</requirement>
+      </requirements>
+    </criterion>
+    <criterion id="AC3">
+      <title>Symmetric Key Generation</title>
+      <requirements>
+        <requirement>generateKey() -&gt; SymmetricKey creates 256-bit AES key</requirement>
+        <requirement>Key is cryptographically random</requirement>
+        <requirement>Key can be serialized for Keychain storage</requirement>
+        <requirement>Key can be reconstructed from serialized data</requirement>
+        <requirement>Keys persist across app restarts when stored in Keychain</requirement>
+      </requirements>
+    </criterion>
+    <criterion id="AC4">
+      <title>Secure Random Data Generation</title>
+      <requirements>
+        <requirement>randomData(count: Int) -&gt; Data generates random bytes</requirement>
+        <requirement>Uses system-provided secure random generator</requirement>
+        <requirement>Suitable for nonces, IDs, and salts</requirement>
+        <requirement>No predictable patterns in output</requirement>
+      </requirements>
+    </criterion>
+    <criterion id="AC5">
+      <title>Performance Benchmarks</title>
+      <requirements>
+        <requirement>SHA-256 hash of 10MB: &lt; 100ms</requirement>
+        <requirement>AES-GCM encrypt 5MB: &lt; 50ms</requirement>
+        <requirement>AES-GCM decrypt 5MB: &lt; 50ms</requirement>
+        <requirement>Key generation: &lt; 1ms</requirement>
+        <requirement>All operations use hardware acceleration where available</requirement>
+      </requirements>
+    </criterion>
+    <criterion id="AC6">
+      <title>Unit Test Coverage</title>
+      <requirements>
+        <requirement>All public methods have test coverage</requirement>
+        <requirement>Test vectors validate correctness</requirement>
+        <requirement>Edge cases tested (empty data, large data, invalid keys)</requirement>
+        <requirement>Error handling paths tested</requirement>
+        <requirement>Code coverage &gt;= 95%</requirement>
+      </requirements>
+    </criterion>
+  </acceptance-criteria>
+
+  <technical-requirements>
+    <requirement priority="critical">
+      <title>File Location</title>
+      <description>Create ios/Rial/Core/Crypto/CryptoService.swift</description>
+      <rationale>Follows native Swift project structure from Story 6.1</rationale>
+    </requirement>
+    <requirement priority="critical">
+      <title>CryptoKit Framework</title>
+      <description>Import and use native CryptoKit for all cryptographic operations</description>
+      <rationale>Hardware-accelerated, Secure Enclave integration, Apple-vetted</rationale>
+    </requirement>
+    <requirement priority="critical">
+      <title>AES-GCM Algorithm</title>
+      <description>Use AES.GCM.seal() and AES.GCM.open() for authenticated encryption</description>
+      <rationale>Real AEAD encryption vs SHA-256 stream cipher workaround in React Native</rationale>
+    </requirement>
+    <requirement priority="high">
+      <title>Error Handling</title>
+      <description>Define CryptoError enum with descriptive error cases</description>
+      <rationale>Type-safe error handling, clear diagnostics for debugging</rationale>
+    </requirement>
+    <requirement priority="high">
+      <title>Logging</title>
+      <description>Use os.log Logger for performance and error logging</description>
+      <rationale>Integration with native logging infrastructure</rationale>
+    </requirement>
+    <requirement priority="medium">
+      <title>Performance Optimization</title>
+      <description>Use streaming hash for large files, measure with XCTest</description>
+      <rationale>Avoid memory pressure on large captures</rationale>
+    </requirement>
+  </technical-requirements>
+
+  <architecture-context>
+    <section name="Security Architecture">
+      <reference>docs/architecture.md#Security-Architecture</reference>
+      <key-points>
+        <point>
+          Native Swift eliminates JS bridge crossings for sensitive data.
+          Photo bytes → hash → assertion → encrypted upload happens entirely within Swift memory.
+        </point>
+        <point>
+          CryptoKit provides real AES-GCM authenticated encryption instead of SHA-256 stream cipher workaround.
+        </point>
+        <point>
+          Hardware acceleration on Apple Silicon via Secure Enclave and crypto extensions.
+        </point>
+      </key-points>
+    </section>
+    <section name="Local Storage Encryption">
+      <reference>docs/architecture.md#Local-Storage-Encryption</reference>
+      <key-points>
+        <point>
+          Offline captures use CryptoKit AES-GCM with 256-bit keys.
+          Keys stored in Keychain with kSecAttrAccessibleWhenUnlockedThisDeviceOnly.
+        </point>
+        <point>
+          Replaces React Native SHA-256 stream cipher workaround with real AEAD encryption.
+        </point>
+      </key-points>
+    </section>
+    <section name="Native Security Benefits">
+      <reference>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-6.md#Security-Improvements-Over-React-Native</reference>
+      <comparison>
+        <react-native>
+          JS wrapper around native SHA-256, SHA-256 stream cipher workaround, bridge overhead (~5-10ms)
+        </react-native>
+        <native-swift>
+          Direct CryptoKit SHA-256, Real AES-GCM authenticated encryption, Hardware accelerated (~1-2ms)
+        </native-swift>
+      </comparison>
+    </section>
+  </architecture-context>
+
+  <documentation-artifacts>
+    <artifact>
+      <type>Story File</type>
+      <path>docs/sprint-artifacts/stories/6-3-cryptokit-integration.md</path>
+      <relevance>Primary story definition with complete acceptance criteria and implementation details</relevance>
+      <key-sections>
+        <section>Technical Implementation Details - CryptoService.swift Structure (lines 224-392)</section>
+        <section>Unit Test Example - CryptoServiceTests.swift (lines 397-567)</section>
+        <section>SHA-256 Test Vectors (lines 133-143)</section>
+        <section>Error Handling - CryptoError enum (lines 178-191)</section>
+      </key-sections>
+    </artifact>
+    <artifact>
+      <type>Epic Tech Spec</type>
+      <path>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-6.md</path>
+      <relevance>Technical specification for entire Epic 6 including Story 6.3 details</relevance>
+      <key-sections>
+        <section>Story 6.3: CryptoKit Integration (lines 663-722)</section>
+        <section>Security Improvements Over React Native (lines 48-58)</section>
+        <section>Swift Version Requirement - Swift 5.9+ (lines 272-279)</section>
+        <section>Why No Third-Party Dependencies (lines 262-269)</section>
+      </key-sections>
+    </artifact>
+    <artifact>
+      <type>Architecture Document</type>
+      <path>docs/architecture.md</path>
+      <relevance>System-wide architecture decisions and patterns</relevance>
+      <key-sections>
+        <section>Native iOS Dependencies - CryptoKit framework (lines 262-277)</section>
+        <section>Local Storage Encryption (lines 648-685)</section>
+        <section>ADR-009: Native Swift Architecture (lines 871-920)</section>
+      </key-sections>
+    </artifact>
+  </documentation-artifacts>
+
+  <existing-code-references>
+    <reference>
+      <type>React Native Reference Implementation</type>
+      <path>apps/mobile/services/captureEncryption.ts</path>
+      <relevance>Existing React Native encryption implementation to replace</relevance>
+      <description>
+        Current React Native implementation uses SHA-256 stream cipher workaround for encryption
+        due to lack of native AES-GCM support. This provides reference for:
+        - Key generation and storage patterns (lines 62-77)
+        - Encryption/decryption function signatures (lines 194-290)
+        - IV generation (lines 117-120)
+        - Error handling patterns
+        Native Swift CryptoService will provide superior implementation with real AES-GCM.
+      </description>
+      <key-patterns>
+        <pattern>Key storage in SecureStore with WHEN_UNLOCKED_THIS_DEVICE_ONLY (line 72)</pattern>
+        <pattern>Base64 encoding for key serialization (line 68)</pattern>
+        <pattern>IV generation with 12 bytes (line 40)</pattern>
+        <pattern>Authentication tag verification (lines 274-279)</pattern>
+      </key-patterns>
+    </reference>
+    <reference>
+      <type>Backend Hash Verification</type>
+      <path>backend/src/routes/captures.rs</path>
+      <relevance>Backend expects SHA-256 hash of photo bytes</relevance>
+      <description>
+        Backend verifies photo hash by computing SHA-256 of raw bytes (line 283).
+        Native CryptoService must produce compatible hex-encoded SHA-256 digest.
+      </description>
+      <code-snippet>
+        let computed_hash = Sha256::digest(&amp;parsed.photo_bytes);
+        // Backend expects hex-encoded SHA-256 matching client-computed hash
+      </code-snippet>
+    </reference>
+    <reference>
+      <type>iOS Project Structure</type>
+      <path>ios/Rial/Core/</path>
+      <relevance>Target directory structure for CryptoService implementation</relevance>
+      <description>
+        Core/ directory already exists with subdirectories:
+        - Attestation/ (for DCAppAttest integration)
+        - Capture/ (for ARKit capture)
+        - Crypto/ (EMPTY - target for this story)
+        - Networking/ (for URLSession)
+        - Storage/ (for CoreData)
+
+        CryptoService.swift should be created at ios/Rial/Core/Crypto/CryptoService.swift
+      </description>
+    </reference>
+  </existing-code-references>
+
+  <code-templates>
+    <template name="CryptoService Implementation">
+      <description>Complete CryptoService.swift implementation with all required methods</description>
+      <reference>docs/sprint-artifacts/stories/6-3-cryptokit-integration.md lines 224-392</reference>
+      <key-components>
+        <component>SHA-256 hashing: sha256(), sha256Data(), sha256Stream()</component>
+        <component>AES-GCM encryption: encrypt(), decrypt()</component>
+        <component>Key management: generateKey(), keyToData(), keyFromData()</component>
+        <component>Random generation: randomData()</component>
+        <component>Error handling: CryptoError enum with LocalizedError</component>
+        <component>Logging: Logger(subsystem: "app.rial", category: "crypto")</component>
+      </key-components>
+    </template>
+    <template name="Unit Test Suite">
+      <description>Comprehensive XCTest test suite for CryptoService</description>
+      <reference>docs/sprint-artifacts/stories/6-3-cryptokit-integration.md lines 397-567</reference>
+      <test-categories>
+        <category>SHA-256 test vectors (empty string, "abc", "quick brown fox")</category>
+        <category>AES-GCM round-trip encryption/decryption</category>
+        <category>Wrong key detection</category>
+        <category>Tampered data detection (authentication failure)</category>
+        <category>Key serialization round-trip</category>
+        <category>Random data generation (length, uniqueness)</category>
+        <category>Performance benchmarks (measure blocks)</category>
+      </test-categories>
+    </template>
+    <template name="CryptoError Enum">
+      <description>Type-safe error handling for cryptographic operations</description>
+      <source>
+enum CryptoError: Error, LocalizedError {
+    case encryptionFailed
+    case decryptionFailed
+    case authenticationFailed
+    case invalidKey
+    case fileNotFound
+    case fileReadError
+
+    var errorDescription: String? {
+        switch self {
+        case .encryptionFailed: return "Failed to encrypt data"
+        case .decryptionFailed: return "Failed to decrypt data"
+        case .authenticationFailed: return "Authentication failed - data may be corrupted or tampered"
+        case .invalidKey: return "Invalid encryption key"
+        case .fileNotFound: return "File not found"
+        case .fileReadError: return "Failed to read file"
+        }
+    }
+}
+      </source>
+    </template>
+  </code-templates>
+
+  <cryptokit-api-references>
+    <api name="SHA256">
+      <framework>CryptoKit</framework>
+      <documentation>https://developer.apple.com/documentation/cryptokit/sha256</documentation>
+      <usage>
+        let hash = SHA256.hash(data: data)
+        let hexString = hash.map { String(format: "%02x", $0) }.joined()
+      </usage>
+      <notes>Hardware-accelerated on Apple Silicon. Use SHA256.HashFunction for streaming.</notes>
+    </api>
+    <api name="AES.GCM">
+      <framework>CryptoKit</framework>
+      <documentation>https://developer.apple.com/documentation/cryptokit/aes/gcm</documentation>
+      <usage>
+        // Encrypt
+        let sealedBox = try AES.GCM.seal(data, using: key)
+        let combined = sealedBox.combined! // nonce + ciphertext + tag
+
+        // Decrypt
+        let box = try AES.GCM.SealedBox(combined: combined)
+        let plaintext = try AES.GCM.open(box, using: key)
+      </usage>
+      <notes>Authenticated Encryption with Associated Data (AEAD). Detects tampering automatically.</notes>
+    </api>
+    <api name="SymmetricKey">
+      <framework>CryptoKit</framework>
+      <documentation>https://developer.apple.com/documentation/cryptokit/symmetrickey</documentation>
+      <usage>
+        // Generate
+        let key = SymmetricKey(size: .bits256)
+
+        // Serialize
+        let keyData = key.withUnsafeBytes { Data($0) }
+
+        // Reconstruct
+        let restoredKey = SymmetricKey(data: keyData)
+      </usage>
+      <notes>Keys can be backed by Secure Enclave when created from SecureEnclave.P256.KeyAgreement</notes>
+    </api>
+    <api name="SecRandomCopyBytes">
+      <framework>Security</framework>
+      <documentation>https://developer.apple.com/documentation/security/1399291-secrandomcopybytes</documentation>
+      <usage>
+        var bytes = [UInt8](repeating: 0, count: count)
+        _ = SecRandomCopyBytes(kSecRandomDefault, count, &amp;bytes)
+        return Data(bytes)
+      </usage>
+      <notes>System-provided cryptographically secure random number generator</notes>
+    </api>
+  </cryptokit-api-references>
+
+  <sha256-test-vectors>
+    <vector>
+      <input>""</input>
+      <description>Empty string</description>
+      <expected-hash>e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</expected-hash>
+    </vector>
+    <vector>
+      <input>abc</input>
+      <description>Short ASCII string</description>
+      <expected-hash>ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad</expected-hash>
+    </vector>
+    <vector>
+      <input>The quick brown fox jumps over the lazy dog</input>
+      <description>Standard test phrase</description>
+      <expected-hash>d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592</expected-hash>
+    </vector>
+  </sha256-test-vectors>
+
+  <dependencies>
+    <prerequisite>
+      <story-key>6-1-initialize-native-ios-project</story-key>
+      <description>Provides project structure and Core/ directory</description>
+      <status>COMPLETED</status>
+    </prerequisite>
+    <blocks>
+      <story-key>6-8-per-capture-assertion-signing</story-key>
+      <description>Uses SHA-256 for hashing captures before assertion</description>
+    </blocks>
+    <blocks>
+      <story-key>6-10-ios-data-protection-encryption</story-key>
+      <description>Uses AES-GCM for offline capture encryption</description>
+    </blocks>
+    <blocks>
+      <story-key>6-6-frame-processing-pipeline</story-key>
+      <description>Uses SHA-256 for photo hashing in metadata</description>
+    </blocks>
+    <external-dependencies>
+      <dependency>
+        <name>CryptoKit.framework</name>
+        <type>Built-in iOS Framework</type>
+        <minimum-version>iOS 13.0+</minimum-version>
+        <description>Apple's native cryptography framework</description>
+      </dependency>
+      <dependency>
+        <name>Security.framework</name>
+        <type>Built-in iOS Framework</type>
+        <minimum-version>iOS 15.0+</minimum-version>
+        <description>For SecRandomCopyBytes secure random generation</description>
+      </dependency>
+    </external-dependencies>
+  </dependencies>
+
+  <testing-context>
+    <test-environment>
+      <simulator-compatible>true</simulator-compatible>
+      <description>All CryptoKit operations can be tested in simulator</description>
+    </test-environment>
+    <test-file-location>ios/RialTests/Crypto/CryptoServiceTests.swift</test-file-location>
+    <test-categories>
+      <category name="SHA-256 Tests">
+        <tests>
+          <test>testSHA256_EmptyString - Verify empty string hash</test>
+          <test>testSHA256_ABC - Verify "abc" hash</test>
+          <test>testSHA256_QuickBrownFox - Verify standard test phrase</test>
+          <test>testSHA256Data_ReturnsRawBytes - Verify 32-byte output</test>
+          <test>testSHA256Stream_LargeFile - Verify streaming hash for large files</test>
+        </tests>
+      </category>
+      <category name="AES-GCM Tests">
+        <tests>
+          <test>testEncryptDecrypt_RoundTrip - Verify plaintext preservation</test>
+          <test>testDecrypt_WrongKey_Fails - Verify key mismatch detection</test>
+          <test>testDecrypt_TamperedData_Fails - Verify authentication failure</test>
+          <test>testEncryption_LargeData - Verify 5MB encryption performance</test>
+        </tests>
+      </category>
+      <category name="Key Management Tests">
+        <tests>
+          <test>testGenerateKey_ReturnsValidKey - Verify 32-byte key</test>
+          <test>testKeySerializationRoundTrip - Verify key persistence</test>
+          <test>testKeyFromData_InvalidSize_Throws - Verify error handling</test>
+        </tests>
+      </category>
+      <category name="Random Generation Tests">
+        <tests>
+          <test>testRandomData_GeneratesCorrectLength - Verify byte count</test>
+          <test>testRandomData_IsNotPredictable - Verify uniqueness</test>
+        </tests>
+      </category>
+      <category name="Performance Tests">
+        <tests>
+          <test>testSHA256_10MB_Performance - Measure hash speed (target &lt; 100ms)</test>
+          <test>testEncryption_5MB_Performance - Measure encryption (target &lt; 50ms)</test>
+          <test>testDecryption_5MB_Performance - Measure decryption (target &lt; 50ms)</test>
+        </tests>
+      </category>
+    </test-categories>
+    <test-standards>
+      <standard>Use XCTest framework for all unit tests</standard>
+      <standard>Use XCTAssertEqual for hash verification</standard>
+      <standard>Use XCTAssertThrowsError for error handling tests</standard>
+      <standard>Use measure blocks for performance benchmarking</standard>
+      <standard>Target 95%+ code coverage</standard>
+    </test-standards>
+  </testing-context>
+
+  <implementation-guidance>
+    <guideline priority="critical">
+      <title>Start with CryptoService.swift structure</title>
+      <description>
+        Create ios/Rial/Core/Crypto/CryptoService.swift with struct CryptoService
+        and enum CryptoError. Import CryptoKit, Foundation, and os.log.
+      </description>
+    </guideline>
+    <guideline priority="critical">
+      <title>Implement SHA-256 first</title>
+      <description>
+        Start with sha256() and sha256Data() methods. Verify with test vectors
+        before proceeding to streaming hash or encryption.
+      </description>
+    </guideline>
+    <guideline priority="critical">
+      <title>Use AES.GCM.seal() for encryption</title>
+      <description>
+        Do NOT attempt to manually construct GCM mode. Use CryptoKit's built-in
+        AES.GCM.seal() which handles nonce generation, encryption, and auth tag.
+        Extract combined representation (nonce + ciphertext + tag).
+      </description>
+    </guideline>
+    <guideline priority="high">
+      <title>Error handling with CryptoKitError</title>
+      <description>
+        Catch CryptoKitError.authenticationFailure specifically for tampered data.
+        Map to CryptoError.authenticationFailed for consistent error handling.
+      </description>
+    </guideline>
+    <guideline priority="high">
+      <title>Logging strategy</title>
+      <description>
+        Use Logger.debug for operations, Logger.error for failures.
+        Log data sizes but NEVER log key material or plaintext.
+        Use privacy: .public for non-sensitive metrics.
+      </description>
+    </guideline>
+    <guideline priority="medium">
+      <title>Performance optimization</title>
+      <description>
+        Implement sha256Stream() for files &gt; 10MB to avoid memory pressure.
+        Use 1MB chunk size for streaming. Measure with XCTest measure blocks.
+      </description>
+    </guideline>
+    <guideline priority="medium">
+      <title>DocC documentation</title>
+      <description>
+        Add DocC comments to all public methods. Use /// for doc comments.
+        Include parameter descriptions, return values, and throws documentation.
+      </description>
+    </guideline>
+  </implementation-guidance>
+
+  <integration-points>
+    <integration>
+      <story>6.4 - Keychain Services Integration</story>
+      <description>CryptoService.keyToData() output will be stored in Keychain</description>
+      <interface>Data serialization of SymmetricKey (32 bytes for AES-256)</interface>
+    </integration>
+    <integration>
+      <story>6.6 - Frame Processing Pipeline</story>
+      <description>CryptoService.sha256() will hash JPEG data for metadata</description>
+      <interface>Hex-encoded SHA-256 digest string compatible with backend verification</interface>
+    </integration>
+    <integration>
+      <story>6.8 - Per-Capture Assertion Signing</story>
+      <description>CryptoService.sha256Data() will hash capture data for assertion</description>
+      <interface>Raw 32-byte SHA-256 digest as Data for DCAppAttest clientDataHash</interface>
+    </integration>
+    <integration>
+      <story>6.10 - iOS Data Protection Encryption</story>
+      <description>CryptoService.encrypt() and decrypt() for offline captures</description>
+      <interface>AES-GCM with SymmetricKey, returns combined nonce+ciphertext+tag</interface>
+    </integration>
+    <integration>
+      <component>Backend Capture Upload</component>
+      <description>Backend expects SHA-256 hash of photo bytes in metadata</description>
+      <reference>backend/src/routes/captures.rs line 283</reference>
+      <interface>Hex-encoded SHA-256 string matching Rust sha2::Sha256::digest output</interface>
+    </integration>
+  </integration-points>
+
+  <fr-coverage>
+    <fr id="FR11">
+      <description>Compute SHA-256 hash</description>
+      <implementation>CryptoService.sha256() and sha256Data() methods</implementation>
+    </fr>
+    <fr id="FR17">
+      <description>Encrypted offline storage</description>
+      <implementation>CryptoService.encrypt() and decrypt() with AES-GCM</implementation>
+    </fr>
+  </fr-coverage>
+
+  <security-considerations>
+    <consideration priority="critical">
+      <title>AES-GCM provides authenticated encryption</title>
+      <description>
+        Unlike React Native SHA-256 stream cipher, AES-GCM detects tampering automatically.
+        Do not skip authentication tag verification. CryptoKit handles this in AES.GCM.open().
+      </description>
+    </consideration>
+    <consideration priority="critical">
+      <title>Use 256-bit keys</title>
+      <description>
+        Always use SymmetricKey(size: .bits256) for strongest AES key size.
+        This is required for compliance and security posture.
+      </description>
+    </consideration>
+    <consideration priority="critical">
+      <title>Never reuse nonces</title>
+      <description>
+        AES-GCM security depends on unique nonces. CryptoKit generates random nonces
+        automatically via AES.GCM.seal(). Do not attempt manual nonce management.
+      </description>
+    </consideration>
+    <consideration priority="high">
+      <title>Hardware acceleration</title>
+      <description>
+        CryptoKit uses Apple Silicon crypto extensions on A11 and later chips.
+        SHA-256 and AES-GCM benefit from dedicated hardware instructions.
+      </description>
+    </consideration>
+    <consideration priority="high">
+      <title>Key storage</title>
+      <description>
+        Always store keys in Keychain, never in UserDefaults or files.
+        Use kSecAttrAccessibleWhenUnlockedThisDeviceOnly for maximum protection.
+      </description>
+    </consideration>
+  </security-considerations>
+
+  <performance-targets>
+    <target operation="SHA-256 hash 10MB">
+      <max-time>100ms</max-time>
+      <measurement>XCTest measure block</measurement>
+      <device>iPhone 12 Pro minimum</device>
+    </target>
+    <target operation="AES-GCM encrypt 5MB">
+      <max-time>50ms</max-time>
+      <measurement>XCTest measure block</measurement>
+      <device>iPhone 12 Pro minimum</device>
+    </target>
+    <target operation="AES-GCM decrypt 5MB">
+      <max-time>50ms</max-time>
+      <measurement>XCTest measure block</measurement>
+      <device>iPhone 12 Pro minimum</device>
+    </target>
+    <target operation="Key generation">
+      <max-time>1ms</max-time>
+      <measurement>XCTest measure block</measurement>
+      <device>Any</device>
+    </target>
+  </performance-targets>
+
+  <warnings-and-gaps>
+    <warning>
+      <type>Missing Documentation</type>
+      <description>
+        No existing Swift code in ios/Rial/Core/Crypto/ directory.
+        This is expected as Story 6.3 creates the cryptography foundation.
+      </description>
+      <impact>None - expected for first implementation story</impact>
+    </warning>
+    <note>
+      <type>React Native Reference</type>
+      <description>
+        React Native implementation in apps/mobile/services/captureEncryption.ts
+        provides reference for encryption patterns but uses SHA-256 stream cipher workaround.
+        Native implementation will use proper AES-GCM for superior security.
+      </description>
+    </note>
+    <note>
+      <type>Backend Compatibility</type>
+      <description>
+        Backend expects hex-encoded SHA-256 hash of raw photo bytes.
+        CryptoService.sha256() must produce identical output to Rust sha2::Sha256::digest.
+      </description>
+    </note>
+  </warnings-and-gaps>
+
+  <validation-checklist>
+    <item>All acceptance criteria implemented and tested</item>
+    <item>SHA-256 test vectors pass (empty, "abc", "quick brown fox")</item>
+    <item>AES-GCM round-trip encryption/decryption successful</item>
+    <item>Wrong key detection throws CryptoError.decryptionFailed</item>
+    <item>Tampered data detection throws CryptoError.authenticationFailed</item>
+    <item>Key serialization/deserialization round-trip successful</item>
+    <item>Random data generation produces unique output</item>
+    <item>Performance benchmarks meet targets on iPhone 12 Pro</item>
+    <item>Unit tests achieve 95%+ code coverage</item>
+    <item>DocC documentation complete for all public methods</item>
+    <item>Logging uses os.log Logger with appropriate levels</item>
+    <item>Error handling tested for all failure modes</item>
+    <item>File created at correct path: ios/Rial/Core/Crypto/CryptoService.swift</item>
+    <item>Test file created at: ios/RialTests/Crypto/CryptoServiceTests.swift</item>
+  </validation-checklist>
+
+  <next-steps>
+    <step>Story 6.4: Keychain Services Integration - Store encryption keys</step>
+    <step>Story 6.8: Per-Capture Assertion Signing - Use SHA-256 for assertions</step>
+    <step>Story 6.10: iOS Data Protection Encryption - Use AES-GCM for offline captures</step>
+  </next-steps>
+</story-context>

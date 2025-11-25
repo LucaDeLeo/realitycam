@@ -94,9 +94,9 @@ development_status:
   # Can be developed in parallel - provides native alternative to Epics 2-4 mobile
   # Tech spec created: 2025-11-25
   epic-6: contexted
-  6-1-initialize-native-ios-project: in-progress
-  6-2-dcappattest-direct-integration: backlog
-  6-3-cryptokit-integration: backlog
+  6-1-initialize-native-ios-project: done
+  6-2-dcappattest-direct-integration: drafted
+  6-3-cryptokit-integration: done
   6-4-keychain-services-integration: backlog
   6-5-arkit-unified-capture-session: backlog
   6-6-frame-processing-pipeline: backlog
