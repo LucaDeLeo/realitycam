@@ -107,9 +107,7 @@ struct HistoryView: View {
             LazyVGrid(columns: columns, spacing: 8) {
                 ForEach(viewModel.captures) { capture in
                     NavigationLink {
-                        // ResultDetailView will be implemented in Story 6.15
-                        Text("Detail for \(capture.id.uuidString.prefix(8))")
-                            .navigationTitle("Capture Details")
+                        ResultDetailView(capture: capture)
                     } label: {
                         CaptureThumbnailView(capture: capture)
                     }

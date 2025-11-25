@@ -108,6 +108,6 @@ development_status:
   6-12-certificate-pinning-retry-logic: done
   6-13-swiftui-capture-screen: done
   6-14-capture-history-view: done
-  6-15-result-detail-view: backlog
+  6-15-result-detail-view: done
   6-16-feature-parity-validation: backlog
   epic-6-retrospective: optional

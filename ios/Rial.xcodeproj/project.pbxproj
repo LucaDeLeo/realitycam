@@ -52,6 +52,10 @@
 		3089F9DB003E /* CaptureThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1054 /* CaptureThumbnailView.swift */; };
 		3089F9DB003F /* EmptyHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1055 /* EmptyHistoryView.swift */; };
 		3089F9DB0033 /* UploadServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1043 /* UploadServiceTests.swift */; };
+		3089F9DB0040 /* ResultDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1056 /* ResultDetailView.swift */; };
+		3089F9DB0041 /* ConfidenceBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1057 /* ConfidenceBadge.swift */; };
+		3089F9DB0042 /* EvidenceSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1058 /* EvidenceSummaryView.swift */; };
+		3089F9DB0043 /* ZoomableImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1059 /* ZoomableImageView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -122,6 +126,10 @@
 		3089F9DB1053 /* HistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryViewModel.swift; sourceTree = "<group>"; };
 		3089F9DB1054 /* CaptureThumbnailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureThumbnailView.swift; sourceTree = "<group>"; };
 		3089F9DB1055 /* EmptyHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyHistoryView.swift; sourceTree = "<group>"; };
+		3089F9DB1056 /* ResultDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultDetailView.swift; sourceTree = "<group>"; };
+		3089F9DB1057 /* ConfidenceBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfidenceBadge.swift; sourceTree = "<group>"; };
+		3089F9DB1058 /* EvidenceSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvidenceSummaryView.swift; sourceTree = "<group>"; };
+		3089F9DB1059 /* ZoomableImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomableImageView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -291,6 +299,10 @@
 		3089F9DB5043 /* Result */ = {
 			isa = PBXGroup;
 			children = (
+				3089F9DB1057 /* ConfidenceBadge.swift */,
+				3089F9DB1058 /* EvidenceSummaryView.swift */,
+				3089F9DB1056 /* ResultDetailView.swift */,
+				3089F9DB1059 /* ZoomableImageView.swift */,
 			);
 			path = Result;
 			sourceTree = "<group>";
@@ -556,6 +568,10 @@
 				3089F9DB003D /* HistoryViewModel.swift in Sources */,
 				3089F9DB003E /* CaptureThumbnailView.swift in Sources */,
 				3089F9DB003F /* EmptyHistoryView.swift in Sources */,
+				3089F9DB0040 /* ResultDetailView.swift in Sources */,
+				3089F9DB0041 /* ConfidenceBadge.swift in Sources */,
+				3089F9DB0042 /* EvidenceSummaryView.swift in Sources */,
+				3089F9DB0043 /* ZoomableImageView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
