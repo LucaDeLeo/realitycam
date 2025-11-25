@@ -95,7 +95,7 @@ development_status:
   # Tech spec created: 2025-11-25
   epic-6: contexted
   6-1-initialize-native-ios-project: done
-  6-2-dcappattest-direct-integration: drafted
+  6-2-dcappattest-direct-integration: done
   6-3-cryptokit-integration: done
   6-4-keychain-services-integration: done
   6-5-arkit-unified-capture-session: backlog

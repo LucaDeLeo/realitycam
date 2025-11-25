@@ -1,0 +1,1046 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-key>6-2-dcappattest-direct-integration</story-key>
+    <story-title>DCAppAttest Direct Integration</story-title>
+    <epic-id>6</epic-id>
+    <epic-title>Native Swift Implementation</epic-title>
+    <story-file>docs/sprint-artifacts/stories/6-2-dcappattest-direct-integration.md</story-file>
+    <generated-at>2025-11-25T06:20:00Z</generated-at>
+    <context-version>1.0</context-version>
+  </metadata>
+
+  <story-summary>
+    <overview>
+      Implement direct integration with Apple's DCAppAttest framework for hardware-backed device attestation,
+      eliminating the @expo/app-integrity wrapper and providing native Swift access to Secure Enclave operations.
+      This provides cryptographic proof of device authenticity and per-capture assertions.
+    </overview>
+
+    <user-story>
+      As a security-conscious user, I want my device to prove it's genuine using Apple's hardware attestation,
+      so that my captures have cryptographic proof of authentic origin.
+    </user-story>
+
+    <dependencies>
+      <dependency type="prerequisite" story-key="6-1-initialize-native-ios-project">
+        Provides Xcode project structure and configuration
+      </dependency>
+      <dependency type="prerequisite" story-key="6-4-keychain-services-integration">
+        Provides KeychainService for persisting attestation key IDs
+      </dependency>
+    </dependencies>
+
+    <blocks>
+      <story story-key="6-8-per-capture-assertion-signing">
+        Requires DeviceAttestation service for per-capture assertions
+      </story>
+      <story story-key="6-11-urlsession-background-uploads">
+        Needs assertions for authenticated uploads
+      </story>
+    </blocks>
+  </story-summary>
+
+  <acceptance-criteria>
+    <criterion id="AC1">
+      <title>Device Key Generation in Secure Enclave</title>
+      <given>The app is running on an iPhone with Secure Enclave</given>
+      <when>The device needs to generate an attestation key</when>
+      <then>
+        - DCAppAttestService.shared.generateKey() creates key in hardware
+        - Key ID returned as Base64-encoded string
+        - Key is non-extractable (lives only in Secure Enclave)
+        - Key ID persisted in Keychain for future use
+        - Key generation completes in less than 100ms
+      </then>
+      <and>
+        If Secure Enclave not available:
+        - isSupported returns false
+        - Clear error thrown: AttestationError.unsupported
+        - App continues with degraded functionality (captures marked unverified)
+      </and>
+      <performance-target>Key generation less than 100ms</performance-target>
+    </criterion>
+
+    <criterion id="AC2">
+      <title>Device Attestation Object Generation</title>
+      <given>An attestation key exists in Secure Enclave</given>
+      <when>App requests device attestation (one-time during registration)</when>
+      <then>
+        - App requests challenge from backend (GET /api/v1/devices/challenge)
+        - Backend returns 32-byte random challenge with 5-minute expiry
+        - DCAppAttestService.shared.attestKey(keyId, clientDataHash: challenge) produces attestation object
+        - Attestation object contains certificate chain, device integrity assertion, challenge binding, app identity
+        - Attestation object base64-encoded for backend transmission
+        - Backend can verify against Apple's attestation service
+      </then>
+      <performance-target>Attestation generation less than 500ms</performance-target>
+    </criterion>
+
+    <criterion id="AC3">
+      <title>Per-Capture Assertion Generation</title>
+      <given>Device has completed attestation and has registered key</given>
+      <when>Photo capture is ready for upload</when>
+      <then>
+        - SHA-256 hash computed from JPEG + depth data
+        - DCAppAttestService.shared.generateAssertion(keyId, clientDataHash: hash) creates assertion
+        - Assertion cryptographically bound to capture data
+        - Assertion generation completes in less than 50ms
+        - Assertion data attached to upload payload
+        - Backend can verify assertion against device's public key
+      </then>
+      <and>
+        Assertion includes:
+        - Counter value (increments with each assertion, prevents replay)
+        - Signature over clientDataHash
+        - Binding to original attestation
+      </and>
+      <performance-target>Assertion generation less than 50ms (critical path)</performance-target>
+    </criterion>
+
+    <criterion id="AC4">
+      <title>Error Handling and Graceful Degradation</title>
+      <given>Various error scenarios may occur</given>
+      <when>Attestation operations fail</when>
+      <then>
+        Appropriate errors handled:
+        - Device jailbroken (DCError.featureUnsupported): Mark device unverified, continue capturing
+        - Network timeout (DCError.serverUnavailable): Queue for retry with exponential backoff
+        - Invalid key ID (DCError.invalidKey): Re-generate key and retry
+        - Counter exhausted (DCError.invalidInput): Re-attest device (generate new key)
+      </then>
+      <and>
+        - All errors logged with context for debugging
+        - User sees appropriate messages (not technical error codes)
+        - App never crashes due to attestation failures
+      </and>
+    </criterion>
+
+    <criterion id="AC5">
+      <title>Keychain Integration for Key Persistence</title>
+      <given>Attestation keys must persist across app restarts</given>
+      <when>Key is generated or loaded</when>
+      <then>
+        - Key ID stored in Keychain with key "rial.attestation.keyId"
+        - Keychain uses kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly protection
+        - On subsequent launches, existing key ID retrieved from Keychain
+        - No new key generation if valid key ID exists
+        - Key cannot be backed up to iCloud (stays on device)
+      </then>
+    </criterion>
+
+    <criterion id="AC6">
+      <title>Backend Registration Integration</title>
+      <given>Attestation object is generated</given>
+      <when>Device registers with backend</when>
+      <then>
+        POST request to /api/v1/devices/register includes:
+        - platform: "ios"
+        - model: Device model (e.g., "iPhone 15 Pro")
+        - has_lidar: true
+        - attestation.key_id: base64-encoded key ID
+        - attestation.attestation_object: base64-encoded attestation
+        - attestation.challenge: base64-encoded challenge
+        Backend responds with:
+        - device_id: UUID
+        - attestation_level: "secure_enclave" or "unverified"
+        Device ID persisted in Keychain
+        Registration is one-time per device install
+      </then>
+    </criterion>
+  </acceptance-criteria>
+
+  <technical-implementation>
+    <framework-dependencies>
+      <framework name="DeviceCheck" version="iOS 14.0+">
+        DCAppAttest service for hardware attestation
+      </framework>
+      <framework name="CryptoKit" version="iOS 13.0+">
+        SHA-256 hashing for challenge and clientDataHash computation
+      </framework>
+      <framework name="Security" version="iOS 2.0+">
+        Keychain services for key ID persistence
+      </framework>
+      <framework name="os.log" version="iOS 10.0+">
+        Unified logging framework for attestation events
+      </framework>
+    </framework-dependencies>
+
+    <architecture-decisions>
+      <decision id="AD1">
+        <title>Zero External Dependencies</title>
+        <description>
+          Use only Apple's native frameworks - no third-party packages for security-critical code.
+          This eliminates supply chain risk and provides smallest attack surface.
+        </description>
+        <rationale>
+          - No npm/CocoaPods supply chain vulnerabilities
+          - Direct OS API access (no abstraction layers)
+          - Easier security auditing (single language, known frameworks)
+          - No dependency version conflicts
+        </rationale>
+      </decision>
+
+      <decision id="AD2">
+        <title>Direct DCAppAttest Integration</title>
+        <description>
+          Use DeviceCheck framework directly instead of @expo/app-integrity wrapper.
+          Eliminates JavaScript bridge crossings for sensitive cryptographic operations.
+        </description>
+        <rationale>
+          - No JS bridge crossing for photo bytes
+          - Direct Secure Enclave API access
+          - ~3x faster assertions (30-50ms native vs 100-150ms with bridge)
+          - Detailed DCAppAttest error codes (not generic wrapper errors)
+          - Single native security layer (not JS runtime + native module)
+        </rationale>
+      </decision>
+
+      <decision id="AD3">
+        <title>Keychain for Key ID Persistence</title>
+        <description>
+          Store attestation key ID in Keychain with kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly.
+          Keys themselves never leave Secure Enclave.
+        </description>
+        <rationale>
+          - Hardware-backed storage
+          - Persists across app restarts
+          - Not backed up to iCloud (ThisDeviceOnly)
+          - Accessible after first device unlock (not when locked)
+        </rationale>
+      </decision>
+    </architecture-decisions>
+
+    <implementation-files>
+      <file path="ios/Rial/Core/Attestation/DeviceAttestation.swift" type="service">
+        Primary service class implementing DCAppAttest operations. Provides generateKey(),
+        attestKey(), generateAssertion(), isSupported, and loadStoredKeyId() methods.
+      </file>
+      <file path="ios/RialTests/Attestation/DeviceAttestationTests.swift" type="test">
+        Unit tests with mocked DCAppAttestService. Tests key generation, attestation, assertion,
+        error handling, performance, and Keychain integration.
+      </file>
+    </implementation-files>
+
+    <code-structure>
+      <class name="DeviceAttestation">
+        <description>Service for managing device attestation using DCAppAttest</description>
+        <properties>
+          <property name="service" type="DCAppAttestService">Shared instance of DCAppAttestService</property>
+          <property name="keychain" type="KeychainService">Keychain service for key ID and device state persistence (Story 6-4)</property>
+          <property name="logger" type="Logger">Unified logging for attestation events</property>
+        </properties>
+        <methods>
+          <method name="isSupported" returns="Bool">
+            Check if DCAppAttest is supported on this device (requires Secure Enclave)
+          </method>
+          <method name="generateKey()" returns="String" async="true" throws="true">
+            Generate new attestation key in Secure Enclave. Returns base64-encoded key ID.
+            Persists key ID to Keychain using keychain.save(Data(keyId.utf8), forKey: "rial.attestation.keyId").
+            Target: less than 100ms.
+          </method>
+          <method name="attestKey(_:challenge:)" returns="Data" async="true" throws="true">
+            Generate attestation object for device registration. Accepts keyId and challenge Data.
+            Hashes challenge with CryptoService.sha256Data(challenge), calls DCAppAttestService.attestKey().
+            Target: less than 500ms.
+          </method>
+          <method name="generateAssertion(_:clientData:)" returns="Data" async="true" throws="true">
+            Generate assertion for specific capture. Accepts keyId and capture data (JPEG + depth).
+            Hashes client data with CryptoService.sha256Data(clientData), calls DCAppAttestService.generateAssertion().
+            Target: less than 50ms (critical path).
+          </method>
+          <method name="loadStoredKeyId()" returns="String?">
+            Load existing key ID from Keychain using keychain.load(forKey: "rial.attestation.keyId").
+            Converts Data to String with UTF-8 encoding. Returns nil if not found.
+          </method>
+          <method name="saveDeviceState(_:)" throws="true">
+            Save device registration state to Keychain after successful backend registration.
+            Uses keychain.saveDeviceState(state) with DeviceState model from KeychainService.
+          </method>
+          <method name="loadDeviceState()" returns="DeviceState?" throws="true">
+            Load device registration state from Keychain.
+            Uses keychain.loadDeviceState(), returns nil if not registered yet.
+          </method>
+        </methods>
+        <dependencies>
+          <dependency type="service">KeychainService (Story 6-4 COMPLETED)</dependency>
+          <dependency type="service">CryptoService (Story 6-4 COMPLETED)</dependency>
+          <dependency type="framework">DeviceCheck (DCAppAttestService)</dependency>
+        </dependencies>
+      </class>
+
+      <enum name="AttestationError">
+        <description>Errors that can occur during attestation operations</description>
+        <cases>
+          <case name="unsupported">DCAppAttest not supported on this device (jailbroken or no Secure Enclave)</case>
+          <case name="keyGenerationFailed">Failed to generate attestation key</case>
+          <case name="attestationFailed">Failed to generate device attestation</case>
+          <case name="assertionFailed">Failed to generate capture assertion</case>
+          <case name="invalidKeyId">Invalid attestation key ID</case>
+          <case name="networkError(underlying: Error)">Network error during attestation</case>
+        </cases>
+      </enum>
+    </code-structure>
+
+    <performance-requirements>
+      <requirement id="PERF1">
+        <operation>Key Generation</operation>
+        <target>Less than 100ms</target>
+        <measurement>Time from generateKey() call to return</measurement>
+        <logging>Log duration with Logger.info()</logging>
+      </requirement>
+      <requirement id="PERF2">
+        <operation>Device Attestation</operation>
+        <target>Less than 500ms</target>
+        <measurement>Time from attestKey() call to return</measurement>
+        <logging>Log duration with Logger.info()</logging>
+      </requirement>
+      <requirement id="PERF3">
+        <operation>Per-Capture Assertion</operation>
+        <target>Less than 50ms (critical path)</target>
+        <measurement>Time from generateAssertion() call to return</measurement>
+        <logging>Warn if exceeds 50ms, debug otherwise</logging>
+      </requirement>
+    </performance-requirements>
+  </technical-implementation>
+
+  <existing-code-references>
+    <reference path="ios/Rial/Core/Storage/KeychainService.swift" type="dependency-completed">
+      <description>
+        **Story 6-4 Completed Implementation** - Keychain service providing secure storage for attestation key IDs
+        and device state. Critical for DeviceAttestation key persistence.
+
+        Key Methods for Story 6-2 Integration:
+        1. save(_:forKey:) - Store attestation key ID in Keychain
+        2. load(forKey:) - Load stored key ID on app launch
+        3. saveDeviceState(_:) - Store DeviceState after registration
+        4. loadDeviceState() - Load device registration state
+
+        Security Configuration:
+        - Service identifier: "app.rial.keychain"
+        - Accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        - Synchronizable: false (no iCloud sync)
+        - Automatic update on duplicate (errSecDuplicateItem handled)
+
+        DeviceState Model:
+        - deviceId: String (UUID from backend)
+        - attestationKeyId: String? (DCAppAttest key ID)
+        - isRegistered: Bool (registration status)
+        - registeredAt: Date? (timestamp of registration)
+
+        Error Handling:
+        - KeychainError.saveFailed(OSStatus) - save operation failed
+        - KeychainError.loadFailed(OSStatus) - load operation failed
+        - KeychainError.itemNotFound - item doesn't exist (not an error, returns nil)
+        - KeychainError.encodingFailed - JSON encoding failed
+        - KeychainError.decodingFailed - JSON decoding failed
+      </description>
+      <integration-pattern>
+        <step>1. Initialize KeychainService in DeviceAttestation init</step>
+        <step>2. After generateKey(): try keychain.save(Data(keyId.utf8), forKey: "rial.attestation.keyId")</step>
+        <step>3. On app launch: loadStoredKeyId() checks keychain for existing key</step>
+        <step>4. After registration: save DeviceState with deviceId and attestationKeyId</step>
+      </integration-pattern>
+      <code-examples>
+        <example name="Save Key ID">
+          let keyId = try await service.generateKey()
+          try keychain.save(Data(keyId.utf8), forKey: "rial.attestation.keyId")
+        </example>
+        <example name="Load Key ID">
+          guard let data = try keychain.load(forKey: "rial.attestation.keyId"),
+                let keyId = String(data: data, encoding: .utf8) else {
+            return nil
+          }
+        </example>
+        <example name="Save Device State">
+          let state = DeviceState(
+            deviceId: deviceId,
+            attestationKeyId: keyId,
+            isRegistered: true,
+            registeredAt: Date()
+          )
+          try keychain.saveDeviceState(state)
+        </example>
+      </code-examples>
+    </reference>
+
+    <reference path="ios/Rial/Core/Crypto/CryptoService.swift" type="dependency-completed">
+      <description>
+        **Story 6-4 Completed Implementation** - Cryptographic operations service using CryptoKit.
+        Provides SHA-256 hashing for DCAppAttest clientDataHash computation.
+
+        Key Methods for Story 6-2 Integration:
+        1. sha256(_:) -> String - Hash challenge/capture data, returns hex string
+        2. sha256Data(_:) -> Data - Hash and return raw 32-byte Data (for DCAppAttest)
+
+        Usage in DeviceAttestation:
+        - attestKey(keyId, challenge): Hash challenge with sha256Data() before passing to DCAppAttestService
+        - generateAssertion(keyId, clientData): Hash JPEG+depth data with sha256Data()
+
+        Implementation Details:
+        - Uses CryptoKit's SHA256.hash(data:) for hardware-accelerated hashing
+        - sha256(_:) returns lowercase hex-encoded digest (64 characters)
+        - sha256Data(_:) returns raw bytes as Data (32 bytes)
+        - Both methods are static (no instance required)
+
+        Performance:
+        - 10MB file hashes in less than 100ms (hardware-accelerated)
+        - Streaming hash available via sha256Stream(url:) for large files
+      </description>
+      <integration-pattern>
+        <step>1. Import CryptoService (no initialization needed, all static methods)</step>
+        <step>2. For attestation: let hash = CryptoService.sha256Data(challenge)</step>
+        <step>3. For assertions: let hash = CryptoService.sha256Data(jpeg + depth)</step>
+        <step>4. Pass hash as clientDataHash to DCAppAttest methods</step>
+      </integration-pattern>
+      <code-examples>
+        <example name="Hash Challenge">
+          func attestKey(_ keyId: String, challenge: Data) async throws -> Data {
+            let clientDataHash = CryptoService.sha256Data(challenge)
+            return try await service.attestKey(keyId, clientDataHash: clientDataHash)
+          }
+        </example>
+        <example name="Hash Capture Data">
+          func generateAssertion(_ keyId: String, captureData: Data) async throws -> Data {
+            let clientDataHash = CryptoService.sha256Data(captureData)
+            return try await service.generateAssertion(keyId, clientDataHash: clientDataHash)
+          }
+        </example>
+      </code-examples>
+    </reference>
+
+    <reference path="apps/mobile/hooks/useDeviceAttestation.ts" type="reference-implementation">
+      <description>
+        React Native implementation using @expo/app-integrity. Shows attestation flow:
+        1. Check isSupported
+        2. Generate key (or load existing)
+        3. Fetch challenge from backend
+        4. Call attestKeyAsync with challenge
+        5. Handle errors with retry logic and graceful degradation
+
+        Native Swift implementation follows same state machine but without JS bridge:
+        - idle → fetching_challenge → attesting → attested
+        - Error states: unsupported, network errors, security errors
+        - Exponential backoff retry (1s, 2s, 4s)
+        - Max 3 retry attempts before unverified mode
+      </description>
+      <key-patterns>
+        <pattern>Attestation timeout (5 seconds)</pattern>
+        <pattern>Challenge expiry check before attestation</pattern>
+        <pattern>Security error vs network error handling</pattern>
+        <pattern>User-friendly error messages (not technical codes)</pattern>
+        <pattern>Automatic attestation on app launch when key ready</pattern>
+      </key-patterns>
+    </reference>
+
+    <reference path="backend/src/services/attestation.rs" type="backend-integration">
+      <description>
+        Backend attestation verification service. Shows what backend expects:
+        - CBOR attestation object format
+        - Certificate chain verification steps
+        - Nonce computation: SHA256(authData || clientDataHash)
+        - App identity verification (TeamID.BundleID)
+        - Public key extraction from COSE structure
+        - Counter verification (must be 0 for initial attestation)
+
+        Native app must provide:
+        - Valid CBOR attestation object from DCAppAttestService
+        - Challenge that was used (for nonce verification)
+        - Key ID for device identification
+      </description>
+      <key-requirements>
+        <requirement>Attestation object must be base64-encoded</requirement>
+        <requirement>Challenge must match what was returned from /api/v1/devices/challenge</requirement>
+        <requirement>Counter must be 0 for initial attestation</requirement>
+        <requirement>Certificate chain must be complete (leaf + intermediate)</requirement>
+      </key-requirements>
+    </reference>
+
+    <reference path="backend/src/routes/devices.rs" type="api-endpoints">
+      <description>
+        Backend device registration endpoints. Shows API contracts:
+
+        GET /api/v1/devices/challenge:
+        - Returns { challenge: "base64...", expires_at: "ISO8601..." }
+        - Challenge is 32 cryptographically random bytes
+        - Expires in 5 minutes
+        - Rate limited: 10 challenges per minute per IP
+
+        POST /api/v1/devices/register:
+        - Accepts nested format (preferred):
+          {
+            "platform": "ios",
+            "model": "iPhone 15 Pro",
+            "has_lidar": true,
+            "attestation": {
+              "key_id": "base64...",
+              "attestation_object": "base64...",
+              "challenge": "base64..."
+            }
+          }
+        - Returns { device_id: "uuid", attestation_level: "secure_enclave"|"unverified", has_lidar: bool }
+        - 201 Created on success
+        - 409 Conflict if device already registered
+        - 400 Bad Request for validation errors
+      </description>
+      <error-handling>
+        <error code="409">Device already registered - load existing device ID from Keychain</error>
+        <error code="400">Validation error - check payload format</error>
+        <error code="422">Attestation verification failed - device registered as unverified</error>
+        <error code="429">Rate limited - exponential backoff retry</error>
+      </error-handling>
+    </reference>
+
+    <reference path="docs/architecture.md" type="architecture-context">
+      <description>
+        Architecture document section 5.1 Backend Endpoints:
+        - Device challenge endpoint details
+        - Device registration endpoint details
+        - Error response structures
+        - Authentication header requirements (for future capture uploads)
+
+        Section 5.2 Request/Response Formats:
+        - Detailed JSON schemas for registration
+        - Error response format with codes
+        - Challenge expiry behavior
+
+        Section 5.3 Authentication Headers:
+        - X-Device-Id: UUID (from registration response)
+        - X-Device-Timestamp: Unix milliseconds
+        - X-Device-Signature: Base64 Ed25519 signature
+        - Signature computation: sign(timestamp|sha256(body), deviceKey)
+      </description>
+    </reference>
+
+    <reference path="ios/Rial/App/RialApp.swift" type="project-structure">
+      <description>
+        Current iOS project structure. Shows:
+        - SwiftUI app lifecycle with @main
+        - AppDelegate integration for background tasks
+        - Project exists at ios/Rial.xcodeproj
+
+        DeviceAttestation service should be placed at:
+        ios/Rial/Core/Attestation/DeviceAttestation.swift
+
+        Tests should be placed at:
+        ios/RialTests/Attestation/DeviceAttestationTests.swift
+      </description>
+    </reference>
+  </existing-code-references>
+
+  <development-constraints>
+    <constraint type="platform">
+      <title>Physical Device Required for Testing</title>
+      <description>
+        DCAppAttest requires Secure Enclave, which is not available in iOS Simulator.
+        All integration tests must run on physical iPhone Pro device (12 Pro or later).
+      </description>
+      <impact>
+        - Unit tests use mocked DCAppAttestService (simulator-compatible)
+        - Integration tests require physical device with LiDAR
+        - CI pipeline can only run unit tests
+        - Manual testing checklist required for release validation
+      </impact>
+    </constraint>
+
+    <constraint type="security">
+      <title>Key ID is NOT Secret</title>
+      <description>
+        The attestation key ID is a public identifier, safe to transmit to backend.
+        The actual private key never leaves Secure Enclave and cannot be extracted.
+      </description>
+      <security-properties>
+        <property>Key ID safe to transmit over network</property>
+        <property>Private key non-extractable from Secure Enclave</property>
+        <property>One attestation per key (re-attestation requires new key generation)</property>
+        <property>Counter increments with each assertion (prevents replay attacks)</property>
+        <property>Challenge must be fresh (5-minute expiry window)</property>
+      </security-properties>
+    </constraint>
+
+    <constraint type="backend-coordination">
+      <title>Backend Endpoints Required</title>
+      <description>
+        This story requires backend endpoints to be functional:
+        - GET /api/v1/devices/challenge (implemented)
+        - POST /api/v1/devices/register (implemented)
+        - Attestation verification service (implemented in backend/src/services/attestation.rs)
+        - Assertion verification for captures (implemented in device_auth middleware)
+      </description>
+      <validation>
+        Test device registration end-to-end with backend running locally or in dev environment.
+      </validation>
+    </constraint>
+
+    <constraint type="ios-version">
+      <title>iOS 15.0+ Minimum</title>
+      <description>
+        DCAppAttest available on iOS 14.0+, but project targets iOS 15.0 for Swift concurrency.
+        All iPhone Pro models (12 Pro through current) support iOS 15+.
+      </description>
+    </constraint>
+  </development-constraints>
+
+  <testing-strategy>
+    <unit-tests>
+      <test-file path="ios/RialTests/Attestation/DeviceAttestationTests.swift">
+        <test-case name="testIsSupported">
+          Verify isSupported returns true when DCAppAttestService available (on real device)
+        </test-case>
+        <test-case name="testKeyGenerationSuccess">
+          Mock successful key generation, verify key ID returned and persisted to Keychain
+        </test-case>
+        <test-case name="testKeyGenerationUnsupported">
+          Mock isSupported = false, verify AttestationError.unsupported thrown
+        </test-case>
+        <test-case name="testAttestationSuccess">
+          Mock successful attestation, verify Data returned in less than 500ms
+        </test-case>
+        <test-case name="testAssertionSuccess">
+          Mock successful assertion, verify Data returned in less than 50ms
+        </test-case>
+        <test-case name="testAssertionPerformance">
+          Measure assertion generation time, warn if exceeds 50ms target
+        </test-case>
+        <test-case name="testKeychainIntegration">
+          Verify key ID saved to and loaded from Keychain correctly
+        </test-case>
+        <test-case name="testErrorHandling">
+          Test all AttestationError cases with appropriate error mapping
+        </test-case>
+      </test-file>
+      <coverage-target>90%+ code coverage for DeviceAttestation.swift</coverage-target>
+    </unit-tests>
+
+    <integration-tests>
+      <test-requirement type="physical-device">
+        <title>Device Key Generation Test</title>
+        <steps>
+          1. Run app on physical iPhone Pro
+          2. Trigger key generation
+          3. Verify key ID returned
+          4. Verify key ID persisted in Keychain
+          5. Restart app, verify key ID loaded from Keychain
+        </steps>
+      </test-requirement>
+
+      <test-requirement type="physical-device">
+        <title>Device Attestation Test</title>
+        <steps>
+          1. Generate key
+          2. Request challenge from backend (GET /api/v1/devices/challenge)
+          3. Generate attestation with challenge
+          4. Verify attestation object format
+          5. POST to /api/v1/devices/register
+          6. Verify backend responds with device_id and attestation_level = "secure_enclave"
+        </steps>
+      </test-requirement>
+
+      <test-requirement type="physical-device">
+        <title>Per-Capture Assertion Test</title>
+        <steps>
+          1. Use registered device with key
+          2. Create mock capture data (JPEG + depth)
+          3. Generate assertion
+          4. Verify assertion completes in less than 50ms
+          5. Verify counter increments on subsequent assertions
+        </steps>
+      </test-requirement>
+
+      <test-requirement type="error-scenario">
+        <title>Graceful Degradation Test</title>
+        <steps>
+          1. Test with invalid key ID (verify error handled)
+          2. Test with expired challenge (verify error handled)
+          3. Test network timeout during attestation (verify retry logic)
+          4. Verify app continues to function when attestation fails
+        </steps>
+      </test-requirement>
+    </integration-tests>
+
+    <manual-testing-checklist>
+      <item>Key generation succeeds on iPhone Pro</item>
+      <item>Key ID valid format (base64 string)</item>
+      <item>Key persists across app restarts</item>
+      <item>Challenge request succeeds</item>
+      <item>Attestation object generated successfully</item>
+      <item>Backend registration succeeds with attestation_level = "secure_enclave"</item>
+      <item>Assertion generation completes in less than 50ms</item>
+      <item>Counter increments with each assertion</item>
+      <item>Error messages user-friendly (not technical codes)</item>
+      <item>App doesn't crash on attestation failures</item>
+    </manual-testing-checklist>
+  </testing-strategy>
+
+  <implementation-guidance>
+    <task-breakdown>
+      <task id="T1" priority="high">
+        <title>Create DeviceAttestation Service</title>
+        <files>
+          <file>ios/Rial/Core/Attestation/DeviceAttestation.swift</file>
+        </files>
+        <steps>
+          1. Create Attestation folder: mkdir -p ios/Rial/Core/Attestation
+          2. Create DeviceAttestation.swift with class structure
+          3. Import DeviceCheck, CryptoKit, os.log
+          4. Implement isSupported computed property
+          5. Implement AttestationError enum with all cases
+          6. Add DocC documentation comments
+        </steps>
+      </task>
+
+      <task id="T2" priority="high">
+        <title>Implement Key Generation Flow</title>
+        <implements>AC1</implements>
+        <steps>
+          1. Implement generateKey() method as async throws
+          2. Check isSupported, throw AttestationError.unsupported if false
+          3. Call DCAppAttestService.shared.generateKey()
+          4. Add performance logging (startTime, duration calculation)
+          5. Persist key ID to Keychain using KeychainService.save(_:forKey:)
+             - Convert key ID string to Data: Data(keyId.utf8)
+             - Save with key "rial.attestation.keyId"
+          6. Handle DCError and map to AttestationError
+          7. Return key ID
+        </steps>
+        <performance>Target: less than 100ms</performance>
+        <integration-notes>
+          KeychainService automatically handles kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+          and errSecDuplicateItem (updates existing item). No additional configuration needed.
+        </integration-notes>
+      </task>
+
+      <task id="T3" priority="high">
+        <title>Implement Attestation Flow</title>
+        <implements>AC2</implements>
+        <steps>
+          1. Implement attestKey(_:challenge:) method
+          2. Hash challenge with CryptoService.sha256Data(challenge)
+             - Returns Data (32 bytes) ready for DCAppAttest
+          3. Call DCAppAttestService.shared.attestKey(keyId, clientDataHash: hash)
+          4. Add performance logging
+          5. Return attestation object Data
+          6. Handle errors (network, invalid key, etc.)
+        </steps>
+        <performance>Target: less than 500ms</performance>
+        <integration-notes>
+          Use CryptoService.sha256Data() instead of manual SHA256.hash() for consistency
+          and to match Story 6-4 implementation. Both are equivalent but CryptoService
+          provides centralized crypto operations.
+        </integration-notes>
+      </task>
+
+      <task id="T4" priority="high">
+        <title>Implement Per-Capture Assertion</title>
+        <implements>AC3</implements>
+        <steps>
+          1. Implement generateAssertion(_:clientData:) method
+          2. Hash clientData (JPEG + depth) with CryptoService.sha256Data(clientData)
+             - Returns Data (32 bytes) ready for DCAppAttest
+          3. Call DCAppAttestService.shared.generateAssertion(keyId, clientDataHash: hash)
+          4. Add performance logging with warning if exceeds 50ms
+          5. Return assertion Data
+          6. Handle counter increment validation
+        </steps>
+        <performance>Target: less than 50ms (CRITICAL PATH)</performance>
+        <integration-notes>
+          CryptoService.sha256Data() is hardware-accelerated and optimized for performance.
+          For large capture data (JPEG + depth ~4MB), hashing completes in less than 10ms,
+          leaving 40ms for DCAppAttest assertion generation.
+        </integration-notes>
+      </task>
+
+      <task id="T5" priority="medium">
+        <title>Integrate with KeychainService</title>
+        <implements>AC5</implements>
+        <steps>
+          1. Initialize KeychainService in DeviceAttestation (inject or use shared instance)
+          2. Store key ID with key "rial.attestation.keyId":
+             try keychain.save(Data(keyId.utf8), forKey: "rial.attestation.keyId")
+          3. Implement loadStoredKeyId() method:
+             - Load with keychain.load(forKey: "rial.attestation.keyId")
+             - Convert Data to String: String(data: data, encoding: .utf8)
+             - Return nil if not found (keychain.load returns nil)
+          4. Check for existing key before generating new one in generateKey()
+          5. Implement saveDeviceState helper for post-registration:
+             - Create DeviceState with deviceId, attestationKeyId, isRegistered, registeredAt
+             - Call keychain.saveDeviceState(state)
+        </steps>
+        <note>Story 6.4 COMPLETED - KeychainService fully implemented and tested</note>
+        <integration-notes>
+          KeychainService handles all security configuration automatically:
+          - kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+          - kSecAttrSynchronizable = false (no iCloud sync)
+          - Automatic update on duplicate (no need to check existence)
+        </integration-notes>
+      </task>
+
+      <task id="T6" priority="medium">
+        <title>Error Handling and Logging</title>
+        <implements>AC4</implements>
+        <steps>
+          1. Create AttestationError enum with all cases
+          2. Map DCError cases to AttestationError
+          3. Add user-friendly error descriptions
+          4. Implement Logger with subsystem "app.rial", category "attestation"
+          5. Log all operations (success and failure) with appropriate levels
+          6. Add retry logic guidance for transient errors
+        </steps>
+      </task>
+
+      <task id="T7" priority="low">
+        <title>Backend Integration Helpers</title>
+        <implements>AC6</implements>
+        <steps>
+          1. Create method to build registration payload JSON
+          2. Serialize attestation Data to base64
+          3. Include device model from UIDevice.current
+          4. Include LiDAR check (for Story 6.5 ARKit integration)
+          5. Document payload format with example
+        </steps>
+        <note>Actual API call implementation in Story 6.11</note>
+      </task>
+
+      <task id="T8" priority="high">
+        <title>Unit Tests</title>
+        <implements>All ACs</implements>
+        <steps>
+          1. Create RialTests/Attestation/DeviceAttestationTests.swift
+          2. Create MockDCAppAttestService protocol for dependency injection
+          3. Test key generation success and failure paths
+          4. Test attestation success and failure paths
+          5. Test assertion performance (less than 50ms target)
+          6. Test Keychain integration (save/load)
+          7. Test all error cases
+          8. Measure code coverage (target: 90%+)
+        </steps>
+      </task>
+
+      <task id="T9" priority="medium">
+        <title>Integration Testing Preparation</title>
+        <steps>
+          1. Document physical device testing requirements
+          2. Create manual testing checklist
+          3. Prepare backend mock/dev environment
+          4. Document expected attestation object structure
+          5. Document performance measurement approach
+        </steps>
+      </task>
+    </task-breakdown>
+
+    <implementation-order>
+      <phase number="1">Tasks T1, T2, T6 (Core service + key generation + error handling)</phase>
+      <phase number="2">Tasks T3, T4 (Attestation and assertion flows)</phase>
+      <phase number="3">Tasks T5, T7 (Keychain integration + backend helpers)</phase>
+      <phase number="4">Tasks T8, T9 (Testing and validation)</phase>
+    </implementation-order>
+
+    <critical-decisions>
+      <decision>
+        Use async/await for all DCAppAttest operations (requires iOS 15.0+)
+      </decision>
+      <decision>
+        Store only key ID in Keychain, never the private key (which stays in Secure Enclave)
+      </decision>
+      <decision>
+        Use CryptoService.sha256Data() for all hashing (consistency with Story 6-4)
+      </decision>
+      <decision>
+        Use KeychainService from Story 6-4 for all persistent storage operations
+      </decision>
+      <decision>
+        Log performance metrics for all operations to identify bottlenecks
+      </decision>
+      <decision>
+        Gracefully degrade to unverified mode on attestation failures (never crash)
+      </decision>
+    </critical-decisions>
+
+    <implementation-example>
+      <title>Complete DeviceAttestation Implementation with Story 6-4 Integration</title>
+      <code language="swift">
+        import DeviceCheck
+        import os.log
+
+        class DeviceAttestation {
+            private let service = DCAppAttestService.shared
+            private let keychain: KeychainService
+            private let logger = Logger(subsystem: "app.rial", category: "attestation")
+
+            init(keychain: KeychainService = KeychainService()) {
+                self.keychain = keychain
+            }
+
+            var isSupported: Bool {
+                service.isSupported
+            }
+
+            func generateKey() async throws -> String {
+                guard service.isSupported else {
+                    logger.error("DCAppAttest not supported on this device")
+                    throw AttestationError.unsupported
+                }
+
+                let startTime = Date()
+                do {
+                    let keyId = try await service.generateKey()
+                    let duration = Date().timeIntervalSince(startTime) * 1000
+                    logger.info("Key generated in \(duration, format: .fixed(precision: 2))ms")
+
+                    // Persist key ID using KeychainService from Story 6-4
+                    try keychain.save(Data(keyId.utf8), forKey: "rial.attestation.keyId")
+
+                    return keyId
+                } catch {
+                    logger.error("Key generation failed: \(error.localizedDescription)")
+                    throw AttestationError.keyGenerationFailed
+                }
+            }
+
+            func attestKey(_ keyId: String, challenge: Data) async throws -> Data {
+                let startTime = Date()
+
+                // Hash challenge using CryptoService from Story 6-4
+                let clientDataHash = CryptoService.sha256Data(challenge)
+
+                do {
+                    let attestation = try await service.attestKey(keyId, clientDataHash: clientDataHash)
+                    let duration = Date().timeIntervalSince(startTime) * 1000
+                    logger.info("Attestation generated in \(duration, format: .fixed(precision: 2))ms")
+                    return attestation
+                } catch {
+                    logger.error("Attestation failed: \(error.localizedDescription)")
+                    throw AttestationError.attestationFailed
+                }
+            }
+
+            func generateAssertion(_ keyId: String, clientData: Data) async throws -> Data {
+                let startTime = Date()
+
+                // Hash client data using CryptoService from Story 6-4
+                let clientDataHash = CryptoService.sha256Data(clientData)
+
+                do {
+                    let assertion = try await service.generateAssertion(keyId, clientDataHash: clientDataHash)
+                    let duration = Date().timeIntervalSince(startTime) * 1000
+
+                    if duration > 50 {
+                        logger.warning("Assertion took \(duration, format: .fixed(precision: 2))ms (target: 50ms)")
+                    } else {
+                        logger.debug("Assertion generated in \(duration, format: .fixed(precision: 2))ms")
+                    }
+
+                    return assertion
+                } catch {
+                    logger.error("Assertion generation failed: \(error.localizedDescription)")
+                    throw AttestationError.assertionFailed
+                }
+            }
+
+            func loadStoredKeyId() -> String? {
+                do {
+                    // Load from Keychain using KeychainService from Story 6-4
+                    guard let data = try keychain.load(forKey: "rial.attestation.keyId") else {
+                        return nil
+                    }
+                    return String(data: data, encoding: .utf8)
+                } catch {
+                    logger.debug("No stored key ID found: \(error.localizedDescription)")
+                    return nil
+                }
+            }
+
+            func saveDeviceState(deviceId: String, attestationKeyId: String) throws {
+                // Save device state using KeychainService DeviceState model from Story 6-4
+                let state = DeviceState(
+                    deviceId: deviceId,
+                    attestationKeyId: attestationKeyId,
+                    isRegistered: true,
+                    registeredAt: Date()
+                )
+                try keychain.saveDeviceState(state)
+                logger.info("Device state saved to Keychain")
+            }
+
+            func loadDeviceState() throws -> DeviceState? {
+                // Load device state using KeychainService from Story 6-4
+                return try keychain.loadDeviceState()
+            }
+        }
+
+        enum AttestationError: Error, LocalizedError {
+            case unsupported
+            case keyGenerationFailed
+            case attestationFailed
+            case assertionFailed
+            case invalidKeyId
+            case networkError(underlying: Error)
+
+            var errorDescription: String? {
+                switch self {
+                case .unsupported:
+                    return "Device attestation is not supported on this device"
+                case .keyGenerationFailed:
+                    return "Failed to generate attestation key"
+                case .attestationFailed:
+                    return "Failed to generate device attestation"
+                case .assertionFailed:
+                    return "Failed to generate capture assertion"
+                case .invalidKeyId:
+                    return "Invalid attestation key ID"
+                case .networkError(let error):
+                    return "Network error: \(error.localizedDescription)"
+                }
+            }
+        }
+      </code>
+      <notes>
+        This implementation integrates with Story 6-4 completed services:
+        - KeychainService for key ID and device state persistence
+        - CryptoService for SHA-256 hashing (clientDataHash computation)
+        - DeviceState model for structured device registration data
+      </notes>
+    </implementation-example>
+  </implementation-guidance>
+
+  <related-documentation>
+    <document path="docs/sprint-artifacts/stories/6-2-dcappattest-direct-integration.md">
+      Complete story specification with detailed acceptance criteria and technical implementation
+    </document>
+    <document path="docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-6.md">
+      Epic 6 technical specification, section "Story 6.2: DCAppAttest Direct Integration"
+    </document>
+    <document path="docs/architecture.md">
+      Architecture document, sections on native Swift architecture and security
+    </document>
+    <document path="docs/epics.md">
+      Epic breakdown with story dependencies and FR coverage
+    </document>
+
+    <apple-documentation>
+      <doc url="https://developer.apple.com/documentation/devicecheck/dcappattestservice">
+        DCAppAttestService API Reference
+      </doc>
+      <doc url="https://developer.apple.com/documentation/devicecheck/establishing_your_app_s_integrity">
+        App Attest Guide - Establishing Your App's Integrity
+      </doc>
+      <doc url="https://developer.apple.com/documentation/devicecheck/validating_apps_that_connect_to_your_server">
+        Validating Apps on Apple's Servers
+      </doc>
+    </apple-documentation>
+  </related-documentation>
+
+  <definition-of-done>
+    <item>All acceptance criteria verified and passing</item>
+    <item>All tasks completed</item>
+    <item>DeviceAttestation.swift implemented with full DocC documentation</item>
+    <item>Unit tests achieve 90%+ code coverage</item>
+    <item>Physical device testing completed successfully (manual checklist)</item>
+    <item>Performance benchmarks meet targets (100ms key gen, 500ms attestation, 50ms assertion)</item>
+    <item>Error handling tested for all scenarios</item>
+    <item>Keychain integration working correctly</item>
+    <item>Backend registration flow tested end-to-end</item>
+    <item>Code reviewed and approved</item>
+    <item>Code committed to feature branch (feat/epic-6-native-swift-implementation)</item>
+  </definition-of-done>
+</story-context>

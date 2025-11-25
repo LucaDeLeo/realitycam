@@ -15,16 +15,15 @@ configuration:
   auto_push: true
 
 checkpoint:
-  story_key: 6-2-dcappattest-direct-integration
-  phase: implement
-  saved_at: 2025-11-25T07:40:00Z
+  story_key: 6-5-arkit-unified-capture-session
+  phase: create
+  saved_at: 2025-11-25T08:15:00Z
   data: null
 
 epics_contexted: []
 
-# Re-ordered: 6.3, 6.4 first, then 6.2 can proceed
+# Re-ordered: 6.3, 6.4 first, then 6.2 can proceed (6.2 now done)
 stories_pending:
-  - 6-2-dcappattest-direct-integration
   - 6-5-arkit-unified-capture-session
   - 6-6-frame-processing-pipeline
   - 6-7-metal-depth-visualization
@@ -53,10 +52,16 @@ stories_processed:
     completed_at: 2025-11-25T07:05:00Z
   - story_key: 6-4-keychain-services-integration
     status: success
-    commit: pending
+    commit: 0eaf00e
     review_cycles: 1
     started_at: 2025-11-25T07:05:00Z
     completed_at: 2025-11-25T07:40:00Z
+  - story_key: 6-2-dcappattest-direct-integration
+    status: success
+    commit: 2db7be6
+    review_cycles: 1
+    started_at: 2025-11-25T07:40:00Z
+    completed_at: 2025-11-25T08:15:00Z
 
 stories_deferred:
   - story_key: 6-2-dcappattest-direct-integration
@@ -69,6 +74,6 @@ statistics:
   epics_contexted_jit: 0
   epics_already_contexted: 1
   total_stories: 16
-  success_count: 3
+  success_count: 4
   failed_count: 0
-  deferred_count: 1
+  deferred_count: 0
