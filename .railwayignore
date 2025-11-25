@@ -1,0 +1,62 @@
+# .railwayignore
+# Exclude files from Railway deployment snapshot
+# Uses same syntax as .gitignore
+
+# iOS app (not needed for backend deployment)
+ios/
+apps/mobile/
+
+# Web app (deployed separately on Vercel)
+apps/web/
+
+# Node.js dependencies (rebuilt during build)
+node_modules/
+.pnpm-store/
+
+# IDE and tools
+.bmad/
+.claude/
+.codex/
+.vscode/
+.idea/
+
+# Git history (can be large)
+.git/
+
+# Documentation (not needed for runtime)
+*.md
+docs/
+
+# Test files
+tests/
+**/tests/
+**/__tests__/
+*.test.*
+*.spec.*
+playwright-report/
+test-results/
+coverage/
+
+# Local environment files
+.env
+.env.local
+.env.*.local
+
+# Build artifacts from other packages
+.next/
+.turbo/
+dist/
+out/
+
+# Infrastructure (local docker setup)
+infrastructure/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Turborepo cache
+.turbo/
+
+# Logs
+*.log
