@@ -25,6 +25,10 @@
 		3089F9DB0016 /* CaptureData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1021 /* CaptureData.swift */; };
 		3089F9DB0017 /* FrameProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1022 /* FrameProcessor.swift */; };
 		3089F9DB0018 /* FrameProcessorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1023 /* FrameProcessorTests.swift */; };
+		3089F9DB0019 /* DepthVisualization.metal in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1024 /* DepthVisualization.metal */; };
+		3089F9DB0020 /* DepthVisualizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1025 /* DepthVisualizer.swift */; };
+		3089F9DB0021 /* DepthOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1026 /* DepthOverlayView.swift */; };
+		3089F9DB0022 /* DepthVisualizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1027 /* DepthVisualizerTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -68,6 +72,10 @@
 		3089F9DB1021 /* CaptureData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureData.swift; sourceTree = "<group>"; };
 		3089F9DB1022 /* FrameProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameProcessor.swift; sourceTree = "<group>"; };
 		3089F9DB1023 /* FrameProcessorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameProcessorTests.swift; sourceTree = "<group>"; };
+		3089F9DB1024 /* DepthVisualization.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = DepthVisualization.metal; sourceTree = "<group>"; };
+		3089F9DB1025 /* DepthVisualizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthVisualizer.swift; sourceTree = "<group>"; };
+		3089F9DB1026 /* DepthOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthOverlayView.swift; sourceTree = "<group>"; };
+		3089F9DB1027 /* DepthVisualizerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthVisualizerTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -155,6 +163,7 @@
 			children = (
 				3089F9DB1019 /* ARCaptureSession.swift */,
 				3089F9DB1022 /* FrameProcessor.swift */,
+				3089F9DB1025 /* DepthVisualizer.swift */,
 			);
 			path = Capture;
 			sourceTree = "<group>";
@@ -196,6 +205,7 @@
 		3089F9DB5040 /* Capture */ = {
 			isa = PBXGroup;
 			children = (
+				3089F9DB1026 /* DepthOverlayView.swift */,
 			);
 			path = Capture;
 			sourceTree = "<group>";
@@ -232,6 +242,7 @@
 		3089F9DB5006 /* Shaders */ = {
 			isa = PBXGroup;
 			children = (
+				3089F9DB1024 /* DepthVisualization.metal */,
 			);
 			path = Shaders;
 			sourceTree = "<group>";
@@ -285,6 +296,7 @@
 			children = (
 				3089F9DB1020 /* ARCaptureSessionTests.swift */,
 				3089F9DB1023 /* FrameProcessorTests.swift */,
+				3089F9DB1027 /* DepthVisualizerTests.swift */,
 			);
 			path = Capture;
 			sourceTree = "<group>";
@@ -446,6 +458,9 @@
 				3089F9DB0014 /* ARCaptureSession.swift in Sources */,
 				3089F9DB0016 /* CaptureData.swift in Sources */,
 				3089F9DB0017 /* FrameProcessor.swift in Sources */,
+				3089F9DB0019 /* DepthVisualization.metal in Sources */,
+				3089F9DB0020 /* DepthVisualizer.swift in Sources */,
+				3089F9DB0021 /* DepthOverlayView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -459,6 +474,7 @@
 				3089F9DB0013 /* DeviceAttestationServiceTests.swift in Sources */,
 				3089F9DB0015 /* ARCaptureSessionTests.swift in Sources */,
 				3089F9DB0018 /* FrameProcessorTests.swift in Sources */,
+				3089F9DB0022 /* DepthVisualizerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
