@@ -97,7 +97,7 @@ vi.mock('next/headers', () => ({
  * Suppress React 19 act() warnings in tests
  * React 19 is stricter about act() usage
  */
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+(globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
 /**
  * Mock window.matchMedia for responsive tests
