@@ -236,8 +236,8 @@ describe('useUploadQueue Timer Management', () => {
 
     test('[P2] should handle null timer refs gracefully', () => {
       // GIVEN: Null timer refs
-      let retryTimerRef: ReturnType<typeof setTimeout> | null = null;
-      let cleanupTimerRef: ReturnType<typeof setTimeout> | null = null;
+      const retryTimerRef: ReturnType<typeof setTimeout> | null = null;
+      const cleanupTimerRef: ReturnType<typeof setTimeout> | null = null;
 
       // WHEN: Cleanup runs (simulating unmount)
       const cleanup = () => {

@@ -2,9 +2,9 @@
 #
 # Workflow stages:
 # 1. Lint & Type Check (fast feedback)
-# 2. Unit Tests (parallel: web, mobile, backend)
+# 2. Unit Tests (parallel: web, iOS native, backend)
 # 3. Integration Tests (requires containers)
-# 4. E2E Tests (web only, mobile uses Maestro separately)
+# 4. E2E Tests (web only)
 #
 # Triggers:
 # - Push to main branch
@@ -66,19 +66,12 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      # Web
-      - name: Lint Web
-        working-directory: apps/web
-        run: pnpm run lint
+      # Web & Mobile (workspace-level)
+      - name: Lint All
+        run: pnpm lint
 
-      - name: Type Check Web
-        working-directory: apps/web
-        run: pnpm exec tsc --noEmit
-
-      # Mobile
-      - name: Type Check Mobile
-        working-directory: apps/mobile
-        run: pnpm run typecheck
+      - name: Type Check All
+        run: pnpm typecheck
 
       # Backend
       - name: Lint Backend (Clippy)
@@ -114,7 +107,7 @@ jobs:
 
       - name: Run Unit Tests
         working-directory: apps/web
-        run: pnpm run test:ci
+        run: pnpm run test:unit --run
 
       - name: Upload Coverage
         uses: codecov/codecov-action@v4
@@ -130,42 +123,31 @@ jobs:
           name: web-unit-results
           path: apps/web/test-results/
 
-  unit-tests-mobile:
-    name: Unit Tests (Mobile)
-    runs-on: ubuntu-latest
+  unit-tests-ios:
+    name: Unit Tests (iOS)
+    runs-on: macos-latest
     needs: lint
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
 
       - name: Run Unit Tests
-        working-directory: apps/mobile
-        run: pnpm run test:ci
-
-      - name: Upload Coverage
-        uses: codecov/codecov-action@v4
-        with:
-          files: apps/mobile/coverage/lcov.info
-          flags: mobile-unit
-          token: ${{ secrets.CODECOV_TOKEN }}
+        run: |
+          xcodebuild test \
+            -project ios/Rial.xcodeproj \
+            -scheme Rial \
+            -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
+            -only-testing:RialTests \
+            | xcpretty --color --report junit --output ios/test-results/junit.xml
 
       - name: Upload Test Results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: mobile-unit-results
-          path: apps/mobile/test-results/
+          name: ios-unit-results
+          path: ios/test-results/
 
   unit-tests-backend:
     name: Unit Tests (Backend)
@@ -215,7 +197,7 @@ jobs:
   integration-tests:
     name: Integration Tests (Backend)
     runs-on: ubuntu-latest
-    needs: [unit-tests-web, unit-tests-mobile, unit-tests-backend]
+    needs: [unit-tests-web, unit-tests-ios, unit-tests-backend]
 
     services:
       postgres:
@@ -357,14 +339,14 @@ jobs:
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    needs: [lint, unit-tests-web, unit-tests-mobile, unit-tests-backend, integration-tests, e2e-tests-web]
+    needs: [lint, unit-tests-web, unit-tests-ios, unit-tests-backend, integration-tests, e2e-tests-web]
     if: always()
     steps:
       - name: Check All Jobs
         run: |
           if [[ "${{ needs.lint.result }}" != "success" ]] ||
              [[ "${{ needs.unit-tests-web.result }}" != "success" ]] ||
-             [[ "${{ needs.unit-tests-mobile.result }}" != "success" ]] ||
+             [[ "${{ needs.unit-tests-ios.result }}" != "success" ]] ||
              [[ "${{ needs.unit-tests-backend.result }}" != "success" ]] ||
              [[ "${{ needs.integration-tests.result }}" != "success" ]] ||
              [[ "${{ needs.e2e-tests-web.result }}" != "success" ]]; then

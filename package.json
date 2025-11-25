@@ -14,6 +14,8 @@
     "build:shared": "pnpm --filter @realitycam/shared build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @realitycam/web test:unit --run",
+    "test:ci": "pnpm typecheck && pnpm lint && pnpm test",
     "docker:up": "docker-compose -f infrastructure/docker-compose.yml up -d",
     "docker:down": "docker-compose -f infrastructure/docker-compose.yml down"
   },
