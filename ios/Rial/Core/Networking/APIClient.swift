@@ -24,7 +24,7 @@ import os.log
 ///
 /// ## Usage
 /// ```swift
-/// let client = APIClient(baseURL: URL(string: "https://api.realitycam.app")!)
+/// let client = APIClient(baseURL: URL(string: "https://backend-production-5e5a.up.railway.app")!)
 ///
 /// // Register device
 /// let response: DeviceRegistrationResponse = try await client.post(

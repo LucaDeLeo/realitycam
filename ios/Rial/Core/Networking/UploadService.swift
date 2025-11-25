@@ -27,7 +27,7 @@ import os.log
 /// ## Usage
 /// ```swift
 /// let uploadService = UploadService(
-///     baseURL: URL(string: "https://api.realitycam.app")!,
+///     baseURL: URL(string: "https://backend-production-5e5a.up.railway.app")!,
 ///     captureStore: captureStore,
 ///     keychain: keychainService
 /// )

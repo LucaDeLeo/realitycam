@@ -200,8 +200,8 @@ extension CertificatePinning {
 
     /// Production hosts that require pinning.
     static let productionHosts: Set<String> = [
-        "api.realitycam.app",
-        "realitycam.app"
+        "backend-production-5e5a.up.railway.app",
+        "rial-web.vercel.app"
     ]
 
     /// Create pinning for production environment.
