@@ -31,6 +31,9 @@
 		3089F9DB0022 /* DepthVisualizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1027 /* DepthVisualizerTests.swift */; };
 		3089F9DB0023 /* CaptureAssertionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1028 /* CaptureAssertionService.swift */; };
 		3089F9DB0024 /* CaptureAssertionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1029 /* CaptureAssertionServiceTests.swift */; };
+		3089F9DB0025 /* CaptureStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1030 /* CaptureStore.swift */; };
+		3089F9DB0026 /* OfflineQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1031 /* OfflineQueue.swift */; };
+		3089F9DB0027 /* CaptureStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1032 /* CaptureStoreTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -80,6 +83,9 @@
 		3089F9DB1027 /* DepthVisualizerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthVisualizerTests.swift; sourceTree = "<group>"; };
 		3089F9DB1028 /* CaptureAssertionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureAssertionService.swift; sourceTree = "<group>"; };
 		3089F9DB1029 /* CaptureAssertionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureAssertionServiceTests.swift; sourceTree = "<group>"; };
+		3089F9DB1030 /* CaptureStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureStore.swift; sourceTree = "<group>"; };
+		3089F9DB1031 /* OfflineQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineQueue.swift; sourceTree = "<group>"; };
+		3089F9DB1032 /* CaptureStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureStoreTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -191,7 +197,9 @@
 		3089F9DB5034 /* Storage */ = {
 			isa = PBXGroup;
 			children = (
+				3089F9DB1030 /* CaptureStore.swift */,
 				3089F9DB1015 /* KeychainService.swift */,
+				3089F9DB1031 /* OfflineQueue.swift */,
 			);
 			path = Storage;
 			sourceTree = "<group>";
@@ -283,6 +291,7 @@
 		3089F9DB5051 /* Storage */ = {
 			isa = PBXGroup;
 			children = (
+				3089F9DB1032 /* CaptureStoreTests.swift */,
 				3089F9DB1016 /* KeychainServiceTests.swift */,
 			);
 			path = Storage;
@@ -468,6 +477,8 @@
 				3089F9DB0020 /* DepthVisualizer.swift in Sources */,
 				3089F9DB0021 /* DepthOverlayView.swift in Sources */,
 				3089F9DB0023 /* CaptureAssertionService.swift in Sources */,
+				3089F9DB0025 /* CaptureStore.swift in Sources */,
+				3089F9DB0026 /* OfflineQueue.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -483,6 +494,7 @@
 				3089F9DB0018 /* FrameProcessorTests.swift in Sources */,
 				3089F9DB0022 /* DepthVisualizerTests.swift in Sources */,
 				3089F9DB0024 /* CaptureAssertionServiceTests.swift in Sources */,
+				3089F9DB0027 /* CaptureStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
