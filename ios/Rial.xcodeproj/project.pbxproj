@@ -39,6 +39,10 @@
 		3089F9DB0030 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1040 /* APIClient.swift */; };
 		3089F9DB0031 /* DeviceSignature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1041 /* DeviceSignature.swift */; };
 		3089F9DB0032 /* UploadService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1042 /* UploadService.swift */; };
+		3089F9DB0034 /* CertificatePinning.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1044 /* CertificatePinning.swift */; };
+		3089F9DB0035 /* RetryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1045 /* RetryManager.swift */; };
+		3089F9DB0036 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1046 /* NetworkMonitor.swift */; };
+		3089F9DB0037 /* RetryManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1047 /* RetryManagerTests.swift */; };
 		3089F9DB0033 /* UploadServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1043 /* UploadServiceTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -97,6 +101,10 @@
 		3089F9DB1040 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		3089F9DB1041 /* DeviceSignature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSignature.swift; sourceTree = "<group>"; };
 		3089F9DB1042 /* UploadService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadService.swift; sourceTree = "<group>"; };
+		3089F9DB1044 /* CertificatePinning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificatePinning.swift; sourceTree = "<group>"; };
+		3089F9DB1045 /* RetryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetryManager.swift; sourceTree = "<group>"; };
+		3089F9DB1046 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
+		3089F9DB1047 /* RetryManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetryManagerTests.swift; sourceTree = "<group>"; };
 		3089F9DB1043 /* UploadServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadServiceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -203,7 +211,10 @@
 			isa = PBXGroup;
 			children = (
 				3089F9DB1040 /* APIClient.swift */,
+				3089F9DB1044 /* CertificatePinning.swift */,
 				3089F9DB1041 /* DeviceSignature.swift */,
+				3089F9DB1046 /* NetworkMonitor.swift */,
+				3089F9DB1045 /* RetryManager.swift */,
 				3089F9DB1042 /* UploadService.swift */,
 			);
 			path = Networking;
@@ -300,6 +311,7 @@
 		3089F9DB5054 /* Networking */ = {
 			isa = PBXGroup;
 			children = (
+				3089F9DB1047 /* RetryManagerTests.swift */,
 				3089F9DB1043 /* UploadServiceTests.swift */,
 			);
 			path = Networking;
@@ -507,7 +519,10 @@
 				3089F9DB0026 /* OfflineQueue.swift in Sources */,
 				3089F9DB0028 /* CaptureEncryption.swift in Sources */,
 				3089F9DB0030 /* APIClient.swift in Sources */,
+				3089F9DB0034 /* CertificatePinning.swift in Sources */,
 				3089F9DB0031 /* DeviceSignature.swift in Sources */,
+				3089F9DB0036 /* NetworkMonitor.swift in Sources */,
+				3089F9DB0035 /* RetryManager.swift in Sources */,
 				3089F9DB0032 /* UploadService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -526,6 +541,7 @@
 				3089F9DB0024 /* CaptureAssertionServiceTests.swift in Sources */,
 				3089F9DB0027 /* CaptureStoreTests.swift in Sources */,
 				3089F9DB0029 /* CaptureEncryptionTests.swift in Sources */,
+				3089F9DB0037 /* RetryManagerTests.swift in Sources */,
 				3089F9DB0033 /* UploadServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
