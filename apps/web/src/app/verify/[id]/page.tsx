@@ -11,12 +11,95 @@ interface VerifyPageProps {
   params: Promise<{ id: string }>;
 }
 
+// Demo data for /verify/demo route (works without backend)
+const DEMO_CAPTURE: CapturePublicData = {
+  capture_id: 'demo',
+  confidence_level: 'high',
+  captured_at: new Date().toISOString(),
+  uploaded_at: new Date().toISOString(),
+  location_coarse: 'San Francisco, CA',
+  evidence: {
+    hardware_attestation: {
+      status: 'pass',
+      level: 'full',
+      verified: true,
+      device_model: 'iPhone 15 Pro',
+    },
+    depth_analysis: {
+      status: 'pass',
+      is_likely_real_scene: true,
+      depth_layers: 42,
+      depth_variance: 0.73,
+      flat_region_ratio: 0.12,
+    },
+    metadata: {
+      timestamp_valid: true,
+      timestamp_delta_seconds: 2,
+      model_verified: true,
+      model_name: 'iPhone 15 Pro',
+      location_available: true,
+      location_opted_out: false,
+    },
+    processing: {
+      processed_at: new Date().toISOString(),
+      processing_time_ms: 847,
+      version: '1.0.0',
+    },
+  },
+  photo_url: '/images/WhatsApp Image 2025-11-23 at 20.24.05.jpeg',
+};
+
+interface CapturePublicData {
+  capture_id: string;
+  confidence_level: string;
+  captured_at: string;
+  uploaded_at: string;
+  location_coarse?: string;
+  evidence: {
+    hardware_attestation: {
+      status: string;
+      level?: string;
+      verified?: boolean;
+      device_model?: string;
+    };
+    depth_analysis: {
+      status: string;
+      is_likely_real_scene?: boolean;
+      depth_layers?: number;
+      depth_variance?: number;
+      flat_region_ratio?: number;
+    };
+    metadata: {
+      timestamp_valid?: boolean;
+      timestamp_delta_seconds?: number;
+      model_verified?: boolean;
+      model_name?: string;
+      location_available?: boolean;
+      location_opted_out?: boolean;
+    };
+    processing: {
+      processed_at?: string;
+      processing_time_ms?: number;
+      version?: string;
+    };
+  };
+  photo_url?: string;
+  depth_map_url?: string;
+}
+
 export default async function VerifyPage({ params }: VerifyPageProps) {
   const { id } = await params;
 
-  // Fetch capture data from backend
-  const response = await apiClient.getCapturePublic(id);
-  const capture = response?.data;
+  // Handle demo route specially (works without backend)
+  let capture: CapturePublicData | null = null;
+
+  if (id === 'demo') {
+    capture = DEMO_CAPTURE;
+  } else {
+    // Fetch capture data from backend
+    const response = await apiClient.getCapturePublic(id);
+    capture = response?.data ?? null;
+  }
 
   // Show 404 if capture not found
   if (!capture) {
