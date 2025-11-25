@@ -43,6 +43,10 @@
 		3089F9DB0035 /* RetryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1045 /* RetryManager.swift */; };
 		3089F9DB0036 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1046 /* NetworkMonitor.swift */; };
 		3089F9DB0037 /* RetryManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1047 /* RetryManagerTests.swift */; };
+		3089F9DB0038 /* ARViewContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1048 /* ARViewContainer.swift */; };
+		3089F9DB0039 /* CaptureButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1049 /* CaptureButton.swift */; };
+		3089F9DB003A /* CaptureViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1050 /* CaptureViewModel.swift */; };
+		3089F9DB003B /* CaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1051 /* CaptureView.swift */; };
 		3089F9DB0033 /* UploadServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1043 /* UploadServiceTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -106,6 +110,10 @@
 		3089F9DB1046 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
 		3089F9DB1047 /* RetryManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetryManagerTests.swift; sourceTree = "<group>"; };
 		3089F9DB1043 /* UploadServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadServiceTests.swift; sourceTree = "<group>"; };
+		3089F9DB1048 /* ARViewContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARViewContainer.swift; sourceTree = "<group>"; };
+		3089F9DB1049 /* CaptureButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureButton.swift; sourceTree = "<group>"; };
+		3089F9DB1050 /* CaptureViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureViewModel.swift; sourceTree = "<group>"; };
+		3089F9DB1051 /* CaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -245,6 +253,10 @@
 		3089F9DB5040 /* Capture */ = {
 			isa = PBXGroup;
 			children = (
+				3089F9DB1048 /* ARViewContainer.swift */,
+				3089F9DB1049 /* CaptureButton.swift */,
+				3089F9DB1051 /* CaptureView.swift */,
+				3089F9DB1050 /* CaptureViewModel.swift */,
 				3089F9DB1026 /* DepthOverlayView.swift */,
 			);
 			path = Capture;
@@ -524,6 +536,10 @@
 				3089F9DB0036 /* NetworkMonitor.swift in Sources */,
 				3089F9DB0035 /* RetryManager.swift in Sources */,
 				3089F9DB0032 /* UploadService.swift in Sources */,
+				3089F9DB0038 /* ARViewContainer.swift in Sources */,
+				3089F9DB0039 /* CaptureButton.swift in Sources */,
+				3089F9DB003A /* CaptureViewModel.swift in Sources */,
+				3089F9DB003B /* CaptureView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
