@@ -97,7 +97,7 @@ development_status:
   6-1-initialize-native-ios-project: done
   6-2-dcappattest-direct-integration: drafted
   6-3-cryptokit-integration: done
-  6-4-keychain-services-integration: backlog
+  6-4-keychain-services-integration: done
   6-5-arkit-unified-capture-session: backlog
   6-6-frame-processing-pipeline: backlog
   6-7-metal-depth-visualization: backlog

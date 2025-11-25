@@ -1,0 +1,625 @@
+<story-context id="6-4-keychain-services-integration-context" v="1.0">
+  <metadata>
+    <epicId>6</epicId>
+    <storyId>6-4-keychain-services-integration</storyId>
+    <title>Keychain Services Integration</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-25</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/6-4-keychain-services-integration.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>security-conscious user</asA>
+    <iWant>my cryptographic keys stored in hardware-backed Keychain</iWant>
+    <soThat>keys are protected even if the device is compromised</soThat>
+    <tasks>
+      <task id="1" status="pending">Create KeychainService Core (AC1, AC5)</task>
+      <task id="2" status="pending">Implement Basic Save Operation (AC1, AC2)</task>
+      <task id="3" status="pending">Implement Basic Load Operation (AC1)</task>
+      <task id="4" status="pending">Implement Update Operation (AC1)</task>
+      <task id="5" status="pending">Implement Delete Operation (AC1)</task>
+      <task id="6" status="pending">Implement SymmetricKey Storage (AC4)</task>
+      <task id="7" status="pending">Implement Secure Enclave Key Support (AC3)</task>
+      <task id="8" status="pending">Implement Device State Storage (AC6)</task>
+      <task id="9" status="pending">Error Handling Implementation (AC5)</task>
+      <task id="10" status="pending">Unit Tests (AC7)</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1" priority="critical">
+      <title>Basic Keychain Operations</title>
+      <description>KeychainService exists in Core/Storage/ with save/load/delete operations that work across app restarts with specific error types</description>
+      <verificationSteps>
+        - Create KeychainService.swift in ios/Rial/Core/Storage/
+        - Implement save(_ data: Data, forKey key: String) throws
+        - Implement load(forKey key: String) throws -&gt; Data
+        - Implement delete(forKey key: String) throws
+        - Test operations work across app restarts
+        - Verify Keychain items scoped to app identifier
+        - Support keys: rial.attestation.keyId, rial.device.id, rial.device.state, rial.encryption.key
+      </verificationSteps>
+    </criterion>
+
+    <criterion id="AC2" priority="critical">
+      <title>Data Protection Attributes</title>
+      <description>Default accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly with no iCloud sync</description>
+      <verificationSteps>
+        - Set default accessibility to AfterFirstUnlockThisDeviceOnly
+        - Data accessible after first device unlock
+        - Data NOT accessible on other devices (ThisDeviceOnly)
+        - Data NOT synced to iCloud Keychain (kSecAttrSynchronizable = false)
+        - Data protected in device backups
+        - Allow custom accessibility per item if needed
+      </verificationSteps>
+    </criterion>
+
+    <criterion id="AC3" priority="high">
+      <title>Secure Enclave Key Integration</title>
+      <description>Support for Secure Enclave key operations with hardware-backed protection</description>
+      <verificationSteps>
+        - Implement saveSecureEnclaveKey(tag: String) throws -&gt; SecKey
+        - Implement loadSecureEnclaveKey(tag: String) throws -&gt; SecKey?
+        - Implement deleteSecureEnclaveKey(tag: String) throws
+        - Keys are hardware-bound (non-extractable)
+        - Use kSecAttrTokenIDSecureEnclave attribute
+        - Keys persist across app restarts
+        - Support P-256 elliptic curve operations
+      </verificationSteps>
+    </criterion>
+
+    <criterion id="AC4" priority="critical">
+      <title>CryptoService Integration</title>
+      <description>Store and retrieve SymmetricKeys using CryptoService serialization helpers</description>
+      <verificationSteps>
+        - Implement saveSymmetricKey(_ key: SymmetricKey, forKey keyName: String) throws
+        - Implement loadSymmetricKey(forKey keyName: String) throws -&gt; SymmetricKey?
+        - Use CryptoService.keyToData() for serialization
+        - Use CryptoService.keyFromData() for deserialization
+        - Test round-trip preserves key functionality
+        - Verify keys work for encryption/decryption after retrieval
+      </verificationSteps>
+    </criterion>
+
+    <criterion id="AC5" priority="high">
+      <title>Error Handling</title>
+      <description>KeychainError enum with specific error types and user-friendly messages</description>
+      <verificationSteps>
+        - Define KeychainError enum: saveFailed, loadFailed, deleteFailed, itemNotFound, duplicateItem, invalidData, unexpectedError
+        - Implement LocalizedError protocol for user-friendly messages
+        - Include OSStatus codes in error types
+        - Log error context (key name, operation)
+        - Handle duplicate item by updating instead
+        - Load non-existent item returns nil (not throw)
+        - Delete non-existent item succeeds silently
+      </verificationSteps>
+    </criterion>
+
+    <criterion id="AC6" priority="high">
+      <title>Device State Management</title>
+      <description>Store and retrieve complete DeviceState structure as JSON</description>
+      <verificationSteps>
+        - Implement saveDeviceState(_ state: DeviceState) throws
+        - Implement loadDeviceState() throws -&gt; DeviceState?
+        - Encode DeviceState to JSON using JSONEncoder
+        - Store with key "rial.device.state"
+        - Handle decoding errors gracefully
+        - Test with complete DeviceState struct (deviceId, attestationKeyId, attestationLevel, hasLidar, deviceModel, registeredAt)
+      </verificationSteps>
+    </criterion>
+
+    <criterion id="AC7" priority="critical">
+      <title>Unit Test Coverage</title>
+      <description>Comprehensive unit tests with 95%+ coverage of KeychainService</description>
+      <verificationSteps>
+        - All public methods have test coverage
+        - Test save/load/delete cycles
+        - Test data protection attributes
+        - Test error handling paths
+        - Test edge cases (empty data, large data, invalid keys)
+        - Test SymmetricKey round-trip with encrypt/decrypt
+        - Test DeviceState save/load
+        - Test data persistence across KeychainService instances
+        - Achieve 95%+ code coverage
+      </verificationSteps>
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <artifact path="docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-6.md" type="technical-specification" relevance="critical">
+        <description>Epic 6 Technical Specification - Contains detailed Keychain implementation patterns, data models, and integration requirements</description>
+        <sections>
+          - Story 6.4: Keychain Services Integration (lines 724-793)
+          - Data Models: Keychain Storage Keys (lines 568-576)
+          - Security Considerations: Data Protection Levels (lines 9.2)
+          - Complete KeychainService.swift implementation example (lines 734-627)
+          - KeychainError enum definition with OSStatus handling
+          - DeviceState struct definition for Keychain storage
+        </sections>
+      </artifact>
+
+      <artifact path="docs/sprint-artifacts/stories/6-4-keychain-services-integration.md" type="story-definition" relevance="critical">
+        <description>Complete story definition with acceptance criteria, tasks, technical details, and integration patterns</description>
+        <sections>
+          - User story and context (lines 10-32)
+          - Security benefits comparison table (lines 23-32)
+          - All acceptance criteria (lines 35-167)
+          - Complete task breakdown (lines 170-282)
+          - Full KeychainService.swift implementation (lines 287-644)
+          - Unit test examples (lines 646-793)
+          - CryptoService integration patterns (lines 795-815)
+          - Dependencies and blocking relationships (lines 819-831)
+        </sections>
+      </artifact>
+
+      <artifact path="CLAUDE.md" type="project-documentation" relevance="high">
+        <description>Project overview and development guidelines for RealityCam</description>
+        <sections>
+          - Architecture: Key directories (ios/Rial/Core/Storage/)
+          - Testing strategy for iOS (unit tests, device requirements)
+          - When to rebuild after native module changes
+        </sections>
+      </artifact>
+    </docs>
+
+    <code>
+      <artifact path="ios/Rial/Core/Crypto/CryptoService.swift" type="swift-service" relevance="critical">
+        <description>CryptoKit wrapper providing key serialization helpers that KeychainService depends on</description>
+        <interfaces>
+          - static func keyToData(_ key: SymmetricKey) -&gt; Data
+            Purpose: Serialize SymmetricKey for Keychain storage
+            Returns: 32 bytes of key material
+            Usage: let keyData = CryptoService.keyToData(symmetricKey)
+
+          - static func keyFromData(_ data: Data) throws -&gt; SymmetricKey
+            Purpose: Reconstruct SymmetricKey from Keychain data
+            Throws: CryptoError.invalidKey if data is not 32 bytes
+            Usage: let key = try CryptoService.keyFromData(storedData)
+
+          - static func generateKey() -&gt; SymmetricKey
+            Purpose: Generate new 256-bit AES key
+            Returns: Cryptographically random SymmetricKey
+            Usage: let key = CryptoService.generateKey()
+
+          - static func encrypt(_ data: Data, using key: SymmetricKey) throws -&gt; Data
+            Purpose: AES-GCM encryption for testing key functionality
+            Usage: let ciphertext = try CryptoService.encrypt(plaintext, using: key)
+
+          - static func decrypt(_ data: Data, using key: SymmetricKey) throws -&gt; Data
+            Purpose: AES-GCM decryption for testing key functionality
+            Usage: let plaintext = try CryptoService.decrypt(ciphertext, using: key)
+        </interfaces>
+        <patterns>
+          - Uses os.log Logger for consistent logging pattern
+          - Static methods for stateless service
+          - Comprehensive DocC documentation comments
+          - Detailed error types with LocalizedError protocol
+        </patterns>
+      </artifact>
+
+      <artifact path="ios/RialTests/Crypto/CryptoServiceTests.swift" type="swift-test" relevance="high">
+        <description>Test patterns and structure for Core services</description>
+        <testPatterns>
+          - XCTest with @testable import Rial
+          - Comprehensive test documentation
+          - Test organization: MARK comments for sections
+          - Known test vectors for cryptographic operations
+          - Edge case testing (empty data, large data)
+          - Error path testing with XCTAssertThrowsError
+          - Performance benchmarks with measure {}
+          - Cleanup in tearDown() method
+        </testPatterns>
+      </artifact>
+
+      <artifact path="ios/Rial/Rial.entitlements" type="xcode-entitlements" relevance="medium">
+        <description>Xcode entitlements configuration showing Keychain access groups</description>
+        <configuration>
+          - keychain-access-groups: $(AppIdentifierPrefix)app.rial.keychain
+          - Keychain items scoped to "app.rial.keychain" service identifier
+          - DCAppAttest capability also configured
+        </configuration>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <prerequisite storyId="6-1-initialize-native-ios-project" status="done">
+        <reason>Provides project structure and Core/Storage/ directory</reason>
+      </prerequisite>
+
+      <prerequisite storyId="6-3-cryptokit-integration" status="done">
+        <reason>Provides CryptoService with keyToData/keyFromData serialization helpers</reason>
+      </prerequisite>
+
+      <blocks storyId="6-2-dcappattest-direct-integration" status="drafted">
+        <reason>DCAppAttest will store attestation key IDs in Keychain</reason>
+      </blocks>
+
+      <blocks storyId="6-10-ios-data-protection-encryption" status="backlog">
+        <reason>Will store encryption keys in Keychain for offline capture encryption</reason>
+      </blocks>
+
+      <externalDependency name="Security.framework" type="system-framework">
+        <description>Built-in iOS framework providing Keychain Services API</description>
+        <apis>
+          - SecItemAdd: Add items to Keychain
+          - SecItemCopyMatching: Retrieve items from Keychain
+          - SecItemUpdate: Update existing Keychain items
+          - SecItemDelete: Remove items from Keychain
+          - SecKeyCreateRandomKey: Create Secure Enclave keys
+          - SecAccessControlCreateWithFlags: Configure key access control
+        </apis>
+      </externalDependency>
+
+      <externalDependency name="Foundation.framework" type="system-framework">
+        <description>Provides Codable protocol and JSON encoding/decoding</description>
+        <apis>
+          - JSONEncoder: Encode DeviceState to JSON
+          - JSONDecoder: Decode DeviceState from JSON
+          - Data: Binary data handling
+        </apis>
+      </externalDependency>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <architectural>
+      - MUST use direct Security.framework APIs (no third-party wrappers)
+      - MUST scope all Keychain items to service identifier "app.rial.keychain"
+      - MUST use kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly as default accessibility
+      - MUST set kSecAttrSynchronizable = false to prevent iCloud sync
+      - MUST use hardware-backed Keychain storage (no UserDefaults or files)
+      - Secure Enclave keys MUST use kSecAttrTokenIDSecureEnclave attribute
+      - Secure Enclave keys MUST be non-extractable (kSecAttrIsPermanent = true)
+    </architectural>
+
+    <security>
+      - Keys stored with ThisDeviceOnly attribute (no cross-device access)
+      - No key export functionality (keys lost if device erased by design)
+      - Never expose raw key bytes outside Keychain/CryptoService boundary
+      - Log key names as .public, but redact key values
+      - All Keychain operations must handle errors gracefully
+      - Authentication failures indicate tampering or wrong key
+    </security>
+
+    <performance>
+      - Basic save/load operations should complete in &lt; 10ms
+      - SymmetricKey serialization round-trip should be &lt; 1ms
+      - DeviceState JSON encoding should be &lt; 5ms
+      - Secure Enclave key generation may take 50-200ms (acceptable)
+    </performance>
+
+    <implementation>
+      - Place KeychainService.swift in ios/Rial/Core/Storage/
+      - Place KeychainServiceTests.swift in ios/RialTests/Storage/
+      - Follow CryptoService code patterns (static Logger, DocC comments)
+      - Use os.log Logger with subsystem "app.rial", category "keychain"
+      - Implement LocalizedError protocol for all error types
+      - Include OSStatus codes in error types for debugging
+      - Use @testable import Rial in tests
+      - Create Storage/ directory in RialTests/ if it doesn't exist
+    </implementation>
+
+    <keychainKeys>
+      - rial.attestation.keyId: DCAppAttest key identifier (String)
+      - rial.device.id: Registered device UUID (String)
+      - rial.device.state: Complete DeviceState (JSON)
+      - rial.encryption.key: Offline capture encryption key (SymmetricKey, 32 bytes)
+    </keychainKeys>
+  </constraints>
+
+  <interfaces>
+    <external>
+      <interface name="CryptoService" path="ios/Rial/Core/Crypto/CryptoService.swift">
+        <method>
+          static func keyToData(_ key: SymmetricKey) -&gt; Data
+          - Convert SymmetricKey to Data for Keychain storage
+          - Returns 32 bytes of key material
+          - Used in saveSymmetricKey()
+        </method>
+        <method>
+          static func keyFromData(_ data: Data) throws -&gt; SymmetricKey
+          - Reconstruct SymmetricKey from Keychain data
+          - Validates data is exactly 32 bytes
+          - Throws CryptoError.invalidKey if invalid
+          - Used in loadSymmetricKey()
+        </method>
+        <method>
+          static func generateKey() -&gt; SymmetricKey
+          - Generate new 256-bit AES key
+          - Used for testing and by Story 6.10
+        </method>
+      </interface>
+    </external>
+
+    <internal>
+      <interface name="KeychainService" path="ios/Rial/Core/Storage/KeychainService.swift">
+        <method>
+          func save(_ data: Data, forKey key: String) throws
+          - Save arbitrary Data to Keychain
+          - Automatically updates if item exists
+          - Throws KeychainError on failure
+        </method>
+        <method>
+          func load(forKey key: String) throws -&gt; Data?
+          - Load Data from Keychain
+          - Returns nil if item not found (doesn't throw)
+          - Throws KeychainError on other failures
+        </method>
+        <method>
+          func delete(forKey key: String) throws
+          - Remove item from Keychain
+          - Succeeds silently if item doesn't exist
+          - Throws KeychainError on other failures
+        </method>
+        <method>
+          func saveSymmetricKey(_ key: SymmetricKey, forKey keyName: String) throws
+          - Save CryptoKit SymmetricKey
+          - Uses CryptoService.keyToData() internally
+          - Throws KeychainError on failure
+        </method>
+        <method>
+          func loadSymmetricKey(forKey keyName: String) throws -&gt; SymmetricKey?
+          - Load CryptoKit SymmetricKey
+          - Uses CryptoService.keyFromData() internally
+          - Returns nil if not found
+          - Throws KeychainError on deserialization failure
+        </method>
+        <method>
+          func saveDeviceState(_ state: DeviceState) throws
+          - Save DeviceState as JSON
+          - Uses JSONEncoder with iso8601 dates
+          - Stores with key "rial.device.state"
+        </method>
+        <method>
+          func loadDeviceState() throws -&gt; DeviceState?
+          - Load DeviceState from JSON
+          - Uses JSONDecoder with iso8601 dates
+          - Returns nil if not found
+          - Throws KeychainError if JSON invalid
+        </method>
+        <method>
+          func saveSecureEnclaveKey(tag: String) throws -&gt; SecKey
+          - Create P-256 key in Secure Enclave
+          - Key is hardware-bound, non-extractable
+          - Returns SecKey reference
+          - Requires physical device
+        </method>
+        <method>
+          func loadSecureEnclaveKey(tag: String) throws -&gt; SecKey?
+          - Load existing Secure Enclave key
+          - Returns nil if not found
+          - Throws KeychainError on failure
+        </method>
+        <method>
+          func deleteSecureEnclaveKey(tag: String) throws
+          - Remove Secure Enclave key
+          - Succeeds silently if key doesn't exist
+        </method>
+      </interface>
+
+      <dataModel name="DeviceState" path="ios/Rial/Models/Device.swift (to be created in Story 6.2)">
+        <description>Device registration state stored in Keychain</description>
+        <fields>
+          - deviceId: UUID
+          - attestationKeyId: String
+          - attestationLevel: AttestationLevel (enum: secureEnclave, unverified)
+          - hasLidar: Bool
+          - deviceModel: String
+          - registeredAt: Date
+        </fields>
+        <encoding>JSON with iso8601 date encoding</encoding>
+      </dataModel>
+
+      <errorType name="KeychainError">
+        <cases>
+          - saveFailed(OSStatus): Item could not be saved
+          - loadFailed(OSStatus): Item could not be retrieved
+          - deleteFailed(OSStatus): Item could not be deleted
+          - itemNotFound: Key does not exist
+          - duplicateItem: Item already exists on save
+          - invalidData: Data format incorrect
+          - unexpectedError(OSStatus): Unexpected Keychain error
+        </cases>
+        <protocol>LocalizedError for user-friendly descriptions</protocol>
+      </errorType>
+    </internal>
+  </interfaces>
+
+  <tests>
+    <standards>
+      - XCTest framework with @testable import Rial
+      - Test file: ios/RialTests/Storage/KeychainServiceTests.swift
+      - Create RialTests/Storage/ directory if needed
+      - Use setUp() to create KeychainService instance
+      - Use tearDown() to clean up test Keychain items
+      - Organize tests with MARK: comments for sections
+      - Document test purpose with inline comments
+      - Use XCTAssert* methods for verification
+      - Test both success and error paths
+      - Use XCTAssertThrowsError for error testing
+      - Target: 95%+ code coverage
+    </standards>
+
+    <locations>
+      - ios/RialTests/Storage/KeychainServiceTests.swift (new file)
+      - Follow pattern from ios/RialTests/Crypto/CryptoServiceTests.swift
+      - Create Storage/ subdirectory in RialTests/ if it doesn't exist
+    </locations>
+
+    <ideas>
+      <testCase name="testSaveAndLoad_RoundTrip">
+        - Save test data with key "test.key"
+        - Load data back
+        - Verify loaded data matches saved data
+        - Clean up in tearDown
+      </testCase>
+
+      <testCase name="testLoad_NonExistentKey_ReturnsNil">
+        - Attempt to load non-existent key
+        - Verify returns nil (doesn't throw)
+      </testCase>
+
+      <testCase name="testSave_DuplicateKey_UpdatesItem">
+        - Save data with key "test.key"
+        - Save different data with same key
+        - Verify second save updates (doesn't error)
+        - Load and verify updated value
+      </testCase>
+
+      <testCase name="testDelete_ExistingItem_Succeeds">
+        - Save test data
+        - Delete the item
+        - Verify item no longer exists (load returns nil)
+      </testCase>
+
+      <testCase name="testDelete_NonExistentItem_Succeeds">
+        - Delete non-existent key
+        - Verify doesn't throw (succeeds silently)
+      </testCase>
+
+      <testCase name="testSymmetricKey_SaveAndLoad">
+        - Generate SymmetricKey with CryptoService.generateKey()
+        - Save key with saveSymmetricKey()
+        - Load key with loadSymmetricKey()
+        - Verify key works by encrypting and decrypting test data
+        - Compare plaintext after round-trip
+      </testCase>
+
+      <testCase name="testSymmetricKey_LoadNonExistent_ReturnsNil">
+        - Attempt to load non-existent SymmetricKey
+        - Verify returns nil
+      </testCase>
+
+      <testCase name="testDeviceState_SaveAndLoad">
+        - Create DeviceState with all fields
+        - Save with saveDeviceState()
+        - Load with loadDeviceState()
+        - Verify all fields match (deviceId, attestationKeyId, etc.)
+      </testCase>
+
+      <testCase name="testDeviceState_LoadNonExistent_ReturnsNil">
+        - Attempt to load DeviceState when none exists
+        - Verify returns nil
+      </testCase>
+
+      <testCase name="testKeychainItem_PersistsAcrossInstances">
+        - Save test data with first KeychainService instance
+        - Create new KeychainService instance
+        - Load data with new instance
+        - Verify data persists
+      </testCase>
+
+      <testCase name="testSave_EmptyData_Succeeds">
+        - Save empty Data()
+        - Load and verify it's empty
+      </testCase>
+
+      <testCase name="testSave_LargeData_Succeeds">
+        - Save 1MB of test data
+        - Load and verify size matches
+      </testCase>
+
+      <testCase name="testSecureEnclaveKey_CreateAndLoad">
+        - Create Secure Enclave key with saveSecureEnclaveKey()
+        - Load key with loadSecureEnclaveKey()
+        - Verify key exists
+        - Note: Requires physical device with Secure Enclave
+      </testCase>
+
+      <testCase name="testSecureEnclaveKey_Delete">
+        - Create Secure Enclave key
+        - Delete with deleteSecureEnclaveKey()
+        - Verify key no longer exists
+        - Note: Requires physical device
+      </testCase>
+    </ideas>
+  </tests>
+
+  <implementationNotes>
+    <integrationPoints>
+      <point story="6.2" description="DCAppAttest Direct Integration">
+        Will use KeychainService to store:
+        - Attestation key ID (rial.attestation.keyId)
+        - Device ID (rial.device.id)
+        - Complete DeviceState (rial.device.state)
+      </point>
+
+      <point story="6.10" description="iOS Data Protection Encryption">
+        Will use KeychainService to store:
+        - Encryption key for offline captures (rial.encryption.key)
+        - Uses saveSymmetricKey/loadSymmetricKey methods
+        - Key retrieved for encrypting capture data before CoreData storage
+      </point>
+    </integrationPoints>
+
+    <codePatterns>
+      <pattern name="Logger Usage">
+        - Create static Logger: private static let logger = Logger(subsystem: "app.rial", category: "keychain")
+        - Use logger.info() for key operations
+        - Use logger.debug() for detailed flow
+        - Use logger.error() for failures with context
+        - Mark key names as .public privacy level
+        - Never log key values
+      </pattern>
+
+      <pattern name="Error Handling">
+        - Map OSStatus to specific KeychainError cases
+        - Include OSStatus in error for debugging
+        - Implement LocalizedError for user-friendly messages
+        - Handle common cases: errSecDuplicateItem (update instead), errSecItemNotFound (return nil)
+      </pattern>
+
+      <pattern name="Keychain Query Dictionary">
+        - Always include kSecClass (kSecClassGenericPassword for data, kSecClassKey for Secure Enclave)
+        - Always include kSecAttrService for app-specific scoping
+        - Use kSecAttrAccount for key name
+        - Set kSecAttrAccessible for data protection
+        - Set kSecAttrSynchronizable = false to prevent iCloud sync
+      </pattern>
+
+      <pattern name="CryptoService Integration">
+        - Use CryptoService.keyToData() to serialize SymmetricKey before save()
+        - Use CryptoService.keyFromData() to deserialize after load()
+        - Handle CryptoError.invalidKey from keyFromData()
+        - Test key functionality with encrypt/decrypt after retrieval
+      </pattern>
+    </codePatterns>
+
+    <securityConsiderations>
+      - Default accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        Rationale: Balances security with background operation needs
+        Data accessible after first unlock, even when device re-locked
+
+      - ThisDeviceOnly: Prevents iCloud Keychain sync
+        Critical for device-bound attestation keys
+
+      - Secure Enclave keys are non-extractable by design
+        Keys cannot be backed up, lost if device erased
+        Acceptable tradeoff for maximum security
+
+      - No key export functionality
+        Aligns with privacy-first approach
+        Users understand keys are device-bound
+
+      - OSStatus codes logged for debugging
+        Helps diagnose Keychain issues in production
+        Common errors: -25300 (not found), -25299 (duplicate), -25308 (device locked)
+    </securityConsiderations>
+
+    <knownLimitations>
+      - Secure Enclave operations require physical device
+        Cannot test in simulator (limited Secure Enclave support)
+        Include in device-only test suite
+
+      - Keychain size limits
+        Practical limit ~1MB per item
+        Not an issue for keys and small DeviceState
+
+      - Background access restrictions
+        Data accessible after first unlock
+        Not accessible before first unlock after boot
+    </knownLimitations>
+  </implementationNotes>
+</story-context>
