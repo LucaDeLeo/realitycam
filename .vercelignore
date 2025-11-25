@@ -1,0 +1,33 @@
+# iOS app
+ios/
+
+# Backend (Rust)
+backend/
+
+# Mobile app
+apps/mobile/
+
+# Documentation
+docs/
+
+# Infrastructure
+infrastructure/
+
+# Git
+.git/
+
+# Build outputs
+target/
+
+# IDE
+.idea/
+.vscode/
+
+# Test artifacts
+playwright-report/
+test-results/
+coverage/
+
+# Misc
+*.log
+.DS_Store

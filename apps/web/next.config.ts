@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Transpile shared workspace package
+  transpilePackages: ["@realitycam/shared"],
 };
 
 export default nextConfig;
