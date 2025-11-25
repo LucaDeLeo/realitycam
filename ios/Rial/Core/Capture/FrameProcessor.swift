@@ -123,12 +123,14 @@ public final class FrameProcessor: @unchecked Sendable {
             photoHash: photoHash
         )
 
-        // Construct final CaptureData
+        // Construct final CaptureData (assertion added separately by CaptureAssertionService)
         let captureData = CaptureData(
             jpeg: jpegData,
             depth: compressedDepth,
             metadata: metadata,
             assertion: nil,
+            assertionStatus: .none,
+            assertionAttemptCount: 0,
             timestamp: Date(timeIntervalSince1970: frame.timestamp)
         )
 

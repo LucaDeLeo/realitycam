@@ -101,7 +101,7 @@ development_status:
   6-5-arkit-unified-capture-session: done
   6-6-frame-processing-pipeline: done
   6-7-metal-depth-visualization: done
-  6-8-per-capture-assertion-signing: backlog
+  6-8-per-capture-assertion-signing: done
   6-9-coredata-capture-queue: backlog
   6-10-ios-data-protection-encryption: backlog
   6-11-urlsession-background-uploads: backlog

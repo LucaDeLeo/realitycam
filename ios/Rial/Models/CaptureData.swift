@@ -38,7 +38,14 @@ public struct CaptureData: Codable, Identifiable, Sendable {
     public let metadata: CaptureMetadata
 
     /// Hardware attestation assertion data (added by Story 6.8)
+    /// Contains CBOR-encoded signature from Secure Enclave (1-2KB typical)
     public var assertion: Data?
+
+    /// Status of assertion generation for this capture
+    public var assertionStatus: AssertionStatus
+
+    /// Number of assertion generation attempts (for retry logic)
+    public var assertionAttemptCount: Int
 
     /// Capture timestamp
     public let timestamp: Date
@@ -51,6 +58,8 @@ public struct CaptureData: Codable, Identifiable, Sendable {
     ///   - depth: Compressed depth map data
     ///   - metadata: Capture metadata
     ///   - assertion: Optional hardware attestation assertion
+    ///   - assertionStatus: Status of assertion generation (defaults to .none)
+    ///   - assertionAttemptCount: Number of assertion attempts (defaults to 0)
     ///   - timestamp: Capture timestamp (defaults to current time)
     public init(
         id: UUID = UUID(),
@@ -58,6 +67,8 @@ public struct CaptureData: Codable, Identifiable, Sendable {
         depth: Data,
         metadata: CaptureMetadata,
         assertion: Data? = nil,
+        assertionStatus: AssertionStatus = .none,
+        assertionAttemptCount: Int = 0,
         timestamp: Date = Date()
     ) {
         self.id = id
@@ -65,6 +76,8 @@ public struct CaptureData: Codable, Identifiable, Sendable {
         self.depth = depth
         self.metadata = metadata
         self.assertion = assertion
+        self.assertionStatus = assertionStatus
+        self.assertionAttemptCount = assertionAttemptCount
         self.timestamp = timestamp
     }
 
@@ -77,6 +90,42 @@ public struct CaptureData: Codable, Identifiable, Sendable {
     public var totalSizeFormatted: String {
         ByteCountFormatter.string(fromByteCount: Int64(totalSizeBytes), countStyle: .file)
     }
+
+    /// Base64-encoded assertion for JSON serialization in upload metadata.
+    /// Returns `nil` if no assertion is available.
+    public var base64EncodedAssertion: String? {
+        assertion?.base64EncodedString()
+    }
+
+    /// Whether this capture has a valid assertion attached
+    public var hasAssertion: Bool {
+        assertion != nil && assertionStatus == .generated
+    }
+
+    /// Whether this capture needs assertion retry
+    public var needsAssertionRetry: Bool {
+        assertionStatus == .pending && assertionAttemptCount < 3
+    }
+}
+
+// MARK: - AssertionStatus
+
+/// Status of assertion generation for a capture.
+///
+/// Tracks whether assertion was successfully generated, pending retry,
+/// or permanently failed.
+public enum AssertionStatus: String, Codable, Sendable {
+    /// No assertion attempted yet
+    case none
+
+    /// Assertion successfully generated
+    case generated
+
+    /// Assertion generation failed, pending retry
+    case pending
+
+    /// Retry limit exceeded, assertion failed permanently
+    case failed
 }
 
 // MARK: - CaptureMetadata
