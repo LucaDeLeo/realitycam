@@ -41,7 +41,7 @@ RUN apt-get update && apt-get install -y \
     libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy binary from builder
+# Copy binary from builder.
 COPY --from=builder /app/target/release/realitycam-api .
 
 # Copy migrations and certs
