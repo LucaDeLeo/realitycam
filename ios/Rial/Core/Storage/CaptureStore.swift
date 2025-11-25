@@ -47,6 +47,9 @@ final class CaptureStore {
     /// CoreData persistent container
     private let container: NSPersistentContainer
 
+    /// Optional encryption service for at-rest encryption
+    private let encryption: CaptureEncryption?
+
     /// Retention period for uploaded captures (7 days)
     private let retentionDays: Int = 7
 
@@ -60,8 +63,11 @@ final class CaptureStore {
     /// Initializes CoreData stack with iOS Data Protection and
     /// lightweight migration support.
     ///
-    /// - Parameter inMemory: If true, uses in-memory store (for testing)
-    init(inMemory: Bool = false) {
+    /// - Parameters:
+    ///   - inMemory: If true, uses in-memory store (for testing)
+    ///   - encryption: Optional encryption service for at-rest encryption
+    init(inMemory: Bool = false, encryption: CaptureEncryption? = nil) {
+        self.encryption = encryption
         container = NSPersistentContainer(
             name: "RialModel",
             managedObjectModel: Self.createManagedObjectModel()
@@ -122,22 +128,43 @@ final class CaptureStore {
     func saveCapture(_ capture: CaptureData, status: CaptureStatus = .pending) async throws {
         let context = container.newBackgroundContext()
 
+        // Encrypt data if encryption service is available
+        let jpegData: Data
+        let depthData: Data
+        let metadataData: Data
+        let assertionData: Data?
+
+        if let encryption = encryption {
+            let metadata = try JSONEncoder().encode(capture.metadata)
+            let encrypted = try encryption.encryptCapture(jpeg: capture.jpeg, depth: capture.depth, metadata: metadata)
+            jpegData = encrypted.jpeg
+            depthData = encrypted.depth
+            metadataData = encrypted.metadata
+            assertionData = try encryption.encrypt(optional: capture.assertion)
+        } else {
+            jpegData = capture.jpeg
+            depthData = capture.depth
+            metadataData = try JSONEncoder().encode(capture.metadata)
+            assertionData = capture.assertion
+        }
+
         try await context.perform {
             let entity = CaptureEntity(context: context)
             entity.id = capture.id
-            entity.jpeg = capture.jpeg
-            entity.depth = capture.depth
-            entity.metadata = try JSONEncoder().encode(capture.metadata)
-            entity.assertion = capture.assertion
+            entity.jpeg = jpegData
+            entity.depth = depthData
+            entity.metadata = metadataData
+            entity.assertion = assertionData
             entity.assertionStatus = capture.assertionStatus.rawValue
             entity.status = status.rawValue
             entity.createdAt = capture.timestamp
             entity.attemptCount = 0
+            entity.isEncrypted = self.encryption != nil
 
             try context.save()
         }
 
-        Self.logger.info("Saved capture: \(capture.id.uuidString, privacy: .public)")
+        Self.logger.info("Saved capture: \(capture.id.uuidString, privacy: .public) (encrypted: \(self.encryption != nil))")
 
         // Check storage quota after save
         await checkStorageQuota()
@@ -368,14 +395,37 @@ final class CaptureStore {
 
     /// Convert CaptureEntity to CaptureData.
     private func captureData(from entity: CaptureEntity) throws -> CaptureData {
-        let metadata = try JSONDecoder().decode(CaptureMetadata.self, from: entity.metadata)
+        // Decrypt if necessary
+        let jpegData: Data
+        let depthData: Data
+        let metadataData: Data
+        let assertionData: Data?
+
+        if entity.isEncrypted, let encryption = encryption {
+            let decrypted = try encryption.decryptCapture(
+                jpeg: entity.jpeg,
+                depth: entity.depth,
+                metadata: entity.metadata
+            )
+            jpegData = decrypted.jpeg
+            depthData = decrypted.depth
+            metadataData = decrypted.metadata
+            assertionData = try encryption.decrypt(optional: entity.assertion)
+        } else {
+            jpegData = entity.jpeg
+            depthData = entity.depth
+            metadataData = entity.metadata
+            assertionData = entity.assertion
+        }
+
+        let metadata = try JSONDecoder().decode(CaptureMetadata.self, from: metadataData)
 
         return CaptureData(
             id: entity.id,
-            jpeg: entity.jpeg,
-            depth: entity.depth,
+            jpeg: jpegData,
+            depth: depthData,
             metadata: metadata,
-            assertion: entity.assertion,
+            assertion: assertionData,
             assertionStatus: AssertionStatus(rawValue: entity.assertionStatus) ?? .none,
             assertionAttemptCount: Int(entity.attemptCount),
             timestamp: entity.createdAt
@@ -475,11 +525,17 @@ final class CaptureStore {
         thumbnailAttr.attributeType = .binaryDataAttributeType
         thumbnailAttr.isOptional = true
 
+        let isEncryptedAttr = NSAttributeDescription()
+        isEncryptedAttr.name = "isEncrypted"
+        isEncryptedAttr.attributeType = .booleanAttributeType
+        isEncryptedAttr.isOptional = false
+        isEncryptedAttr.defaultValue = false
+
         captureEntity.properties = [
             idAttr, jpegAttr, depthAttr, metadataAttr, assertionAttr,
             assertionStatusAttr, statusAttr, createdAtAttr, attemptCountAttr,
             lastAttemptAtAttr, serverCaptureIdAttr, verificationUrlAttr,
-            uploadedAtAttr, thumbnailAttr
+            uploadedAtAttr, thumbnailAttr, isEncryptedAttr
         ]
 
         model.entities = [captureEntity]
@@ -506,6 +562,7 @@ public class CaptureEntity: NSManagedObject, Identifiable {
     @NSManaged public var verificationUrl: String?
     @NSManaged public var uploadedAt: Date?
     @NSManaged public var thumbnail: Data?
+    @NSManaged public var isEncrypted: Bool
 }
 
 extension CaptureEntity {

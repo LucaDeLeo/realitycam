@@ -103,7 +103,7 @@ development_status:
   6-7-metal-depth-visualization: done
   6-8-per-capture-assertion-signing: done
   6-9-coredata-capture-queue: done
-  6-10-ios-data-protection-encryption: backlog
+  6-10-ios-data-protection-encryption: done
   6-11-urlsession-background-uploads: backlog
   6-12-certificate-pinning-retry-logic: backlog
   6-13-swiftui-capture-screen: backlog

@@ -34,6 +34,8 @@
 		3089F9DB0025 /* CaptureStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1030 /* CaptureStore.swift */; };
 		3089F9DB0026 /* OfflineQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1031 /* OfflineQueue.swift */; };
 		3089F9DB0027 /* CaptureStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1032 /* CaptureStoreTests.swift */; };
+		3089F9DB0028 /* CaptureEncryption.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1033 /* CaptureEncryption.swift */; };
+		3089F9DB0029 /* CaptureEncryptionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1034 /* CaptureEncryptionTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -86,6 +88,8 @@
 		3089F9DB1030 /* CaptureStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureStore.swift; sourceTree = "<group>"; };
 		3089F9DB1031 /* OfflineQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineQueue.swift; sourceTree = "<group>"; };
 		3089F9DB1032 /* CaptureStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureStoreTests.swift; sourceTree = "<group>"; };
+		3089F9DB1033 /* CaptureEncryption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureEncryption.swift; sourceTree = "<group>"; };
+		3089F9DB1034 /* CaptureEncryptionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureEncryptionTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -197,6 +201,7 @@
 		3089F9DB5034 /* Storage */ = {
 			isa = PBXGroup;
 			children = (
+				3089F9DB1033 /* CaptureEncryption.swift */,
 				3089F9DB1030 /* CaptureStore.swift */,
 				3089F9DB1015 /* KeychainService.swift */,
 				3089F9DB1031 /* OfflineQueue.swift */,
@@ -291,6 +296,7 @@
 		3089F9DB5051 /* Storage */ = {
 			isa = PBXGroup;
 			children = (
+				3089F9DB1034 /* CaptureEncryptionTests.swift */,
 				3089F9DB1032 /* CaptureStoreTests.swift */,
 				3089F9DB1016 /* KeychainServiceTests.swift */,
 			);
@@ -479,6 +485,7 @@
 				3089F9DB0023 /* CaptureAssertionService.swift in Sources */,
 				3089F9DB0025 /* CaptureStore.swift in Sources */,
 				3089F9DB0026 /* OfflineQueue.swift in Sources */,
+				3089F9DB0028 /* CaptureEncryption.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -495,6 +502,7 @@
 				3089F9DB0022 /* DepthVisualizerTests.swift in Sources */,
 				3089F9DB0024 /* CaptureAssertionServiceTests.swift in Sources */,
 				3089F9DB0027 /* CaptureStoreTests.swift in Sources */,
+				3089F9DB0029 /* CaptureEncryptionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
