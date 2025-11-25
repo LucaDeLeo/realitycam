@@ -47,6 +47,10 @@
 		3089F9DB0039 /* CaptureButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1049 /* CaptureButton.swift */; };
 		3089F9DB003A /* CaptureViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1050 /* CaptureViewModel.swift */; };
 		3089F9DB003B /* CaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1051 /* CaptureView.swift */; };
+		3089F9DB003C /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1052 /* HistoryView.swift */; };
+		3089F9DB003D /* HistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1053 /* HistoryViewModel.swift */; };
+		3089F9DB003E /* CaptureThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1054 /* CaptureThumbnailView.swift */; };
+		3089F9DB003F /* EmptyHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1055 /* EmptyHistoryView.swift */; };
 		3089F9DB0033 /* UploadServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1043 /* UploadServiceTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -114,6 +118,10 @@
 		3089F9DB1049 /* CaptureButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureButton.swift; sourceTree = "<group>"; };
 		3089F9DB1050 /* CaptureViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureViewModel.swift; sourceTree = "<group>"; };
 		3089F9DB1051 /* CaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureView.swift; sourceTree = "<group>"; };
+		3089F9DB1052 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
+		3089F9DB1053 /* HistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryViewModel.swift; sourceTree = "<group>"; };
+		3089F9DB1054 /* CaptureThumbnailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureThumbnailView.swift; sourceTree = "<group>"; };
+		3089F9DB1055 /* EmptyHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyHistoryView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -272,6 +280,10 @@
 		3089F9DB5042 /* History */ = {
 			isa = PBXGroup;
 			children = (
+				3089F9DB1054 /* CaptureThumbnailView.swift */,
+				3089F9DB1055 /* EmptyHistoryView.swift */,
+				3089F9DB1052 /* HistoryView.swift */,
+				3089F9DB1053 /* HistoryViewModel.swift */,
 			);
 			path = History;
 			sourceTree = "<group>";
@@ -540,6 +552,10 @@
 				3089F9DB0039 /* CaptureButton.swift in Sources */,
 				3089F9DB003A /* CaptureViewModel.swift in Sources */,
 				3089F9DB003B /* CaptureView.swift in Sources */,
+				3089F9DB003C /* HistoryView.swift in Sources */,
+				3089F9DB003D /* HistoryViewModel.swift in Sources */,
+				3089F9DB003E /* CaptureThumbnailView.swift in Sources */,
+				3089F9DB003F /* EmptyHistoryView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

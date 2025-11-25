@@ -282,7 +282,7 @@ public struct DepthDimensions: Codable, Sendable, Equatable {
 // MARK: - CaptureStatus
 
 /// Status of a capture in the processing/upload queue.
-public enum CaptureStatus: String, Codable, Sendable {
+public enum CaptureStatus: String, Codable, Sendable, CaseIterable {
     /// Capture is being processed (JPEG conversion, compression)
     case processing
 
