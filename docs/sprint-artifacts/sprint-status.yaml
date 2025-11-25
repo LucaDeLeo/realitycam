@@ -98,7 +98,7 @@ development_status:
   6-2-dcappattest-direct-integration: done
   6-3-cryptokit-integration: done
   6-4-keychain-services-integration: done
-  6-5-arkit-unified-capture-session: backlog
+  6-5-arkit-unified-capture-session: done
   6-6-frame-processing-pipeline: backlog
   6-7-metal-depth-visualization: backlog
   6-8-per-capture-assertion-signing: backlog

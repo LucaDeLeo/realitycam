@@ -20,6 +20,8 @@
 		3089F9DB0011 /* KeychainServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1016 /* KeychainServiceTests.swift */; };
 		3089F9DB0012 /* DeviceAttestationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1017 /* DeviceAttestationService.swift */; };
 		3089F9DB0013 /* DeviceAttestationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1018 /* DeviceAttestationServiceTests.swift */; };
+		3089F9DB0014 /* ARCaptureSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1019 /* ARCaptureSession.swift */; };
+		3089F9DB0015 /* ARCaptureSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1020 /* ARCaptureSessionTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -58,6 +60,8 @@
 		3089F9DB1016 /* KeychainServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainServiceTests.swift; sourceTree = "<group>"; };
 		3089F9DB1017 /* DeviceAttestationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceAttestationService.swift; sourceTree = "<group>"; };
 		3089F9DB1018 /* DeviceAttestationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceAttestationServiceTests.swift; sourceTree = "<group>"; };
+		3089F9DB1019 /* ARCaptureSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARCaptureSession.swift; sourceTree = "<group>"; };
+		3089F9DB1020 /* ARCaptureSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARCaptureSessionTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -143,6 +147,7 @@
 		3089F9DB5031 /* Capture */ = {
 			isa = PBXGroup;
 			children = (
+				3089F9DB1019 /* ARCaptureSession.swift */,
 			);
 			path = Capture;
 			sourceTree = "<group>";
@@ -235,6 +240,7 @@
 			isa = PBXGroup;
 			children = (
 				3089F9DB5052 /* Attestation */,
+				3089F9DB5053 /* Capture */,
 				3089F9DB5051 /* Storage */,
 				3089F9DB5050 /* Crypto */,
 				3089F9DB1005 /* RialTests.swift */,
@@ -264,6 +270,14 @@
 				3089F9DB1018 /* DeviceAttestationServiceTests.swift */,
 			);
 			path = Attestation;
+			sourceTree = "<group>";
+		};
+		3089F9DB5053 /* Capture */ = {
+			isa = PBXGroup;
+			children = (
+				3089F9DB1020 /* ARCaptureSessionTests.swift */,
+			);
+			path = Capture;
 			sourceTree = "<group>";
 		};
 		3089F9DB5010 /* RialUITests */ = {
@@ -420,6 +434,7 @@
 				3089F9DB0008 /* CryptoService.swift in Sources */,
 				3089F9DB0010 /* KeychainService.swift in Sources */,
 				3089F9DB0012 /* DeviceAttestationService.swift in Sources */,
+				3089F9DB0014 /* ARCaptureSession.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -431,6 +446,7 @@
 				3089F9DB0009 /* CryptoServiceTests.swift in Sources */,
 				3089F9DB0011 /* KeychainServiceTests.swift in Sources */,
 				3089F9DB0013 /* DeviceAttestationServiceTests.swift in Sources */,
+				3089F9DB0015 /* ARCaptureSessionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
