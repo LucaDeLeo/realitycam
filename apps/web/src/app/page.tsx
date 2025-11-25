@@ -23,11 +23,10 @@ export default function Home() {
             <span className="text-xl font-bold tracking-tighter">rial.</span>
           </div>
           <Link
-            href="#"
+            href="#verify"
             className="group inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-sm font-medium text-black transition-all hover:bg-white/90 hover:scale-105"
           >
-            <AppleLogo className="h-4 w-4" />
-            <span>Get the app</span>
+            <span>Try the Verifier</span>
           </Link>
         </div>
       </nav>
@@ -36,8 +35,8 @@ export default function Home() {
       <section className="container mx-auto px-6 pt-32 pb-24 flex flex-col items-center text-center">
         <div className="space-y-8 max-w-4xl mx-auto">
           <div className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-white/80 backdrop-blur-sm mb-4">
-            <span className="flex h-2 w-2 rounded-full bg-green-500 mr-2 animate-pulse"></span>
-            Available now on iOS
+            <span className="flex h-2 w-2 rounded-full bg-yellow-500 mr-2 animate-pulse"></span>
+            Building in public
           </div>
 
           <h1 className="text-5xl font-bold text-white md:text-7xl tracking-tighter drop-shadow-lg">
@@ -50,11 +49,10 @@ export default function Home() {
 
           <div className="flex flex-col items-center space-y-12 w-full pt-4">
             <Link
-              href="#"
+              href="#verify"
               className="inline-flex h-14 items-center gap-3 rounded-full bg-white px-8 text-black transition-all hover:bg-white/90 hover:scale-105 font-medium text-lg shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)]"
             >
-              <AppleLogo className="h-6 w-6" />
-              <span>Download on the App Store</span>
+              <span>See How It Works</span>
             </Link>
 
             <div className="relative w-full max-w-5xl mx-auto mt-12 flex justify-center">
@@ -248,26 +246,38 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Stats Section */}
+      {/* Tech Stack Section */}
       <section className="container mx-auto px-6 py-20">
         <div className="mx-auto max-w-5xl">
-          <div className="grid gap-8 rounded-2xl border border-white/10 bg-black/40 p-10 backdrop-blur-md md:grid-cols-3 shadow-2xl">
-            <div className="text-center">
-              <div className="text-5xl font-bold text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">99.9%</div>
-              <div className="mt-3 text-sm font-medium text-neutral-400 uppercase tracking-wider">
-                Detection Accuracy
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-center text-neutral-400 uppercase tracking-wider">Built With</h2>
+            <div className="grid gap-6 rounded-2xl border border-white/10 bg-black/40 p-10 backdrop-blur-md md:grid-cols-3 shadow-2xl">
+              <div className="text-center space-y-3">
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-pink-500/10 ring-1 ring-pink-500/30">
+                  <Fingerprint className="h-7 w-7 text-pink-400" />
+                </div>
+                <div className="text-lg font-semibold text-white">DCAppAttest</div>
+                <div className="text-sm text-neutral-400">
+                  Apple&apos;s hardware attestation proving photos come from real devices
+                </div>
               </div>
-            </div>
-            <div className="text-center">
-              <div className="text-5xl font-bold text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">{"<2s"}</div>
-              <div className="mt-3 text-sm font-medium text-neutral-400 uppercase tracking-wider">
-                Verification Time
+              <div className="text-center space-y-3">
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-cyan-500/10 ring-1 ring-cyan-500/30">
+                  <Shield className="h-7 w-7 text-cyan-400" />
+                </div>
+                <div className="text-lg font-semibold text-white">LiDAR Depth</div>
+                <div className="text-sm text-neutral-400">
+                  3D depth maps from iPhone Pro sensors to detect screen captures
+                </div>
               </div>
-            </div>
-            <div className="text-center">
-              <div className="text-5xl font-bold text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">195+</div>
-              <div className="mt-3 text-sm font-medium text-neutral-400 uppercase tracking-wider">
-                Countries Supported
+              <div className="text-center space-y-3">
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-purple-500/10 ring-1 ring-purple-500/30">
+                  <Scale className="h-7 w-7 text-purple-400" />
+                </div>
+                <div className="text-lg font-semibold text-white">C2PA Standard</div>
+                <div className="text-sm text-neutral-400">
+                  Industry-standard content credentials from Adobe &amp; Microsoft
+                </div>
               </div>
             </div>
           </div>
@@ -295,19 +305,19 @@ export default function Home() {
       <section className="container mx-auto px-6 py-32 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-t from-pink-500/10 to-transparent pointer-events-none" />
         <div className="relative mx-auto max-w-4xl space-y-10 text-center">
-          <h2 className="text-5xl font-bold text-balance drop-shadow-xl">Try it, for rial.</h2>
+          <h2 className="text-5xl font-bold text-balance drop-shadow-xl">Help us build it.</h2>
           <p className="text-xl text-neutral-300 text-balance">
-            Be among the first to join the verified image revolution. Limited beta spots available.
+            We&apos;re actively developing rial. and looking for early testers to help shape the future of photo verification.
           </p>
           <div className="flex justify-center">
             <Button
               size="lg"
               className="h-16 px-10 text-xl font-bold text-black rounded-full bg-gradient-to-r from-pink-400 via-yellow-300 to-purple-400 hover:scale-105 transition-transform shadow-[0_0_30px_rgba(244,114,182,0.6)] border-2 border-white/20"
             >
-              [ Sign Up for the Beta ]
+              [ Join the Waitlist ]
             </Button>
           </div>
-          <p className="text-sm text-neutral-500">(Limited slots available. Launching Q2 2026.)</p>
+          <p className="text-sm text-neutral-500">Currently in development. Sign up to get notified when we launch.</p>
         </div>
       </section>
 
