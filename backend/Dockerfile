@@ -15,6 +15,9 @@ COPY Cargo.toml Cargo.lock ./
 # Create dummy src to cache dependencies
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 
+# Enable SQLx offline mode (uses cached query metadata)
+ENV SQLX_OFFLINE=true
+
 # Build dependencies (this layer is cached)
 RUN cargo build --release && rm -rf src
 
