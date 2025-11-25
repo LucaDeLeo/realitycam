@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO devices (\n            id, attestation_level, attestation_key_id, platform, model,\n            has_lidar, first_seen_at, last_seen_at, assertion_counter\n        )\n        VALUES ($1, 'secure_enclave', $2, 'iOS', $3, true, NOW(), NOW(), 0)\n        ON CONFLICT (attestation_key_id) DO UPDATE SET last_seen_at = NOW()\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "23f9a6976fc8e2ee120cdc0722b6878b695142ab65dffee0ef7f21c6da7f1037"
+}

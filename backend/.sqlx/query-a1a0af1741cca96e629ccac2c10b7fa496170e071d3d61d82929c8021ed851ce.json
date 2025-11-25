@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM devices\n            WHERE id = $1\n            AND attestation_key_id LIKE 'test-key-%'\n            AND NOT EXISTS (SELECT 1 FROM captures WHERE device_id = $1)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a1a0af1741cca96e629ccac2c10b7fa496170e071d3d61d82929c8021ed851ce"
+}
