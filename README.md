@@ -1,6 +1,6 @@
 # RealityCam
 
-> **Hackathon Note:** This repository has continued development after the hackathon deadline. The current version includes deployment to Railway/Vercel, a native Swift iOS rewrite, and various cleanups.
+> **Hackathon Note:** This repository has continued development after the hackathon deadline. The current version includes deployment to Railway/Vercel, a native Swift iOS rewrite, comprehensive CI, and various cleanups.
 >
 > **To view the code as it was at the hackathon deadline (~9pm Sunday, Nov 24, 2025 Argentina time), see commit [`2938e2e`](https://github.com/LucaDeLeo/realitycam/tree/2938e2e).**
 
@@ -8,11 +8,16 @@
 
 Photo verification platform that captures authenticated photos with hardware attestation and LiDAR depth analysis.
 
+## Live Demo
+
+- **Web App**: [realitycam.vercel.app](https://realitycam.vercel.app)
+- **Backend API**: Deployed on Railway
+
 ## Prerequisites
 
 - **Node.js** 22+ (with pnpm 9+)
 - **Rust** 1.82+
-- **Docker** 24+
+- **Docker** 24+ (for local development)
 - **Xcode** 16+ (for iOS development)
 - **iPhone Pro** or newer (LiDAR required for depth capture)
 
@@ -20,14 +25,16 @@ Photo verification platform that captures authenticated photos with hardware att
 
 ```
 realitycam/
+  ios/                  # Native Swift iOS app (SwiftUI, ARKit, DCAppAttest)
+    Rial/               # Main app target
+    RialTests/          # XCTest unit tests
+    RialUITests/        # XCTest UI tests
   apps/
-    mobile/           # Expo SDK 54 + React Native 0.81 (iOS-only)
-    web/              # Next.js 16 + Turbopack + TailwindCSS
+    web/                # Next.js 16 + Turbopack + TailwindCSS
   packages/
-    shared/           # TypeScript types shared across apps
-  backend/            # Rust/Axum API server
-  infrastructure/     # Docker Compose for local services
-  docs/               # Project documentation
+    shared/             # TypeScript types shared across web app
+  backend/              # Rust/Axum API server
+  infrastructure/       # Docker Compose for local services
 ```
 
 ## Quick Start
@@ -42,7 +49,7 @@ npm install -g pnpm
 pnpm install
 ```
 
-### 2. Start Docker Services
+### 2. Start Docker Services (Local Dev)
 
 ```bash
 # Start PostgreSQL and LocalStack
@@ -62,9 +69,6 @@ Services:
 # Backend
 cp backend/.env.example backend/.env
 
-# Mobile (optional for local dev)
-cp apps/mobile/.env.example apps/mobile/.env
-
 # Web
 cp apps/web/.env.example apps/web/.env
 ```
@@ -79,36 +83,20 @@ cargo run
 
 The API server starts at http://localhost:8080
 
-### 5. Run Mobile App (iOS)
+### 5. Run iOS App
 
-> **Note:** The mobile app requires a **physical iPhone Pro** (or newer) with LiDAR. Simulator and Expo Go are not supported due to camera/LiDAR hardware requirements.
-
-```bash
-cd apps/mobile
-pnpm install
-
-# Generate iOS project (first time or after native changes)
-npx expo prebuild --platform ios
-
-# Start Metro bundler
-pnpm start
-```
-
-Then build and run via Xcode:
+> **Note:** The iOS app requires a **physical iPhone Pro** (or newer) with LiDAR for full functionality. Simulator works for UI testing but not LiDAR capture.
 
 ```bash
-# Open Xcode workspace
-open ios/realitycam.xcworkspace
+cd ios
+open Rial.xcodeproj
 
 # In Xcode:
-# 1. Select your physical iPhone device (not simulator)
+# 1. Select your physical iPhone device (or simulator for UI testing)
 # 2. Press Cmd+R to build and run
 ```
 
-For device to connect to local backend, update `apps/mobile/.env`:
-```
-EXPO_PUBLIC_API_URL=http://<YOUR_MAC_IP>:8080
-```
+Configure the backend URL in `Rial/Core/Configuration/AppEnvironment.swift` for local development.
 
 ### 6. Run Web App
 
@@ -124,11 +112,26 @@ Opens at http://localhost:3000
 | Command | Description |
 |---------|-------------|
 | `pnpm dev:web` | Start web development server |
-| `pnpm dev:mobile` | Start mobile Expo server |
 | `pnpm docker:up` | Start Docker services |
 | `pnpm docker:down` | Stop Docker services |
 | `pnpm lint` | Run linters across all packages |
 | `pnpm typecheck` | Run TypeScript type checking |
+
+## CI/CD
+
+GitHub Actions runs on every push/PR to main:
+
+1. **Lint & Type Check** - ESLint, TypeScript, Clippy, rustfmt
+2. **Unit Tests** (parallel with change detection):
+   - Web (Vitest)
+   - iOS (XCTest)
+   - Backend (cargo test)
+3. **Integration Tests** - Backend with PostgreSQL + LocalStack
+4. **E2E Tests** - Playwright against production
+
+**Deployment**:
+- **Web**: Auto-deploys to Vercel on push to main
+- **Backend**: Auto-deploys to Railway on push to main
 
 ## Environment Variables
 
@@ -141,12 +144,6 @@ Opens at http://localhost:3000
 | `S3_BUCKET` | S3 bucket name | `realitycam-media-dev` |
 | `RUST_LOG` | Logging level | `info,sqlx=warn` |
 | `PORT` | Server port | `8080` |
-
-### Mobile (`apps/mobile/.env`)
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `EXPO_PUBLIC_API_URL` | Backend API URL | `http://localhost:8080` |
 
 ### Web (`apps/web/.env`)
 
@@ -230,12 +227,14 @@ cargo build
 
 Note: First build will take several minutes due to c2pa-rs dependencies.
 
-### Expo Prebuild Issues
+### Xcode Build Issues
 
 ```bash
-cd apps/mobile
-rm -rf ios/
-npx expo prebuild --platform ios --clean
+# Clean build
+cd ios && xcodebuild clean -scheme Rial
+
+# Reset derived data (nuclear option)
+rm -rf ~/Library/Developer/Xcode/DerivedData/Rial-*
 ```
 
 ### TypeScript Errors with Shared Types
@@ -247,12 +246,12 @@ pnpm --filter @realitycam/shared typecheck
 
 ## Tech Stack
 
-- **Mobile**: Expo SDK 54, React Native 0.81, expo-router
+- **iOS**: Native Swift, SwiftUI, ARKit, DCAppAttest, Combine
 - **Web**: Next.js 16, React 19, TailwindCSS 4
 - **Backend**: Rust, Axum 0.8, SQLx, c2pa-rs
 - **Database**: PostgreSQL 16
 - **Storage**: S3 (LocalStack for dev, AWS for prod)
-- **Types**: TypeScript, shared via workspace
+- **CI/CD**: GitHub Actions, Vercel, Railway
 
 ## License
 

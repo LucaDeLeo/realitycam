@@ -12,18 +12,29 @@ RealityCam is a photo verification platform capturing authenticated photos with 
 ```bash
 pnpm install                     # Install all dependencies
 pnpm dev:web                     # Start Next.js web app (localhost:3000)
-pnpm dev:mobile                  # Start Expo mobile server
 pnpm lint                        # Lint all packages
 pnpm typecheck                   # TypeScript check all packages
 ```
 
-### Mobile App (apps/mobile)
+### iOS App (ios/Rial)
 ```bash
-cd apps/mobile
-pnpm start                       # Start Expo dev server
-npx expo prebuild --platform ios # Generate iOS project (first time or after native changes)
-npx expo run:ios --device        # Run on physical device (required for camera/LiDAR)
-pnpm typecheck                   # TypeScript check
+cd ios
+
+# Build and run
+xcodebuild -scheme Rial -destination 'platform=iOS Simulator,name=iPhone 15 Pro' build
+
+# Run unit tests
+xcodebuild test -project Rial.xcodeproj -scheme Rial \
+  -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
+  -only-testing:RialTests
+
+# Run UI tests
+xcodebuild test -project Rial.xcodeproj -scheme Rial \
+  -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
+  -only-testing:RialUITests
+
+# Open in Xcode
+open Rial.xcodeproj
 ```
 
 ### Web App (apps/web)
@@ -46,7 +57,7 @@ cargo clippy                     # Lint
 SQLX_OFFLINE=true cargo build    # Build with cached query metadata
 ```
 
-### Docker Services
+### Docker Services (Local Dev)
 ```bash
 pnpm docker:up                   # Start PostgreSQL + LocalStack S3
 pnpm docker:down                 # Stop services
@@ -55,40 +66,55 @@ pnpm docker:down                 # Stop services
 ## Architecture
 
 ### Stack
-- **Mobile**: Expo SDK 54, React Native 0.81, expo-router, react-native-vision-camera, Zustand
+- **iOS**: Native Swift, SwiftUI, ARKit, DCAppAttest, Combine
 - **Web**: Next.js 16 (Turbopack), React 19, TailwindCSS 4
 - **Backend**: Rust, Axum 0.8, SQLx 0.8, c2pa-rs 0.51
 - **Database**: PostgreSQL 16
 - **Storage**: S3 (LocalStack dev, AWS prod)
 
+### Deployment
+- **Web**: Vercel (config: `vercel.json`)
+- **Backend**: Railway (config: `backend/railway.toml`)
+
 ### Key Directories
 ```
-apps/mobile/
-  app/                    # expo-router file-based routing
-  hooks/                  # useCapture, useLiDAR, useDeviceAttestation, etc.
-  services/               # api.ts, offlineStorage, uploadService
-  store/                  # Zustand stores (deviceStore, uploadQueueStore)
-  components/Camera/      # CameraView, DepthOverlay, CaptureButton
+ios/
+  Rial/
+    App/                      # SwiftUI entry (RialApp, ContentView, AppDelegate)
+    Core/
+      Attestation/            # DeviceAttestationService, CaptureAssertionService
+      Capture/                # ARCaptureSession, FrameProcessor, DepthVisualizer
+      Configuration/          # AppEnvironment
+      Crypto/                 # CryptoService (Secure Enclave)
+      Networking/             # APIClient, UploadService, DeviceSignature, RetryManager
+      Storage/                # KeychainService, CaptureStore, OfflineQueue, CaptureEncryption
+    Features/
+      Capture/                # CaptureView, CaptureViewModel, ARViewContainer
+      History/                # HistoryView, HistoryViewModel
+      Result/                 # ResultDetailView, EvidenceSummaryView
+    Models/                   # CaptureData
+  RialTests/                  # XCTest unit tests
+  RialUITests/                # XCTest UI tests
 
 apps/web/
-  src/app/                # Next.js App Router
-  src/components/         # Evidence/, Media/, Upload/
-  tests/                  # Playwright E2E tests + fixtures
+  src/app/                    # Next.js App Router
+  src/components/             # Evidence/, Media/, Upload/
+  tests/                      # Playwright E2E tests + fixtures
 
 backend/
-  src/routes/             # API endpoints (captures, devices, verify, health, test)
-  src/services/           # c2pa, attestation, depth_analysis, storage
-  src/middleware/         # device_auth (Ed25519 signature verification)
-  src/models/             # SQLx models (capture, device, evidence)
-  migrations/             # SQLx migrations
+  src/routes/                 # API endpoints (captures, devices, verify, health, test)
+  src/services/               # c2pa, attestation, depth_analysis, storage
+  src/middleware/             # device_auth (Ed25519 signature verification)
+  src/models/                 # SQLx models (capture, device, evidence)
+  migrations/                 # SQLx migrations
 
-packages/shared/          # TypeScript types shared across apps
+packages/shared/              # TypeScript types shared across apps
 ```
 
-### Mobile App Flow
-1. Device attestation via `@expo/app-integrity` (DCAppAttest)
+### iOS App Flow
+1. Device attestation via DCAppAttest
 2. Secure Enclave key generation for signing
-3. Photo capture with synchronized LiDAR depth map
+3. Photo capture with synchronized LiDAR depth map (ARKit)
 4. Local processing (hash, compress, metadata collection)
 5. Per-capture attestation signature
 6. Upload with device signature auth
@@ -108,11 +134,10 @@ No tokens. Device auth uses Ed25519 signatures from Secure Enclave keys. Each re
 
 ## Important Notes
 
-- **Camera requires physical device**: Simulator doesn't support multi-lens or LiDAR. Use `npx expo run:ios --device`
-- **Expo Go not supported for camera**: Must use development build after `expo prebuild`
+- **LiDAR requires physical device**: Simulator doesn't support LiDAR depth capture
 - **First Rust build is slow**: c2pa-rs compiles many dependencies
 - **SQLx offline mode**: Run `cargo sqlx prepare` after schema changes to update `.sqlx/` cache
-- **Environment files**: Copy `.env.example` to `.env` in backend/, apps/mobile/, apps/web/
+- **Environment files**: Copy `.env.example` to `.env` in backend/, apps/web/
 
 ## Database
 
@@ -126,6 +151,27 @@ sqlx migrate add <name>
 # Run migrations (happens on server start too)
 sqlx migrate run
 ```
+
+## CI/CD
+
+### GitHub Actions (`.github/workflows/ci.yml`)
+
+**Triggers**: Push/PR to main
+
+**Stages**:
+1. **Lint & Type Check** - ESLint, TypeScript, Clippy, rustfmt
+2. **Unit Tests** (parallel, with change detection):
+   - Web (Vitest) - runs if `apps/web/**` changed
+   - iOS (XCTest) - runs if `ios/**` changed
+   - Backend (cargo test) - runs if `backend/**` changed
+3. **Integration Tests** - Backend with PostgreSQL + LocalStack containers
+4. **E2E Tests** - Playwright (Chromium) against production
+
+**Change Detection**: Uses `dorny/paths-filter` to skip unchanged components.
+
+### Deployment
+- **Vercel**: Auto-deploys web app on push to main
+- **Railway**: Auto-deploys backend on push to main
 
 ## Testing
 
@@ -155,17 +201,6 @@ pnpm exec playwright install     # Install browsers (first time)
 - **Data Factories**: `EvidenceFactory` for API-based test data seeding
 - **Test Endpoints**: Backend has `/api/v1/test/evidence` endpoints (only enabled with `ENABLE_TEST_ENDPOINTS=true`)
 
-**Vitest Setup (Next.js 16 + React 19):**
-- `vitest.config.ts` - Vitest config with `vite-tsconfig-paths` for `@/` alias support
-- `vitest.setup.ts` - Next.js mocks (`next/link`, `next/navigation`, `next/image`, `next/router`, `next/headers`)
-- Includes `IntersectionObserver`, `ResizeObserver`, and `matchMedia` mocks for component tests
-
-**Running E2E Tests:**
-1. Start infrastructure: `pnpm docker:up`
-2. Start backend with test endpoints: `cd backend && ENABLE_TEST_ENDPOINTS=true cargo run`
-3. Start web app: `cd apps/web && pnpm dev`
-4. Run tests: `cd apps/web && pnpm test`
-
 **Test Files:**
 ```
 apps/web/
@@ -177,26 +212,36 @@ apps/web/
   vitest.setup.ts               # Next.js mocks and test utilities
 ```
 
-### Mobile App (Jest + Maestro)
+### iOS App (XCTest)
 ```bash
-cd apps/mobile
-pnpm test                        # Run all Jest unit tests
-pnpm test -- --testPathPattern="useCaptureProcessing"  # Run specific tests
+cd ios
+
+# Run all unit tests
+xcodebuild test -project Rial.xcodeproj -scheme Rial \
+  -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
+  -only-testing:RialTests
+
+# Run specific test class
+xcodebuild test -project Rial.xcodeproj -scheme Rial \
+  -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
+  -only-testing:RialTests/CryptoServiceTests
 ```
 
 **Test Files:**
 ```
-apps/mobile/
-  __tests__/hooks/              # Hook unit tests (useCaptureProcessing, useUploadQueue)
-  __tests__/services/           # Service tests (captureEncryption, storageQuota)
-  __tests__/store/              # Store tests (uploadQueueStore)
-  __tests__/utils/              # Utility tests (retryStrategy)
+ios/
+  RialTests/
+    Attestation/              # DeviceAttestationServiceTests, CaptureAssertionServiceTests
+    Capture/                  # ARCaptureSessionTests, FrameProcessorTests, DepthVisualizerTests
+    Crypto/                   # CryptoServiceTests
+    Networking/               # RetryManagerTests, UploadServiceTests
+    Storage/                  # KeychainServiceTests, CaptureStoreTests, CaptureEncryptionTests
+  RialUITests/                # UI automation tests
 ```
-Maestro E2E tests scaffolded but require physical device.
 
 ## Running Everything (Full Stack)
 
-### 1. Start Infrastructure
+### 1. Start Infrastructure (Local Dev)
 ```bash
 # From repo root
 docker-compose -f infrastructure/docker-compose.yml up -d
@@ -221,67 +266,35 @@ pnpm dev
 # Server at http://localhost:3000
 ```
 
-### 4. Start Mobile App
+### 4. Run iOS App
 ```bash
-cd apps/mobile
-
-# First time OR after native module changes:
-npx expo prebuild --clean --platform ios
-
-# Start Metro bundler:
-pnpm start
-
-# Build & run in Xcode:
-# Open apps/mobile/ios/realitycam.xcworkspace
-# Select your device (not simulator)
+cd ios
+open Rial.xcodeproj
+# Select your device (physical for LiDAR, simulator for UI testing)
 # Cmd+R to build and run
 ```
 
-### 5. Configure Mobile API URL
-```bash
-# apps/mobile/.env
-EXPO_PUBLIC_API_URL=http://<YOUR_IP>:8080
-
-# Find your IP:
-ipconfig getifaddr en0
-```
+### 5. Configure iOS API URL
+Update `AppEnvironment.swift` or use environment configuration for the backend URL.
 
 ## When to Rebuild / Refresh
 
 | Change Type | Action Required |
 |-------------|-----------------|
-| **TypeScript/JS in mobile** | Hot reload (automatic) or shake device → Reload |
+| **Swift code** | Cmd+R in Xcode (automatic rebuild) |
 | **TypeScript/JS in web** | Hot reload (automatic) |
 | **Rust backend code** | Restart `cargo run` |
-| **Native module Swift/ObjC** | `npx expo prebuild --clean --platform ios` + rebuild in Xcode |
-| **app.config.ts changes** | `npx expo prebuild --clean --platform ios` + rebuild in Xcode |
-| **package.json dependencies** | `pnpm install` + (if native deps) prebuild + Xcode rebuild |
 | **Database schema** | Add migration, restart backend |
 | **Environment variables** | Restart affected service |
-
-### Native Module Changes (LiDAR, etc.)
-```bash
-cd apps/mobile
-
-# Regenerate iOS project with native modules
-npx expo prebuild --clean --platform ios
-
-# Open in Xcode and rebuild
-open ios/realitycam.xcworkspace
-# Cmd+R to build and run
-```
 
 ### Quick Troubleshooting
 ```bash
 # Kill stuck backend process
 lsof -ti:8080 | xargs kill -9
 
-# Reset Metro cache
-cd apps/mobile && pnpm start --clear
+# Clean Xcode build
+cd ios && xcodebuild clean -scheme Rial
 
-# Reset iOS build
-cd apps/mobile && rm -rf ios/ && npx expo prebuild --platform ios
-
-# Check if LiDAR module is linked
-npx expo-modules-autolinking resolve | grep -i lidar
+# Reset derived data (nuclear option)
+rm -rf ~/Library/Developer/Xcode/DerivedData/Rial-*
 ```
