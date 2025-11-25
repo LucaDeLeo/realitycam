@@ -1,0 +1,723 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		3089F9DB0001 /* RialApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1001 /* RialApp.swift */; };
+		3089F9DB0002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1002 /* AppDelegate.swift */; };
+		3089F9DB0003 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1003 /* ContentView.swift */; };
+		3089F9DB0004 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1004 /* Assets.xcassets */; };
+		3089F9DB0005 /* RialTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1005 /* RialTests.swift */; };
+		3089F9DB0006 /* RialUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1006 /* RialUITests.swift */; };
+		3089F9DB0007 /* RialUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1007 /* RialUITestsLaunchTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		3089F9DB2001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3089F9DB0000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3089F9DB3001;
+			remoteInfo = Rial;
+		};
+		3089F9DB2002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3089F9DB0000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3089F9DB3001;
+			remoteInfo = Rial;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		3089F9DB1001 /* RialApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RialApp.swift; sourceTree = "<group>"; };
+		3089F9DB1002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		3089F9DB1003 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		3089F9DB1004 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		3089F9DB1005 /* RialTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RialTests.swift; sourceTree = "<group>"; };
+		3089F9DB1006 /* RialUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RialUITests.swift; sourceTree = "<group>"; };
+		3089F9DB1007 /* RialUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RialUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		3089F9DB1008 /* Rial.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Rial.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3089F9DB1009 /* RialTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RialTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		3089F9DB1010 /* RialUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RialUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		3089F9DB1011 /* Rial.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Rial.entitlements; sourceTree = "<group>"; };
+		3089F9DB1012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		3089F9DB4001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3089F9DB4002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3089F9DB4003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		3089F9DB5000 = {
+			isa = PBXGroup;
+			children = (
+				3089F9DB5001 /* Rial */,
+				3089F9DB5009 /* RialTests */,
+				3089F9DB5010 /* RialUITests */,
+				3089F9DB5020 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		3089F9DB5001 /* Rial */ = {
+			isa = PBXGroup;
+			children = (
+				3089F9DB5002 /* App */,
+				3089F9DB5003 /* Core */,
+				3089F9DB5004 /* Features */,
+				3089F9DB5005 /* Models */,
+				3089F9DB5006 /* Shaders */,
+				3089F9DB5007 /* Resources */,
+				3089F9DB1011 /* Rial.entitlements */,
+				3089F9DB1012 /* Info.plist */,
+			);
+			path = Rial;
+			sourceTree = "<group>";
+		};
+		3089F9DB5002 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				3089F9DB1001 /* RialApp.swift */,
+				3089F9DB1002 /* AppDelegate.swift */,
+				3089F9DB1003 /* ContentView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		3089F9DB5003 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				3089F9DB5030 /* Attestation */,
+				3089F9DB5031 /* Capture */,
+				3089F9DB5032 /* Crypto */,
+				3089F9DB5033 /* Networking */,
+				3089F9DB5034 /* Storage */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		3089F9DB5030 /* Attestation */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Attestation;
+			sourceTree = "<group>";
+		};
+		3089F9DB5031 /* Capture */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Capture;
+			sourceTree = "<group>";
+		};
+		3089F9DB5032 /* Crypto */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Crypto;
+			sourceTree = "<group>";
+		};
+		3089F9DB5033 /* Networking */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Networking;
+			sourceTree = "<group>";
+		};
+		3089F9DB5034 /* Storage */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Storage;
+			sourceTree = "<group>";
+		};
+		3089F9DB5004 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				3089F9DB5040 /* Capture */,
+				3089F9DB5041 /* Preview */,
+				3089F9DB5042 /* History */,
+				3089F9DB5043 /* Result */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		3089F9DB5040 /* Capture */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Capture;
+			sourceTree = "<group>";
+		};
+		3089F9DB5041 /* Preview */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Preview;
+			sourceTree = "<group>";
+		};
+		3089F9DB5042 /* History */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = History;
+			sourceTree = "<group>";
+		};
+		3089F9DB5043 /* Result */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Result;
+			sourceTree = "<group>";
+		};
+		3089F9DB5005 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		3089F9DB5006 /* Shaders */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Shaders;
+			sourceTree = "<group>";
+		};
+		3089F9DB5007 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				3089F9DB1004 /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		3089F9DB5009 /* RialTests */ = {
+			isa = PBXGroup;
+			children = (
+				3089F9DB1005 /* RialTests.swift */,
+			);
+			path = RialTests;
+			sourceTree = "<group>";
+		};
+		3089F9DB5010 /* RialUITests */ = {
+			isa = PBXGroup;
+			children = (
+				3089F9DB1006 /* RialUITests.swift */,
+				3089F9DB1007 /* RialUITestsLaunchTests.swift */,
+			);
+			path = RialUITests;
+			sourceTree = "<group>";
+		};
+		3089F9DB5020 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				3089F9DB1008 /* Rial.app */,
+				3089F9DB1009 /* RialTests.xctest */,
+				3089F9DB1010 /* RialUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		3089F9DB3001 /* Rial */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3089F9DB6001 /* Build configuration list for PBXNativeTarget "Rial" */;
+			buildPhases = (
+				3089F9DB7001 /* Sources */,
+				3089F9DB4001 /* Frameworks */,
+				3089F9DB8001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Rial;
+			productName = Rial;
+			productReference = 3089F9DB1008 /* Rial.app */;
+			productType = "com.apple.product-type.application";
+		};
+		3089F9DB3002 /* RialTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3089F9DB6002 /* Build configuration list for PBXNativeTarget "RialTests" */;
+			buildPhases = (
+				3089F9DB7002 /* Sources */,
+				3089F9DB4002 /* Frameworks */,
+				3089F9DB8002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3089F9DB9001 /* PBXTargetDependency */,
+			);
+			name = RialTests;
+			productName = RialTests;
+			productReference = 3089F9DB1009 /* RialTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		3089F9DB3003 /* RialUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3089F9DB6003 /* Build configuration list for PBXNativeTarget "RialUITests" */;
+			buildPhases = (
+				3089F9DB7003 /* Sources */,
+				3089F9DB4003 /* Frameworks */,
+				3089F9DB8003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3089F9DB9002 /* PBXTargetDependency */,
+			);
+			name = RialUITests;
+			productName = RialUITests;
+			productReference = 3089F9DB1010 /* RialUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		3089F9DB0000 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					3089F9DB3001 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					3089F9DB3002 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = 3089F9DB3001;
+					};
+					3089F9DB3003 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = 3089F9DB3001;
+					};
+				};
+			};
+			buildConfigurationList = 3089F9DBA000 /* Build configuration list for PBXProject "Rial" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 3089F9DB5000;
+			productRefGroup = 3089F9DB5020 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				3089F9DB3001 /* Rial */,
+				3089F9DB3002 /* RialTests */,
+				3089F9DB3003 /* RialUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		3089F9DB8001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3089F9DB0004 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3089F9DB8002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3089F9DB8003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		3089F9DB7001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3089F9DB0001 /* RialApp.swift in Sources */,
+				3089F9DB0002 /* AppDelegate.swift in Sources */,
+				3089F9DB0003 /* ContentView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3089F9DB7002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3089F9DB0005 /* RialTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		3089F9DB7003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3089F9DB0006 /* RialUITests.swift in Sources */,
+				3089F9DB0007 /* RialUITestsLaunchTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		3089F9DB9001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3089F9DB3001 /* Rial */;
+			targetProxy = 3089F9DB2001 /* PBXContainerItemProxy */;
+		};
+		3089F9DB9002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3089F9DB3001 /* Rial */;
+			targetProxy = 3089F9DB2002 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		3089F9DBA001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		3089F9DBA002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		3089F9DBB001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Rial/Rial.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Rial/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Rial;
+				INFOPLIST_KEY_LSRequiresIPhoneOS = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rial.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		3089F9DBB002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Rial/Rial.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Rial/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Rial;
+				INFOPLIST_KEY_LSRequiresIPhoneOS = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rial.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		3089F9DBC001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rial.ios.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Rial.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Rial";
+			};
+			name = Debug;
+		};
+		3089F9DBC002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rial.ios.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Rial.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Rial";
+			};
+			name = Release;
+		};
+		3089F9DBD001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rial.ios.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Rial;
+			};
+			name = Debug;
+		};
+		3089F9DBD002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rial.ios.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Rial;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3089F9DBA000 /* Build configuration list for PBXProject "Rial" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3089F9DBA001 /* Debug */,
+				3089F9DBA002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		3089F9DB6001 /* Build configuration list for PBXNativeTarget "Rial" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3089F9DBB001 /* Debug */,
+				3089F9DBB002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		3089F9DB6002 /* Build configuration list for PBXNativeTarget "RialTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3089F9DBC001 /* Debug */,
+				3089F9DBC002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		3089F9DB6003 /* Build configuration list for PBXNativeTarget "RialUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3089F9DBD001 /* Debug */,
+				3089F9DBD002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 3089F9DB0000 /* Project object */;
+}

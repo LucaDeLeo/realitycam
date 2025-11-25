@@ -92,8 +92,9 @@ development_status:
   # Epic 6: Native Swift Implementation (16 stories)
   # Added via Sprint Change Proposal SCP-006 (2025-11-25)
   # Can be developed in parallel - provides native alternative to Epics 2-4 mobile
-  epic-6: backlog
-  6-1-initialize-native-ios-project: backlog
+  # Tech spec created: 2025-11-25
+  epic-6: contexted
+  6-1-initialize-native-ios-project: in-progress
   6-2-dcappattest-direct-integration: backlog
   6-3-cryptokit-integration: backlog
   6-4-keychain-services-integration: backlog

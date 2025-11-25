@@ -22,11 +22,17 @@ build/
 .turbo/
 out/
 
-# iOS specific
+# iOS specific - Expo/React Native app (apps/mobile)
 apps/mobile/ios/
-*.xcworkspace
-*.xcodeproj
+apps/mobile/**/*.xcworkspace
+apps/mobile/**/*.xcodeproj
 Pods/
+
+# iOS native app (ios/Rial) - commit xcodeproj, ignore artifacts
+ios/*/xcuserdata/
+ios/*/DerivedData/
+ios/*/build/
+ios/*/*.xcworkspace/
 
 # Android (should not exist but just in case)
 apps/mobile/android/

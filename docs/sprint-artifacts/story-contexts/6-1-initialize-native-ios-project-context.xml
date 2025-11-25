@@ -1,0 +1,551 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML
+  Story: 6-1-initialize-native-ios-project
+  Generated: 2025-11-25
+  Purpose: Single source of truth for story implementation
+-->
+<story-context>
+  <metadata>
+    <story-key>6-1-initialize-native-ios-project</story-key>
+    <story-title>Initialize Native iOS Project</story-title>
+    <epic>6 - Native Swift Implementation</epic>
+    <complexity>Simple</complexity>
+    <status>drafted</status>
+    <generated-at>2025-11-25</generated-at>
+  </metadata>
+
+  <story-summary>
+    <user-story>
+      As a developer,
+      I want the Rial iOS project created with proper Swift structure,
+      So that I can implement native security features without React Native overhead.
+    </user-story>
+    <context>
+      This is the foundational story for Epic 6 - Native Swift Implementation. It establishes
+      the Xcode project structure, capabilities, and folder organization that all subsequent
+      native iOS stories will build upon. Epic 6 re-implements the iOS mobile app in pure
+      native Swift/SwiftUI, eliminating React Native/Expo to achieve maximum security posture
+      through direct OS framework access.
+    </context>
+    <benefits>
+      <benefit>Direct Secure Enclave access for cryptographic operations</benefit>
+      <benefit>Unified RGB+depth capture with perfect synchronization</benefit>
+      <benefit>Background uploads that survive app termination</benefit>
+      <benefit>Zero external dependencies (minimal attack surface)</benefit>
+    </benefits>
+  </story-summary>
+
+  <acceptance-criteria>
+    <criterion id="AC1">
+      <title>Xcode Project Creation</title>
+      <description>
+        Given Xcode 16+ is installed with Swift 5.9+
+        When I open the project at ios/Rial/Rial.xcodeproj
+        Then the project:
+        - Builds successfully for iOS 15.0+ targets
+        - Uses SwiftUI app lifecycle (@main entry point)
+        - Has bundle identifier app.rial.ios configured
+        - Development team configured for device deployment
+      </description>
+    </criterion>
+    <criterion id="AC2">
+      <title>Project Structure</title>
+      <description>
+        Given the Xcode project exists
+        When I examine the folder structure
+        Then it matches the architecture specification with:
+        - ios/Rial/ containing App/, Core/, Features/, Models/, Shaders/, Resources/
+        - Core/ containing Attestation/, Capture/, Crypto/, Networking/, Storage/
+        - Features/ containing Capture/, Preview/, History/, Result/
+        - RialTests/ and RialUITests/ test targets
+      </description>
+    </criterion>
+    <criterion id="AC3">
+      <title>App Capabilities Configuration</title>
+      <description>
+        Given the project is created
+        When I examine Signing and Capabilities in Xcode
+        Then the following are configured:
+        - App Attest capability enabled (for DCAppAttest)
+        - Keychain Sharing capability enabled (for secure storage)
+        - Background Modes: background-fetch enabled (for upload handling)
+      </description>
+    </criterion>
+    <criterion id="AC4">
+      <title>Info.plist Configuration</title>
+      <description>
+        Given the project is created
+        When I examine Info.plist
+        Then it contains:
+        - NSCameraUsageDescription with appropriate message
+        - NSLocationWhenInUseUsageDescription with appropriate message
+        - NSPhotoLibraryUsageDescription with appropriate message
+        - UIBackgroundModes containing background-fetch
+      </description>
+    </criterion>
+    <criterion id="AC5">
+      <title>Test Targets</title>
+      <description>
+        Given the project is created
+        When I examine the project targets
+        Then test targets exist:
+        - RialTests target for XCTest unit tests
+        - RialUITests target for XCUITest UI tests
+        - Both targets build successfully
+        - Sample test file exists in each target
+      </description>
+    </criterion>
+    <criterion id="AC6">
+      <title>Git Integration</title>
+      <description>
+        Given the project is created
+        When I check .gitignore
+        Then Xcode build artifacts are excluded:
+        - *.xcuserdata/
+        - DerivedData/
+        - build/
+        - *.xcworkspace (we only need xcodeproj)
+      </description>
+    </criterion>
+  </acceptance-criteria>
+
+  <technical-requirements>
+    <requirement category="tooling">
+      <item>Xcode 16+ with iOS 18 SDK</item>
+      <item>Swift 5.9+ compiler</item>
+      <item>Apple Developer Program membership (for device deployment)</item>
+    </requirement>
+    <requirement category="deployment-target">
+      <item>iOS 15.0 minimum deployment target</item>
+      <item>iPhone only (not iPad/Mac)</item>
+    </requirement>
+    <requirement category="project-configuration">
+      <item>SwiftUI app lifecycle (@main entry point)</item>
+      <item>Bundle identifier: app.rial.ios</item>
+      <item>Display name: Rial</item>
+      <item>Organization identifier: app.rial</item>
+    </requirement>
+    <requirement category="capabilities">
+      <item>App Attest capability</item>
+      <item>Keychain Sharing with access group $(AppIdentifierPrefix)app.rial.keychain</item>
+      <item>Background Modes with background-fetch</item>
+    </requirement>
+    <requirement category="no-external-dependencies">
+      <description>
+        The project intentionally has ZERO external dependencies for security reasons.
+        All security-critical functionality uses Apple's first-party frameworks only.
+      </description>
+    </requirement>
+  </technical-requirements>
+
+  <documentation-artifacts>
+    <artifact type="story" path="docs/sprint-artifacts/stories/6-1-initialize-native-ios-project.md">
+      Primary story file with detailed tasks, acceptance criteria, and implementation notes.
+    </artifact>
+    <artifact type="tech-spec" path="docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-6.md">
+      Epic 6 technical specification with complete architecture, story breakdown,
+      API integration points, data models, and security considerations.
+    </artifact>
+    <artifact type="architecture" path="docs/architecture.md">
+      Project architecture document with decision records (ADRs), technology stack,
+      project structure, and security architecture.
+    </artifact>
+  </documentation-artifacts>
+
+  <architecture-context>
+    <project-structure>
+      <description>
+        The native iOS project structure as defined in architecture.md and tech-spec-epic-6.md:
+      </description>
+      <structure>
+ios/
+  Rial/
+    App/
+      RialApp.swift           # @main entry point
+      AppDelegate.swift       # Background task handling
+    Core/
+      Attestation/            # DCAppAttest, CaptureAssertion (Story 6.2, 6.8)
+      Capture/                # ARCaptureSession, DepthProcessor (Story 6.5, 6.6)
+      Crypto/                 # CryptoKit wrappers (Story 6.3)
+      Networking/             # APIClient, UploadService (Story 6.11, 6.12)
+      Storage/                # CoreData, Keychain (Story 6.4, 6.9)
+    Features/
+      Capture/                # CaptureView, ViewModel (Story 6.13)
+      Preview/                # PreviewView
+      History/                # HistoryView (Story 6.14)
+      Result/                 # ResultDetailView (Story 6.15)
+    Models/                   # Data models (Capture, Device, Evidence)
+    Shaders/                  # Metal shaders (Story 6.7)
+    Resources/
+      Assets.xcassets
+  RialTests/                  # XCTest unit tests
+  RialUITests/                # XCUITest UI tests
+  Rial.xcodeproj
+      </structure>
+    </project-structure>
+
+    <key-decisions>
+      <decision id="ADR-009" title="Native Swift Architecture for iOS App">
+        <rationale>
+          Security-focused photo verification app where trust is the core value proposition.
+          Native Swift eliminates JS bridge crossings for sensitive data, provides real AES-GCM
+          via CryptoKit, unified ARFrame for camera/depth sync, and background uploads via URLSession.
+        </rationale>
+        <consequences>
+          New ios/ directory with Xcode project. apps/mobile/ (Expo/RN) kept as reference.
+          All mobile stories in Epics 2-4 superseded by Epic 6. Team needs Swift/SwiftUI skills.
+        </consequences>
+      </decision>
+      <decision id="ADR-001" title="iPhone Pro Only (MVP)">
+        <rationale>
+          LiDAR sensor is primary authenticity signal. All iPhone Pro models (12+) have
+          consistent hardware. Eliminates Android fragmentation. 50% less native code.
+        </rationale>
+      </decision>
+    </key-decisions>
+
+    <zero-dependencies-philosophy>
+      <description>
+        The native iOS app uses only Apple's native frameworks - no third-party dependencies
+        for security-critical functionality.
+      </description>
+      <rationale>
+        <reason>Smaller attack surface (no supply chain risk from third-party packages)</reason>
+        <reason>Direct OS API access (no abstraction layers to compromise)</reason>
+        <reason>Easier security auditing (single language, known frameworks)</reason>
+        <reason>No dependency version conflicts or breaking updates</reason>
+      </rationale>
+      <frameworks>
+        <framework name="DeviceCheck">DCAppAttest hardware attestation - Direct Secure Enclave access</framework>
+        <framework name="CryptoKit">SHA-256, AES-GCM, key management - Hardware-accelerated</framework>
+        <framework name="ARKit">RGB + LiDAR depth capture - Unified ARFrame</framework>
+        <framework name="Metal">Depth visualization shaders - 60fps GPU-native</framework>
+        <framework name="Security">Keychain services - Secure Enclave-backed keys</framework>
+        <framework name="Foundation">URLSession networking - Background uploads, cert pinning</framework>
+        <framework name="CoreData">Local capture persistence - Offline queue management</framework>
+        <framework name="CoreLocation">GPS coordinates - Location metadata</framework>
+      </frameworks>
+    </zero-dependencies-philosophy>
+  </architecture-context>
+
+  <code-templates>
+    <template name="RialApp.swift">
+      <description>Main app entry point with SwiftUI lifecycle</description>
+      <code language="swift"><![CDATA[
+import SwiftUI
+
+@main
+struct RialApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+]]></code>
+    </template>
+
+    <template name="AppDelegate.swift">
+      <description>AppDelegate for background URL session handling</description>
+      <code language="swift"><![CDATA[
+import UIKit
+
+class AppDelegate: NSObject, UIApplicationDelegate {
+    /// Completion handler for background URL session events
+    var backgroundCompletionHandler: (() -> Void)?
+
+    func application(
+        _ application: UIApplication,
+        handleEventsForBackgroundURLSession identifier: String,
+        completionHandler: @escaping () -> Void
+    ) {
+        backgroundCompletionHandler = completionHandler
+    }
+}
+]]></code>
+    </template>
+
+    <template name="ContentView.swift">
+      <description>Placeholder ContentView for initial setup</description>
+      <code language="swift"><![CDATA[
+import SwiftUI
+
+struct ContentView: View {
+    var body: some View {
+        VStack {
+            Text("Rial")
+                .font(.largeTitle)
+                .fontWeight(.bold)
+            Text("Native iOS App")
+                .foregroundColor(.secondary)
+        }
+    }
+}
+]]></code>
+    </template>
+
+    <template name="Rial.entitlements">
+      <description>Entitlements configuration for App Attest and Keychain</description>
+      <code language="xml"><![CDATA[
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.developer.devicecheck.appattest-environment</key>
+    <string>development</string>
+    <key>keychain-access-groups</key>
+    <array>
+        <string>$(AppIdentifierPrefix)app.rial.keychain</string>
+    </array>
+</dict>
+</plist>
+]]></code>
+    </template>
+
+    <template name="RialTests.swift">
+      <description>Sample XCTest unit test template for RialTests target</description>
+      <code language="swift"><![CDATA[
+import XCTest
+
+final class RialTests: XCTestCase {
+    override func setUpWithError() throws {
+        // Put setup code here. This method is called before the invocation of each test method in the class.
+    }
+
+    override func tearDownWithError() throws {
+        // Put teardown code here. This method is called after the invocation of each test method in the class.
+    }
+
+    func testExample() throws {
+        // This is an example of a functional test case.
+        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        XCTAssertTrue(true)
+    }
+
+    func testPerformanceExample() throws {
+        // This is an example of a performance test case.
+        self.measure {
+            // Put the code you want to measure the time of here.
+        }
+    }
+}
+]]></code>
+    </template>
+
+    <template name="RialUITests.swift">
+      <description>Sample XCUITest UI test template for RialUITests target</description>
+      <code language="swift"><![CDATA[
+import XCTest
+
+final class RialUITests: XCTestCase {
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        // Put setup code here. This method is called before the invocation of each test method in the class.
+    }
+
+    override func tearDownWithError() throws {
+        // Put teardown code here. This method is called after the invocation of each test method in the class.
+    }
+
+    func testExample() throws {
+        let app = XCUIApplication()
+        app.launch()
+
+        // Use recording to get started writing UI tests.
+        // Use XCTAssert and related functions to verify your tests produce the correct results.
+    }
+
+    func testLaunchPerformance() throws {
+        if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 7.0, *) {
+            // This measures how long it takes to launch your application.
+            measure(metrics: [XCTApplicationLaunchMetric()]) {
+                XCUIApplication().launch()
+            }
+        }
+    }
+}
+]]></code>
+    </template>
+  </code-templates>
+
+  <existing-code-patterns>
+    <pattern name="React Native Attestation Flow (Reference)">
+      <source-file>apps/mobile/hooks/useDeviceAttestation.ts</source-file>
+      <description>
+        Reference implementation of DCAppAttest flow in React Native. The native Swift
+        implementation will follow similar patterns but with direct DeviceCheck API access
+        instead of @expo/app-integrity wrapper.
+      </description>
+      <key-concepts>
+        <concept>State machine: idle -> fetching_challenge -> attesting -> attested/failed</concept>
+        <concept>Exponential backoff retry (1s, 2s, 4s) for network failures</concept>
+        <concept>5-second attestation timeout protection</concept>
+        <concept>Challenge caching with expiration tracking</concept>
+      </key-concepts>
+    </pattern>
+
+    <pattern name="API Error Handling (Reference)">
+      <source-file>apps/mobile/services/api.ts</source-file>
+      <description>
+        Reference implementation of API communication patterns. Native Swift will use
+        URLSession but follow similar error code patterns and timeout handling.
+      </description>
+      <key-concepts>
+        <concept>10-second request timeout</concept>
+        <concept>Typed error codes: TIMEOUT, NETWORK_ERROR, RATE_LIMITED, SERVER_ERROR</concept>
+        <concept>AbortController for timeout management</concept>
+      </key-concepts>
+    </pattern>
+  </existing-code-patterns>
+
+  <gitignore-requirements>
+    <description>
+      The root .gitignore already contains some iOS ignores but needs Xcode-specific additions
+      for the new native ios/ directory (not apps/mobile/ios/).
+    </description>
+    <existing-patterns>
+      <pattern>apps/mobile/ios/</pattern>
+      <pattern>*.xcworkspace</pattern>
+      <pattern>*.xcodeproj</pattern>
+      <pattern>Pods/</pattern>
+    </existing-patterns>
+    <required-additions>
+      <addition>ios/*/xcuserdata/</addition>
+      <addition>ios/*/DerivedData/</addition>
+      <addition>ios/*/build/</addition>
+      <addition>ios/*/*.xcworkspace (keep xcodeproj, ignore xcworkspace)</addition>
+    </required-additions>
+    <note>
+      The existing .gitignore patterns for apps/mobile/ios/ are overly broad.
+      For the native ios/ directory, we want to commit the xcodeproj but ignore
+      user-specific data and build artifacts.
+    </note>
+  </gitignore-requirements>
+
+  <dependencies>
+    <prerequisites>
+      <item>None - this is the first story in Epic 6</item>
+    </prerequisites>
+    <blocks>
+      <story key="6-2">DCAppAttest Direct Integration - depends on project structure</story>
+      <story key="6-3">CryptoKit Integration - depends on Core/Crypto/ folder</story>
+      <story key="6-4">Keychain Services Integration - depends on Core/Storage/ folder</story>
+      <story key="6-5">ARKit Unified Capture Session - depends on Core/Capture/ folder</story>
+      <story key="6-9">CoreData Capture Queue - depends on Core/Storage/ folder</story>
+    </blocks>
+    <external-dependencies>
+      <dependency>Xcode 16+ with iOS 18 SDK</dependency>
+      <dependency>Apple Developer Program membership (for device deployment)</dependency>
+      <dependency>Physical iPhone Pro (for testing attestation in future stories)</dependency>
+    </external-dependencies>
+  </dependencies>
+
+  <testing-requirements>
+    <unit-tests>
+      <target>RialTests</target>
+      <requirement>Sample test file must exist and pass</requirement>
+      <requirement>Target must build successfully</requirement>
+    </unit-tests>
+    <ui-tests>
+      <target>RialUITests</target>
+      <requirement>Sample test file must exist and pass</requirement>
+      <requirement>Target must build successfully</requirement>
+    </ui-tests>
+    <verification-commands>
+      <command description="Build and run tests">
+        xcodebuild test \
+          -project ios/Rial.xcodeproj \
+          -scheme Rial \
+          -destination 'platform=iOS Simulator,name=iPhone 15 Pro'
+      </command>
+      <command description="Clean build">
+        xcodebuild clean build \
+          -project ios/Rial.xcodeproj \
+          -scheme Rial \
+          -destination 'platform=iOS Simulator,name=iPhone 15 Pro'
+      </command>
+    </verification-commands>
+  </testing-requirements>
+
+  <implementation-notes>
+    <note importance="critical">
+      Do NOT use the Core Data template during project creation - CoreData will be added
+      manually in Story 6.9 with specific data protection configuration.
+    </note>
+    <note importance="critical">
+      The project intentionally has ZERO external dependencies for security reasons.
+      All security-critical functionality will use Apple's first-party frameworks only.
+    </note>
+    <note importance="critical" task-reference="Task 8">
+      .gitignore Update - CRITICAL IMPLEMENTATION DETAIL:
+
+      The root .gitignore has overly broad patterns that need refinement:
+      1. Existing pattern "*.xcodeproj" will exclude all xcodeproj directories
+      2. Task 8 requires BOTH:
+         a) Scope the existing "*.xcodeproj" pattern to "apps/mobile/**/*.xcodeproj"
+            (to allow ios/Rial/Rial.xcodeproj to be committed)
+         b) Add new ios-specific patterns for build artifacts:
+            - ios/*/xcuserdata/
+            - ios/*/DerivedData/
+            - ios/*/build/
+            - ios/*/*.xcworkspace/
+
+      This ensures the native Xcode project is version-controlled while excluding
+      build artifacts and user-specific data.
+    </note>
+    <note importance="important">
+      The folder structure anticipates all 16 stories in Epic 6. Create placeholder
+      groups even if they will be empty initially.
+    </note>
+    <note importance="important">
+      Background modes are required for Story 6.11 (URLSession Background Uploads).
+      Configure them now even though they won't be used until later.
+    </note>
+    <note importance="info">
+      The ios/ directory is at the project root (not under apps/). This follows the
+      architecture decision to have the native app as a primary component, with
+      apps/mobile/ retained as reference implementation.
+    </note>
+  </implementation-notes>
+
+  <definition-of-done>
+    <checklist>
+      <item>All acceptance criteria verified and passing</item>
+      <item>All tasks completed</item>
+      <item>Project builds successfully for iOS 15.0+ simulator</item>
+      <item>Project builds successfully for iOS 15.0+ device (if team configured)</item>
+      <item>Unit test target builds and sample test passes</item>
+      <item>UI test target builds and sample test passes</item>
+      <item>App Attest capability enabled and verified</item>
+      <item>Keychain Sharing capability enabled</item>
+      <item>Info.plist contains all required usage descriptions</item>
+      <item>Folder structure matches architecture specification</item>
+      <item>.gitignore updated for Xcode artifacts</item>
+      <item>Code committed to feature branch</item>
+    </checklist>
+  </definition-of-done>
+
+  <fr-coverage>
+    <description>
+      This story provides the infrastructure foundation enabling subsequent stories
+      to implement mobile functional requirements.
+    </description>
+    <coverage>
+      <fr-group name="Device and Attestation" frs="FR1-FR3">
+        Enabled via App Attest capability
+      </fr-group>
+      <fr-group name="Capture Flow" frs="FR6-FR13">
+        Enabled via folder structure for Core/Capture/
+      </fr-group>
+      <fr-group name="Upload and Sync" frs="FR14-FR19">
+        Enabled via background modes and folder structure
+      </fr-group>
+      <fr-group name="Encrypted Storage" frs="FR17">
+        Enabled via Keychain Sharing capability
+      </fr-group>
+    </coverage>
+  </fr-coverage>
+</story-context>
