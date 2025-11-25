@@ -126,15 +126,16 @@ struct LiDARUnavailableView: View {
             Text("LiDAR Required")
                 .font(.title2)
                 .fontWeight(.semibold)
+                .foregroundColor(.white)
 
             Text("RealityCam requires an iPhone Pro model with LiDAR sensor for authenticated depth capture.")
                 .multilineTextAlignment(.center)
-                .foregroundColor(.secondary)
+                .foregroundColor(.white.opacity(0.8))
                 .padding(.horizontal)
 
             Text("Compatible devices: iPhone 12 Pro and newer")
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundColor(.white.opacity(0.6))
         }
         .padding()
     }
