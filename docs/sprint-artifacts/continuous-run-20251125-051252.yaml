@@ -15,16 +15,15 @@ configuration:
   auto_push: true
 
 checkpoint:
-  story_key: 6-6-frame-processing-pipeline
+  story_key: 6-7-metal-depth-visualization
   phase: create
-  saved_at: 2025-11-25T08:35:00Z
+  saved_at: 2025-11-25T08:42:00Z
   data: null
 
 epics_contexted: []
 
 # Re-ordered: 6.3, 6.4 first, then 6.2 can proceed (6.2 now done)
 stories_pending:
-  - 6-6-frame-processing-pipeline
   - 6-7-metal-depth-visualization
   - 6-8-per-capture-assertion-signing
   - 6-9-coredata-capture-queue
@@ -67,6 +66,12 @@ stories_processed:
     review_cycles: 0
     started_at: 2025-11-25T08:15:00Z
     completed_at: 2025-11-25T08:35:00Z
+  - story_key: 6-6-frame-processing-pipeline
+    status: success
+    commit: 78797c8
+    review_cycles: 0
+    started_at: 2025-11-25T08:35:00Z
+    completed_at: 2025-11-25T08:42:00Z
 
 stories_deferred:
   - story_key: 6-2-dcappattest-direct-integration
@@ -79,6 +84,6 @@ statistics:
   epics_contexted_jit: 0
   epics_already_contexted: 1
   total_stories: 16
-  success_count: 5
+  success_count: 6
   failed_count: 0
   deferred_count: 0

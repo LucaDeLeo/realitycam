@@ -22,6 +22,9 @@
 		3089F9DB0013 /* DeviceAttestationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1018 /* DeviceAttestationServiceTests.swift */; };
 		3089F9DB0014 /* ARCaptureSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1019 /* ARCaptureSession.swift */; };
 		3089F9DB0015 /* ARCaptureSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1020 /* ARCaptureSessionTests.swift */; };
+		3089F9DB0016 /* CaptureData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1021 /* CaptureData.swift */; };
+		3089F9DB0017 /* FrameProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1022 /* FrameProcessor.swift */; };
+		3089F9DB0018 /* FrameProcessorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1023 /* FrameProcessorTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -62,6 +65,9 @@
 		3089F9DB1018 /* DeviceAttestationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceAttestationServiceTests.swift; sourceTree = "<group>"; };
 		3089F9DB1019 /* ARCaptureSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARCaptureSession.swift; sourceTree = "<group>"; };
 		3089F9DB1020 /* ARCaptureSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARCaptureSessionTests.swift; sourceTree = "<group>"; };
+		3089F9DB1021 /* CaptureData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureData.swift; sourceTree = "<group>"; };
+		3089F9DB1022 /* FrameProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameProcessor.swift; sourceTree = "<group>"; };
+		3089F9DB1023 /* FrameProcessorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameProcessorTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -148,6 +154,7 @@
 			isa = PBXGroup;
 			children = (
 				3089F9DB1019 /* ARCaptureSession.swift */,
+				3089F9DB1022 /* FrameProcessor.swift */,
 			);
 			path = Capture;
 			sourceTree = "<group>";
@@ -217,6 +224,7 @@
 		3089F9DB5005 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				3089F9DB1021 /* CaptureData.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -276,6 +284,7 @@
 			isa = PBXGroup;
 			children = (
 				3089F9DB1020 /* ARCaptureSessionTests.swift */,
+				3089F9DB1023 /* FrameProcessorTests.swift */,
 			);
 			path = Capture;
 			sourceTree = "<group>";
@@ -435,6 +444,8 @@
 				3089F9DB0010 /* KeychainService.swift in Sources */,
 				3089F9DB0012 /* DeviceAttestationService.swift in Sources */,
 				3089F9DB0014 /* ARCaptureSession.swift in Sources */,
+				3089F9DB0016 /* CaptureData.swift in Sources */,
+				3089F9DB0017 /* FrameProcessor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -447,6 +458,7 @@
 				3089F9DB0011 /* KeychainServiceTests.swift in Sources */,
 				3089F9DB0013 /* DeviceAttestationServiceTests.swift in Sources */,
 				3089F9DB0015 /* ARCaptureSessionTests.swift in Sources */,
+				3089F9DB0018 /* FrameProcessorTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
