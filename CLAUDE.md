@@ -136,19 +136,29 @@ cargo test                       # Run all unit/integration tests
 cargo test <test_name>           # Run specific test
 ```
 
-### Web App (Playwright E2E)
+### Web App (Vitest + Playwright)
 ```bash
 cd apps/web
+pnpm test:unit                   # Run Vitest unit tests (lib functions)
+pnpm test:unit:watch             # Watch mode for unit tests
+pnpm test:unit:coverage          # Unit tests with coverage
 pnpm test                        # Run all E2E tests (Chromium, Firefox, WebKit, Mobile)
 pnpm test -- --project=chromium  # Run Chromium only (faster)
 pnpm exec playwright install     # Install browsers (first time)
 ```
 
 **Test Infrastructure:**
-- **Framework**: Playwright with multi-browser support
+- **Unit Tests**: Vitest with jsdom for lib utilities and React components
+- **Component Tests**: React Testing Library with Next.js mocks
+- **E2E Tests**: Playwright with multi-browser support
 - **Browsers**: Chromium, Firefox, WebKit, Mobile Chrome
 - **Data Factories**: `EvidenceFactory` for API-based test data seeding
 - **Test Endpoints**: Backend has `/api/v1/test/evidence` endpoints (only enabled with `ENABLE_TEST_ENDPOINTS=true`)
+
+**Vitest Setup (Next.js 16 + React 19):**
+- `vitest.config.ts` - Vitest config with `vite-tsconfig-paths` for `@/` alias support
+- `vitest.setup.ts` - Next.js mocks (`next/link`, `next/navigation`, `next/image`, `next/router`, `next/headers`)
+- Includes `IntersectionObserver`, `ResizeObserver`, and `matchMedia` mocks for component tests
 
 **Running E2E Tests:**
 1. Start infrastructure: `pnpm docker:up`
@@ -158,17 +168,29 @@ pnpm exec playwright install     # Install browsers (first time)
 
 **Test Files:**
 ```
-apps/web/tests/
-  e2e/                          # E2E test specs
-  support/
-    fixtures/                   # Playwright fixtures (page, apiHelper)
-    fixtures/factories/         # Data factories (EvidenceFactory)
+apps/web/
+  src/lib/__tests__/            # Unit tests for lib utilities (status.ts, api.ts)
+  src/app/**/__tests__/         # Component tests (error.tsx, not-found.tsx)
+  tests/e2e/                    # E2E test specs
+  tests/support/fixtures/       # Playwright fixtures
+  vitest.config.ts              # Vitest configuration
+  vitest.setup.ts               # Next.js mocks and test utilities
 ```
 
 ### Mobile App (Jest + Maestro)
 ```bash
 cd apps/mobile
-pnpm test                        # Run Jest unit tests
+pnpm test                        # Run all Jest unit tests
+pnpm test -- --testPathPattern="useCaptureProcessing"  # Run specific tests
+```
+
+**Test Files:**
+```
+apps/mobile/
+  __tests__/hooks/              # Hook unit tests (useCaptureProcessing, useUploadQueue)
+  __tests__/services/           # Service tests (captureEncryption, storageQuota)
+  __tests__/store/              # Store tests (uploadQueueStore)
+  __tests__/utils/              # Utility tests (retryStrategy)
 ```
 Maestro E2E tests scaffolded but require physical device.
 

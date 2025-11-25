@@ -14,8 +14,13 @@ module.exports = {
     '^.+\\.(js|jsx|ts|tsx)$': 'babel-jest',
   },
 
-  // Test file patterns
-  testMatch: ['<rootDir>/tests/**/*.test.{ts,tsx}', '<rootDir>/tests/**/*.spec.{ts,tsx}'],
+  // Test file patterns - include both tests/ and __tests__/ directories
+  testMatch: [
+    '<rootDir>/tests/**/*.test.{ts,tsx}',
+    '<rootDir>/tests/**/*.spec.{ts,tsx}',
+    '<rootDir>/__tests__/**/*.test.{ts,tsx}',
+    '<rootDir>/__tests__/**/*.spec.{ts,tsx}',
+  ],
 
   // Setup files
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
