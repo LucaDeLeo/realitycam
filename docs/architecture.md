@@ -1,4 +1,4 @@
-# RealityCam - Architecture Document
+# rial. - Architecture Document
 
 **Author:** Luca
 **Architect:** Winston (BMAD)
@@ -9,10 +9,10 @@
 
 ## Executive Summary
 
-RealityCam is a focused MVP providing cryptographically-attested, LiDAR-verified photo provenance for iPhone Pro devices. The architecture prioritizes hardware-rooted trust and depth-based authenticity verification.
+rial. is a focused MVP providing cryptographically-attested, LiDAR-verified photo provenance for iPhone Pro devices. The architecture prioritizes hardware-rooted trust and depth-based authenticity verification.
 
 **Core Components:**
-- **iOS App** (Expo/React Native): Photo capture with LiDAR depth and hardware attestation
+- **iOS App** (Native Swift/SwiftUI): Photo capture with LiDAR depth and hardware attestation
 - **Backend** (Rust/Axum): Evidence computation, C2PA manifest generation
 - **Verification Web** (Next.js 16): Public verification interface
 
@@ -34,12 +34,16 @@ RealityCam is a focused MVP providing cryptographically-attested, LiDAR-verified
 
 **First implementation story should execute these commands:**
 
-### iOS App
+### iOS App (Rial)
 ```bash
-bunx create-expo-app@latest realitycam-mobile --template blank-typescript
-cd realitycam-mobile
-bunx expo install react-native-vision-camera expo-crypto expo-secure-store expo-file-system
-bunx expo prebuild --platform ios  # iOS only for MVP
+# Create new Xcode project:
+# - Product Name: Rial
+# - Interface: SwiftUI
+# - Language: Swift
+# - Storage: None (Core Data added manually)
+# - Include Tests: Yes (Unit + UI)
+# - Minimum Deployment: iOS 15.0
+# - Device: iPhone only
 ```
 
 ### Verification Web
@@ -60,20 +64,22 @@ cd realitycam-api
 
 | Category | Decision | Version | Rationale |
 |----------|----------|---------|-----------|
-| Platform | iPhone Pro only | iOS 14+ | LiDAR required for depth verification |
-| Mobile Framework | Expo + React Native | SDK 53 | TypeScript, React Native 0.79, prebuild for native |
+| Platform | iPhone Pro only | iOS 15+ | LiDAR required, modern Swift concurrency |
+| Mobile Framework | Native Swift/SwiftUI | Swift 5.9+ | Direct OS access, minimal attack surface |
 | Web Framework | Next.js | 16 | Turbopack default, Cache Components, React 19.2 |
 | Backend Framework | Axum | 0.8.x | Type-safe, Tokio ecosystem, c2pa-rs native |
 | Database | PostgreSQL | 16 | JSONB for evidence, TIMESTAMPTZ |
 | ORM | SQLx | 0.8.x | Compile-time checked queries |
 | C2PA SDK | c2pa-rs | 0.51.x | Official CAI SDK, Rust 1.82+ |
-| State Management | Zustand | Latest | Lightweight, persist middleware |
+| State Management | SwiftUI + Keychain | Native | @State, @StateObject, secure persistence |
 | File Storage | S3 + CloudFront | - | Presigned URLs, CDN delivery |
-| Attestation Library | @expo/app-integrity | ~1.0.0 | Official Expo DCAppAttest wrapper |
-| Attestation API | DCAppAttest | iOS 14+ | Secure Enclave backed |
-| Depth Capture | Custom Expo Module | Swift | ARKit LiDAR (~400 lines) |
+| Attestation | DeviceCheck (DCAppAttest) | iOS 15+ | Direct Secure Enclave, no wrappers |
+| Cryptography | CryptoKit | Native | Hardware-accelerated, Secure Enclave keys |
+| Depth Capture | ARKit | Native | Unified RGB+Depth in single ARFrame |
+| Depth Visualization | Metal | Native | 60fps GPU-native shaders |
 | Auth Pattern | Device Signature | Ed25519 | No tokens, hardware-bound |
-| Testing (Mobile) | Jest + Maestro | - | Unit + E2E on real devices |
+| Networking | URLSession | Native | Background uploads, cert pinning |
+| Testing (Mobile) | XCTest + XCUITest | - | Unit + UI tests, real devices |
 | Testing (Backend) | cargo test + testcontainers | - | Integration with real Postgres |
 | Testing (Web) | Vitest + Playwright | - | Fast unit + E2E |
 
@@ -83,41 +89,57 @@ cd realitycam-api
 
 ```
 realitycam/
+├── ios/                                 # Native Swift app (PRIMARY)
+│   ├── Rial/
+│   │   ├── App/
+│   │   │   ├── RialApp.swift            # @main entry point
+│   │   │   └── AppDelegate.swift        # Background task handling
+│   │   ├── Core/                        # Security-critical services
+│   │   │   ├── Attestation/
+│   │   │   │   ├── DeviceAttestation.swift    # DCAppAttest direct
+│   │   │   │   └── CaptureAssertion.swift     # Per-capture signing
+│   │   │   ├── Capture/
+│   │   │   │   ├── ARCaptureSession.swift     # Unified RGB+Depth
+│   │   │   │   └── DepthProcessor.swift       # Depth analysis prep
+│   │   │   ├── Crypto/
+│   │   │   │   ├── SecureKeychain.swift       # Keychain wrapper
+│   │   │   │   ├── CaptureEncryption.swift    # AES-GCM offline
+│   │   │   │   └── HashingService.swift       # CryptoKit SHA-256
+│   │   │   ├── Networking/
+│   │   │   │   ├── APIClient.swift            # URLSession + signing
+│   │   │   │   ├── DeviceSignature.swift      # Request auth
+│   │   │   │   └── UploadService.swift        # Background uploads
+│   │   │   └── Storage/
+│   │   │       ├── CaptureStore.swift         # Core Data persistence
+│   │   │       └── OfflineQueue.swift         # Upload queue
+│   │   ├── Features/                    # SwiftUI views + view models
+│   │   │   ├── Capture/
+│   │   │   │   ├── CaptureView.swift
+│   │   │   │   ├── CaptureViewModel.swift
+│   │   │   │   └── DepthOverlayView.swift     # Metal shader overlay
+│   │   │   ├── Preview/
+│   │   │   │   ├── PreviewView.swift
+│   │   │   │   └── PreviewViewModel.swift
+│   │   │   ├── History/
+│   │   │   │   ├── HistoryView.swift
+│   │   │   │   └── HistoryViewModel.swift
+│   │   │   └── Result/
+│   │   │       └── ResultView.swift
+│   │   ├── Models/
+│   │   │   ├── Capture.swift
+│   │   │   ├── Device.swift
+│   │   │   └── Evidence.swift
+│   │   ├── Shaders/
+│   │   │   └── DepthColormap.metal      # GPU depth visualization
+│   │   └── Resources/
+│   │       └── Assets.xcassets
+│   ├── RialTests/                       # XCTest unit tests
+│   ├── RialUITests/                     # XCUITest UI tests
+│   └── Rial.xcodeproj
+│
 ├── apps/
-│   ├── mobile/                          # iOS Expo app (iPhone Pro only)
-│   │   ├── app/                         # Expo Router file-based routing
-│   │   │   ├── (tabs)/
-│   │   │   │   ├── _layout.tsx
-│   │   │   │   ├── capture.tsx          # Main capture screen
-│   │   │   │   └── history.tsx          # Local capture history
-│   │   │   ├── preview.tsx              # Pre-upload preview with depth viz
-│   │   │   ├── result.tsx               # Post-upload verification link
-│   │   │   └── _layout.tsx
-│   │   ├── components/
-│   │   │   ├── Camera/
-│   │   │   │   ├── CaptureButton.tsx
-│   │   │   │   └── DepthOverlay.tsx     # LiDAR depth visualization
-│   │   │   └── Evidence/
-│   │   │       └── ConfidenceBadge.tsx
-│   │   ├── hooks/
-│   │   │   ├── useDeviceAttestation.ts  # @expo/app-integrity wrapper
-│   │   │   ├── useCapture.ts            # Photo + depth capture orchestration
-│   │   │   ├── useLiDAR.ts              # Custom LiDAR module wrapper
-│   │   │   └── useUploadQueue.ts
-│   │   ├── modules/
-│   │   │   └── lidar-depth/             # Custom Expo Module (iOS only, ~400 lines)
-│   │   │       ├── index.ts
-│   │   │       ├── ios/
-│   │   │       │   ├── LiDARDepthModule.swift
-│   │   │       │   └── DepthCaptureSession.swift
-│   │   │       └── expo-module.config.json
-│   │   ├── store/
-│   │   │   └── captureStore.ts
-│   │   ├── services/
-│   │   │   └── api.ts
-│   │   ├── app.config.ts
-│   │   └── package.json
-│   │
+│   ├── mobile/                          # Expo/RN (REFERENCE for feature parity)
+│   │   └── ...                          # Kept for parallel testing
 │   └── web/                             # Next.js 16 verification site
 │       ├── app/
 │       │   ├── page.tsx
@@ -126,7 +148,7 @@ realitycam/
 │       ├── components/
 │       │   ├── Evidence/
 │       │   │   ├── EvidencePanel.tsx
-│       │   │   ├── DepthAnalysis.tsx    # LiDAR depth visualization
+│       │   │   ├── DepthAnalysis.tsx
 │       │   │   └── ConfidenceSummary.tsx
 │       │   ├── Media/
 │       │   │   └── SecureImage.tsx
@@ -143,30 +165,14 @@ realitycam/
 │           ├── capture.ts
 │           └── api.ts
 │
-├── backend/                             # Rust API server
+├── backend/                             # Rust API server (unchanged)
 │   ├── src/
 │   │   ├── main.rs
 │   │   ├── config.rs
 │   │   ├── routes/
-│   │   │   ├── devices.rs
-│   │   │   ├── captures.rs
-│   │   │   └── verify.rs
 │   │   ├── middleware/
-│   │   │   ├── device_auth.rs
-│   │   │   └── request_id.rs
 │   │   ├── services/
-│   │   │   ├── attestation.rs           # iOS DCAppAttest verification
-│   │   │   ├── evidence/
-│   │   │   │   ├── mod.rs
-│   │   │   │   ├── hardware.rs          # Attestation checks
-│   │   │   │   ├── depth.rs             # LiDAR depth analysis
-│   │   │   │   └── metadata.rs          # EXIF/device checks
-│   │   │   ├── c2pa.rs
-│   │   │   └── storage.rs
 │   │   ├── models/
-│   │   │   ├── device.rs
-│   │   │   ├── capture.rs
-│   │   │   └── evidence.rs
 │   │   └── error.rs
 │   ├── migrations/
 │   └── Cargo.toml
@@ -186,10 +192,12 @@ realitycam/
 
 | FR Category | Primary Location | Notes |
 |-------------|------------------|-------|
-| Device & Attestation | `mobile/hooks/useDeviceAttestation.ts` | @expo/app-integrity wrapper |
-| LiDAR Depth Capture | `mobile/modules/lidar-depth/ios/` | Custom ARKit depth module |
-| Photo Capture | `mobile/app/capture.tsx`, `mobile/hooks/` | Photo only for MVP |
-| Upload & Sync | `mobile/hooks/useUploadQueue.ts` | `backend/routes/captures.rs` |
+| Device & Attestation | `ios/Rial/Core/Attestation/` | DCAppAttest direct via DeviceCheck |
+| LiDAR Depth Capture | `ios/Rial/Core/Capture/` | ARKit unified RGB+Depth |
+| Photo Capture | `ios/Rial/Features/Capture/` | SwiftUI + ARKit |
+| Cryptography | `ios/Rial/Core/Crypto/` | CryptoKit, Keychain |
+| Upload & Sync | `ios/Rial/Core/Networking/` | URLSession background uploads |
+| Offline Storage | `ios/Rial/Core/Storage/` | Core Data + AES-GCM encryption |
 | Evidence Generation | `backend/services/evidence/` | Hardware + Depth + Metadata |
 | C2PA Integration | `backend/services/c2pa.rs` | Manifest embedding |
 | Verification Interface | `web/app/verify/`, `web/components/` | Public verification page |
@@ -246,65 +254,73 @@ tracing-subscriber = { version = "0.3", features = ["json"] }
 dotenvy = "0.15"
 ```
 
-### Mobile Dependencies (package.json)
+### Native iOS Dependencies
 
-```json
-{
-  "dependencies": {
-    "expo": "~54.0.0",
-    "@expo/app-integrity": "~0.1.0",
-    "react-native-vision-camera": "^4.7.3",
-    "expo-crypto": "~15.0.0",
-    "expo-secure-store": "~15.0.0",
-    "expo-file-system": "~19.0.0",
-    "zustand": "^5.0.0"
-  }
+**rial.** uses only Apple's native frameworks—no third-party dependencies for security-critical functionality:
+
+| Framework | Purpose | Notes |
+|-----------|---------|-------|
+| **DeviceCheck** | DCAppAttest hardware attestation | Direct Secure Enclave access |
+| **CryptoKit** | SHA-256, AES-GCM, key management | Hardware-accelerated |
+| **ARKit** | RGB + LiDAR depth capture | Unified ARFrame |
+| **Metal** | Depth visualization shaders | 60fps GPU-native |
+| **Security** | Keychain services | Secure Enclave-backed keys |
+| **Foundation** | URLSession networking | Background uploads, cert pinning |
+| **CoreData** | Local capture persistence | Offline queue management |
+| **CoreLocation** | GPS coordinates | Location metadata |
+
+**Swift Package Dependencies:**
+```swift
+// Package.swift - intentionally minimal
+dependencies: []  // No external packages for security-critical code
+```
+
+**Why Zero External Dependencies:**
+- Smaller attack surface (no supply chain risk)
+- Direct OS API access (no abstraction layers)
+- Easier security auditing (single language, known frameworks)
+- No dependency version conflicts
+
+### Native Security Architecture
+
+**Attestation Flow (Direct DeviceCheck):**
+
+```swift
+import DeviceCheck
+
+// ONE-TIME: Device registration (on first launch)
+let service = DCAppAttestService.shared
+let keyId = try await service.generateKey()
+let attestation = try await service.attestKey(keyId, clientDataHash: challenge)
+// → Send to POST /api/v1/devices/register
+
+// PER-CAPTURE: Assertion binds signature to specific photo bytes
+let photoHash = SHA256.hash(data: photoData)
+let clientDataHash = Data(photoHash)
+let assertion = try await service.generateAssertion(keyId, clientDataHash: clientDataHash)
+// → Include in POST /api/v1/captures
+```
+
+**Key Insight:** In native Swift, `clientDataHash` is computed directly from photo bytes—no serialization to JS, no bridge crossing. The assertion is cryptographically bound to the exact data being uploaded.
+
+### ARKit Unified Capture
+
+Unlike React Native (which requires separate camera + LiDAR modules), native ARKit provides synchronized RGB + depth in a single frame:
+
+```swift
+let config = ARWorldTrackingConfiguration()
+config.frameSemantics = [.sceneDepth]
+
+func session(_ session: ARSession, didUpdate frame: ARFrame) {
+    // PERFECTLY SYNCHRONIZED - same timestamp
+    let rgbImage = frame.capturedImage       // CVPixelBuffer
+    let depthMap = frame.sceneDepth?.depthMap // CVPixelBuffer (Float32)
+    let confidence = frame.sceneDepth?.confidenceMap
+    let intrinsics = frame.camera.intrinsics
 }
 ```
 
-**Notes:**
-- `react-native-vision-camera`: Physical lens switching (0.5x/1x/2x), replaces expo-camera
-- `@expo/app-integrity`: DCAppAttest integration (device registration + per-capture assertions)
-- LiDAR depth capture: Custom Expo Module in Swift (~400 lines), see `modules/lidar-depth/`
-- **Requires development build** — Expo Go not supported (vision-camera needs native code)
-
-### Mobile Library Decisions
-
-**Evaluated Libraries:**
-
-| Library | Decision | Rationale |
-|---------|----------|-----------|
-| `@expo/app-integrity` | ✅ Use | Official Expo DCAppAttest wrapper, maintained, TypeScript |
-| `react-native-vision-camera` | ✅ Use | Physical lens switching (0.5x/1x/2x), high performance |
-| `expo-camera` | ❌ Replaced | Digital zoom only, no physical lens access |
-| `expo-crypto` | ✅ Use | SHA-256 hashing, official Expo |
-| `expo-secure-store` | ✅ Use | Encrypted offline storage |
-| `expo-sensors` | ⏸️ Defer | Gyro/accel only needed for video (post-MVP) |
-| `react-native-attestation` | ❌ Skip | Redundant with @expo/app-integrity |
-| `react-native-secure-enclave-operations` | ❌ Skip | Redundant with @expo/app-integrity |
-| `ExifReader` | ❌ Skip | Backend handles EXIF validation, not client |
-
-**Custom Module Required:**
-
-No existing library provides ARKit LiDAR depth capture. The `lidar-depth` Expo Module must implement:
-1. Start `ARSession` with `.sceneDepth` configuration
-2. Capture `ARFrame.sceneDepth.depthMap` synchronized with photo
-3. Extract `CVPixelBuffer` → `float32[]` array
-4. Real-time depth overlay for camera preview (FR6)
-
-**Attestation vs Assertion (Important Distinction):**
-
-```typescript
-// ONE-TIME: Device registration (on first launch)
-const keyId = await AppIntegrity.generateKeyAsync();
-const attestation = await AppIntegrity.attestKeyAsync(keyId, challenge);
-// → Send to POST /api/v1/devices/register
-
-// PER-CAPTURE: Assertion for each photo (proves this capture came from attested device)
-const clientDataHash = await Crypto.digestStringAsync(SHA256, captureMetadata);
-const assertion = await AppIntegrity.generateAssertionAsync(keyId, clientDataHash);
-// → Include in POST /api/v1/captures
-```
+This eliminates the timing coordination problems inherent in the multi-module RN approach.
 
 ---
 
@@ -627,23 +643,45 @@ Response:
 - Certificate pinning in mobile app (Phase 1)
 - Presigned URLs expire in 1 hour
 
-### Local Storage Encryption (Story 4.3)
+### Local Storage Encryption
 
-Offline captures are encrypted locally before storage using a Secure Enclave-backed key:
+Offline captures use multiple layers of native iOS protection:
 
-| Component | Implementation | Notes |
-|-----------|---------------|-------|
-| Key Storage | `expo-secure-store` | WHEN_UNLOCKED_THIS_DEVICE_ONLY (Secure Enclave backed) |
-| Key Derivation | SHA-256 stream | Expands 256-bit key to data length via counter mode |
-| Encryption | XOR with key stream | Provides confidentiality equivalent to AES-256-CTR |
-| Auth Tag | HMAC-SHA256 | 32-byte tag appended to ciphertext for tamper detection |
-| IV | 12-byte random | Unique per capture, stored in encryption.json |
+| Layer | Implementation | Notes |
+|-------|---------------|-------|
+| **iOS Data Protection** | `.completeFileProtection` | Files encrypted at rest, tied to device passcode |
+| **Key Storage** | Keychain + Secure Enclave | `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` |
+| **Encryption** | CryptoKit AES-GCM | Real AEAD encryption (not workaround) |
+| **IV** | 12-byte random | Unique per capture via `AES.GCM.Nonce()` |
 
-**Implementation Note:** React Native lacks native AES-GCM support. The implementation uses SHA-256 in counter mode with HMAC authentication, providing equivalent security properties to AES-256-GCM but is not FIPS-compliant. For production deployments requiring FIPS compliance, consider `react-native-quick-crypto` native module.
+```swift
+import CryptoKit
+
+// Generate Secure Enclave-backed key (one-time)
+let privateKey = try SecureEnclave.P256.KeyAgreement.PrivateKey()
+
+// Derive symmetric key for AES-GCM
+let symmetricKey = SymmetricKey(size: .bits256)
+
+// Encrypt capture data
+let sealedBox = try AES.GCM.seal(captureData, using: symmetricKey)
+let encryptedData = sealedBox.combined! // nonce + ciphertext + tag
+
+// Decrypt
+let box = try AES.GCM.SealedBox(combined: encryptedData)
+let decryptedData = try AES.GCM.open(box, using: symmetricKey)
+```
+
+**Security Properties:**
+- AES-256-GCM: Authenticated encryption with associated data
+- Secure Enclave: Key never leaves hardware boundary
+- iOS Data Protection: Additional encryption layer when device locked
+- No FIPS workarounds needed—using actual standard algorithms
 
 **Files:**
-- `apps/mobile/services/captureEncryption.ts` - Encryption/decryption logic
-- `apps/mobile/services/offlineStorage.ts` - File I/O with encryption
+- `ios/Rial/Core/Crypto/CaptureEncryption.swift` - AES-GCM encryption
+- `ios/Rial/Core/Crypto/SecureKeychain.swift` - Keychain wrapper
+- `ios/Rial/Core/Storage/OfflineQueue.swift` - Encrypted file I/O
 
 ---
 
@@ -665,7 +703,7 @@ Offline captures are encrypted locally before storage using a Secure Enclave-bac
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │   Mobile App    │────▶│  Rust Backend   │────▶│   PostgreSQL    │
-│   (Expo Go)     │     │  (Single node)  │     │   (RDS)         │
+│   (Rial)        │     │  (Single node)  │     │   (RDS)         │
 └─────────────────┘     └────────┬────────┘     └─────────────────┘
                                  │
         ┌────────────────────────┼────────────────────────┐
@@ -683,19 +721,19 @@ Offline captures are encrypted locally before storage using a Secure Enclave-bac
 
 ### Prerequisites
 
-- Node.js 22+
+- Xcode 16+ with Swift 5.9+
 - Rust 1.82+ (for c2pa-rs 0.51)
 - PostgreSQL 16
 - Docker (for local dev)
-- Xcode 16+ (iOS development)
-- iPhone Pro device (12 Pro or later) for LiDAR testing
+- Node.js 22+ (web app only)
+- iPhone Pro device (12 Pro or later) — required for LiDAR and Secure Enclave
 
 ### Setup Commands
 
 ```bash
 # Clone and setup
-git clone https://github.com/your-org/realitycam.git
-cd realitycam
+git clone https://github.com/your-org/rial.git
+cd rial
 
 # Start local services
 docker-compose up -d  # Postgres, LocalStack (S3)
@@ -705,11 +743,11 @@ cd backend
 cp .env.example .env
 cargo run
 
-# Mobile (iOS only - requires Mac + Xcode)
-cd apps/mobile
-npm install
-npx expo prebuild --platform ios
-npx expo run:ios  # Requires iPhone Pro device for LiDAR
+# iOS App (requires Mac + Xcode + iPhone Pro device)
+cd ios
+open Rial.xcodeproj
+# In Xcode: Select your iPhone Pro device (not simulator)
+# Press ⌘R to build and run
 
 # Web
 cd apps/web
@@ -717,7 +755,7 @@ npm install
 npm run dev
 ```
 
-**Note:** LiDAR features require a physical iPhone Pro device. Simulator can be used for non-LiDAR flows.
+**Note:** The iOS app requires a physical iPhone Pro device. Simulator cannot access LiDAR or Secure Enclave for attestation.
 
 ---
 
@@ -739,19 +777,13 @@ npm run dev
 
 ---
 
-### ADR-002: Expo Modules API for LiDAR Depth Capture
+### ADR-002: ~~Expo Modules API for LiDAR Depth Capture~~ DEPRECATED
 
-**Context:** Need ARKit LiDAR depth capture on iOS. No existing library provides this.
+**Status:** DEPRECATED — Superseded by ADR-009 (Native Swift Architecture)
 
-**Decision:** Use Expo Modules API to create custom Swift module for LiDAR depth capture only. Use `@expo/app-integrity` for DCAppAttest (no custom attestation code needed).
+**Original Decision:** Use Expo Modules API to create custom Swift module for LiDAR depth capture.
 
-**Rationale:**
-- `@expo/app-integrity` handles attestation — no need to reimplement DCAppAttest
-- Custom module focused solely on LiDAR depth extraction
-- Type-safe bridge between JS and native via Expo Modules API
-- Expo actively maintains the API
-
-**Consequences:** ~400 lines of Swift code for LiDAR depth capture only (reduced from original estimate of 400-600 for attestation + LiDAR).
+**Deprecated Because:** The entire mobile app is now native Swift. No Expo Modules needed—ARKit is accessed directly.
 
 ---
 
@@ -816,60 +848,75 @@ npm run dev
 
 ---
 
-### ADR-007: @expo/app-integrity for DCAppAttest
+### ADR-007: ~~@expo/app-integrity for DCAppAttest~~ DEPRECATED
 
-**Context:** Need iOS DCAppAttest integration for hardware attestation. Options evaluated:
-- Custom Swift module (original plan)
-- `@expo/app-integrity` (official Expo package)
-- `react-native-attestation` (bifold-wallet project)
-- `react-native-secure-enclave-operations`
+**Status:** DEPRECATED — Superseded by ADR-009 (Native Swift Architecture)
 
-**Decision:** Use `@expo/app-integrity` as primary attestation library.
+**Original Decision:** Use `@expo/app-integrity` as primary attestation library.
 
-**Rationale:**
-- Official Expo package = better maintenance, TypeScript types
-- Handles both device attestation (one-time) and per-capture assertions
-- Reduces custom native code significantly
-- Fallback available: `react-native-attestation` if API is insufficient
-
-**Verified:** `@expo/app-integrity` returns attestation/assertion objects as base64 strings for server-side verification (not just booleans). The iOS methods `attestKeyAsync()` and `generateAssertionAsync()` return `Promise<string>` containing the attestation data to send to your server.
-
-**Consequences:**
-- No custom Swift code for attestation
-- Custom module scope reduced to LiDAR depth capture only (~400 lines vs ~600)
-- Dependency on Expo maintaining the package
+**Deprecated Because:** Native Swift uses DeviceCheck framework directly. No wrapper needed.
 
 ---
 
-### ADR-008: react-native-vision-camera for Photo Capture
+### ADR-008: ~~react-native-vision-camera for Photo Capture~~ DEPRECATED
 
-**Context:** Need physical lens switching (0.5x ultra-wide, 1x wide, 2x telephoto) for camera UX parity with native iOS Camera app. Options evaluated:
-- `expo-camera` (original choice)
-- `react-native-vision-camera` v4
+**Status:** DEPRECATED — Superseded by ADR-009 (Native Swift Architecture)
 
-**Decision:** Replace `expo-camera` with `react-native-vision-camera`.
+**Original Decision:** Replace `expo-camera` with `react-native-vision-camera` for physical lens switching.
+
+**Deprecated Because:** Native Swift uses ARKit directly, which provides both camera capture and depth in a single unified frame. No camera library needed.
+
+---
+
+### ADR-009: Native Swift Architecture for iOS App
+
+**Context:** RealityCam (now **rial.**) is a security-focused photo verification app where trust is the core value proposition. The original architecture used Expo/React Native with custom native modules for security-critical functionality (DCAppAttest, LiDAR depth capture). This introduced multiple abstraction layers and JS↔Native bridge crossings for sensitive data.
+
+**Decision:** Rebuild the iOS app as pure Swift/SwiftUI using only Apple's native frameworks.
 
 **Rationale:**
 
-| Feature | expo-camera | react-native-vision-camera |
-|---------|-------------|----------------------------|
-| Physical lens switching | No (digital zoom only) | Yes (`physicalDevices` API) |
-| Ultra-wide (0.5x) | No | Yes |
-| Telephoto (2x/3x) | No | Yes |
-| Frame processors | No | Yes (ML, filters) |
-| Performance | Good | Excellent (native) |
-| Expo Go support | Yes | No (requires dev build) |
+| Aspect | React Native | Native Swift | Winner |
+|--------|--------------|--------------|--------|
+| Attack surface | JS engine + bridge + native modules | Single compiled binary | Native |
+| Sensitive data handling | Crosses JS↔Native boundary | Stays in process memory | Native |
+| Cryptography | Workarounds (SHA-256 stream cipher) | Real AES-GCM via CryptoKit | Native |
+| Camera/Depth sync | Two modules + JS coordination | Single ARFrame | Native |
+| Background uploads | Foreground only, dies if app killed | URLSession continues after termination | Native |
+| Security audit | Multiple languages, frameworks | Single language, known APIs | Native |
+| Dependencies | npm + native modules (supply chain risk) | Zero external packages | Native |
 
-**Key Implementation Details:**
-- `useCameraDevice(position)` auto-selects multi-camera setup on Pro devices
-- `device.neutralZoom` represents 1x; values below = ultra-wide, above = telephoto
-- Photo API: `takePhoto()` returns `{ path, width, height }` (path without `file://` prefix)
-- Permission hook: `useCameraPermission()` returns `{ hasPermission, requestPermission }`
+**Key Technical Benefits:**
+
+1. **Security Boundary:** Photo bytes → hash → assertion → encrypted upload happens entirely within controlled Swift memory. No JS bridge crossings.
+
+2. **Perfect Capture Sync:** ARKit provides RGB + depth in a single `ARFrame`—no timing coordination needed.
+
+3. **Real Encryption:** CryptoKit AES-GCM instead of SHA-256 stream cipher workaround.
+
+4. **Background Uploads:** URLSession background tasks continue even if iOS terminates the app.
+
+5. **Smaller Binary:** No Hermes JS engine, no Metro bundler, no JS bundle.
+
+**Trade-offs:**
+
+- (+) Maximum security posture for a trust-focused product
+- (+) Direct OS API access
+- (+) Easier to audit
+- (-) Requires Swift expertise (not TypeScript)
+- (-) Longer initial development (rewrite, not iteration)
+- (-) Separate codebase from web (but backend/API shared)
 
 **Consequences:**
-- Requires development build (`npx expo prebuild`) — no Expo Go support
-- Testing requires physical iPhone (simulators don't expose multiple lenses)
-- Better camera UX with real lens switching vs digital zoom
+
+- New `ios/` directory with Xcode project
+- `apps/mobile/` (Expo/RN) kept as reference for feature parity testing
+- All mobile stories in Epics 2-4 superseded by new Epic 6
+- Team needs Swift/SwiftUI skills
+- No path to Android from this codebase (would be separate Kotlin app if ever needed)
+
+**Decision Date:** 2025-11-25
+**Decision Maker:** Luca
 
 ---
 

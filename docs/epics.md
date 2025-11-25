@@ -1,4 +1,4 @@
-# RealityCam - Epic Breakdown
+# rial. - Epic Breakdown
 
 **Author:** Luca
 **Date:** 2025-11-22
@@ -9,7 +9,7 @@
 
 ## Overview
 
-This document provides the complete epic and story breakdown for RealityCam, decomposing the requirements from the [PRD](./prd.md) into implementable stories.
+This document provides the complete epic and story breakdown for rial., decomposing the requirements from the [PRD](./prd.md) into implementable stories.
 
 **Living Document Notice:** This is the initial version. It will be updated after UX Design and Architecture workflows add interaction and technical details to stories.
 
@@ -22,6 +22,7 @@ This document provides the complete epic and story breakdown for RealityCam, dec
 | 3 | Photo Capture with LiDAR Depth | User can capture attested photos with depth data | FR6-FR13 |
 | 4 | Upload & Evidence Processing | Captured photos are processed with full evidence pipeline | FR14-FR26, FR44-FR46 |
 | 5 | C2PA & Verification Experience | Users can verify photos via shareable links | FR27-FR40 |
+| 6 | Native Swift Implementation | Maximum security via native iOS with zero JS bridge | FR1-FR19, FR41-FR46 (native) |
 
 ---
 
@@ -323,7 +324,7 @@ So that **I know whether I can use the full attestation features**.
 - Secure Enclave availability
 
 **And** if device is NOT iPhone Pro (no LiDAR):
-- Display clear message: "RealityCam requires iPhone Pro with LiDAR sensor"
+- Display clear message: "rial. requires iPhone Pro with LiDAR sensor"
 - Explain why: "LiDAR enables real 3D scene verification"
 - Block access to capture features
 
@@ -1249,7 +1250,7 @@ So that **photos are interoperable with the Content Credentials ecosystem**.
 **Given** a capture with completed evidence package
 **When** C2PA manifest generation runs
 **Then** the manifest contains:
-- **Claim Generator:** "RealityCam/1.0.0"
+- **Claim Generator:** "rial./1.0.0"
 - **Actions:** "c2pa.created" with timestamp
 - **Assertions:**
   - Hardware attestation level
@@ -1459,7 +1460,7 @@ So that **users can verify photos they received externally**.
   "data": {
     "status": "c2pa_only",
     "manifest_info": { "generator": "...", "assertions": [...] },
-    "note": "This file has Content Credentials but was not captured with RealityCam"
+    "note": "This file has Content Credentials but was not captured with rial."
   }
 }
 ```
@@ -1487,7 +1488,7 @@ So that **users can verify photos they received externally**.
 ### Story 5.8: File Upload UI on Verification Page
 
 As a **verification page visitor**,
-I want **to upload a file and check if it's in the RealityCam database**,
+I want **to upload a file and check if it's in the rial. database**,
 So that **I can verify photos I received without a verify link**.
 
 **Acceptance Criteria:**
@@ -1504,7 +1505,7 @@ So that **I can verify photos I received without a verify link**.
 - Shows confidence badge and link to full verification page
 
 **If C2PA only:**
-- "This photo has Content Credentials but wasn't captured with RealityCam"
+- "This photo has Content Credentials but wasn't captured with rial."
 - Shows parsed C2PA info
 
 **If no record:**
@@ -1558,7 +1559,7 @@ So that **I can access verify links for past captures**.
 ### Story 5.10: Landing Page and Documentation
 
 As a **visitor**,
-I want **to understand what RealityCam does on the landing page**,
+I want **to understand what rial. does on the landing page**,
 So that **I can decide to download the app or learn about the methodology**.
 
 **Acceptance Criteria:**
@@ -1588,62 +1589,705 @@ So that **I can decide to download the app or learn about the methodology**.
 
 ---
 
+## Epic 6: Native Swift Implementation
+
+**Goal:** Re-implement the iOS mobile app in pure native Swift/SwiftUI, eliminating React Native and achieving maximum security posture through direct OS framework access.
+
+**User Value:** Captures are processed entirely within compiled native code with no JavaScript bridge crossings for sensitive data. Direct Secure Enclave access, unified RGB+depth capture, and background uploads that survive app termination.
+
+**FRs Covered:** FR1-FR19, FR41-FR46 (native re-implementation of all mobile FRs)
+
+**Parallel Development:** This epic can be developed alongside Epics 1-5. The existing Expo/RN code remains in `apps/mobile/` for feature parity comparison until Story 6.16 validates the native implementation.
+
+**Security Improvements:**
+- No JS↔Native bridge crossings for photo bytes, hashes, or keys
+- Direct DCAppAttest API (no @expo/app-integrity wrapper)
+- Unified ARFrame provides RGB + depth in single instant (no timing gaps)
+- CryptoKit hardware-accelerated cryptography
+- URLSession background uploads survive app termination
+- Certificate pinning at URLSession delegate level
+
+---
+
+### Phase 1: Security Foundation
+
+---
+
+### Story 6.1: Initialize Native iOS Project
+
+As a **developer**,
+I want **the Rial iOS project created with proper Swift structure**,
+So that **I can implement native security features without React Native overhead**.
+
+**Acceptance Criteria:**
+
+**Given** Xcode 16+ is installed with Swift 5.9+
+**When** I create the iOS project following architecture guidelines
+**Then** I have:
+- Xcode project at `ios/Rial/` with SwiftUI app lifecycle
+- Minimum deployment target iOS 15.0
+- Bundle identifier configured (e.g., `app.rial.ios`)
+- Development team configured for device deployment
+- Test targets: RialTests (unit), RialUITests (UI)
+- Folder structure: App/, Core/, Features/, Models/, Shaders/, Resources/
+
+**And** the project is configured with:
+- Required capabilities: App Attest, Keychain Sharing
+- Info.plist with camera, location, photo library usage descriptions
+- .gitignore updated for Xcode build artifacts
+
+**Prerequisites:** None (can start parallel to Epics 1-5)
+
+**Technical Notes:**
+- File → New → Project → iOS App (SwiftUI, Swift)
+- Do NOT use Core Data template (added manually in Story 6.9)
+- Create folder groups matching architecture: Core/Attestation/, Core/Capture/, Core/Crypto/, Core/Networking/, Core/Storage/
+- Enable "App Attest" capability in Signing & Capabilities
+
+---
+
+### Story 6.2: DCAppAttest Direct Integration
+
+As a **security-conscious user**,
+I want **my device to prove it's genuine using Apple's hardware attestation**,
+So that **my captures have cryptographic proof of authentic origin**.
+
+**Acceptance Criteria:**
+
+**Given** the app is running on an iPhone with Secure Enclave
+**When** the device registers with the backend
+**Then**:
+- DCAppAttestService.generateKey() creates key in Secure Enclave
+- DCAppAttestService.attestKey() produces attestation object
+- Attestation key ID is persisted in Keychain
+- Backend can verify attestation against Apple's servers
+
+**And** for subsequent captures:
+- generateAssertion() creates per-capture proof
+- Assertion includes capture hash as clientData
+- Assertion generation completes in < 50ms
+
+**And** error handling:
+- Unsupported devices get graceful degradation message
+- Network failures queue attestation for retry
+
+**Prerequisites:** Story 6.1, Story 6.4
+
+**Technical Notes:**
+```swift
+let service = DCAppAttestService.shared
+guard service.isSupported else { throw AttestationError.unsupported }
+let keyId = try await service.generateKey()
+let attestation = try await service.attestKey(keyId, clientDataHash: challenge)
+// attestKey() once per device, generateAssertion() per capture
+```
+
+**FR Coverage:** FR2, FR3, FR10
+
+---
+
+### Story 6.3: CryptoKit Integration
+
+As a **developer**,
+I want **native cryptographic operations using CryptoKit**,
+So that **all hashing and encryption happens in hardware-accelerated native code**.
+
+**Acceptance Criteria:**
+
+**Given** CryptoService.swift exists in Core/Crypto/
+**When** I call cryptographic functions
+**Then** the following operations are available:
+- `sha256(data: Data) -> String` — hex digest
+- `sha256Stream(url: URL) -> String` — streaming for large files
+- `encrypt(data: Data, key: SymmetricKey) -> Data` — AES-GCM
+- `decrypt(data: Data, key: SymmetricKey) -> Data`
+- `generateEncryptionKey() -> SymmetricKey` — 256-bit
+
+**And** Secure Enclave key operations:
+- `createSigningKey() -> SecKey`
+- `sign(data: Data, key: SecKey) -> Data` — P256 signature
+
+**And** performance:
+- SHA-256 of 10MB file completes in < 100ms
+- All operations use hardware acceleration on A-series chips
+
+**Prerequisites:** Story 6.1
+
+**Technical Notes:**
+```swift
+import CryptoKit
+
+func sha256(_ data: Data) -> String {
+    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+}
+
+func encrypt(_ data: Data, key: SymmetricKey) throws -> Data {
+    try AES.GCM.seal(data, using: key).combined!
+}
+```
+
+**FR Coverage:** FR11, FR17 (encryption)
+
+---
+
+### Story 6.4: Keychain Services Integration
+
+As a **security-conscious user**,
+I want **my cryptographic keys stored in hardware-backed Keychain**,
+So that **keys are protected even if the device is compromised**.
+
+**Acceptance Criteria:**
+
+**Given** KeychainService.swift exists in Core/Storage/
+**When** I store and retrieve sensitive data
+**Then** the following operations work:
+- `save(data: Data, key: String)` — stores with hardware protection
+- `load(key: String) -> Data?` — retrieves if available
+- `delete(key: String)` — removes from Keychain
+- `saveSecureEnclaveKey(tag: String) -> SecKey`
+- `loadSecureEnclaveKey(tag: String) -> SecKey?`
+
+**And** security configuration:
+- Default accessibility: `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`
+- Keychain access group configured in entitlements
+- Secure Enclave keys use `kSecAttrTokenIDSecureEnclave`
+
+**And** error handling:
+- Typed `KeychainError` enum for all failure modes
+- Unit tests verify save/load/delete cycle
+
+**Prerequisites:** Story 6.1
+
+**Technical Notes:**
+```swift
+let query: [String: Any] = [
+    kSecClass as String: kSecClassGenericPassword,
+    kSecAttrAccount as String: key,
+    kSecValueData as String: data,
+    kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+]
+SecItemAdd(query as CFDictionary, nil)
+```
+
+**FR Coverage:** FR2, FR17, FR41
+
+---
+
+### Phase 2: Capture Core
+
+---
+
+### Story 6.5: ARKit Unified Capture Session
+
+As a **user**,
+I want **to capture photos with synchronized RGB and LiDAR depth**,
+So that **depth data is perfectly aligned with the photo for authenticity verification**.
+
+**Acceptance Criteria:**
+
+**Given** ARCaptureSession.swift exists in Core/Capture/
+**When** the capture session starts
+**Then**:
+- ARWorldTrackingConfiguration with `.sceneDepth` frame semantics
+- ARSessionDelegate receives ARFrame updates at 30fps+
+- Each ARFrame contains both `capturedImage` (RGB) and `sceneDepth` (depth)
+
+**And** the session handles:
+- LiDAR availability check before starting
+- Interruptions (phone calls, backgrounding) gracefully
+- Proper cleanup on deinit (no memory leaks)
+
+**Prerequisites:** Story 6.1
+
+**Technical Notes:**
+```swift
+let config = ARWorldTrackingConfiguration()
+config.frameSemantics.insert(.sceneDepth)
+session.run(config)
+
+func session(_ session: ARSession, didUpdate frame: ARFrame) {
+    let rgb = frame.capturedImage           // CVPixelBuffer
+    let depth = frame.sceneDepth?.depthMap  // CVPixelBuffer (Float32)
+    // SAME INSTANT - this is the key security improvement
+}
+```
+
+**FR Coverage:** FR6, FR7, FR8
+
+---
+
+### Story 6.6: Frame Processing Pipeline
+
+As a **developer**,
+I want **ARFrame data converted to uploadable formats**,
+So that **captures can be packaged for backend processing**.
+
+**Acceptance Criteria:**
+
+**Given** FrameProcessor.swift exists in Core/Capture/
+**When** I process an ARFrame for capture
+**Then** I get a CaptureData struct containing:
+- JPEG data from `capturedImage` (CVPixelBuffer → CGImage → JPEG)
+- Float32 array from `sceneDepth.depthMap` (gzip compressed)
+- Camera intrinsics and transform matrix
+- EXIF metadata (timestamp, device model, GPS if permitted)
+
+**And** processing is efficient:
+- Runs on background queue (not blocking UI)
+- No full-frame copies held longer than necessary
+- Total processing time < 200ms per capture
+
+**Prerequisites:** Story 6.5
+
+**Technical Notes:**
+```swift
+func processFrame(_ frame: ARFrame) async throws -> CaptureData {
+    let jpeg = try await convertToJPEG(frame.capturedImage)
+    let depth = try compressDepth(frame.sceneDepth?.depthMap)
+    let metadata = extractMetadata(frame)
+    return CaptureData(jpeg: jpeg, depth: depth, metadata: metadata)
+}
+```
+
+**FR Coverage:** FR7, FR8, FR9, FR12, FR13
+
+---
+
+### Story 6.7: Metal Depth Visualization
+
+As a **user**,
+I want **to see a real-time depth overlay while composing my shot**,
+So that **I can verify LiDAR is capturing the scene before taking the photo**.
+
+**Acceptance Criteria:**
+
+**Given** DepthVisualizer.swift and Metal shaders exist
+**When** depth overlay is enabled
+**Then**:
+- Depth map renders as color gradient (near=warm, far=cool)
+- Rendering at 60fps with < 2ms per frame
+- Overlay opacity adjustable (0-100%)
+- Toggle on/off without restarting ARSession
+
+**And** the overlay:
+- Works in portrait and landscape orientations
+- Uses configurable near/far plane distances
+- Handles missing depth gracefully (shows nothing, no crash)
+
+**Prerequisites:** Story 6.5
+
+**Technical Notes:**
+```metal
+// Shaders/DepthVisualization.metal
+fragment float4 depthFragment(VertexOut in [[stage_in]],
+                               texture2d<float> depthTex [[texture(0)]]) {
+    float depth = depthTex.sample(sampler, in.texCoord).r;
+    float norm = saturate((depth - near) / (far - near));
+    return mix(nearColor, farColor, norm);
+}
+```
+
+**FR Coverage:** FR6
+
+---
+
+### Story 6.8: Per-Capture Assertion Signing
+
+As a **user**,
+I want **each capture signed with my device's Secure Enclave key**,
+So that **the backend can verify this specific capture came from my attested device**.
+
+**Acceptance Criteria:**
+
+**Given** CaptureAssertion.swift exists in Core/Attestation/
+**When** a capture is taken
+**Then**:
+- SHA-256 hash computed from JPEG + depth data
+- DCAppAttestService.generateAssertion() called with hash as clientData
+- Assertion data attached to upload payload
+- Assertion generation completes in < 50ms
+
+**And** error handling:
+- Assertion failure doesn't block capture (queued for retry)
+- Backend logs assertion verification result per capture
+
+**Prerequisites:** Story 6.2, Story 6.3, Story 6.6
+
+**Technical Notes:**
+```swift
+func createAssertion(for capture: CaptureData) async throws -> Data {
+    let hash = CryptoService.sha256(capture.jpeg + capture.depth)
+    let hashData = Data(SHA256.hash(data: hash.data(using: .utf8)!))
+    return try await DCAppAttestService.shared.generateAssertion(keyId, clientDataHash: hashData)
+}
+```
+
+**FR Coverage:** FR10
+
+---
+
+### Phase 3: Storage & Upload
+
+---
+
+### Story 6.9: CoreData Capture Queue
+
+As a **user**,
+I want **my captures stored locally until upload succeeds**,
+So that **I don't lose photos if I'm offline or upload fails**.
+
+**Acceptance Criteria:**
+
+**Given** CoreData model with CaptureEntity
+**When** a capture is taken
+**Then** it's persisted with:
+- id (UUID), jpeg (Binary), depth (Binary), metadata (Transformable)
+- status: pending | uploading | uploaded | failed
+- createdAt, attemptCount, lastAttemptAt
+- assertion (Binary, nullable)
+
+**And** storage management:
+- Automatic cleanup of uploaded captures after 7 days
+- Storage quota warning at 500MB
+- Prevent new captures at 1GB quota
+- Migration support for future schema changes
+
+**Prerequisites:** Story 6.1
+
+**Technical Notes:**
+- Use NSPersistentContainer with automatic lightweight migration
+- Binary data with "Allows External Storage" for large files
+- @FetchRequest in SwiftUI for reactive updates
+- Background context for save operations
+
+**FR Coverage:** FR17, FR18, FR19
+
+---
+
+### Story 6.10: iOS Data Protection Encryption
+
+As a **security-conscious user**,
+I want **my queued captures encrypted when my device is locked**,
+So that **sensitive photos are protected if my device is stolen**.
+
+**Acceptance Criteria:**
+
+**Given** captures are stored in CoreData
+**When** the device is locked
+**Then**:
+- CoreData store uses `NSFileProtectionCompleteUntilFirstUserAuthentication`
+- Capture data additionally encrypted with AES-GCM before storage
+- Encryption key stored in Keychain (hardware-backed)
+
+**And** the encryption:
+- Decryption happens lazily on access
+- Data remains encrypted in device backups
+- Unit tests verify encryption/decryption round-trip
+
+**Prerequisites:** Story 6.3, Story 6.4, Story 6.9
+
+**Technical Notes:**
+```swift
+let desc = NSPersistentStoreDescription(url: storeURL)
+desc.setOption(
+    FileProtectionType.completeUntilFirstUserAuthentication as NSObject,
+    forKey: NSPersistentStoreFileProtectionKey
+)
+```
+
+**FR Coverage:** FR17
+
+---
+
+### Story 6.11: URLSession Background Uploads
+
+As a **user**,
+I want **uploads to continue even if I close the app**,
+So that **my captures are uploaded reliably without keeping the app open**.
+
+**Acceptance Criteria:**
+
+**Given** UploadService.swift uses background URLSession
+**When** I capture a photo and close the app
+**Then**:
+- Upload continues in background
+- App is woken on completion to update status
+- Incomplete uploads resume on app relaunch
+
+**And** the upload:
+- Uses multipart form-data (photo + depth + metadata + assertion)
+- Progress tracked via URLSessionTaskDelegate
+- Background completion handler signals iOS properly
+
+**Prerequisites:** Story 6.1, Story 6.9
+
+**Technical Notes:**
+```swift
+let config = URLSessionConfiguration.background(withIdentifier: "app.rial.upload")
+config.isDiscretionary = false
+config.sessionSendsLaunchEvents = true
+
+// AppDelegate
+func application(_ app: UIApplication,
+                 handleEventsForBackgroundURLSession id: String,
+                 completionHandler: @escaping () -> Void) {
+    uploadService.backgroundCompletionHandler = completionHandler
+}
+```
+
+**FR Coverage:** FR14, FR16, FR18
+
+---
+
+### Story 6.12: Certificate Pinning & Retry Logic
+
+As a **security-conscious user**,
+I want **API connections verified against known certificates**,
+So that **man-in-the-middle attacks cannot intercept my uploads**.
+
+**Acceptance Criteria:**
+
+**Given** URLSessionDelegate implements certificate validation
+**When** connecting to the backend
+**Then**:
+- Server certificate's public key verified against pinned key
+- Pinning failure = connection rejected, capture stays queued
+- TLS 1.3 minimum enforced
+
+**And** retry logic:
+- Exponential backoff: 1s, 2s, 4s, 8s, 16s
+- Max 5 attempts before marking as failed
+- Network reachability change triggers retry of queued items
+- User can manually retry failed uploads
+
+**Prerequisites:** Story 6.11
+
+**Technical Notes:**
+```swift
+func urlSession(_ session: URLSession,
+                didReceive challenge: URLAuthenticationChallenge,
+                completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+    guard let trust = challenge.protectionSpace.serverTrust,
+          let cert = SecTrustGetCertificateAtIndex(trust, 0),
+          let serverKey = SecCertificateCopyKey(cert) else {
+        completionHandler(.cancelAuthenticationChallenge, nil)
+        return
+    }
+    // Compare serverKey against pinned public key
+}
+```
+
+**FR Coverage:** FR15, FR16
+
+---
+
+### Phase 4: User Experience
+
+---
+
+### Story 6.13: SwiftUI Capture Screen
+
+As a **user**,
+I want **a clean camera interface with depth preview**,
+So that **I can easily capture attested photos**.
+
+**Acceptance Criteria:**
+
+**Given** CaptureView.swift displays the camera
+**When** I open the app
+**Then** I see:
+- Full-screen ARView with live camera preview
+- Depth overlay toggle button (SF Symbol: eye/eye.slash)
+- Large capture button with haptic feedback
+- Flash toggle (if available)
+- Flip camera disabled (back only for LiDAR)
+
+**And** capture flow:
+- Capture button triggers flash animation
+- Preview shows captured photo with "Use" / "Retake"
+- "Use" saves to queue, navigates to history
+- Handles camera/location permission requests
+
+**Prerequisites:** Story 6.5, Story 6.6, Story 6.7
+
+**Technical Notes:**
+- UIViewRepresentable to wrap ARView in SwiftUI
+- @StateObject for ARCaptureSession
+- NavigationStack for flow management
+- SF Symbols for consistent iOS appearance
+
+**FR Coverage:** FR6, FR7
+
+---
+
+### Story 6.14: Capture History View
+
+As a **user**,
+I want **to see my capture history and upload status**,
+So that **I can track what's been verified and share links**.
+
+**Acceptance Criteria:**
+
+**Given** HistoryView.swift displays captures
+**When** I navigate to history
+**Then** I see:
+- Grid of capture thumbnails (LazyVGrid, 3 columns)
+- Each item: thumbnail, status badge, date
+- Status badges: ✓ Uploaded (green), ↑ Uploading (blue), ⏳ Pending (gray), ✗ Failed (red)
+- Sorted by date (newest first)
+- Empty state: "No captures yet" with capture CTA
+
+**And** interactions:
+- Tap → navigate to detail view
+- Pull-to-refresh → retry failed uploads
+- Efficient thumbnail caching
+
+**Prerequisites:** Story 6.9, Story 6.11
+
+**Technical Notes:**
+- @FetchRequest with NSSortDescriptor for reactive updates
+- Thumbnails generated once, cached alongside capture
+- NavigationLink to ResultDetailView
+
+**FR Coverage:** FR19
+
+---
+
+### Story 6.15: Result Detail View
+
+As a **user**,
+I want **to see the verification result and share the verify link**,
+So that **I can prove my photo's authenticity to others**.
+
+**Acceptance Criteria:**
+
+**Given** ResultDetailView.swift shows a capture
+**When** I tap a capture in history
+**Then** I see:
+- Full photo with pinch-to-zoom
+- Confidence badge (HIGH/MEDIUM/LOW) if uploaded
+- Evidence summary (attestation ✓, depth ✓, timestamp ✓)
+- Verify link: `https://rial.app/verify/{id}`
+- Copy link button
+- Share button (iOS share sheet with photo + link)
+
+**And** for pending/failed:
+- Upload status indicator
+- Retry button for failed uploads
+- "Uploading..." progress for in-flight
+
+**Prerequisites:** Story 6.14, Story 6.11
+
+**Technical Notes:**
+```swift
+ShareLink(
+    item: verifyURL,
+    preview: SharePreview("Verified photo from rial.", image: thumbnail)
+)
+```
+
+**FR Coverage:** FR19, FR31
+
+---
+
+### Story 6.16: Feature Parity Validation
+
+As a **developer**,
+I want **to verify the native app matches Expo app functionality**,
+So that **we can confidently deprecate the React Native version**.
+
+**Acceptance Criteria:**
+
+**Given** both apps installed on same test device
+**When** performing side-by-side testing
+**Then** the following pass:
+- [ ] Device registration produces valid attestation (both apps)
+- [ ] Capture produces valid JPEG + depth (hashes match format)
+- [ ] Backend accepts uploads from both apps
+- [ ] Assertion verification passes for both
+- [ ] History displays same server-side captures
+- [ ] Share links work identically
+
+**And** performance comparison documented:
+- Capture latency (native should be faster)
+- Memory usage (native should be lower)
+- Upload reliability (native has background support)
+- Battery impact
+
+**And** automation:
+- XCUITest covers critical flows
+- Backend logs client version per upload
+
+**Prerequisites:** Stories 6.1-6.15
+
+**Technical Notes:**
+- Same Apple ID / device for both apps
+- Document intentional differences (native improvements)
+- Create migration guide for Expo → native transition
+- After validation, Expo code can be archived/removed
+
+**FR Coverage:** All mobile FRs (validation)
+
+---
+
 ## FR Coverage Matrix
 
-| FR | Description | Epic | Story |
-|----|-------------|------|-------|
-| FR1 | Detect iPhone Pro with LiDAR | 2 | 2.1 |
-| FR2 | Generate Secure Enclave keys | 2 | 2.2 |
-| FR3 | Request DCAppAttest attestation | 2 | 2.3 |
-| FR4 | Backend verifies attestation | 2 | 2.5 |
-| FR5 | Assign attestation level | 2 | 2.5 |
-| FR6 | Camera view with depth overlay | 3 | 3.2, 3.3 |
-| FR7 | Capture photo | 3 | 3.2 |
-| FR8 | Capture LiDAR depth map | 3 | 3.1, 3.4 |
-| FR9 | Record GPS coordinates | 3 | 3.5 |
-| FR10 | Capture attestation signature | 3 | 3.6 |
-| FR11 | Compute SHA-256 hash | 3 | 3.7 |
-| FR12 | Compress depth map | 3 | 3.7 |
-| FR13 | Construct capture request | 3 | 3.7 |
-| FR14 | Upload via multipart POST | 4 | 4.1 |
-| FR15 | TLS 1.3 for API | 4 | 4.1, 4.2 |
-| FR16 | Retry with exponential backoff | 4 | 4.2 |
-| FR17 | Encrypted offline storage | 4 | 4.3 |
-| FR18 | Auto-upload when online | 4 | 4.2, 4.3 |
-| FR19 | Pending upload status | 4 | 4.2 |
-| FR20 | Verify attestation | 4 | 4.4 |
-| FR21 | Depth analysis | 4 | 4.5 |
-| FR22 | Determine real scene | 4 | 4.5 |
-| FR23 | Validate EXIF timestamp | 4 | 4.6 |
-| FR24 | Validate device model | 4 | 4.6 |
-| FR25 | Generate evidence package | 4 | 4.8 |
-| FR26 | Calculate confidence level | 4 | 4.9 |
-| FR27 | Create C2PA manifest | 5 | 5.1 |
-| FR28 | Sign C2PA manifest | 5 | 5.1 |
-| FR29 | Embed C2PA manifest | 5 | 5.2 |
-| FR30 | Store both versions | 5 | 5.2 |
-| FR31 | Shareable verify URL | 5 | 5.3 |
-| FR32 | Confidence summary | 5 | 5.3 |
-| FR33 | Depth visualization | 5 | 5.4 |
-| FR34 | Expandable evidence panel | 5 | 5.5 |
-| FR35 | Per-check status display | 5 | 5.5 |
-| FR36 | File upload verification | 5 | 5.7, 5.8 |
-| FR37 | Hash lookup | 5 | 5.7 |
-| FR38 | Match found display | 5 | 5.8 |
-| FR39 | C2PA-only display | 5 | 5.8 |
-| FR40 | No record display | 5 | 5.8 |
-| FR41 | Device pseudonymous ID | 2 | 2.5 |
-| FR42 | Anonymous capture | 2 | 2.6 |
-| FR43 | Device registration storage | 2 | 2.5 |
-| FR44 | Coarse GPS in public view | 4 | 4.7 |
-| FR45 | Location opt-out | 3, 4 | 3.5, 4.7 |
-| FR46 | Depth map not downloadable | 4, 5 | 4.5, 5.4 |
+| FR | Description | Epic | Story | Native (Epic 6) |
+|----|-------------|------|-------|-----------------|
+| FR1 | Detect iPhone Pro with LiDAR | 2 | 2.1 | 6.5 |
+| FR2 | Generate Secure Enclave keys | 2 | 2.2 | 6.2, 6.4 |
+| FR3 | Request DCAppAttest attestation | 2 | 2.3 | 6.2 |
+| FR4 | Backend verifies attestation | 2 | 2.5 | — |
+| FR5 | Assign attestation level | 2 | 2.5 | — |
+| FR6 | Camera view with depth overlay | 3 | 3.2, 3.3 | 6.5, 6.7, 6.13 |
+| FR7 | Capture photo | 3 | 3.2 | 6.5, 6.6, 6.13 |
+| FR8 | Capture LiDAR depth map | 3 | 3.1, 3.4 | 6.5, 6.6 |
+| FR9 | Record GPS coordinates | 3 | 3.5 | 6.6 |
+| FR10 | Capture attestation signature | 3 | 3.6 | 6.8 |
+| FR11 | Compute SHA-256 hash | 3 | 3.7 | 6.3 |
+| FR12 | Compress depth map | 3 | 3.7 | 6.6 |
+| FR13 | Construct capture request | 3 | 3.7 | 6.6 |
+| FR14 | Upload via multipart POST | 4 | 4.1 | 6.11 |
+| FR15 | TLS 1.3 for API | 4 | 4.1, 4.2 | 6.12 |
+| FR16 | Retry with exponential backoff | 4 | 4.2 | 6.12 |
+| FR17 | Encrypted offline storage | 4 | 4.3 | 6.3, 6.9, 6.10 |
+| FR18 | Auto-upload when online | 4 | 4.2, 4.3 | 6.11 |
+| FR19 | Pending upload status | 4 | 4.2 | 6.9, 6.14 |
+| FR20 | Verify attestation | 4 | 4.4 | — |
+| FR21 | Depth analysis | 4 | 4.5 | — |
+| FR22 | Determine real scene | 4 | 4.5 | — |
+| FR23 | Validate EXIF timestamp | 4 | 4.6 | — |
+| FR24 | Validate device model | 4 | 4.6 | — |
+| FR25 | Generate evidence package | 4 | 4.8 | — |
+| FR26 | Calculate confidence level | 4 | 4.9 | — |
+| FR27 | Create C2PA manifest | 5 | 5.1 | — |
+| FR28 | Sign C2PA manifest | 5 | 5.1 | — |
+| FR29 | Embed C2PA manifest | 5 | 5.2 | — |
+| FR30 | Store both versions | 5 | 5.2 | — |
+| FR31 | Shareable verify URL | 5 | 5.3 | 6.15 |
+| FR32 | Confidence summary | 5 | 5.3 | — |
+| FR33 | Depth visualization | 5 | 5.4 | — |
+| FR34 | Expandable evidence panel | 5 | 5.5 | — |
+| FR35 | Per-check status display | 5 | 5.5 | — |
+| FR36 | File upload verification | 5 | 5.7, 5.8 | — |
+| FR37 | Hash lookup | 5 | 5.7 | — |
+| FR38 | Match found display | 5 | 5.8 | — |
+| FR39 | C2PA-only display | 5 | 5.8 | — |
+| FR40 | No record display | 5 | 5.8 | — |
+| FR41 | Device pseudonymous ID | 2 | 2.5 | 6.4 |
+| FR42 | Anonymous capture | 2 | 2.6 | 6.2 |
+| FR43 | Device registration storage | 2 | 2.5 | 6.4 |
+| FR44 | Coarse GPS in public view | 4 | 4.7 | 6.6 |
+| FR45 | Location opt-out | 3, 4 | 3.5, 4.7 | 6.6 |
+| FR46 | Depth map not downloadable | 4, 5 | 4.5, 5.4 | — |
+
+**Note:** Epic 6 "Native" column shows Swift story alternatives for mobile-side FRs. Backend/web FRs (FR4-5, FR20-30, FR32-40) have no native equivalent as they remain Rust/Next.js.
 
 ---
 
 ## Summary
 
-**Total: 5 Epics, 41 Stories**
+**Total: 6 Epics, 57 Stories**
 
 | Epic | Stories | FRs Covered |
 |------|---------|-------------|
@@ -1652,10 +2296,14 @@ So that **I can decide to download the app or learn about the methodology**.
 | Epic 3: Photo Capture with LiDAR Depth | 8 | FR6-FR13 |
 | Epic 4: Upload & Evidence Processing | 10 | FR14-FR26, FR44-FR46 |
 | Epic 5: C2PA & Verification Experience | 10 | FR27-FR40 |
+| Epic 6: Native Swift Implementation | 16 | FR1-FR19, FR41-FR46 (native) |
 
 **Context Incorporated:**
 - ✅ PRD requirements (all 46 FRs mapped)
 - ✅ Architecture technical decisions (tech stack, API contracts, patterns)
+- ✅ Native Swift re-implementation for maximum security posture
+
+**Epic 6 Note:** Provides native Swift alternatives to Epics 2-4 mobile functionality. Can be developed in parallel. After Story 6.16 validation, Expo/RN code can be deprecated.
 
 **Status:** COMPLETE - Ready for Phase 4 Implementation!
 

@@ -1,4 +1,4 @@
-# RealityCam - Product Requirements Document
+# rial. - Product Requirements Document
 
 **Author:** Luca
 **Date:** 2025-11-21
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-RealityCam is an iOS camera app providing cryptographically-attested, LiDAR-verified photo provenance for iPhone Pro devices. It shows viewers not just "this came from a camera" but "here's the strength of evidence that this was a real 3D scene captured by a genuine device."
+rial. is an iOS camera app providing cryptographically-attested, LiDAR-verified photo provenance for iPhone Pro devices. It shows viewers not just "this came from a camera" but "here's the strength of evidence that this was a real 3D scene captured by a genuine device."
 
 The core insight: Provenance claims are only as strong as their weakest assumption. A software-only hash proves nothing if the software layer is compromised. Hardware attestation must be the foundation, not a later enhancement. LiDAR depth analysis provides the "real scene" signal that's prohibitively expensive to fake.
 
@@ -40,11 +40,11 @@ The core insight: Provenance claims are only as strong as their weakest assumpti
 **Platform:** iPhone Pro only (MVP)
 
 This is a multi-component system:
-- **iOS App** (Expo/React Native): Photo capture with LiDAR depth and hardware attestation
+- **iOS App** (Native Swift/SwiftUI): Photo capture with LiDAR depth and hardware attestation
 - **Backend** (Rust/Axum): Evidence processing, C2PA manifest generation
 - **Verification Web** (Next.js 16): Public verification interface
 
-The system requires deep integration with iOS Secure Enclave (DCAppAttest) and ARKit LiDAR APIs for depth-based authenticity verification.
+The system requires deep integration with iOS Secure Enclave (DCAppAttest) and ARKit LiDAR APIs for depth-based authenticity verification. Native Swift chosen for direct OS framework access and minimal attack surface.
 
 ---
 
@@ -226,9 +226,10 @@ The following are explicitly **not** part of this product:
 | iPhone 13 Pro / Pro Max | 2021 | ✅ | ✅ | Supported |
 | iPhone 12 Pro / Pro Max | 2020 | ✅ | ✅ | Supported |
 
-- Minimum iOS version: iOS 14.0 (DCAppAttest introduced)
+- Minimum iOS version: iOS 15.0 (required for modern Swift concurrency and improved ARKit depth APIs)
 - LiDAR required for MVP (primary evidence signal)
 - Non-Pro iPhones: Not supported in MVP (no LiDAR)
+- All supported devices can run iOS 15+ (iPhone 12 Pro released with iOS 14, updated to iOS 15+)
 
 **Why No Android (MVP):**
 - StrongBox availability varies by manufacturer
@@ -542,22 +543,30 @@ These add value but require more implementation effort:
 
 ### Tech Stack
 
-**iOS App:**
-- Expo SDK 53 + React Native 0.79
-- `@expo/app-integrity` for DCAppAttest hardware attestation
-- `expo-camera`, `expo-crypto`, `expo-secure-store`, `expo-file-system`
-- Custom Expo Module (Swift) for ARKit LiDAR depth capture only (~400 lines)
-- Zustand for state management
+**iOS App (Native Swift):**
+- Swift 5.9+ / SwiftUI
+- Minimum iOS 15.0 (all iPhone Pro with LiDAR support this)
+- Direct OS framework usage for maximum security posture:
+  - **DeviceCheck**: DCAppAttest for hardware attestation
+  - **CryptoKit**: SHA-256 hashing, AES-GCM encryption, Secure Enclave keys
+  - **ARKit**: Unified RGB + LiDAR depth capture (single ARFrame)
+  - **Metal**: Real-time depth visualization (60fps GPU-native)
+  - **Foundation/URLSession**: Background uploads with certificate pinning
+  - **Security/Keychain**: Hardware-backed key storage
 
-**Note:** `expo-sensors` deferred to post-MVP (needed for video gyro×optical-flow analysis)
+**Note:** Native architecture chosen over React Native for:
+- Smaller attack surface (no JS bridge, no third-party native modules)
+- Direct Secure Enclave access (signing keys never leave hardware boundary)
+- Perfect camera/depth synchronization (ARKit provides both in single frame)
+- Background upload reliability (iOS continues even if app terminated)
+- Auditable security (single language, direct OS API calls)
 
-**Mobile Library Decisions (Evaluated):**
-| Library | Status | Notes |
-|---------|--------|-------|
-| `@expo/app-integrity` | ✅ Use | Official Expo DCAppAttest wrapper |
-| `react-native-attestation` | ❌ Skip | Redundant, keep as fallback |
-| `react-native-secure-enclave-operations` | ❌ Skip | Redundant with @expo/app-integrity |
-| `ExifReader` | ❌ Skip | Backend handles EXIF validation |
+**Swift Package Dependencies:**
+| Package | Purpose | Notes |
+|---------|---------|-------|
+| None required | Direct OS frameworks | Minimal dependency footprint |
+
+**Reference Implementation:** Expo/React Native code retained in `apps/mobile/` for feature parity testing during development.
 
 **Backend:**
 - Rust 1.82+ + Axum 0.8.x
@@ -596,7 +605,7 @@ These add value but require more implementation effort:
 
 ---
 
-_This PRD captures the essence of RealityCam MVP - cryptographically-attested, LiDAR-verified photo provenance for iPhone Pro devices. Hardware trust + depth analysis provides graduated evidence strength rather than false binary certainty._
+_This PRD captures the essence of rial. MVP - cryptographically-attested, LiDAR-verified photo provenance for iPhone Pro devices. Hardware trust + depth analysis provides graduated evidence strength rather than false binary certainty._
 
 _Created through collaborative discovery between Luca and AI facilitator. Updated for MVP scope (iPhone Pro only, photo only, LiDAR depth as primary signal)._
 

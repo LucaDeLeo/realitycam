@@ -88,3 +88,25 @@ development_status:
   5-7-file-verification-results-display: done
   5-8-capture-result-screen-mobile: done
   epic-5-retrospective: optional
+
+  # Epic 6: Native Swift Implementation (16 stories)
+  # Added via Sprint Change Proposal SCP-006 (2025-11-25)
+  # Can be developed in parallel - provides native alternative to Epics 2-4 mobile
+  epic-6: backlog
+  6-1-initialize-native-ios-project: backlog
+  6-2-dcappattest-direct-integration: backlog
+  6-3-cryptokit-integration: backlog
+  6-4-keychain-services-integration: backlog
+  6-5-arkit-unified-capture-session: backlog
+  6-6-frame-processing-pipeline: backlog
+  6-7-metal-depth-visualization: backlog
+  6-8-per-capture-assertion-signing: backlog
+  6-9-coredata-capture-queue: backlog
+  6-10-ios-data-protection-encryption: backlog
+  6-11-urlsession-background-uploads: backlog
+  6-12-certificate-pinning-retry-logic: backlog
+  6-13-swiftui-capture-screen: backlog
+  6-14-capture-history-view: backlog
+  6-15-result-detail-view: backlog
+  6-16-feature-parity-validation: backlog
+  epic-6-retrospective: optional
