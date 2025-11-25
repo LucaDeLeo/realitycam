@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "nextjs",
+  "framework": null,
   "installCommand": "cd ../.. && pnpm install",
-  "buildCommand": "cd ../.. && pnpm --filter @realitycam/web build"
+  "buildCommand": "cd ../.. && pnpm --filter @realitycam/web build",
+  "outputDirectory": ".next"
 }
