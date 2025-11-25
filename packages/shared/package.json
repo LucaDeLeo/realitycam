@@ -16,5 +16,7 @@
   },
   "devDependencies": {
     "typescript": "^5.9.2"
-  }
+  },
+  "sideEffects": false,
+  "license": "UNLICENSED"
 }

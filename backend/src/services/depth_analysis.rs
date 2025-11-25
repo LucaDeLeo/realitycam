@@ -218,17 +218,20 @@ pub fn compute_depth_statistics(depths: &[f32]) -> Result<DepthStatistics, Depth
     let variance_sum: f64 = valid.iter().map(|d| (d - mean).powi(2)).sum();
     let variance = (variance_sum / valid_count as f64).sqrt();
 
-    // Find min/max
-    let min_depth = valid
-        .iter()
-        .copied()
-        .min_by(|a, b| a.partial_cmp(b).unwrap())
-        .unwrap_or(0.0);
-    let max_depth = valid
-        .iter()
-        .copied()
-        .max_by(|a, b| a.partial_cmp(b).unwrap())
-        .unwrap_or(0.0);
+    // Find min/max using safe float comparison
+    let min_depth = valid.iter().copied().fold(f64::INFINITY, f64::min);
+    let min_depth = if min_depth.is_infinite() {
+        0.0
+    } else {
+        min_depth
+    };
+
+    let max_depth = valid.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let max_depth = if max_depth.is_infinite() {
+        0.0
+    } else {
+        max_depth
+    };
 
     // Coverage ratio
     let coverage = valid_count as f64 / total_count as f64;
@@ -454,7 +457,8 @@ pub fn detect_screen_pattern(depths: &[f32], stats: &DepthStatistics) -> (bool, 
     // Check depth uniformity - what % of pixels are within tight band of median
     let median_depth = {
         let mut sorted = valid.clone();
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        // Safe float sort: treat NaN as greater than all values
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Greater));
         sorted[sorted.len() / 2]
     };
 

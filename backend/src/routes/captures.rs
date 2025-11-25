@@ -29,8 +29,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::error::{ApiError, ApiErrorWithRequestId};
-use crate::middleware::DeviceContext;
-use crate::models::{Device, EvidencePackage, HardwareAttestation, ProcessingInfo};
+use crate::middleware::{lookup_device, update_device_counter, DeviceContext};
+use crate::models::{EvidencePackage, HardwareAttestation, ProcessingInfo};
 use crate::routes::AppState;
 use crate::services::{
     analyze_depth_map_from_bytes, process_location_for_evidence, validate_metadata,
@@ -162,47 +162,7 @@ async fn parse_multipart(mut multipart: Multipart) -> Result<ParsedMultipart, Ap
 // ============================================================================
 // Database Operations
 // ============================================================================
-
-/// Looks up a device by ID from the database (for assertion verification)
-async fn lookup_device(pool: &PgPool, device_id: Uuid) -> Result<Device, ApiError> {
-    let device = sqlx::query_as!(
-        Device,
-        r#"
-        SELECT id, attestation_level, attestation_key_id, attestation_chain,
-               platform, model, has_lidar, first_seen_at, last_seen_at,
-               assertion_counter, public_key
-        FROM devices
-        WHERE id = $1
-        "#,
-        device_id
-    )
-    .fetch_optional(pool)
-    .await?
-    .ok_or(ApiError::DeviceNotFound)?;
-
-    Ok(device)
-}
-
-/// Updates the device assertion counter after successful verification
-async fn update_device_counter(
-    pool: &PgPool,
-    device_id: Uuid,
-    new_counter: i64,
-) -> Result<(), sqlx::Error> {
-    sqlx::query!(
-        r#"
-        UPDATE devices
-        SET assertion_counter = $2, last_seen_at = NOW()
-        WHERE id = $1
-        "#,
-        device_id,
-        new_counter
-    )
-    .execute(pool)
-    .await?;
-
-    Ok(())
-}
+// Note: lookup_device and update_device_counter are imported from middleware module
 
 /// Parameters for inserting a capture with evidence
 struct InsertCaptureWithEvidenceParams {
@@ -316,13 +276,11 @@ async fn upload_capture(
     );
 
     // ========================================================================
-    // SECURITY FIX: Server-side hash verification
+    // SECURITY: Server-side hash verification of RAW BYTES
     // ========================================================================
-    // Compute SHA256 to match mobile's method: hash the base64 STRING (not raw bytes).
-    // Mobile does: digestStringAsync(SHA256, base64EncodedPhoto) which hashes the base64 text.
-    // TODO: Fix mobile to hash raw bytes instead for proper security.
-    let photo_base64 = STANDARD.encode(&parsed.photo_bytes);
-    let computed_hash = Sha256::digest(photo_base64.as_bytes());
+    // Compute SHA256 of raw photo bytes for proper cryptographic security.
+    // Mobile and backend both hash raw bytes (not base64 string) as of Nov 2025.
+    let computed_hash = Sha256::digest(&parsed.photo_bytes);
     let claimed_hash_bytes = STANDARD.decode(&parsed.metadata.photo_hash).map_err(|e| {
         tracing::warn!(
             request_id = %request_id,

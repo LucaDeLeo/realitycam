@@ -1,4 +1,5 @@
 import type { EvidenceStatus } from '@realitycam/shared';
+import { getStatusText } from '@/lib/status';
 
 /**
  * Extended status type that includes 'pending' for placeholder states
@@ -83,22 +84,7 @@ function StatusIcon({ status }: { status: ExtendedEvidenceStatus }) {
   }
 }
 
-/**
- * Get status text for accessibility
- */
-function getStatusText(status: ExtendedEvidenceStatus): string {
-  switch (status) {
-    case 'pass':
-      return 'Verified';
-    case 'fail':
-      return 'Failed';
-    case 'unavailable':
-      return 'Unavailable';
-    case 'pending':
-    default:
-      return 'Pending';
-  }
-}
+// Status text helper imported from @/lib/status
 
 /**
  * EvidenceRow - Individual row in the evidence panel

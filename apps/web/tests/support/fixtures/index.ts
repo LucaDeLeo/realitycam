@@ -1,3 +1,7 @@
+/* eslint-disable react-hooks/rules-of-hooks */
+// Note: This file uses Playwright's `use` fixture function, not React hooks.
+// The eslint-disable is needed because the linter incorrectly flags `use` as a React hook.
+
 import { test as base, mergeTests } from '@playwright/test';
 import { EvidenceFactory } from './factories/evidence-factory';
 

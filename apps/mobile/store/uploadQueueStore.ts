@@ -523,16 +523,45 @@ export const selectCompletedItems = (state: UploadQueueStore) =>
 
 /**
  * Select count of items by status
+ * Optimized to iterate once instead of 6 separate filters
  */
-export const selectQueueCounts = (state: UploadQueueStore) => ({
-  pending: state.items.filter((item) => item.status === 'pending').length,
-  uploading: state.items.filter((item) => item.status === 'uploading').length,
-  processing: state.items.filter((item) => item.status === 'processing').length,
-  completed: state.items.filter((item) => item.status === 'completed').length,
-  failed: state.items.filter((item) => item.status === 'failed').length,
-  permanentlyFailed: state.items.filter((item) => item.status === 'permanently_failed').length,
-  total: state.items.length,
-});
+export const selectQueueCounts = (state: UploadQueueStore) => {
+  // Single iteration to count all statuses
+  const counts = {
+    pending: 0,
+    uploading: 0,
+    processing: 0,
+    completed: 0,
+    failed: 0,
+    permanentlyFailed: 0,
+    total: state.items.length,
+  };
+
+  for (const item of state.items) {
+    switch (item.status) {
+      case 'pending':
+        counts.pending++;
+        break;
+      case 'uploading':
+        counts.uploading++;
+        break;
+      case 'processing':
+        counts.processing++;
+        break;
+      case 'completed':
+        counts.completed++;
+        break;
+      case 'failed':
+        counts.failed++;
+        break;
+      case 'permanently_failed':
+        counts.permanentlyFailed++;
+        break;
+    }
+  }
+
+  return counts;
+};
 
 /**
  * Select current upload (if any)

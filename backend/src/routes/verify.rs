@@ -162,16 +162,15 @@ async fn verify_file(
         "File received for verification"
     );
 
-    // Compute SHA-256 hash of base64-encoded file bytes
-    // This matches how the upload endpoint computes hashes (SHA256 of base64 string)
-    let file_base64 = STANDARD.encode(&file_bytes);
-    let hash_bytes = Sha256::digest(file_base64.as_bytes()).to_vec();
+    // Compute SHA-256 hash of raw file bytes
+    // Both mobile and backend hash raw bytes (not base64 strings)
+    let hash_bytes = Sha256::digest(&file_bytes).to_vec();
     let hash_base64 = STANDARD.encode(&hash_bytes);
 
     tracing::debug!(
         request_id = %request_id,
         file_hash = %hash_base64,
-        "File hash computed (base64 string hash to match upload)"
+        "File hash computed"
     );
 
     // Check database for matching capture
@@ -195,7 +194,10 @@ async fn verify_file(
             status: VerificationStatus::Verified,
             capture_id: Some(capture.id.to_string()),
             confidence_level: Some(capture.confidence_level),
-            verification_url: Some(format!("{}/{}", state.config.verification_base_url, capture.id)),
+            verification_url: Some(format!(
+                "{}/{}",
+                state.config.verification_base_url, capture.id
+            )),
             manifest_info: None,
             note: None,
             file_hash: hash_base64,
@@ -365,18 +367,14 @@ async fn get_capture_public(
     let photo_url = capture.photo_s3_key.as_ref().map(|key| {
         format!(
             "{}/{}/{}",
-            state.config.s3_public_endpoint,
-            state.config.s3_bucket,
-            key
+            state.config.s3_public_endpoint, state.config.s3_bucket, key
         )
     });
 
     let depth_map_url = capture.depth_map_s3_key.as_ref().map(|key| {
         format!(
             "{}/{}/{}",
-            state.config.s3_public_endpoint,
-            state.config.s3_bucket,
-            key
+            state.config.s3_public_endpoint, state.config.s3_bucket, key
         )
     });
 

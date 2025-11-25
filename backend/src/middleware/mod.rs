@@ -4,4 +4,6 @@
 
 pub mod device_auth;
 
-pub use device_auth::{DeviceAuthConfig, DeviceAuthLayer, DeviceContext};
+pub use device_auth::{
+    lookup_device, update_device_counter, DeviceAuthConfig, DeviceAuthLayer, DeviceContext,
+};

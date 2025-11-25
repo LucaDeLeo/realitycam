@@ -111,6 +111,7 @@ export function useUploadQueue(): UseUploadQueueReturn {
 
   // Processing state refs
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cleanupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const processingLockRef = useRef(false);
 
   /**
@@ -149,7 +150,12 @@ export function useUploadQueue(): UseUploadQueueReturn {
       });
 
       // Clean up local files after successful upload (deferred to avoid blocking)
-      setTimeout(async () => {
+      // Track the timer so we can cancel if component unmounts
+      if (cleanupTimerRef.current) {
+        clearTimeout(cleanupTimerRef.current);
+      }
+      cleanupTimerRef.current = setTimeout(async () => {
+        cleanupTimerRef.current = null;
         try {
           const result = await cleanupCapture(captureId);
           if (result.success) {
@@ -289,6 +295,9 @@ export function useUploadQueue(): UseUploadQueueReturn {
     return () => {
       if (retryTimerRef.current) {
         clearTimeout(retryTimerRef.current);
+      }
+      if (cleanupTimerRef.current) {
+        clearTimeout(cleanupTimerRef.current);
       }
     };
   }, []);

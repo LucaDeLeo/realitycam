@@ -156,7 +156,6 @@ global.testUtils = {
 
 // TypeScript declaration for global test utilities
 declare global {
-  // eslint-disable-next-line no-var
   var testUtils: {
     waitForNextTick: () => Promise<void>;
     createMockPhoto: (overrides?: Record<string, unknown>) => {

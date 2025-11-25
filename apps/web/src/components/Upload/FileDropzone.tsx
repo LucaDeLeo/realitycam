@@ -1,7 +1,13 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import { apiClient, type FileVerificationResponse, type ConfidenceLevel } from '@/lib/api';
+import { apiClient, type FileVerificationResponse } from '@/lib/api';
+import {
+  getVerificationBackground,
+  getVerificationTitle,
+  getConfidenceBadgeColor,
+  type VerificationDisplayStatus,
+} from '@/lib/status';
 
 // ============================================================================
 // Types
@@ -242,12 +248,12 @@ function VerificationResult({ result, fileName, onReset, className = '' }: Verif
   return (
     <div className={`w-full rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden ${className}`}>
       {/* Status Header */}
-      <div className={`px-6 py-4 ${getStatusBackground(status)}`}>
+      <div className={`px-6 py-4 ${getVerificationBackground(status as VerificationDisplayStatus)}`}>
         <div className="flex items-center gap-3">
           <StatusIcon status={status} />
           <div>
             <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">
-              {getStatusTitle(status)}
+              {getVerificationTitle(status as VerificationDisplayStatus)}
             </h3>
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
               {fileName}
@@ -363,42 +369,5 @@ function StatusIcon({ status }: { status: string }) {
 }
 
 // ============================================================================
-// Helper Functions
+// Helper Functions (imported from @/lib/status)
 // ============================================================================
-
-function getStatusBackground(status: string): string {
-  switch (status) {
-    case 'verified':
-      return 'bg-green-50 dark:bg-green-900/20 border-b border-green-100 dark:border-green-900';
-    case 'c2pa_only':
-      return 'bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-100 dark:border-yellow-900';
-    default:
-      return 'bg-zinc-50 dark:bg-zinc-800 border-b border-zinc-100 dark:border-zinc-700';
-  }
-}
-
-function getStatusTitle(status: string): string {
-  switch (status) {
-    case 'verified':
-      return 'Photo Verified';
-    case 'c2pa_only':
-      return 'Content Credentials Found';
-    default:
-      return 'No Record Found';
-  }
-}
-
-function getConfidenceBadgeColor(level: ConfidenceLevel): string {
-  switch (level) {
-    case 'high':
-      return 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400';
-    case 'medium':
-      return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400';
-    case 'low':
-      return 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400';
-    case 'suspicious':
-      return 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400';
-    default:
-      return 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400';
-  }
-}

@@ -1,9 +1,11 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { ConfidenceBadge } from '@/components/Evidence/ConfidenceBadge';
 import { EvidencePanel } from '@/components/Evidence/EvidencePanel';
 import { ImagePlaceholder } from '@/components/Media/ImagePlaceholder';
 import { apiClient, formatDate, type ConfidenceLevel, type CheckStatus } from '@/lib/api';
+import { mapToEvidenceStatus } from '@/lib/status';
 
 interface VerifyPageProps {
   params: Promise<{ id: string }>;
@@ -16,23 +18,21 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
   const response = await apiClient.getCapturePublic(id);
   const capture = response?.data;
 
-  // Map evidence status to CheckStatus
-  const getCheckStatus = (status: string | undefined): CheckStatus => {
-    if (status === 'pass' || status === 'verified') return 'pass';
-    if (status === 'fail' || status === 'failed') return 'fail';
-    return 'unavailable';
-  };
+  // Show 404 if capture not found
+  if (!capture) {
+    notFound();
+  }
 
   // Build evidence items from capture data
   const evidenceItems = capture?.evidence ? [
     {
       label: 'Hardware Attestation',
-      status: getCheckStatus(capture.evidence.hardware_attestation?.status),
+      status: mapToEvidenceStatus(capture.evidence.hardware_attestation?.status),
       value: capture.evidence.hardware_attestation?.device_model || undefined,
     },
     {
       label: 'LiDAR Depth Analysis',
-      status: getCheckStatus(capture.evidence.depth_analysis?.status),
+      status: mapToEvidenceStatus(capture.evidence.depth_analysis?.status),
       value: capture.evidence.depth_analysis?.is_likely_real_scene ? 'Real 3D scene detected' : 'Analysis complete',
     },
     {

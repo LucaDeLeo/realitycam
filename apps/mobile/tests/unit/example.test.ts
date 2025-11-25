@@ -127,16 +127,18 @@ describe('Async Operations', () => {
 describe('Zustand Store Pattern', () => {
   test('zustand can create and update stores', () => {
     // Use require instead of dynamic import for Jest compatibility
-    const { create } = require('zustand');
+    // Use dynamic import to get typed create function
+    const zustand = require('zustand') as typeof import('zustand');
+    const { create } = zustand;
 
     interface TestStore {
       count: number;
       increment: () => void;
     }
 
-    const useStore = create<TestStore>((set: (fn: (state: TestStore) => Partial<TestStore>) => void) => ({
+    const useStore = create<TestStore>()((set) => ({
       count: 0,
-      increment: () => set((state: TestStore) => ({ count: state.count + 1 })),
+      increment: () => set((state) => ({ count: state.count + 1 })),
     }));
 
     expect(useStore.getState().count).toBe(0);

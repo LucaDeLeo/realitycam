@@ -207,7 +207,8 @@ async fn create_test_evidence(
             edge_coherence: req.depth_analysis.coherence,
             min_depth: 0.5,
             max_depth: 5.0,
-            is_likely_real_scene: req.depth_analysis.has_depth && req.depth_analysis.depth_layers > 1,
+            is_likely_real_scene: req.depth_analysis.has_depth
+                && req.depth_analysis.depth_layers > 1,
         },
         metadata: MetadataEvidence {
             timestamp_valid: true,
@@ -237,7 +238,7 @@ async fn create_test_evidence(
     })?;
 
     // Generate a fake hash for the test capture
-    let fake_hash = format!("test-{}", capture_id);
+    let fake_hash = format!("test-{capture_id}");
     let hash_bytes = fake_hash.as_bytes().to_vec();
 
     // Parse captured_at timestamp
@@ -353,19 +354,16 @@ async fn delete_test_evidence(
     })?;
 
     // Delete the capture
-    let result = sqlx::query!(
-        r#"DELETE FROM captures WHERE id = $1"#,
-        capture_id
-    )
-    .execute(&state.db)
-    .await
-    .map_err(|e| {
-        tracing::error!(error = %e, "Failed to delete test evidence");
-        ApiErrorWithRequestId {
-            error: ApiError::Database(e),
-            request_id,
-        }
-    })?;
+    let result = sqlx::query!(r#"DELETE FROM captures WHERE id = $1"#, capture_id)
+        .execute(&state.db)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "Failed to delete test evidence");
+            ApiErrorWithRequestId {
+                error: ApiError::Database(e),
+                request_id,
+            }
+        })?;
 
     // Also clean up the test device if no other captures reference it
     if let Some(record) = capture_record {

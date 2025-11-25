@@ -122,20 +122,28 @@ export function useCaptureProcessing(): UseCaptureProcessingReturn {
       console.log('[useCaptureProcessing] Starting processing for capture:', raw.id);
 
       try {
-        // 1. Read photo file and compute SHA-256 hash
+        // 1. Read photo file and compute SHA-256 hash of RAW BYTES
+        // NOTE: Previously hashed base64 string which was non-standard.
+        // Now hashing raw bytes for proper cryptographic security.
         console.log('[useCaptureProcessing] Computing photo hash...');
         let photoHash: string;
+        let photoBase64: string;
         try {
-          // Use legacy API
-          const photoBase64 = await FileSystem.readAsStringAsync(raw.photoUri, {
+          // Read file as base64
+          photoBase64 = await FileSystem.readAsStringAsync(raw.photoUri, {
             encoding: FileSystem.EncodingType.Base64,
           });
-          photoHash = await Crypto.digestStringAsync(
+          // Convert to raw bytes for proper hashing
+          const photoBytes = base64ToBytes(photoBase64);
+          // Hash the raw bytes (not the base64 string)
+          // Note: Crypto.digest expects ArrayBuffer, so we use .buffer
+          const hashBytes = await Crypto.digest(
             Crypto.CryptoDigestAlgorithm.SHA256,
-            photoBase64,
-            { encoding: Crypto.CryptoEncoding.BASE64 }
+            photoBytes.buffer as ArrayBuffer
           );
-          console.log('[useCaptureProcessing] Photo hash computed successfully');
+          // Convert hash to base64 for transport
+          photoHash = bytesToBase64(new Uint8Array(hashBytes));
+          console.log('[useCaptureProcessing] Photo hash computed successfully (raw bytes)');
         } catch (fileError) {
           console.error('[useCaptureProcessing] Failed to read photo file:', fileError);
           const processingError: ProcessingError = {

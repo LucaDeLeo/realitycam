@@ -432,7 +432,8 @@ fn validate_timestamp(timestamp_ms: i64, config: &DeviceAuthConfig) -> Result<()
 }
 
 /// Looks up a device by ID from the database
-async fn lookup_device(db: &PgPool, device_id: Uuid) -> Result<Device, ApiError> {
+/// Public for use in captures route and other modules
+pub async fn lookup_device(db: &PgPool, device_id: Uuid) -> Result<Device, ApiError> {
     let device = sqlx::query_as!(
         Device,
         r#"
@@ -452,7 +453,8 @@ async fn lookup_device(db: &PgPool, device_id: Uuid) -> Result<Device, ApiError>
 }
 
 /// Updates the device assertion counter in the database
-async fn update_device_counter(
+/// Public for use in captures route and other modules
+pub async fn update_device_counter(
     db: &PgPool,
     device_id: Uuid,
     new_counter: i64,
@@ -495,6 +497,21 @@ fn verify_device_assertion(
             "Replay attack detected: counter not increasing"
         );
         return Err(ApiError::ReplayDetected);
+    }
+
+    // Detect suspicious counter gaps (potential key compromise or device reset)
+    // Normal usage increments by 1-10 per session. Gaps > 1000 are suspicious.
+    const COUNTER_GAP_WARNING_THRESHOLD: i64 = 1000;
+    let counter_gap = auth_data.counter as i64 - device.assertion_counter;
+    if counter_gap > COUNTER_GAP_WARNING_THRESHOLD {
+        tracing::warn!(
+            device_id = %device.id,
+            received_counter = auth_data.counter,
+            stored_counter = device.assertion_counter,
+            counter_gap = counter_gap,
+            "Suspicious counter gap detected - possible key compromise or device reset"
+        );
+        // NOTE: We don't reject the request, but this should trigger monitoring alerts
     }
 
     // Get public key

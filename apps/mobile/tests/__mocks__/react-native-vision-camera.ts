@@ -8,7 +8,8 @@
 import type { PhotoFile, CameraDevice } from 'react-native-vision-camera';
 
 // Mock photo result
-const mockPhotoFile: PhotoFile = {
+// Use type assertion to allow partial metadata (full type has many optional fields)
+const mockPhotoFile = {
   path: '/mock/photos/captured.jpg',
   width: 4032,
   height: 3024,
@@ -19,13 +20,41 @@ const mockPhotoFile: PhotoFile = {
     Orientation: 1,
     DPIHeight: 72,
     DPIWidth: 72,
+    '{TIFF}': {
+      ResolutionUnit: 2,
+      Software: 'Mock Camera',
+      Make: 'Apple',
+      DateTime: '2025:01:01 12:00:00',
+      XResolution: 72,
+      Model: 'iPhone 15 Pro',
+      YResolution: 72,
+    },
+    '{Exif}': {
+      ExposureTime: 0.01,
+      FNumber: 1.78,
+      ISOSpeedRatings: [100],
+      DateTimeOriginal: '2025:01:01 12:00:00',
+      ShutterSpeedValue: 6.64,
+      ApertureValue: 1.69,
+      BrightnessValue: 5.0,
+      ExposureBiasValue: 0,
+      MeteringMode: 5,
+      Flash: 16,
+      FocalLength: 6.86,
+      SubjectArea: [2013, 1511, 2217, 1330],
+      SubsecTimeOriginal: '000',
+      SubsecTimeDigitized: '000',
+      FocalLenIn35mmFilm: 24,
+      LensMake: 'Apple',
+      LensModel: 'iPhone 15 Pro back triple camera 6.86mm f/1.78',
+    },
   },
-};
+} as PhotoFile;
 
 // Mock camera device
-const mockCameraDevice: CameraDevice = {
+// Use type assertion since CameraDevice type varies by react-native-vision-camera version
+const mockCameraDevice = {
   id: 'mock-camera-id',
-  devices: ['wide-angle-camera', 'ultra-wide-angle-camera'],
   hasFlash: true,
   hasTorch: true,
   isMultiCam: true,
@@ -44,7 +73,7 @@ const mockCameraDevice: CameraDevice = {
   formats: [],
   hardwareLevel: 'full',
   sensorOrientation: 'landscape-right',
-};
+} as CameraDevice;
 
 // Mock Camera component
 export const Camera = jest.fn().mockImplementation(({ children }) => children);
