@@ -23,6 +23,7 @@ This document provides the complete epic and story breakdown for rial., decompos
 | 4 | Upload & Evidence Processing | Captured photos are processed with full evidence pipeline | FR14-FR26, FR44-FR46 |
 | 5 | C2PA & Verification Experience | Users can verify photos via shareable links | FR27-FR40 |
 | 6 | Native Swift Implementation | Maximum security via native iOS with zero JS bridge | FR1-FR19, FR41-FR46 (native) |
+| 7 | Video Capture with LiDAR Depth | Attested video with frame-by-frame depth verification | FR47-FR55 |
 
 ---
 
@@ -93,6 +94,17 @@ This document provides the complete epic and story breakdown for rial., decompos
 - **FR44:** GPS stored at coarse level (city) by default in public view
 - **FR45:** Users can opt-out of location (noted in evidence, not suspicious)
 - **FR46:** Depth map stored but not publicly downloadable (only visualization)
+
+### Video Capture (FR47-FR55)
+- **FR47:** App records video up to 15 seconds with LiDAR depth at 10fps
+- **FR48:** App displays real-time edge-detection depth overlay during recording
+- **FR49:** App computes frame hash chain (each frame hashes with previous)
+- **FR50:** App generates attestation for complete or interrupted videos
+- **FR51:** App collects same metadata for video as photos
+- **FR52:** Backend verifies video hash chain integrity
+- **FR53:** Backend analyzes depth consistency across video frames
+- **FR54:** Backend generates C2PA manifest for video files
+- **FR55:** Verification page displays video with playback and evidence
 
 ---
 
@@ -2280,14 +2292,585 @@ So that **we can confidently deprecate the React Native version**.
 | FR44 | Coarse GPS in public view | 4 | 4.7 | 6.6 |
 | FR45 | Location opt-out | 3, 4 | 3.5, 4.7 | 6.6 |
 | FR46 | Depth map not downloadable | 4, 5 | 4.5, 5.4 | — |
+| FR47 | Video with LiDAR depth at 10fps | 7 | 7.1, 7.2 | 7.1, 7.2 |
+| FR48 | Real-time edge depth overlay | 7 | 7.3 | 7.3 |
+| FR49 | Frame hash chain | 7 | 7.4 | 7.4 |
+| FR50 | Video attestation with checkpoints | 7 | 7.5 | 7.5 |
+| FR51 | Video metadata collection | 7 | 7.6 | 7.6 |
+| FR52 | Hash chain verification | 7 | 7.10 | — |
+| FR53 | Video depth analysis | 7 | 7.9 | — |
+| FR54 | C2PA video manifest | 7 | 7.12 | — |
+| FR55 | Video verification page | 7 | 7.13 | — |
 
-**Note:** Epic 6 "Native" column shows Swift story alternatives for mobile-side FRs. Backend/web FRs (FR4-5, FR20-30, FR32-40) have no native equivalent as they remain Rust/Next.js.
+**Note:** Epic 6 "Native" column shows Swift story alternatives for mobile-side FRs. Backend/web FRs (FR4-5, FR20-30, FR32-40, FR52-55) have no native equivalent as they remain Rust/Next.js. Epic 7 is entirely native Swift for mobile functionality.
+
+---
+
+## Epic 7: Video Capture with LiDAR Depth
+
+**Goal:** Extend the photo capture system to record authenticated video with continuous frame-by-frame LiDAR depth data, enabling verification of dynamic real-world events.
+
+**User Value:** Users can capture short video clips (up to 15 seconds) with the same hardware attestation and depth verification as photos, proving they recorded a real 3D scene unfolding over time. Ideal for documenting incidents, proving chain of events, and detecting manipulation that single-frame analysis might miss.
+
+**FRs Covered:** FR47-FR55 (Video Capture)
+
+**Technical Foundation:**
+- Builds on Epic 6 native Swift implementation (ARKit unified capture)
+- Reuses attestation infrastructure from Epic 2
+- Extends evidence processing from Epic 4
+- Integrates with C2PA video manifest support from Epic 5
+
+---
+
+### Story 7.1: ARKit Video Recording Session
+
+As a **user**,
+I want **to record video with synchronized RGB and depth streams**,
+So that **every frame has corresponding LiDAR depth data for verification**.
+
+**Acceptance Criteria:**
+
+**Given** the user is on the capture screen with video mode selected
+**When** the user presses and holds the record button
+**Then**:
+- ARSession records at 30fps with `.sceneDepth` frame semantics
+- Each ARFrame contains both `capturedImage` (RGB) and `sceneDepth` (depth)
+- Recording continues until button release or 15-second limit
+- Visual timer shows remaining recording time
+- Haptic feedback on start and stop
+
+**And** the recording:
+- Stops automatically at 15-second maximum
+- Can be stopped early by user
+- Shows "Recording..." indicator with elapsed time
+
+**Prerequisites:** Story 6.5 (ARKit Unified Capture Session)
+
+**Technical Notes:**
+- Use AVAssetWriter for video encoding (H.264/HEVC)
+- ARSession provides synchronized RGB+depth per frame
+- Store depth keyframes at 10fps (every 3rd ARFrame)
+- Video resolution: 1920x1080 or 3840x2160 based on device capability
+
+---
+
+### Story 7.2: Depth Keyframe Extraction (10fps)
+
+As a **developer**,
+I want **to capture depth data at 10fps during video recording**,
+So that **file sizes are manageable while maintaining forensic value**.
+
+**Acceptance Criteria:**
+
+**Given** video recording is in progress at 30fps
+**When** depth keyframes are extracted
+**Then**:
+- Depth captured every 3rd frame (10fps from 30fps video)
+- 15 seconds × 10fps = 150 depth frames maximum
+- Each depth frame stored as Float32 array (256×192 pixels)
+- Depth frames indexed by video timestamp
+
+**And** the storage format:
+- Depth frames stored as binary blob (gzip compressed)
+- Frame index maps timestamp → offset in blob
+- Total depth size: ~15MB uncompressed, ~10MB compressed (typical)
+
+**Prerequisites:** Story 7.1
+
+**Technical Notes:**
+```swift
+// Extract depth at 10fps
+func session(_ session: ARSession, didUpdate frame: ARFrame) {
+    frameCount += 1
+    if frameCount % 3 == 0 { // Every 3rd frame = 10fps
+        guard let depth = frame.sceneDepth?.depthMap else { return }
+        depthBuffer.append(extractDepthData(depth), timestamp: frame.timestamp)
+    }
+}
+```
+
+---
+
+### Story 7.3: Real-time Edge Depth Overlay
+
+As a **user**,
+I want **to see a real-time depth edge overlay while recording**,
+So that **I can verify LiDAR is capturing the scene without obscuring my view**.
+
+**Acceptance Criteria:**
+
+**Given** video recording mode is active
+**When** the depth overlay toggle is enabled
+**Then**:
+- Edge-detection overlay shows depth boundaries (not full colormap)
+- Overlay renders at 30fps with < 3ms per frame
+- Edges appear as white/colored lines on transparent background
+- Toggle button shows overlay state (eye/eye.slash SF Symbol)
+
+**And** performance:
+- CPU impact < 15% additional
+- GPU impact < 25% additional
+- No visible frame drops in recorded video
+- Overlay does NOT appear in recorded video (preview only)
+
+**Prerequisites:** Story 6.7 (Metal Depth Visualization)
+
+**Technical Notes:**
+- Sobel or Canny edge detection on depth buffer
+- Render edges only (much faster than full colormap)
+- Metal shader for real-time processing
+- Separate preview layer from recording pipeline
+
+---
+
+### Story 7.4: Frame Hash Chain
+
+As a **security-conscious user**,
+I want **each video frame cryptographically chained to previous frames**,
+So that **frames cannot be reordered, removed, or inserted without detection**.
+
+**Acceptance Criteria:**
+
+**Given** video recording is in progress
+**When** each frame is captured
+**Then** hash chain is computed:
+```
+H1 = SHA256(frame1 + depth1 + timestamp1)
+H2 = SHA256(frame2 + depth2 + timestamp2 + H1)
+H3 = SHA256(frame3 + depth3 + timestamp3 + H2)
+...
+Hn = SHA256(frameN + ... + Hn-1)
+```
+
+**And** the hash chain:
+- Uses video frame pixels + depth data + timestamp
+- Chains every frame (30fps), not just depth keyframes
+- Final hash (Hn) is signed by attestation
+- Intermediate hashes stored every 5 seconds (checkpoints)
+
+**Prerequisites:** Story 6.3 (CryptoKit Integration)
+
+**Technical Notes:**
+- CryptoKit SHA256 for performance
+- Hash on background queue to avoid blocking
+- Store checkpoint hashes: [H150, H300, H450] for 5s, 10s, 15s
+- If interrupted, attest last checkpoint
+
+---
+
+### Story 7.5: Video Attestation with Checkpoints
+
+As a **user**,
+I want **my video attested even if recording is interrupted**,
+So that **partial evidence is still verifiable**.
+
+**Acceptance Criteria:**
+
+**Given** video recording is in progress
+**When** recording completes (normal or interrupted)
+**Then**:
+- On normal completion: Final hash signed with DCAppAttest assertion
+- On interruption: Last checkpoint hash signed instead
+- Assertion includes: video duration, frame count, checkpoint index
+
+**And** checkpoint attestation:
+- Checkpoints saved every 5 seconds
+- Each checkpoint contains: hash, timestamp, frame count
+- Interrupted at 12 seconds → attestation covers first 10 seconds
+- Verification shows "Verified: 10s of 12s recorded"
+
+**Prerequisites:** Story 7.4, Story 6.2 (DCAppAttest)
+
+**Technical Notes:**
+```swift
+struct VideoAttestation {
+    let finalHash: Data           // Hash of final or checkpoint
+    let assertion: Data           // DCAppAttest signature
+    let durationMs: Int64         // Attested duration
+    let frameCount: Int           // Attested frame count
+    let isPartial: Bool           // True if interrupted
+    let checkpointIndex: Int?     // Which checkpoint (0=5s, 1=10s, 2=15s)
+}
+```
+
+---
+
+### Story 7.6: Video Metadata Collection
+
+As a **user**,
+I want **the same metadata captured for video as for photos**,
+So that **location, device info, and timestamps are part of the evidence**.
+
+**Acceptance Criteria:**
+
+**Given** video recording starts
+**When** metadata is collected
+**Then** the following are captured:
+- GPS coordinates at recording start (if permitted)
+- Device model and iOS version
+- Recording start and end timestamps (UTC)
+- Video resolution and codec
+- Depth frame count and resolution
+- Attestation level (secure_enclave/unverified)
+
+**And** the metadata structure:
+```json
+{
+  "type": "video",
+  "started_at": "ISO timestamp",
+  "ended_at": "ISO timestamp",
+  "duration_ms": 12500,
+  "frame_count": 375,
+  "depth_keyframe_count": 125,
+  "resolution": { "width": 1920, "height": 1080 },
+  "codec": "hevc",
+  "device_model": "iPhone 15 Pro",
+  "location": { "lat": 37.7749, "lng": -122.4194 },
+  "attestation_level": "secure_enclave",
+  "hash_chain_final": "base64...",
+  "assertion": "base64..."
+}
+```
+
+**Prerequisites:** Story 7.1, Story 6.6 (Frame Processing)
+
+---
+
+### Story 7.7: Video Local Processing Pipeline
+
+As a **developer**,
+I want **video captures processed for upload**,
+So that **all components are packaged correctly for backend verification**.
+
+**Acceptance Criteria:**
+
+**Given** video recording has completed
+**When** local processing runs
+**Then** the following are prepared:
+1. Video file (H.264/HEVC, ~10-30MB for 15s 1080p)
+2. Depth data blob (gzip compressed, ~10MB)
+3. Hash chain data (all intermediate hashes)
+4. Checkpoint hashes (for partial verification)
+5. Metadata JSON with attestation
+6. Thumbnail image (first frame)
+
+**And** processing completes in < 5 seconds
+
+**Prerequisites:** Story 7.4, Story 7.5, Story 7.6
+
+**Technical Notes:**
+- Video already encoded during recording (AVAssetWriter)
+- Depth compression on background thread
+- Store in CoreData with same queue as photos (Story 6.9)
+- Total upload size: ~30-45MB for 15s video
+
+---
+
+### Story 7.8: Video Upload Endpoint
+
+As a **mobile app**,
+I want **to upload video captures with depth and attestation data**,
+So that **the backend can verify and process them**.
+
+**Acceptance Criteria:**
+
+**Given** a processed video capture is ready
+**When** the app calls `POST /api/v1/captures/video` with multipart/form-data:
+- Part `video`: MP4/MOV binary (~20MB)
+- Part `depth_data`: gzipped depth keyframes (~10MB)
+- Part `hash_chain`: checkpoint hashes
+- Part `metadata`: JSON with attestation
+
+**Then** the backend:
+1. Validates device signature headers
+2. Verifies device exists and is registered
+3. Stores video and depth data to S3
+4. Creates pending capture record with type="video"
+5. Returns capture ID and "processing" status
+
+**And** response format:
+```json
+{
+  "data": {
+    "capture_id": "uuid",
+    "type": "video",
+    "status": "processing",
+    "verification_url": "https://realitycam.app/verify/{uuid}"
+  }
+}
+```
+
+**Prerequisites:** Story 4.1 (extended for video), Story 7.7
+
+**Technical Notes:**
+- Support chunked upload for larger files
+- URLSession background upload (survives app termination)
+- Rate limiting: 5 videos/hour/device
+
+---
+
+### Story 7.9: Video Depth Analysis Service
+
+As a **backend service**,
+I want **to analyze video depth data across multiple frames**,
+So that **I can detect manipulation attempts that single-frame analysis would miss**.
+
+**Acceptance Criteria:**
+
+**Given** a video capture with depth keyframes
+**When** depth analysis runs
+**Then** the service computes:
+```rust
+VideoDepthAnalysis {
+    // Per-frame metrics (sampled)
+    frame_analyses: Vec<FrameDepthAnalysis>,
+
+    // Temporal metrics
+    depth_consistency: f32,    // Depth values consistent across frames
+    motion_coherence: f32,     // Depth changes match RGB motion
+    scene_stability: f32,      // No impossible depth jumps
+
+    // Aggregate
+    is_likely_real_scene: bool,
+    suspicious_frames: Vec<FrameIndex>,
+}
+```
+
+**And** "is_likely_real_scene" is true when:
+- `depth_consistency > 0.8` (depth doesn't randomly change)
+- `motion_coherence > 0.7` (depth motion matches visual motion)
+- `scene_stability > 0.9` (no teleporting objects)
+- At least 80% of sampled frames pass individual depth analysis
+
+**Prerequisites:** Story 4.5 (extended for video)
+
+**Technical Notes:**
+- Analyze every 10th depth keyframe (1 per second)
+- Compare depth deltas to optical flow
+- Flag frames with inconsistent depth motion
+
+---
+
+### Story 7.10: Video Hash Chain Verification
+
+As a **backend service**,
+I want **to verify the video hash chain**,
+So that **I can confirm no frames were added, removed, or reordered**.
+
+**Acceptance Criteria:**
+
+**Given** a video with hash chain data
+**When** hash chain verification runs
+**Then**:
+- Recompute hash chain from video frames + depth data
+- Compare to submitted chain
+- Verify final/checkpoint hash matches attested hash
+- Report any discrepancies
+
+**And** verification result:
+```rust
+HashChainVerification {
+    status: Pass | Fail | Partial,
+    verified_frames: u32,
+    total_frames: u32,
+    chain_intact: bool,
+    attestation_valid: bool,
+
+    // For partial attestation
+    partial_reason: Option<String>,  // "Recording interrupted at 12s"
+    verified_duration_ms: u32,
+}
+```
+
+**Prerequisites:** Story 7.8
+
+**Technical Notes:**
+- Stream video frames for recomputation (memory efficient)
+- Checkpoint verification allows early success
+- Log any chain breaks for forensic analysis
+
+---
+
+### Story 7.11: Video Evidence Package
+
+As a **backend service**,
+I want **to assemble video evidence into a unified package**,
+So that **verification page has complete evidence to display**.
+
+**Acceptance Criteria:**
+
+**Given** all video evidence checks have completed
+**When** evidence package is assembled
+**Then** the package contains:
+```json
+{
+  "type": "video",
+  "duration_ms": 12500,
+  "frame_count": 375,
+
+  "hardware_attestation": {
+    "status": "pass|fail|unavailable",
+    "level": "secure_enclave|unverified",
+    "device_model": "iPhone 15 Pro"
+  },
+
+  "hash_chain": {
+    "status": "pass|fail|partial",
+    "verified_frames": 375,
+    "chain_intact": true
+  },
+
+  "depth_analysis": {
+    "status": "pass|fail",
+    "depth_consistency": 0.92,
+    "motion_coherence": 0.85,
+    "scene_stability": 0.97,
+    "is_likely_real_scene": true,
+    "suspicious_frames": []
+  },
+
+  "metadata": {
+    "timestamp_valid": true,
+    "model_verified": true,
+    "location_available": true,
+    "location_coarse": "San Francisco, CA"
+  },
+
+  "partial_attestation": {
+    "is_partial": false,
+    "verified_duration_ms": 12500
+  }
+}
+```
+
+**Prerequisites:** Story 7.9, Story 7.10, Story 4.8
+
+---
+
+### Story 7.12: C2PA Video Manifest Generation
+
+As a **backend service**,
+I want **to create C2PA manifests for video files**,
+So that **videos are interoperable with the Content Credentials ecosystem**.
+
+**Acceptance Criteria:**
+
+**Given** a video capture with completed evidence package
+**When** C2PA manifest generation runs
+**Then** the manifest contains:
+- **Claim Generator:** "rial./1.0.0"
+- **Actions:** "c2pa.created" with start/end timestamps
+- **Assertions:**
+  - Hardware attestation level
+  - Hash chain verification result
+  - Video depth analysis summary
+  - Duration and frame count
+  - Confidence level
+- **Signature:** Ed25519, certificate chain embedded
+
+**And** manifest is valid per C2PA spec 2.0 for video
+**And** manifest embedded in MP4 per ISO Base Media File Format
+
+**Prerequisites:** Story 5.1 (extended for video)
+
+**Technical Notes:**
+- c2pa-rs supports video (MP4) embedding
+- Use XMP metadata for video-specific assertions
+- Store both original and C2PA-embedded versions
+
+---
+
+### Story 7.13: Video Verification Page
+
+As a **verification page visitor**,
+I want **to verify video captures with playback and evidence display**,
+So that **I can understand the trust level of recorded events**.
+
+**Acceptance Criteria:**
+
+**Given** a user opens a video verification URL
+**When** the page loads
+**Then** the user sees:
+- Video player with playback controls
+- Confidence badge overlay (HIGH/MEDIUM/LOW/SUSPICIOUS)
+- Duration and "Verified X of Y seconds" (if partial)
+- "Recorded Nov 26, 2025 at 10:30 AM"
+- Location (city-level if available)
+
+**And** the evidence panel shows:
+- Hash chain status: "All 375 frames verified" / "Chain break at frame 200"
+- Depth analysis: temporal metrics + frame-by-frame viewer
+- Attestation status
+- Partial attestation explanation (if applicable)
+
+**And** depth visualization:
+- Toggle to overlay depth on video during playback
+- Scrubber to view depth at any timestamp
+
+**Prerequisites:** Story 5.3 (extended for video)
+
+**Technical Notes:**
+- Use native HTML5 video player with custom controls
+- Pre-render depth previews at 1fps for scrubber thumbnails
+- Lazy-load depth overlay for performance
+
+---
+
+### Story 7.14: Video Capture UI
+
+As a **user**,
+I want **a clear interface to switch between photo and video modes**,
+So that **I can choose the right capture type for my needs**.
+
+**Acceptance Criteria:**
+
+**Given** the capture screen is displayed
+**When** the user views mode options
+**Then**:
+- Toggle or segmented control shows Photo | Video
+- Video mode shows record button (hold to record)
+- Visual timer shows "0:00 / 0:15" with fill animation
+- Depth overlay toggle available in both modes
+
+**And** recording interaction:
+- Press and hold record button to start
+- Release to stop (or auto-stop at 15s)
+- Haptic feedback on start, 5s warning, and stop
+- Cannot switch modes while recording
+
+**And** preview after recording:
+- Video playback with play/pause
+- Depth overlay toggle
+- "Use" / "Retake" / "Photo Mode" buttons
+
+**Prerequisites:** Story 6.13 (SwiftUI Capture Screen)
+
+**Technical Notes:**
+- Shared ARSession between photo and video modes
+- Mode switch pauses/resumes depth capture
+- Recording state in captureStore
+
+---
+
+## Video Capture - Functional Requirements
+
+| FR | Description | Story |
+|----|-------------|-------|
+| FR47 | App records video up to 15 seconds with LiDAR depth at 10fps | 7.1, 7.2 |
+| FR48 | App displays real-time edge-detection depth overlay during recording | 7.3 |
+| FR49 | App computes frame hash chain (each frame hashes with previous) | 7.4 |
+| FR50 | App generates attestation for complete or interrupted videos | 7.5 |
+| FR51 | App collects same metadata for video as photos | 7.6 |
+| FR52 | Backend verifies video hash chain integrity | 7.10 |
+| FR53 | Backend analyzes depth consistency across video frames | 7.9 |
+| FR54 | Backend generates C2PA manifest for video files | 7.12 |
+| FR55 | Verification page displays video with playback and evidence | 7.13 |
 
 ---
 
 ## Summary
 
-**Total: 6 Epics, 57 Stories**
+**Total: 7 Epics, 71 Stories**
 
 | Epic | Stories | FRs Covered |
 |------|---------|-------------|
@@ -2297,13 +2880,17 @@ So that **we can confidently deprecate the React Native version**.
 | Epic 4: Upload & Evidence Processing | 10 | FR14-FR26, FR44-FR46 |
 | Epic 5: C2PA & Verification Experience | 10 | FR27-FR40 |
 | Epic 6: Native Swift Implementation | 16 | FR1-FR19, FR41-FR46 (native) |
+| Epic 7: Video Capture with LiDAR Depth | 14 | FR47-FR55 |
 
 **Context Incorporated:**
-- ✅ PRD requirements (all 46 FRs mapped)
+- ✅ PRD requirements (all 55 FRs mapped)
 - ✅ Architecture technical decisions (tech stack, API contracts, patterns)
 - ✅ Native Swift re-implementation for maximum security posture
+- ✅ Video capture with frame-by-frame depth and hash chain integrity
 
 **Epic 6 Note:** Provides native Swift alternatives to Epics 2-4 mobile functionality. Can be developed in parallel. After Story 6.16 validation, Expo/RN code can be deprecated.
+
+**Epic 7 Note:** Video capture extends the native Swift implementation. Builds on Epic 6 ARKit foundations. Adds temporal depth analysis and hash chain verification for video-specific manipulation detection.
 
 **Status:** COMPLETE - Ready for Phase 4 Implementation!
 

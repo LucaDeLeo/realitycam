@@ -2,17 +2,17 @@
 
 **Author:** Luca
 **Architect:** Winston (BMAD)
-**Date:** 2025-11-23
-**Version:** 1.2 (MVP)
+**Date:** 2025-11-26
+**Version:** 1.3 (MVP + Video)
 
 ---
 
 ## Executive Summary
 
-rial. is a focused MVP providing cryptographically-attested, LiDAR-verified photo provenance for iPhone Pro devices. The architecture prioritizes hardware-rooted trust and depth-based authenticity verification.
+rial. is a focused MVP providing cryptographically-attested, LiDAR-verified photo and video provenance for iPhone Pro devices. The architecture prioritizes hardware-rooted trust and depth-based authenticity verification.
 
 **Core Components:**
-- **iOS App** (Native Swift/SwiftUI): Photo capture with LiDAR depth and hardware attestation
+- **iOS App** (Native Swift/SwiftUI): Photo and video capture with LiDAR depth and hardware attestation
 - **Backend** (Rust/Axum): Evidence computation, C2PA manifest generation
 - **Verification Web** (Next.js 16): Public verification interface
 
@@ -20,7 +20,7 @@ rial. is a focused MVP providing cryptographically-attested, LiDAR-verified phot
 1. Hardware attestation as foundation (Secure Enclave + DCAppAttest)
 2. LiDAR depth as primary authenticity signal
 3. iPhone Pro only — no cross-platform complexity
-4. Photo-first — video deferred to post-MVP
+4. Photo and video with synchronized depth — hash chain integrity for video
 
 **Why iPhone Pro Only:**
 - LiDAR sensor enables "real 3D scene" vs "flat image" detection
@@ -97,14 +97,18 @@ realitycam/
 │   │   ├── Core/                        # Security-critical services
 │   │   │   ├── Attestation/
 │   │   │   │   ├── DeviceAttestation.swift    # DCAppAttest direct
-│   │   │   │   └── CaptureAssertion.swift     # Per-capture signing
+│   │   │   │   ├── CaptureAssertion.swift     # Per-capture signing
+│   │   │   │   └── VideoAttestationService.swift # Video checkpoint attestation
 │   │   │   ├── Capture/
 │   │   │   │   ├── ARCaptureSession.swift     # Unified RGB+Depth
-│   │   │   │   └── DepthProcessor.swift       # Depth analysis prep
+│   │   │   │   ├── DepthProcessor.swift       # Depth analysis prep
+│   │   │   │   ├── VideoRecordingSession.swift # ARKit + AVAssetWriter
+│   │   │   │   └── DepthKeyframeBuffer.swift  # 10fps depth extraction
 │   │   │   ├── Crypto/
 │   │   │   │   ├── SecureKeychain.swift       # Keychain wrapper
 │   │   │   │   ├── CaptureEncryption.swift    # AES-GCM offline
-│   │   │   │   └── HashingService.swift       # CryptoKit SHA-256
+│   │   │   │   ├── HashingService.swift       # CryptoKit SHA-256
+│   │   │   │   └── HashChainService.swift     # Video frame hash chain
 │   │   │   ├── Networking/
 │   │   │   │   ├── APIClient.swift            # URLSession + signing
 │   │   │   │   ├── DeviceSignature.swift      # Request auth
@@ -130,7 +134,8 @@ realitycam/
 │   │   │   ├── Device.swift
 │   │   │   └── Evidence.swift
 │   │   ├── Shaders/
-│   │   │   └── DepthColormap.metal      # GPU depth visualization
+│   │   │   ├── DepthColormap.metal      # GPU depth visualization
+│   │   │   └── EdgeDepthVisualization.metal # Sobel edge detection for video
 │   │   └── Resources/
 │   │       └── Assets.xcassets
 │   ├── RialTests/                       # XCTest unit tests
@@ -165,13 +170,22 @@ realitycam/
 │           ├── capture.ts
 │           └── api.ts
 │
-├── backend/                             # Rust API server (unchanged)
+├── backend/                             # Rust API server
 │   ├── src/
 │   │   ├── main.rs
 │   │   ├── config.rs
 │   │   ├── routes/
+│   │   │   ├── captures.rs              # Photo capture endpoint
+│   │   │   ├── captures_video.rs        # Video capture endpoint
+│   │   │   └── ...
 │   │   ├── middleware/
 │   │   ├── services/
+│   │   │   ├── c2pa.rs                  # Photo C2PA manifest
+│   │   │   ├── c2pa_video.rs            # Video C2PA manifest
+│   │   │   ├── depth_analysis.rs        # Photo depth analysis
+│   │   │   ├── video_depth_analysis.rs  # Temporal depth analysis
+│   │   │   ├── hash_chain_verifier.rs   # Video hash chain verification
+│   │   │   └── ...
 │   │   ├── models/
 │   │   └── error.rs
 │   ├── migrations/
@@ -195,11 +209,16 @@ realitycam/
 | Device & Attestation | `ios/Rial/Core/Attestation/` | DCAppAttest direct via DeviceCheck |
 | LiDAR Depth Capture | `ios/Rial/Core/Capture/` | ARKit unified RGB+Depth |
 | Photo Capture | `ios/Rial/Features/Capture/` | SwiftUI + ARKit |
+| Video Capture | `ios/Rial/Core/Capture/` | VideoRecordingSession + DepthKeyframeBuffer |
+| Video Hash Chain | `ios/Rial/Core/Crypto/` | HashChainService for frame integrity |
+| Video Attestation | `ios/Rial/Core/Attestation/` | VideoAttestationService with checkpoints |
 | Cryptography | `ios/Rial/Core/Crypto/` | CryptoKit, Keychain |
 | Upload & Sync | `ios/Rial/Core/Networking/` | URLSession background uploads |
 | Offline Storage | `ios/Rial/Core/Storage/` | Core Data + AES-GCM encryption |
 | Evidence Generation | `backend/services/evidence/` | Hardware + Depth + Metadata |
-| C2PA Integration | `backend/services/c2pa.rs` | Manifest embedding |
+| Video Evidence | `backend/services/` | hash_chain_verifier + video_depth_analysis |
+| C2PA Integration | `backend/services/c2pa.rs` | Photo manifest embedding |
+| C2PA Video | `backend/services/c2pa_video.rs` | Video manifest embedding (MP4) |
 | Verification Interface | `web/app/verify/`, `web/components/` | Public verification page |
 | File Verification | `web/components/Upload/` | Hash-based lookup |
 | Device Management | `backend/routes/devices.rs` | No user accounts for MVP |
@@ -229,8 +248,11 @@ tokio = { version = "1", features = ["full"] }
 # Database
 sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono", "json"] }
 
-# C2PA
-c2pa = { version = "0.51", features = ["file_io"] }
+# C2PA (v0.63 for improved video/MP4 support)
+c2pa = { version = "0.63", features = ["file_io"] }
+
+# Video processing (for hash chain verification)
+ffmpeg-next = "7"
 
 # Cryptography
 ed25519-dalek = "2"
@@ -564,6 +586,51 @@ Response:
 {
   "data": {
     "capture_id": "uuid",
+    "status": "processing",
+    "verification_url": "https://realitycam.app/verify/{id}"
+  }
+}
+```
+
+### Video Capture Upload
+
+```
+POST /api/v1/captures/video
+Content-Type: multipart/form-data
+X-Device-Id: {device_id}
+X-Device-Timestamp: {unix_ms}
+X-Device-Signature: {signature}
+
+Parts:
+- video: binary (MP4/MOV, ~20MB)
+- depth_data: binary (gzipped depth keyframes at 10fps, ~10MB)
+- hash_chain: JSON { frame_hashes[], checkpoints[], final_hash }
+- metadata: JSON (see below)
+
+Metadata Schema:
+{
+  "type": "video",
+  "started_at": "ISO timestamp",
+  "ended_at": "ISO timestamp",
+  "duration_ms": 12500,
+  "frame_count": 375,
+  "depth_keyframe_count": 125,
+  "resolution": { "width": 1920, "height": 1080 },
+  "codec": "hevc",
+  "device_model": "iPhone 15 Pro",
+  "location": { "lat": 37.7749, "lng": -122.4194 },
+  "attestation_level": "secure_enclave",
+  "hash_chain_final": "base64...",
+  "assertion": "base64...",
+  "is_partial": false,
+  "checkpoint_index": null
+}
+
+Response:
+{
+  "data": {
+    "capture_id": "uuid",
+    "type": "video",
     "status": "processing",
     "verification_url": "https://realitycam.app/verify/{id}"
   }
@@ -920,25 +987,107 @@ npm run dev
 
 ---
 
+### ADR-010: Video Architecture with LiDAR Depth
+
+**Context:** Epic 7 extends rial. to capture authenticated video with LiDAR depth verification. Video introduces unique challenges: frame-by-frame integrity, recording interruptions, and temporal depth analysis.
+
+**Decision:** Implement video capture with these core patterns:
+
+1. **Hash Chain Integrity**
+2. **Checkpoint Attestation**
+3. **10fps Depth Keyframes**
+4. **Edge-Only Overlay**
+
+**Pattern 1: Hash Chain Integrity**
+
+Each video frame is cryptographically chained to the previous frame:
+
+```
+H(n) = SHA256(frame_n + depth_n + timestamp_n + H(n-1))
+```
+
+This ensures:
+- No frames can be inserted (chain would break)
+- No frames can be removed (chain would break)
+- No frames can be reordered (previous hash wouldn't match)
+
+**Rationale:** Established cryptographic pattern. Used in blockchain, Chronicle, and similar tamper-evident systems. Validated via Exa research against Facebook ThreatExchange vPDQ/TMK.
+
+**Pattern 2: Checkpoint Attestation**
+
+DCAppAttest signs hash at 5-second intervals:
+
+```
+Checkpoints: [H(150), H(300), H(450)]  // at 5s, 10s, 15s
+```
+
+If recording is interrupted at 12 seconds:
+- Last complete checkpoint (10s) is attested
+- Verification shows "Verified: 10s of 12s recorded"
+
+**Rationale:** Novel pattern for rial. Ensures partial video evidence is still cryptographically valid. Similar to blockchain checkpoint concepts.
+
+**Pattern 3: 10fps Depth Keyframes**
+
+Capture depth every 3rd frame (30fps video → 10fps depth):
+
+| Duration | Video Frames | Depth Keyframes | Depth Size |
+|----------|--------------|-----------------|------------|
+| 5s | 150 | 50 | ~3MB |
+| 10s | 300 | 100 | ~7MB |
+| 15s | 450 | 150 | ~10MB |
+
+**Rationale:** Balance between forensic coverage and file size. 10fps is sufficient for detecting temporal depth inconsistencies while keeping total upload size manageable (~30-45MB).
+
+**Pattern 4: Edge-Only Overlay**
+
+Use Sobel edge detection on depth buffer instead of full colormap:
+
+```metal
+// Sobel edge detection - ~3x faster than colormap
+float edge = sqrt(gx*gx + gy*gy);
+float alpha = edge > threshold ? 0.8 : 0.0;
+```
+
+**Rationale:** Full colormap visualization exceeds GPU performance budget during recording. Edge detection provides sufficient depth visibility at 30fps with < 3ms per frame.
+
+**Consequences:**
+
+- New services: HashChainService, VideoAttestationService, DepthKeyframeBuffer
+- New backend: hash_chain_verifier, video_depth_analysis, c2pa_video
+- New API: POST /api/v1/captures/video
+- Total upload size: ~30-45MB per 15s video
+- Partial video verification possible via checkpoints
+
+**Decision Date:** 2025-11-26
+**Decision Maker:** Luca
+
+---
+
 ## MVP Scope Summary
 
 ### In Scope
-- iPhone Pro (12 Pro, 13 Pro, 14 Pro, 15 Pro, 16 Pro)
-- Photo capture only
+- iPhone Pro (12 Pro, 13 Pro, 14 Pro, 15 Pro, 16 Pro, 17 Pro)
+- Photo capture with LiDAR depth
+- **Video capture (15s max) with 10fps depth keyframes** *(Epic 7)*
+- **Hash chain integrity for video frames** *(Epic 7)*
+- **Checkpoint attestation for interrupted videos** *(Epic 7)*
 - Hardware attestation (DCAppAttest + Secure Enclave)
-- LiDAR depth analysis
+- LiDAR depth analysis (photo + temporal analysis for video)
 - Basic metadata checks
-- C2PA manifest generation
-- Verification web page
+- C2PA manifest generation (photo + video)
+- Verification web page (photo + video playback)
 
 ### Explicitly Deferred (Post-MVP)
 | Feature | Reason for Deferral |
 |---------|---------------------|
 | Android support | Adds 50% native code, StrongBox fragmentation |
-| Video capture | Complex gyro/optical-flow analysis |
+| Extended video (>15s) | Thermal throttling, larger file sizes, UX complexity |
+| Delta depth compression | Optimization for v2 (simpler keyframe approach for MVP) |
 | Sun angle computation | Requires solar position API integration |
 | Barometric pressure | Requires weather/altitude correlation |
 | 360° environment scan | Complex UX, parallax computation |
+| Gyro × optical flow | Cross-modal correlation complexity |
 | User accounts | Device-only auth sufficient for MVP |
 
 ### Supported Devices
@@ -953,6 +1102,7 @@ npm run dev
 
 ---
 
-_Generated by BMAD Decision Architecture Workflow v1.2 (MVP)_
-_Date: 2025-11-23_
+_Generated by BMAD Decision Architecture Workflow v1.3 (MVP + Video)_
+_Date: 2025-11-26_
 _For: Luca_
+_Updated: Added ADR-010 for Epic 7 Video Architecture_

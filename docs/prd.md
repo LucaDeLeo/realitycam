@@ -76,35 +76,40 @@ The system requires deep integration with iOS Secure Enclave (DCAppAttest) and A
 
 ## Product Scope
 
-### MVP - iPhone Pro Photo Capture
+### MVP - iPhone Pro Photo & Video Capture
 
 **iOS App (MVP):**
 - Photo capture with simultaneous LiDAR depth map
+- Video capture (15s max) with 10fps depth keyframes
 - DCAppAttest hardware attestation (Secure Enclave)
-- Depth overlay visualization during capture
-- SHA-256 hash computation
-- Upload: photo + depth_map (gzipped float32) + metadata
+- Depth overlay visualization during capture (edge-only for video)
+- SHA-256 hash computation (hash chain for video)
+- Upload: photo/video + depth_map (gzipped float32) + metadata
 - Receive and display verify URL
 - Local encrypted storage for offline captures
 
 **Backend (MVP):**
 - `POST /devices`: device registration with DCAppAttest verification
-- `POST /captures`: receive upload, verify attestation, analyze depth, store
+- `POST /captures`: receive photo upload, verify attestation, analyze depth, store
+- `POST /captures/video`: receive video upload with depth keyframes and hash chain
 - `GET /captures/:id`: return capture data and evidence
 - `POST /verify-file`: hash lookup
 - Evidence package: Hardware Attestation + Depth Analysis + Metadata
-- C2PA manifest generation via c2pa-rs
+- Video evidence: Hash chain verification + Temporal depth analysis
+- C2PA manifest generation via c2pa-rs (photo and video)
 
 **Verification Web (MVP):**
 - Summary view with confidence level (HIGH/MEDIUM/LOW/SUSPICIOUS)
-- Depth analysis visualization (depth map preview)
+- Depth analysis visualization (depth map preview for photos, scrubber for video)
 - Hardware attestation status display
 - Expandable evidence panel with per-check details
+- Video playback with evidence overlay and hash chain status
+- Partial attestation display for interrupted videos
 - File upload for hash verification
 
 **MVP Scope Constraints:**
 - iPhone Pro only (12 Pro through 17 Pro)
-- Photo only (no video)
+- Photo and video (video limited to 15 seconds max)
 - Device-based auth (no user accounts)
 - LiDAR required (no fallback for non-Pro devices)
 
@@ -113,11 +118,12 @@ The system requires deep integration with iOS Secure Enclave (DCAppAttest) and A
 | Feature | Reason for Deferral |
 |---------|---------------------|
 | Android support | Adds 50% native code, StrongBox fragmentation |
-| Video capture | Complex gyro/optical-flow analysis |
+| Extended video (>15s) | Thermal throttling, larger file sizes, UX complexity |
+| Delta depth compression | Optimization for v2 (simpler keyframe approach for MVP) |
 | 360° environment scan | Complex UX, parallax computation |
 | Sun angle verification | Requires solar position API integration |
 | Barometric pressure | Requires weather/altitude correlation |
-| Gyro × optical flow | Needs video, cross-modal correlation |
+| Gyro × optical flow | Cross-modal correlation complexity |
 | User accounts | Device-only auth sufficient for MVP |
 | Multi-camera lighting | Complexity vs. value for photos |
 | Expert raw data download | Nice-to-have, not core value prop |
@@ -187,18 +193,28 @@ The following are explicitly **not** part of this product:
 4. App simultaneously captures: photo + LiDAR depth map + device attestation
 5. Upload includes all evidence; user receives shareable verify link
 
-**UC2: View Capture Result**
-1. After capture, app shows preview with depth visualization
+**UC2: Video Capture with Depth**
+1. User switches to video mode in capture screen
+2. App shows camera with edge-detection depth overlay
+3. User presses and holds record button
+4. Timer shows elapsed time (max 15 seconds)
+5. User releases or timer reaches limit
+6. App signs hash chain with device attestation
+7. If interrupted: checkpoint attestation preserves partial evidence
+
+**UC3: View Capture Result**
+1. After capture, app shows preview with depth visualization (photo) or playback (video)
 2. User sees preliminary confidence indicator
 3. User can share verify link or capture another
 
-**UC3: Verify Received Media**
+**UC4: Verify Received Media**
 1. Recipient opens verification link
 2. Sees confidence summary (HIGH/MEDIUM/LOW/SUSPICIOUS)
 3. Sees depth analysis visualization (proof of real 3D scene)
-4. Can expand detailed evidence panel
+4. For video: playback with hash chain status and temporal analysis
+5. Can expand detailed evidence panel
 
-**UC4: Upload External File for Hash Lookup**
+**UC5: Upload External File for Hash Lookup**
 1. User uploads file to verification page
 2. System checks if hash matches any registered capture
 3. If match: show evidence. If no match: "No record found"
@@ -409,6 +425,26 @@ These add value but require more implementation effort:
 - FR44: GPS stored at coarse level (city) by default in public view
 - FR45: Users can opt-out of location (noted in evidence, not suspicious)
 - FR46: Depth map stored but not publicly downloadable (only visualization)
+
+### Video Capture (MVP)
+
+- FR47: App records video up to 15 seconds with LiDAR depth at 10fps
+- FR48: App displays real-time edge-detection depth overlay during recording
+- FR49: App computes frame hash chain (each frame hashes with previous)
+- FR50: App generates attestation for complete or interrupted videos (checkpoint attestation)
+- FR51: App collects same metadata for video as photos (GPS, device, timestamp)
+- FR52: Backend verifies video hash chain integrity
+- FR53: Backend analyzes depth consistency across video frames (temporal analysis)
+- FR54: Backend generates C2PA manifest for video files
+- FR55: Verification page displays video with playback and evidence
+
+**Video Capture Technical Details:**
+- **Duration:** Maximum 15 seconds (thermal and UX considerations)
+- **Depth capture:** 10fps keyframes (every 3rd frame from 30fps video)
+- **Hash chain:** Every frame (30fps) chained with previous frame's hash
+- **Checkpoints:** Attestation checkpoints every 5 seconds for partial recovery
+- **Overlay:** Edge-detection only (performance optimized vs full colormap)
+- **File size:** ~30-45MB per 15s video (video + depth + chain + metadata)
 
 ### Deferred Functional Requirements (Post-MVP)
 
