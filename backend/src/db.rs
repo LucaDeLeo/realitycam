@@ -28,7 +28,11 @@ pub async fn create_pool(config: &Config) -> Result<PgPool, sqlx::Error> {
     let mut last_error = None;
 
     for attempt in 1..=max_retries {
-        tracing::info!("Attempting database connection (attempt {}/{})", attempt, max_retries);
+        tracing::info!(
+            "Attempting database connection (attempt {}/{})",
+            attempt,
+            max_retries
+        );
 
         match PgPoolOptions::new()
             .max_connections(config.db_max_connections)
@@ -45,11 +49,7 @@ pub async fn create_pool(config: &Config) -> Result<PgPool, sqlx::Error> {
                 return Ok(pool);
             }
             Err(e) => {
-                tracing::warn!(
-                    "Database connection attempt {} failed: {}",
-                    attempt,
-                    e
-                );
+                tracing::warn!("Database connection attempt {} failed: {}", attempt, e);
                 last_error = Some(e);
 
                 if attempt < max_retries {
