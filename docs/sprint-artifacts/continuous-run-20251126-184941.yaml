@@ -14,18 +14,14 @@ configuration:
   auto_push: true
 
 checkpoint:
-  story_key: 7-1-arkit-video-recording-session
-  phase: implement
-  saved_at: 2025-11-26T18:55:00Z
-  data:
-    context_file_path: docs/sprint-artifacts/story-contexts/7-1-arkit-video-recording-session-context.xml
-    validation_attempts: 1
-    review_cycles: 0
+  story_key: 7-2-depth-keyframe-extraction
+  phase: starting
+  saved_at: 2025-11-26T19:05:00Z
+  data: null
 
 epics_contexted: []
 
 stories_pending:
-  - 7-1-arkit-video-recording-session
   - 7-2-depth-keyframe-extraction
   - 7-3-realtime-edge-depth-overlay
   - 7-4-frame-hash-chain
@@ -40,11 +36,17 @@ stories_pending:
   - 7-13-video-verification-page
   - 7-14-video-capture-ui
 
-stories_processed: []
+stories_processed:
+  - story_key: 7-1-arkit-video-recording-session
+    status: success
+    commit: 683b925
+    review_cycles: 1
+    started_at: 2025-11-26T18:49:41Z
+    completed_at: 2025-11-26T19:05:00Z
 
 statistics:
   epics_contexted_jit: 0
   epics_already_contexted: 1
   total_stories: 14
-  success_count: 0
+  success_count: 1
   failed_count: 0

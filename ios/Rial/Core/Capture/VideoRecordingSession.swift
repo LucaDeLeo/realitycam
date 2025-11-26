@@ -276,6 +276,9 @@ public final class VideoRecordingSession: NSObject {
     /// Whether first frame has been processed (to set dimensions)
     private var hasConfiguredDimensions: Bool = false
 
+    /// Buffer for accumulating depth keyframes at 10fps
+    private let depthKeyframeBuffer = DepthKeyframeBuffer()
+
     // MARK: - Initialization
 
     /// Creates a new VideoRecordingSession.
@@ -321,6 +324,9 @@ public final class VideoRecordingSession: NSObject {
         recordingStartTime = nil
         wasInterrupted = false
         hasConfiguredDimensions = false
+
+        // Initialize depth keyframe buffer for new recording
+        depthKeyframeBuffer.startRecording()
 
         // Create output URL
         let tempDir = FileManager.default.temporaryDirectory
@@ -372,18 +378,22 @@ public final class VideoRecordingSession: NSObject {
 
     /// Stop video recording.
     ///
-    /// Finalizes the video file and returns the result.
+    /// Finalizes the video file and returns the result including depth keyframe data.
     ///
-    /// - Returns: The URL of the recorded video file.
+    /// - Returns: `VideoRecordingResult` containing video URL and depth keyframe data.
     /// - Throws: `VideoRecordingError` if recording cannot be stopped.
     @discardableResult
-    public func stopRecording() async throws -> URL {
+    public func stopRecording() async throws -> VideoRecordingResult {
         Self.logger.info("Stopping video recording")
 
         guard state == .recording else {
             Self.logger.warning("Cannot stop recording - state is \(String(describing: self.state))")
             throw VideoRecordingError.notRecording
         }
+
+        // Capture end time
+        let endTime = Date()
+        let startTime = recordingStartTime ?? endTime
 
         // Update state to processing
         state = .processing
@@ -392,12 +402,14 @@ public final class VideoRecordingSession: NSObject {
         let finalFrameCount = frameCount
         if finalFrameCount == 0 {
             Self.logger.error("No frames captured")
+            depthKeyframeBuffer.reset()
             cleanup()
             throw VideoRecordingError.noFramesCaptured
         }
 
         // Finish writing
         guard let assetWriter = assetWriter, let outputURL = outputURL else {
+            depthKeyframeBuffer.reset()
             cleanup()
             throw VideoRecordingError.writerCreationFailed
         }
@@ -416,21 +428,44 @@ public final class VideoRecordingSession: NSObject {
         if assetWriter.status == .failed {
             let errorMessage = assetWriter.error?.localizedDescription ?? "Unknown error"
             Self.logger.error("AVAssetWriter failed: \(errorMessage)")
+            depthKeyframeBuffer.reset()
             cleanup()
             throw VideoRecordingError.writingFailed(errorMessage)
         }
 
-        let duration = self.duration
-        Self.logger.info("Recording complete - \(finalFrameCount) frames, \(String(format: "%.1f", duration))s, output: \(outputURL.lastPathComponent)")
+        // Finalize depth keyframe buffer (compresses data)
+        let depthData = depthKeyframeBuffer.finalize()
+        let depthKeyframeCount = depthData?.keyframeCount ?? 0
 
-        // Cleanup but keep outputURL
+        let duration = self.duration
+        Self.logger.info("Recording complete - \(finalFrameCount) frames, \(depthKeyframeCount) depth keyframes, \(String(format: "%.1f", duration))s, output: \(outputURL.lastPathComponent)")
+
+        // Capture values before cleanup
         let savedURL = outputURL
+        let savedWidth = videoWidth
+        let savedHeight = videoHeight
+        let savedWasInterrupted = wasInterrupted
+
+        // Cleanup resources
         self.assetWriter = nil
         self.videoInput = nil
         self.pixelBufferAdaptor = nil
         self.state = .idle
 
-        return savedURL
+        // Build result
+        let result = VideoRecordingResult(
+            videoURL: savedURL,
+            frameCount: finalFrameCount,
+            duration: duration,
+            resolution: (width: savedWidth, height: savedHeight),
+            codec: "hevc",
+            wasInterrupted: savedWasInterrupted,
+            startedAt: startTime,
+            endedAt: endTime,
+            depthKeyframeData: depthData
+        )
+
+        return result
     }
 
     /// Cancel recording without saving.
@@ -447,6 +482,9 @@ public final class VideoRecordingSession: NSObject {
         if let url = outputURL {
             try? FileManager.default.removeItem(at: url)
         }
+
+        // Reset depth buffer
+        depthKeyframeBuffer.reset()
 
         cleanup()
     }
@@ -641,6 +679,10 @@ public final class VideoRecordingSession: NSObject {
             let currentFrameCount = _frameCount
             frameCountLock.unlock()
 
+            // Process depth keyframe (every 3rd frame for 10fps from 30fps)
+            // This is done synchronously on the recording queue for thread safety
+            depthKeyframeBuffer.processFrame(frame, frameNumber: currentFrameCount)
+
             // Log progress periodically
             if currentFrameCount % 30 == 0 {
                 Self.logger.debug("Recorded \(currentFrameCount) frames (\(String(format: "%.1f", relativeTime))s)")
@@ -704,4 +746,12 @@ public struct VideoRecordingResult: Sendable {
 
     /// Recording end time
     public let endedAt: Date
+
+    /// Depth keyframe data captured at 10fps (optional, may be nil if no depth data)
+    public let depthKeyframeData: DepthKeyframeData?
+
+    /// Number of depth keyframes captured (convenience property)
+    public var depthKeyframeCount: Int {
+        depthKeyframeData?.keyframeCount ?? 0
+    }
 }

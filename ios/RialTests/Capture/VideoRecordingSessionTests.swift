@@ -364,13 +364,13 @@ final class VideoRecordingSessionTests: XCTestCase {
         await fulfillment(of: [recordExpectation], timeout: 2.0)
 
         // Stop recording
-        let outputURL = try await sut.stopRecording()
+        let result = try await sut.stopRecording()
         XCTAssertEqual(sut.state, .idle)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: outputURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: result.videoURL.path))
         XCTAssertGreaterThan(sut.frameCount, 0)
 
         // Cleanup
-        try? FileManager.default.removeItem(at: outputURL)
+        try? FileManager.default.removeItem(at: result.videoURL)
     }
 
     /// Test that frame callbacks are called during recording.
@@ -475,23 +475,23 @@ final class VideoRecordingSessionTests: XCTestCase {
         try await Task.sleep(nanoseconds: 500_000_000)
 
         // Stop recording
-        let outputURL = try await sut.stopRecording()
+        let result = try await sut.stopRecording()
 
         // Verify file exists
-        XCTAssertTrue(FileManager.default.fileExists(atPath: outputURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: result.videoURL.path))
 
         // Verify file has content
-        let attributes = try FileManager.default.attributesOfItem(atPath: outputURL.path)
+        let attributes = try FileManager.default.attributesOfItem(atPath: result.videoURL.path)
         let fileSize = attributes[.size] as? Int64 ?? 0
         XCTAssertGreaterThan(fileSize, 0, "Video file should have content")
 
         // Verify file is a valid video
-        let asset = AVAsset(url: outputURL)
+        let asset = AVAsset(url: result.videoURL)
         let duration = try await asset.load(.duration)
         XCTAssertGreaterThan(CMTimeGetSeconds(duration), 0, "Video should have duration")
 
         // Cleanup
-        try? FileManager.default.removeItem(at: outputURL)
+        try? FileManager.default.removeItem(at: result.videoURL)
     }
 
     /// Test that delegate receives events during recording.

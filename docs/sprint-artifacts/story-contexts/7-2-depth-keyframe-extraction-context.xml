@@ -1,0 +1,650 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context: 7-2-depth-keyframe-extraction
+  Epic: 7 - Video Capture with LiDAR Depth
+  Generated: 2025-11-26
+
+  This context file provides all documentation, code patterns, interfaces, and
+  constraints needed to implement the Depth Keyframe Extraction story.
+-->
+<story-context>
+  <story-reference>
+    <story-id>7-2-depth-keyframe-extraction</story-id>
+    <story-file>docs/sprint-artifacts/stories/7-2-depth-keyframe-extraction.md</story-file>
+    <epic-id>7</epic-id>
+    <epic-title>Video Capture with LiDAR Depth</epic-title>
+    <priority>P0</priority>
+    <effort>M</effort>
+    <dependencies>
+      <dependency>Story 7-1-arkit-video-recording-session</dependency>
+    </dependencies>
+    <user-story>
+      As a developer,
+      I want to capture depth data at 10fps during video recording,
+      So that file sizes are manageable while maintaining forensic value.
+    </user-story>
+  </story-reference>
+
+  <epic-context>
+    <tech-spec-file>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md</tech-spec-file>
+    <architecture-file>docs/architecture.md</architecture-file>
+    <epic-objectives>
+      <objective>Video Recording with Depth - Capture 30fps video with synchronized 10fps LiDAR depth keyframes</objective>
+      <objective>Hash Chain Integrity - Cryptographically chain every frame to prevent tampering</objective>
+      <objective>Checkpoint Attestation - Enable partial video verification on recording interruption</objective>
+      <objective>Edge Depth Overlay - Real-time depth visualization without performance degradation</objective>
+    </epic-objectives>
+    <performance-constraints>
+      <constraint metric="depth-extraction">Less than 10ms per frame</constraint>
+      <constraint metric="memory-during-recording">Contributes to less than 300MB total</constraint>
+      <constraint metric="compression">Lazy compression after recording, not during</constraint>
+      <constraint metric="max-keyframes">150 keyframes maximum for 15-second video</constraint>
+    </performance-constraints>
+  </epic-context>
+
+  <acceptance-criteria>
+    <criterion id="AC-7.2.1" name="Depth Keyframe Rate">
+      <given>video recording is in progress at 30fps</given>
+      <when>frames are captured by ARKit</when>
+      <then>
+        <check>Depth extracted every 3rd frame (10fps from 30fps video)</check>
+        <check>Extraction triggers via VideoRecordingSession's onFrameProcessed callback</check>
+        <check>Frame counter accurately tracks which frames to extract</check>
+        <check>No depth extraction during non-recording state</check>
+      </then>
+    </criterion>
+
+    <criterion id="AC-7.2.2" name="Depth Data Format">
+      <given>a depth keyframe is extracted</given>
+      <when>the depth buffer is processed</when>
+      <then>
+        <check>Depth map stored as Float32 array (256x192 pixels typical)</check>
+        <check>Each pixel represents depth in meters (LiDAR range 0-5m)</check>
+        <check>Raw CVPixelBuffer converted to contiguous Float32 data</check>
+        <check>Total per-frame size: 256 x 192 x 4 bytes = 196,608 bytes (~192KB)</check>
+      </then>
+    </criterion>
+
+    <criterion id="AC-7.2.3" name="Frame Indexing">
+      <given>depth keyframes are being captured</given>
+      <when>each keyframe is stored</when>
+      <then>
+        <check>Keyframe indexed by video timestamp (TimeInterval)</check>
+        <check>Index maps timestamp to offset in binary blob</check>
+        <check>0-based keyframe index maintained (0, 1, 2, ... 149)</check>
+        <check>Maximum 150 keyframes for 15-second video (10fps x 15s)</check>
+      </then>
+    </criterion>
+
+    <criterion id="AC-7.2.4" name="Storage Format">
+      <given>all depth keyframes captured during recording</given>
+      <when>recording completes (normal or interrupted)</when>
+      <then>
+        <check>All depth frames concatenated into single binary blob</check>
+        <check>Blob compressed with gzip compression</check>
+        <check>Uncompressed size: ~15MB max (150 frames x 192KB)</check>
+        <check>Compressed size: ~10MB typical (30-40% reduction)</check>
+        <check>DepthKeyframeData struct contains frames array + compressed blob</check>
+      </then>
+    </criterion>
+
+    <criterion id="AC-7.2.5" name="Integration with VideoRecordingSession">
+      <given>VideoRecordingSession is recording</given>
+      <when>frames arrive via onFrameProcessed callback</when>
+      <then>
+        <check>DepthKeyframeBuffer receives callback with ARFrame and frame number</check>
+        <check>Buffer extracts depth only when frameNumber % 3 == 0</check>
+        <check>Buffer handles nil sceneDepth gracefully (logs warning, continues)</check>
+        <check>Buffer respects recording state (clears on new recording)</check>
+      </then>
+    </criterion>
+  </acceptance-criteria>
+
+  <documentation-artifacts>
+    <artifact type="tech-spec" relevance="primary">
+      <file>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md</file>
+      <description>Epic 7 technical specification with DepthKeyframeData model, performance constraints, and integration patterns</description>
+      <key-sections>
+        <section>Data Models and Contracts - DepthKeyframeData struct definition</section>
+        <section>Detailed Design - iOS Video Recording - DepthKeyframeBuffer.swift</section>
+        <section>APIs and Interfaces - Hash Chain Computation (shows frame callback pattern)</section>
+        <section>Non-Functional Requirements - Performance constraints</section>
+      </key-sections>
+    </artifact>
+
+    <artifact type="architecture" relevance="primary">
+      <file>docs/architecture.md</file>
+      <description>System architecture with ADR-010 Video Architecture with LiDAR Depth</description>
+      <key-sections>
+        <section>ADR-010 - Pattern 3: 10fps Depth Keyframes</section>
+        <section>Project Structure - ios/Rial/Core/Capture/DepthKeyframeBuffer.swift</section>
+        <section>Technology Stack - Compression framework for gzip</section>
+      </key-sections>
+    </artifact>
+
+    <artifact type="story" relevance="dependency">
+      <file>docs/sprint-artifacts/stories/7-1-arkit-video-recording-session.md</file>
+      <description>Predecessor story that provides VideoRecordingSession with onFrameProcessed callback</description>
+      <key-integration>
+        <point>VideoRecordingSession.onFrameProcessed callback is the integration point</point>
+        <point>VideoRecordingResult struct to be extended with depthKeyframeData</point>
+        <point>Thread safety patterns using NSLock established in Story 7-1</point>
+      </key-integration>
+    </artifact>
+  </documentation-artifacts>
+
+  <existing-code-interfaces>
+    <!-- VideoRecordingSession.swift - Integration point -->
+    <code-file path="ios/Rial/Core/Capture/VideoRecordingSession.swift" relevance="critical">
+      <description>Primary integration point - provides onFrameProcessed callback and VideoRecordingResult</description>
+      <key-interfaces>
+        <interface name="VideoRecordingSessionDelegate">
+          <method signature="func recordingSession(_ session: VideoRecordingSession, didProcessFrame frame: ARFrame, frameNumber: Int)">Frame callback for depth extraction</method>
+        </interface>
+        <interface name="onFrameProcessed callback">
+          <signature>public var onFrameProcessed: ((ARFrame, Int) -> Void)?</signature>
+          <usage>Called for each frame during recording with ARFrame and frameNumber</usage>
+        </interface>
+        <interface name="VideoRecordingResult">
+          <property name="videoURL" type="URL">URL of recorded video file</property>
+          <property name="frameCount" type="Int">Number of frames captured</property>
+          <property name="duration" type="TimeInterval">Recording duration in seconds</property>
+          <property name="resolution" type="(width: Int, height: Int)">Video resolution</property>
+          <property name="codec" type="String">Codec used for encoding</property>
+          <property name="wasInterrupted" type="Bool">Whether recording was interrupted</property>
+          <note>Needs to be extended with depthKeyframeData: DepthKeyframeData?</note>
+        </interface>
+      </key-interfaces>
+      <thread-safety-pattern>
+        <description>Uses NSLock for thread-safe state access - follow this pattern</description>
+        <code><![CDATA[
+    /// Thread-safe state access
+    private let stateLock = NSLock()
+
+    public private(set) var state: RecordingState {
+        get {
+            stateLock.lock()
+            defer { stateLock.unlock() }
+            return _state
+        }
+        set {
+            stateLock.lock()
+            let oldValue = _state
+            _state = newValue
+            stateLock.unlock()
+            // Notify observers...
+        }
+    }
+        ]]></code>
+      </thread-safety-pattern>
+      <frame-callback-usage>
+        <description>How onFrameProcessed is called in appendFrame method</description>
+        <code><![CDATA[
+    // Notify delegate/callback
+    DispatchQueue.main.async { [weak self] in
+        guard let self = self else { return }
+        self.onFrameProcessed?(frame, currentFrameCount)
+        self.delegate?.recordingSession(self, didProcessFrame: frame, frameNumber: currentFrameCount)
+    }
+        ]]></code>
+        <note>Callback is called on main queue - depth extraction should be dispatched to background</note>
+      </frame-callback-usage>
+    </code-file>
+
+    <!-- FrameProcessor.swift - Depth extraction pattern -->
+    <code-file path="ios/Rial/Core/Capture/FrameProcessor.swift" relevance="high">
+      <description>Contains existing depth buffer extraction and compression patterns for photo capture</description>
+      <key-patterns>
+        <pattern name="Depth Buffer Extraction">
+          <description>Pattern for extracting raw Float32 data from CVPixelBuffer</description>
+          <code><![CDATA[
+    private func compressDepth(_ buffer: CVPixelBuffer) throws -> Data {
+        CVPixelBufferLockBaseAddress(buffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+
+        let width = CVPixelBufferGetWidth(buffer)
+        let height = CVPixelBufferGetHeight(buffer)
+
+        guard let baseAddress = CVPixelBufferGetBaseAddress(buffer) else {
+            Self.logger.error("Failed to get depth buffer base address")
+            throw FrameProcessingError.depthCompressionFailed
+        }
+
+        let dataSize = width * height * MemoryLayout<Float>.size
+        let rawData = Data(bytes: baseAddress, count: dataSize)
+
+        // Compress using zlib
+        let compressedData: Data
+        do {
+            compressedData = try (rawData as NSData).compressed(using: .zlib) as Data
+        } catch {
+            Self.logger.error("Zlib compression failed: \(error.localizedDescription)")
+            throw FrameProcessingError.depthCompressionFailed
+        }
+
+        return compressedData
+    }
+          ]]></code>
+        </pattern>
+        <pattern name="Zlib Compression">
+          <import>import Compression</import>
+          <usage>try (rawData as NSData).compressed(using: .zlib) as Data</usage>
+          <note>For video depth, use gzip (COMPRESSION_ZLIB) in Compression framework for better control</note>
+        </pattern>
+        <pattern name="Performance Logging">
+          <code><![CDATA[
+        let startTime = CFAbsoluteTimeGetCurrent()
+        // ... operation ...
+        let processingTime = CFAbsoluteTimeGetCurrent() - startTime
+        Self.logger.debug("Depth compression: \(String(format: "%.1f", processingTime * 1000))ms")
+          ]]></code>
+        </pattern>
+      </key-patterns>
+      <error-handling>
+        <error-enum>FrameProcessingError</error-enum>
+        <note>Follow similar error enum pattern with LocalizedError conformance</note>
+      </error-handling>
+    </code-file>
+
+    <!-- ARCaptureSession.swift - ARFrame access -->
+    <code-file path="ios/Rial/Core/Capture/ARCaptureSession.swift" relevance="medium">
+      <description>Provides ARFrame with sceneDepth property containing depth buffer</description>
+      <key-interfaces>
+        <interface name="ARFrame Extensions">
+          <property name="hasDepthData" type="Bool">Whether frame contains valid LiDAR depth</property>
+          <property name="depthMapSize" type="(width: Int, height: Int)?">Depth map dimensions</property>
+        </interface>
+      </key-interfaces>
+      <depth-access-pattern>
+        <code><![CDATA[
+// Access depth from ARFrame
+if let depthData = frame.sceneDepth {
+    let depthMap = depthData.depthMap  // CVPixelBuffer, kCVPixelFormatType_DepthFloat32
+    let confidenceMap = depthData.confidenceMap  // Optional confidence map
+}
+        ]]></code>
+      </depth-access-pattern>
+    </code-file>
+
+    <!-- CryptoService.swift - SHA256 pattern -->
+    <code-file path="ios/Rial/Core/Crypto/CryptoService.swift" relevance="low">
+      <description>Provides SHA256 hashing patterns - not directly used but demonstrates CryptoKit usage</description>
+      <key-patterns>
+        <pattern name="Data Hashing">
+          <code><![CDATA[
+    static func sha256(_ data: Data) -> String {
+        let hash = SHA256.hash(data: data)
+        return hash.map { String(format: "%02x", $0) }.joined()
+    }
+
+    static func sha256Data(_ data: Data) -> Data {
+        Data(SHA256.hash(data: data))
+    }
+          ]]></code>
+        </pattern>
+      </key-patterns>
+    </code-file>
+
+    <!-- CaptureData.swift - Data model patterns -->
+    <code-file path="ios/Rial/Models/CaptureData.swift" relevance="medium">
+      <description>Existing capture data models - demonstrates Codable, Sendable patterns</description>
+      <key-patterns>
+        <pattern name="Data Model with Codable">
+          <code><![CDATA[
+public struct CaptureData: Codable, Identifiable, Sendable {
+    public let id: UUID
+    public let jpeg: Data
+    public let depth: Data
+    public let metadata: CaptureMetadata
+    // ...
+}
+          ]]></code>
+        </pattern>
+        <pattern name="DepthDimensions">
+          <code><![CDATA[
+public struct DepthDimensions: Codable, Sendable, Equatable {
+    public let width: Int
+    public let height: Int
+
+    public var pixelCount: Int {
+        width * height
+    }
+
+    public var rawDataSize: Int {
+        pixelCount * MemoryLayout<Float>.size
+    }
+}
+          ]]></code>
+          <note>Reuse or reference this pattern for depth keyframe dimensions</note>
+        </pattern>
+      </key-patterns>
+    </code-file>
+  </existing-code-interfaces>
+
+  <data-models>
+    <model name="DepthKeyframeData" from="tech-spec">
+      <description>Container for all depth keyframes captured during video recording</description>
+      <code><![CDATA[
+struct DepthKeyframeData: Codable, Sendable {
+    let frames: [DepthKeyframe]          // 10fps, up to 150 frames
+    let resolution: CGSize               // 256x192 typical
+    let compressedBlob: Data             // Gzipped Float32 array
+}
+      ]]></code>
+    </model>
+
+    <model name="DepthKeyframe" from="tech-spec">
+      <description>Individual depth keyframe with index and location in blob</description>
+      <code><![CDATA[
+struct DepthKeyframe: Codable, Sendable {
+    let index: Int                       // 0-based frame index (0, 1, 2, ... 149)
+    let timestamp: TimeInterval          // Video timestamp from ARFrame
+    let offset: Int                      // Byte offset in uncompressed blob
+}
+      ]]></code>
+    </model>
+  </data-models>
+
+  <development-constraints>
+    <constraint type="performance" source="tech-spec">
+      <name>Depth Extraction Time</name>
+      <requirement>Less than 10ms per frame</requirement>
+      <implementation-note>Use direct CVPixelBuffer access without copies where possible</implementation-note>
+    </constraint>
+
+    <constraint type="memory" source="tech-spec">
+      <name>Memory During Recording</name>
+      <requirement>Contributes to less than 300MB total budget</requirement>
+      <implementation-note>Append depth data to growing buffer, do not store individual Data objects</implementation-note>
+    </constraint>
+
+    <constraint type="timing" source="tech-spec">
+      <name>Lazy Compression</name>
+      <requirement>Compression happens after recording, not during</requirement>
+      <implementation-note>Buffer stores uncompressed data during recording, compresses in finalize()</implementation-note>
+    </constraint>
+
+    <constraint type="threading" source="architecture">
+      <name>Thread Safety</name>
+      <requirement>Buffer must be thread-safe for concurrent frame delivery</requirement>
+      <implementation-note>Use NSLock pattern from VideoRecordingSession</implementation-note>
+    </constraint>
+
+    <constraint type="format" source="tech-spec">
+      <name>Depth Pixel Format</name>
+      <requirement>kCVPixelFormatType_DepthFloat32</requirement>
+      <implementation-note>Validate pixel format before extraction</implementation-note>
+    </constraint>
+
+    <constraint type="integration" source="story">
+      <name>Frame Selection</name>
+      <requirement>Extract depth every 3rd frame (frameNumber % 3 == 0)</requirement>
+      <implementation-note>frameNumber from callback is 1-based, handle accordingly</implementation-note>
+    </constraint>
+  </development-constraints>
+
+  <dependencies>
+    <framework-dependencies>
+      <dependency name="ARKit" version="iOS 15+">Provides ARFrame with sceneDepth</dependency>
+      <dependency name="Compression" version="iOS 9+">Provides COMPRESSION_ZLIB for gzip compression</dependency>
+      <dependency name="Foundation" version="iOS 15+">Provides Data, NSLock, TimeInterval</dependency>
+      <dependency name="os.log" version="iOS 14+">Provides Logger for structured logging</dependency>
+    </framework-dependencies>
+
+    <internal-dependencies>
+      <dependency name="VideoRecordingSession" path="ios/Rial/Core/Capture/VideoRecordingSession.swift">
+        Integration point - provides frame callbacks and result struct
+      </dependency>
+      <dependency name="ARCaptureSession" path="ios/Rial/Core/Capture/ARCaptureSession.swift">
+        Provides ARFrame with depth data
+      </dependency>
+    </internal-dependencies>
+  </dependencies>
+
+  <testing-context>
+    <testing-framework>XCTest</testing-framework>
+    <testing-patterns>
+      <pattern name="Device-Only Tests">
+        <description>Use XCTSkip for tests requiring LiDAR hardware</description>
+        <code><![CDATA[
+    func testDepthExtraction_OnPhysicalDevice() async throws {
+        guard ARCaptureSession.isLiDARAvailable else {
+            throw XCTSkip("LiDAR not available - run on physical iPhone Pro device")
+        }
+        // ... test code ...
+    }
+        ]]></code>
+      </pattern>
+      <pattern name="Mock Delegate">
+        <description>Create mock for testing callbacks</description>
+        <reference>MockVideoRecordingDelegate in VideoRecordingSessionTests.swift</reference>
+      </pattern>
+      <pattern name="Thread Safety Tests">
+        <description>Test concurrent access doesn't crash</description>
+        <code><![CDATA[
+    func testKeyframeCount_ThreadSafe() {
+        let expectation = XCTestExpectation(description: "Concurrent reads complete")
+        expectation.expectedFulfillmentCount = 100
+
+        DispatchQueue.concurrentPerform(iterations: 100) { _ in
+            _ = sut.keyframeCount
+            expectation.fulfill()
+        }
+
+        wait(for: [expectation], timeout: 5.0)
+    }
+        ]]></code>
+      </pattern>
+    </testing-patterns>
+
+    <test-requirements>
+      <unit-tests target-coverage="80%">
+        <test>shouldExtractDepth() returns true for frames 0, 3, 6, 9...</test>
+        <test>shouldExtractDepth() returns false for frames 1, 2, 4, 5...</test>
+        <test>extractDepthData produces correct byte count (width x height x 4)</test>
+        <test>append() increments keyframe count</test>
+        <test>append() calculates correct offsets</test>
+        <test>reset() clears all accumulated data</test>
+        <test>finalize() produces valid DepthKeyframeData</test>
+        <test>compression reduces data size</test>
+        <test>thread safety with concurrent appends</test>
+        <test>maximum 150 keyframes (15s at 10fps)</test>
+        <test>handling of nil depth data (graceful skip)</test>
+      </unit-tests>
+      <integration-tests>
+        <test>Full recording flow captures depth keyframes (device only)</test>
+        <test>Depth keyframe count matches expected (duration * 10fps)</test>
+        <test>Timestamps align with video timestamps</test>
+        <test>Compressed blob can be decompressed</test>
+      </integration-tests>
+    </test-requirements>
+  </testing-context>
+
+  <implementation-reference>
+    <reference-code name="Depth Extraction from Tech Spec">
+      <description>Reference implementation for extracting Float32 depth data</description>
+      <code><![CDATA[
+func extractDepthData(from depthMap: CVPixelBuffer) -> Data {
+    CVPixelBufferLockBaseAddress(depthMap, .readOnly)
+    defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
+
+    let width = CVPixelBufferGetWidth(depthMap)
+    let height = CVPixelBufferGetHeight(depthMap)
+    let bytesPerRow = CVPixelBufferGetBytesPerRow(depthMap)
+
+    guard let baseAddress = CVPixelBufferGetBaseAddress(depthMap) else {
+        return Data()
+    }
+
+    // Copy float32 data
+    let floatBuffer = baseAddress.assumingMemoryBound(to: Float32.self)
+    let pixelCount = width * height
+    return Data(bytes: floatBuffer, count: pixelCount * MemoryLayout<Float32>.size)
+}
+      ]]></code>
+    </reference-code>
+
+    <reference-code name="Compression with Compression Framework">
+      <description>Reference implementation for gzip compression</description>
+      <code><![CDATA[
+import Compression
+
+func compressBlob(_ data: Data) -> Data {
+    let destinationBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: data.count)
+    defer { destinationBuffer.deallocate() }
+
+    let compressedSize = data.withUnsafeBytes { sourceBuffer in
+        compression_encode_buffer(
+            destinationBuffer,
+            data.count,
+            sourceBuffer.baseAddress!.assumingMemoryBound(to: UInt8.self),
+            data.count,
+            nil,
+            COMPRESSION_ZLIB
+        )
+    }
+
+    return Data(bytes: destinationBuffer, count: compressedSize)
+}
+      ]]></code>
+    </reference-code>
+
+    <reference-code name="Frame Selection Logic from Tech Spec">
+      <description>How depth extraction integrates with frame callback</description>
+      <code><![CDATA[
+// In VideoRecordingSession frame callback
+func handleFrame(_ frame: ARFrame, frameNumber: Int) {
+    // Every frame goes to video encoding
+    appendFrame(frame)
+
+    // Every 3rd frame goes to depth buffer (10fps from 30fps)
+    if frameNumber % 3 == 0 {
+        if let depthMap = frame.sceneDepth?.depthMap {
+            depthKeyframeBuffer.append(
+                depthData: extractDepthData(from: depthMap),
+                timestamp: frame.timestamp,
+                frameNumber: frameNumber
+            )
+        }
+    }
+
+    // Every frame goes to hash chain (Story 7.4)
+    onFrameProcessed?(frame, frameNumber)
+}
+      ]]></code>
+      <note>Story 7-2 may need to either integrate directly into VideoRecordingSession OR receive callbacks and handle extraction externally. Check integration approach.</note>
+    </reference-code>
+  </implementation-reference>
+
+  <implementation-tasks>
+    <task id="1" file="ios/Rial/Core/Capture/DepthKeyframeBuffer.swift">
+      <name>Create DepthKeyframeBuffer Class</name>
+      <checklist>
+        <item>Define DepthKeyframeBuffer class</item>
+        <item>Implement DepthKeyframe struct (index, timestamp, offset)</item>
+        <item>Implement DepthKeyframeData struct (frames array, resolution, compressedBlob)</item>
+        <item>Add resolution constant (256x192)</item>
+        <item>Add thread-safe storage for accumulated depth data</item>
+        <item>Add frameCount tracking for 10fps extraction logic</item>
+      </checklist>
+    </task>
+
+    <task id="2" file="ios/Rial/Core/Capture/DepthKeyframeBuffer.swift">
+      <name>Implement Depth Extraction</name>
+      <checklist>
+        <item>Implement shouldExtractDepth(frameNumber:) method (frameNumber % 3 == 0)</item>
+        <item>Implement extractDepthData(from depthMap: CVPixelBuffer) -> Data method</item>
+        <item>Convert CVPixelBuffer to contiguous Float32 array</item>
+        <item>Handle depth buffer resolution</item>
+        <item>Add validation for expected pixel format (kCVPixelFormatType_DepthFloat32)</item>
+      </checklist>
+    </task>
+
+    <task id="3" file="ios/Rial/Core/Capture/DepthKeyframeBuffer.swift">
+      <name>Implement Buffer Operations</name>
+      <checklist>
+        <item>Implement append(depthData: Data, timestamp: TimeInterval, frameNumber: Int) method</item>
+        <item>Track offset for each keyframe in the growing blob</item>
+        <item>Implement reset() method for new recordings</item>
+        <item>Implement finalize() -> DepthKeyframeData method</item>
+        <item>Add keyframeCount computed property</item>
+      </checklist>
+    </task>
+
+    <task id="4" file="ios/Rial/Core/Capture/DepthKeyframeBuffer.swift">
+      <name>Implement Compression</name>
+      <checklist>
+        <item>Implement compressBlob(_ data: Data) -> Data using Compression framework</item>
+        <item>Use COMPRESSION_ZLIB (gzip compatible) algorithm</item>
+        <item>Call compression in finalize() method</item>
+        <item>Add error handling for compression failure</item>
+      </checklist>
+    </task>
+
+    <task id="5" file="ios/Rial/Core/Capture/VideoRecordingSession.swift">
+      <name>Integrate with VideoRecordingSession</name>
+      <checklist>
+        <item>Add depthKeyframeBuffer: DepthKeyframeBuffer property</item>
+        <item>Initialize buffer in startRecording()</item>
+        <item>Call buffer's extract method in frame callback (when frameNumber % 3 == 0)</item>
+        <item>Finalize buffer in stopRecording() and store in result</item>
+        <item>Reset buffer on cancelRecording()</item>
+      </checklist>
+    </task>
+
+    <task id="6" file="ios/Rial/Core/Capture/VideoRecordingSession.swift">
+      <name>Update VideoRecordingResult</name>
+      <checklist>
+        <item>Add depthKeyframeData: DepthKeyframeData? to VideoRecordingResult</item>
+        <item>Update result creation in stopRecording to include depth data</item>
+        <item>Add depthKeyframeCount convenience property</item>
+      </checklist>
+    </task>
+
+    <task id="7" file="ios/Rial/Core/Capture/DepthKeyframeBuffer.swift">
+      <name>Add Logging and Diagnostics</name>
+      <checklist>
+        <item>Log keyframe extraction events (count, timestamp)</item>
+        <item>Log compression ratio on finalize</item>
+        <item>Log warnings for nil depth data</item>
+        <item>Add performance timing for extraction</item>
+      </checklist>
+    </task>
+  </implementation-tasks>
+
+  <learnings-from-story-7-1>
+    <learning name="Thread Safety Pattern">
+      Use NSLock for thread-safe access to shared state (keyframe count, accumulated data). Follow the pattern established in VideoRecordingSession.
+    </learning>
+    <learning name="Callback Integration">
+      The onFrameProcessed callback in VideoRecordingSession is the integration point. Depth extraction should happen within this callback chain.
+    </learning>
+    <learning name="Error Handling">
+      Use comprehensive error enums with LocalizedError conformance for user-friendly messages. Handle nil depth data gracefully (log warning, continue).
+    </learning>
+    <learning name="Testing Strategy">
+      Use XCTSkip for device-only tests that require LiDAR. Provide mock implementations for simulator testing.
+    </learning>
+    <learning name="Documentation">
+      Include comprehensive doc comments and usage examples as demonstrated in VideoRecordingSession.
+    </learning>
+    <learning name="State Management">
+      Clear separation between recording lifecycle (buffer reset on start, finalize on stop, preserve on interruption).
+    </learning>
+  </learnings-from-story-7-1>
+
+  <warnings-and-gaps>
+    <warning type="integration-decision">
+      The tech spec shows depth extraction happening inside VideoRecordingSession's handleFrame method, but the story describes DepthKeyframeBuffer as a separate class receiving callbacks. Clarify: should DepthKeyframeBuffer be a property of VideoRecordingSession, or should it receive callbacks externally via onFrameProcessed?
+    </warning>
+    <warning type="frame-numbering">
+      VideoRecordingSession frameCount is 1-based (starts at 1 after first frame). Ensure frame selection logic (frameNumber % 3 == 0) accounts for this - frame 1 should NOT extract, frame 3 should extract.
+    </warning>
+    <warning type="callback-queue">
+      onFrameProcessed callback is dispatched to main queue. Depth extraction should be dispatched to a background queue to avoid blocking UI.
+    </warning>
+    <warning type="memory-consideration">
+      Uncompressed depth blob for 15s video is ~29MB (150 frames x 196KB). Ensure this fits within memory budget and consider streaming to disk if memory pressure occurs.
+    </warning>
+  </warnings-and-gaps>
+</story-context>

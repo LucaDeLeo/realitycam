@@ -420,19 +420,25 @@ final class CaptureViewModel: ObservableObject {
 
         Task {
             do {
-                guard let outputURL = try await videoRecordingSession?.stopRecording() else {
-                    Self.logger.error("No output URL from video recording")
+                guard let result = try await videoRecordingSession?.stopRecording() else {
+                    Self.logger.error("No result from video recording")
                     return
                 }
 
-                Self.logger.info("Video recording saved to: \(outputURL.lastPathComponent)")
+                Self.logger.info("Video recording saved to: \(result.videoURL.lastPathComponent)")
 
-                // TODO: Story 7.2+ will process the video (depth keyframes, hash chain, attestation)
+                // Log depth keyframe extraction results (Story 7.2)
+                let depthKeyframeCount = result.depthKeyframeCount
+                if depthKeyframeCount > 0 {
+                    Self.logger.info("Depth keyframes captured: \(depthKeyframeCount)")
+                    if let depthData = result.depthKeyframeData {
+                        Self.logger.info("Depth blob: \(depthData.compressedBlob.count) bytes (ratio: \(String(format: "%.1f", depthData.compressionRatio))x)")
+                    }
+                }
+
+                // TODO: Story 7.3+ will process the video (hash chain, attestation)
                 // For now, just log completion
-                let frameCount = recordingFrameCount
-                let duration = recordingDuration
-
-                Self.logger.info("Recording complete: \(frameCount) frames, \(String(format: "%.1f", duration))s")
+                Self.logger.info("Recording complete: \(result.frameCount) frames, \(depthKeyframeCount) depth keyframes, \(String(format: "%.1f", result.duration))s")
 
                 // Reset state
                 resetRecordingState()
