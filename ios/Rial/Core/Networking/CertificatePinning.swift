@@ -200,7 +200,7 @@ extension CertificatePinning {
 
     /// Production hosts that require pinning.
     static let productionHosts: Set<String> = [
-        "backend-production-5e5a.up.railway.app",
+        "rial-api.fly.dev",
         "rial-web.vercel.app"
     ]
 

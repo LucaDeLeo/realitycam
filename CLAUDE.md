@@ -73,8 +73,8 @@ pnpm docker:down                 # Stop services
 - **Storage**: S3 (LocalStack dev, AWS prod)
 
 ### Deployment
-- **Web**: Vercel (config: `vercel.json`)
-- **Backend**: Railway (config: `backend/railway.toml`)
+- **Web**: Vercel (config: `vercel.json`) → [rial-web.vercel.app](https://rial-web.vercel.app)
+- **Backend**: Fly.io (config: `backend/fly.toml`) → [rial-api.fly.dev](https://rial-api.fly.dev)
 
 ### Key Directories
 ```
@@ -171,7 +171,7 @@ sqlx migrate run
 
 ### Deployment
 - **Vercel**: Auto-deploys web app on push to main
-- **Railway**: Auto-deploys backend on push to main
+- **Fly.io**: Deploy backend with `cd backend && fly deploy`
 
 ## Testing
 

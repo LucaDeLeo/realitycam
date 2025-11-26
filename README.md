@@ -1,6 +1,6 @@
 # RealityCam
 
-> **Hackathon Note:** This repository has continued development after the hackathon deadline. The current version includes deployment to Railway/Vercel, a native Swift iOS rewrite, comprehensive CI, and various cleanups.
+> **Hackathon Note:** This repository has continued development after the hackathon deadline. The current version includes deployment to Fly.io/Vercel, a native Swift iOS rewrite, comprehensive CI, and various cleanups.
 >
 > **To view the code as it was at the hackathon deadline (~9pm Sunday, Nov 24, 2025 Argentina time), see commit [`2938e2e`](https://github.com/LucaDeLeo/realitycam/tree/2938e2e).**
 
@@ -10,8 +10,8 @@ Photo verification platform that captures authenticated photos with hardware att
 
 ## Live Demo
 
-- **Web App**: [realitycam.vercel.app](https://realitycam.vercel.app)
-- **Backend API**: Deployed on Railway
+- **Web App**: [rial-web.vercel.app](https://rial-web.vercel.app)
+- **Backend API**: [rial-api.fly.dev](https://rial-api.fly.dev) (Fly.io)
 
 ## Prerequisites
 
@@ -131,7 +131,7 @@ GitHub Actions runs on every push/PR to main:
 
 **Deployment**:
 - **Web**: Auto-deploys to Vercel on push to main
-- **Backend**: Auto-deploys to Railway on push to main
+- **Backend**: Deploy to Fly.io with `fly deploy` from `backend/`
 
 ## Environment Variables
 
@@ -251,7 +251,7 @@ pnpm --filter @realitycam/shared typecheck
 - **Backend**: Rust, Axum 0.8, SQLx, c2pa-rs
 - **Database**: PostgreSQL 16
 - **Storage**: S3 (LocalStack for dev, AWS for prod)
-- **CI/CD**: GitHub Actions, Vercel, Railway
+- **CI/CD**: GitHub Actions, Vercel, Fly.io
 
 ## License
 

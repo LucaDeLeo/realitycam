@@ -25,8 +25,8 @@ enum AppEnvironment {
            let url = URL(string: urlString) {
             return url
         }
-        // Default to Railway production URL
-        return URL(string: "https://backend-production-5e5a.up.railway.app")!
+        // Default to Fly.io production URL
+        return URL(string: "https://rial-api.fly.dev")!
     }
 
     /// Whether the app is running in debug mode
