@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import { Globe, CheckCircle2, Fingerprint, Shield, Scale } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Globe, CheckCircle2, Fingerprint, Shield, Scale, Camera, Share2, Ban, Lock, ArrowRight } from 'lucide-react';
 import { FileDropzone } from '@/components/Upload/FileDropzone';
 import { DualPhoneShowcase } from '@/components/Landing/DualPhoneShowcase';
+import { TallyEmbed } from '@/components/Landing/TallyEmbed';
 
 function AppleLogo({ className }: { className?: string }) {
   return (
@@ -16,10 +16,10 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-black text-white relative overflow-hidden">
       {/* Header */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-black/20 backdrop-blur-md supports-[backdrop-filter]:bg-black/20">
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-black/20 backdrop-blur-md supports-backdrop-filter:bg-black/20">
         <div className="container mx-auto flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-pink-500 via-white to-cyan-500" />
+            <div className="h-8 w-8 rounded-lg bg-linear-to-br from-pink-500 via-white to-cyan-500" />
             <span className="text-xl font-bold tracking-tighter">rial.</span>
           </div>
           <Link
@@ -40,11 +40,12 @@ export default function Home() {
           </div>
 
           <h1 className="text-5xl font-bold text-white md:text-7xl tracking-tighter drop-shadow-lg">
-            Protecting reality in the age of AI.
+            Take a photo.<br />Prove it&apos;s real.
           </h1>
 
           <p className="mx-auto max-w-2xl text-xl font-medium text-white/80 leading-relaxed">
-            The Global Image Verifier. Authenticity verified at the sensor level.
+            Snap → Verify → Share. That&apos;s it.<br />
+            <span className="text-white/60">Every photo gets a link anyone can check.</span>
           </p>
 
           <div className="flex flex-col items-center space-y-12 w-full pt-4">
@@ -52,7 +53,7 @@ export default function Home() {
               href="#verify"
               className="inline-flex h-14 items-center gap-3 rounded-full bg-white px-8 text-black transition-all hover:bg-white/90 hover:scale-105 font-medium text-lg shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)]"
             >
-              <span>See How It Works</span>
+              <span>Try the Verifier</span>
             </Link>
 
             <div className="relative w-full max-w-5xl mx-auto mt-12 flex justify-center">
@@ -64,14 +65,120 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Value Proposition Section */}
+      <section className="container mx-auto px-6 py-20">
+        <div className="mx-auto max-w-5xl">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold tracking-tight mb-4">We can&apos;t access your camera roll.</h2>
+            <p className="text-lg text-neutral-400 max-w-2xl mx-auto">
+              That&apos;s the point. Other apps let you upload anything. Rial only captures—no library, no editing, no way to fake it.
+            </p>
+          </div>
+
+          <div className="grid gap-8 md:grid-cols-2">
+            {/* No Editing Value Prop */}
+            <div className="relative group">
+              <div className="absolute inset-0 bg-linear-to-br from-pink-500/20 to-transparent rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative space-y-6 rounded-2xl border border-white/10 bg-black/60 p-8 backdrop-blur-md">
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <div className="rounded-full bg-pink-500/10 p-4 ring-1 ring-pink-500/30">
+                      <Camera className="h-8 w-8 text-pink-400" />
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 rounded-full bg-black p-1">
+                      <Lock className="h-4 w-4 text-pink-400" />
+                    </div>
+                  </div>
+                  <h3 className="text-2xl font-bold">What you capture is what you share.</h3>
+                </div>
+
+                <p className="text-lg text-neutral-200 leading-relaxed">
+                  The moment you tap the shutter, your photo is signed and uploaded. There&apos;s no step where you could edit it—that step doesn&apos;t exist.
+                </p>
+
+                <div className="flex items-center gap-3 pt-2">
+                  <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/5 border border-white/10">
+                    <Camera className="h-5 w-5 text-white/60" />
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-pink-400" />
+                  <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/5 border border-white/10">
+                    <Lock className="h-5 w-5 text-white/60" />
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-pink-400" />
+                  <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-pink-500/20 border border-pink-500/30">
+                    <CheckCircle2 className="h-5 w-5 text-pink-400" />
+                  </div>
+                  <span className="text-sm text-neutral-400 ml-2">Instant</span>
+                </div>
+
+                <div className="pt-4 space-y-2 text-sm text-neutral-400 border-t border-white/5">
+                  <div className="flex items-center gap-2">
+                    <Ban className="h-4 w-4 text-red-400" />
+                    <span>No camera roll access</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Ban className="h-4 w-4 text-red-400" />
+                    <span>No filters or editing tools</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Easy Sharing Value Prop */}
+            <div className="relative group">
+              <div className="absolute inset-0 bg-linear-to-br from-cyan-500/20 to-transparent rounded-2xl blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative space-y-6 rounded-2xl border border-white/10 bg-black/60 p-8 backdrop-blur-md">
+                <div className="flex items-center gap-4">
+                  <div className="rounded-full bg-cyan-500/10 p-4 ring-1 ring-cyan-500/30">
+                    <Share2 className="h-8 w-8 text-cyan-400" />
+                  </div>
+                  <h3 className="text-2xl font-bold">One link. Anyone can verify.</h3>
+                </div>
+
+                <p className="text-lg text-neutral-200 leading-relaxed">
+                  Every photo gets a unique URL. Send it to a buyer, post it on social, attach it to a legal filing. One tap to see the proof.
+                </p>
+
+                {/* Mock URL Preview */}
+                <div className="rounded-xl bg-black/80 border border-white/10 p-4 font-mono text-sm">
+                  <div className="flex items-center gap-2 text-neutral-500 mb-2">
+                    <Globe className="h-4 w-4" />
+                    <span>Verification Link</span>
+                  </div>
+                  <div className="text-cyan-400 break-all">
+                    rial.app/verify/<span className="text-white/60">a7f3x9...</span>
+                  </div>
+                </div>
+
+                <div className="pt-4 space-y-2 text-sm text-neutral-400 border-t border-white/5">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-400" />
+                    <span>When it was taken</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-400" />
+                    <span>Where it was taken</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-400" />
+                    <span>That it&apos;s unedited</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-400" />
+                    <span>That it came from a real device</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Problem Statement Section */}
       <section id="mission" className="container mx-auto px-6 py-20">
-        <div className="mx-auto max-w-4xl space-y-10 rounded-2xl border border-white/10 bg-black/40 p-8 backdrop-blur-md">
-          <h2 className="text-3xl font-bold">If it&apos;s rial., it can&apos;t be fake.</h2>
-
-          <p className="max-w-3xl text-lg leading-relaxed text-neutral-200 drop-shadow-md">
-            In a world where synthetic content has become the norm, we can no longer trust what we see. Rial is about restoring trust in images, empowering content creators with instant credibility, and giving everyone the power to verify in real-time whether content is authentic or AI-generated. Let&apos;s get back control of visual truth.
-          </p>
+        <div className="mx-auto max-w-4xl rounded-2xl border border-white/10 bg-black/40 p-8 backdrop-blur-md text-center">
+          <h2 className="text-3xl font-bold mb-4">If it says rial., it&apos;s real.</h2>
+          <p className="text-lg text-neutral-400">No edits. No fakes. No questions.</p>
         </div>
       </section>
 
@@ -79,9 +186,9 @@ export default function Home() {
       <section id="verify" className="container mx-auto px-6 py-20">
         <div className="mx-auto max-w-2xl space-y-8">
           <div className="text-center space-y-4">
-            <h2 className="text-4xl font-bold tracking-tight">Verify an Image</h2>
+            <h2 className="text-4xl font-bold tracking-tight">Try it yourself</h2>
             <p className="text-lg text-neutral-400">
-              Upload any photo to check if it was captured with rial. and verify its authenticity.
+              Drop any photo to check if it was captured with rial.
             </p>
           </div>
 
@@ -102,9 +209,9 @@ export default function Home() {
       <section id="features" className="container mx-auto px-6 py-20">
         <div className="mx-auto max-w-6xl space-y-12">
           <div className="space-y-4 text-center md:text-left">
-            <h2 className="text-4xl font-bold tracking-tight">How rial. works</h2>
+            <h2 className="text-4xl font-bold tracking-tight">Why you can trust it</h2>
             <p className="text-lg text-neutral-400">
-              Advanced verification technology that guarantees image authenticity from capture to display.
+              Multiple layers of proof, from hardware to software.
             </p>
           </div>
           <div className="grid gap-8 md:grid-cols-2">
@@ -114,23 +221,23 @@ export default function Home() {
                 <div className="rounded-full bg-white/5 p-3 ring-1 ring-white/10">
                   <Fingerprint className="h-6 w-6 text-pink-400" />
                 </div>
-                <h3 className="text-xl font-semibold">Hardware Attestation</h3>
+                <h3 className="text-xl font-semibold">Your iPhone proves it</h3>
               </div>
               <p className="text-neutral-200 leading-relaxed">
-                We verify images at the deepest level—directly from the Secure Enclave. Our technology uses DCAppAttest to prove the photo originated from a real iPhone, not a PC or emulator.
+                Photos are cryptographically signed by your device&apos;s secure chip. Not software—hardware. We can prove this came from a real iPhone, not a PC.
               </p>
               <div className="pt-2 space-y-2 text-sm text-neutral-400">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-green-400" />
-                  <span>Secure Enclave cryptographic proof</span>
+                  <span>Secure Enclave signing</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-green-400" />
-                  <span>Detects PC-generated fakes instantly</span>
+                  <span>Detects PC-generated fakes</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-green-400" />
-                  <span>Immutable Ed25519 signatures</span>
+                  <span>Tamper-proof signatures</span>
                 </div>
               </div>
             </div>
@@ -141,23 +248,23 @@ export default function Home() {
                 <div className="rounded-full bg-white/5 p-3 ring-1 ring-white/10">
                   <Shield className="h-6 w-6 text-cyan-400" />
                 </div>
-                <h3 className="text-xl font-semibold">LiDAR Depth Analysis</h3>
+                <h3 className="text-xl font-semibold">3D depth says it&apos;s real</h3>
               </div>
               <p className="text-neutral-200 leading-relaxed">
-                iPhone Pro&apos;s LiDAR sensor captures real 3D depth data alongside every photo. We analyze this depth map to detect screen captures and ensure the scene is real.
+                LiDAR captures real 3D depth alongside every photo. We analyze this to detect if you&apos;re photographing a screen or printout—not a real scene.
               </p>
               <div className="pt-2 space-y-2 text-sm text-neutral-400">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-green-400" />
-                  <span>3D scene verification</span>
+                  <span>Real 3D scene verification</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-green-400" />
-                  <span>Detects photos of screens</span>
+                  <span>Catches photos of screens</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-green-400" />
-                  <span>Depth variance analysis</span>
+                  <span>iPhone Pro required</span>
                 </div>
               </div>
             </div>
@@ -168,23 +275,23 @@ export default function Home() {
                 <div className="rounded-full bg-white/5 p-3 ring-1 ring-white/10">
                   <Scale className="h-6 w-6 text-purple-400" />
                 </div>
-                <h3 className="text-xl font-semibold">C2PA Content Credentials</h3>
+                <h3 className="text-xl font-semibold">Industry-standard proof</h3>
               </div>
               <p className="text-neutral-200 leading-relaxed">
-                Industry-standard Content Authenticity Initiative credentials embedded directly into your photos. Interoperable with Adobe, Microsoft, and the broader ecosystem.
+                C2PA credentials embedded in every photo. Same standard used by Adobe, Microsoft, and newsrooms worldwide.
               </p>
               <div className="pt-2 space-y-2 text-sm text-neutral-400">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-green-400" />
-                  <span>CAI ecosystem compatible</span>
+                  <span>Works with major platforms</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-green-400" />
-                  <span>Tamper-evident manifests</span>
+                  <span>Tamper-evident</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-green-400" />
-                  <span>Provenance tracking</span>
+                  <span>Full provenance chain</span>
                 </div>
               </div>
             </div>
@@ -195,23 +302,19 @@ export default function Home() {
                 <div className="rounded-full bg-white/5 p-3 ring-1 ring-white/10">
                   <Globe className="h-6 w-6 text-yellow-300" />
                 </div>
-                <h3 className="text-xl font-semibold">Worldwide Verification</h3>
+                <h3 className="text-xl font-semibold">Verify from anywhere</h3>
               </div>
               <p className="text-neutral-200 leading-relaxed">
-                Verify photos from anywhere in the world. Whether it&apos;s a breaking news event or a remote landscape, if it was taken with rial, you can prove its authenticity in seconds.
+                Anyone with the link can check. No app needed, no account required. One tap, instant result.
               </p>
               <div className="pt-2 space-y-2 text-sm text-neutral-400">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-green-400" />
-                  <span>Instant global verification</span>
+                  <span>Works in any browser</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-green-400" />
-                  <span>Cross-border trust infrastructure</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-400" />
-                  <span>Evidence package generation</span>
+                  <span>Downloadable evidence package</span>
                 </div>
               </div>
             </div>
@@ -222,109 +325,69 @@ export default function Home() {
       {/* Use Cases Section */}
       <section className="container mx-auto px-6 py-20">
         <div className="mx-auto max-w-5xl space-y-10">
-          <h2 className="text-3xl font-bold">Who Needs rial.?</h2>
+          <h2 className="text-3xl font-bold">Use it for</h2>
           <div className="grid gap-6 md:grid-cols-3">
+            {/* Everyday Use Cases */}
             <div className="space-y-4 rounded-lg border border-white/5 bg-white/5 p-6 backdrop-blur-sm hover:bg-white/10 transition-colors">
-              <h3 className="text-lg font-semibold text-pink-400">Journalism & News</h3>
+              <h3 className="text-lg font-semibold text-green-400">Sell faster</h3>
               <p className="text-sm text-neutral-400 leading-relaxed">
-                Restore trust in photojournalism. Verify sources and combat misinformation with cryptographic proof.
+                Buyers trust verified photos. No more &quot;is this the actual item?&quot; back-and-forth.
               </p>
             </div>
             <div className="space-y-4 rounded-lg border border-white/5 bg-white/5 p-6 backdrop-blur-sm hover:bg-white/10 transition-colors">
-              <h3 className="text-lg font-semibold text-yellow-300">Legal & Insurance</h3>
+              <h3 className="text-lg font-semibold text-rose-400">Stand out on dating apps</h3>
               <p className="text-sm text-neutral-400 leading-relaxed">
-                Admissible evidence that stands up in court. Verify accident scenes, property damage, and claims.
+                One verified selfie says more than ten filtered ones. Prove you&apos;re real.
               </p>
             </div>
             <div className="space-y-4 rounded-lg border border-white/5 bg-white/5 p-6 backdrop-blur-sm hover:bg-white/10 transition-colors">
-              <h3 className="text-lg font-semibold text-purple-400">Research & Science</h3>
+              <h3 className="text-lg font-semibold text-cyan-400">Prove you were there</h3>
               <p className="text-sm text-neutral-400 leading-relaxed">
-                Document discoveries and field work with immutable proof of time, location, and authenticity.
+                Concerts, trips, events—with proof, not just pixels.
+              </p>
+            </div>
+            {/* Professional Use Cases */}
+            <div className="space-y-4 rounded-lg border border-white/5 bg-white/5 p-6 backdrop-blur-sm hover:bg-white/10 transition-colors">
+              <h3 className="text-lg font-semibold text-pink-400">Publish with proof</h3>
+              <p className="text-sm text-neutral-400 leading-relaxed">
+                Verified sources. Misinformation blocked. Trust restored.
+              </p>
+            </div>
+            <div className="space-y-4 rounded-lg border border-white/5 bg-white/5 p-6 backdrop-blur-sm hover:bg-white/10 transition-colors">
+              <h3 className="text-lg font-semibold text-yellow-300">Evidence that holds up</h3>
+              <p className="text-sm text-neutral-400 leading-relaxed">
+                Timestamp, location, device—all verified. Stands up in court.
+              </p>
+            </div>
+            <div className="space-y-4 rounded-lg border border-white/5 bg-white/5 p-6 backdrop-blur-sm hover:bg-white/10 transition-colors">
+              <h3 className="text-lg font-semibold text-purple-400">Document for the record</h3>
+              <p className="text-sm text-neutral-400 leading-relaxed">
+                Field work with immutable proof. Time, location, authenticity—locked in.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Tech Stack Section */}
-      <section className="container mx-auto px-6 py-20">
-        <div className="mx-auto max-w-5xl">
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-center text-neutral-400 uppercase tracking-wider">Built With</h2>
-            <div className="grid gap-6 rounded-2xl border border-white/10 bg-black/40 p-10 backdrop-blur-md md:grid-cols-3 shadow-2xl">
-              <div className="text-center space-y-3">
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-pink-500/10 ring-1 ring-pink-500/30">
-                  <Fingerprint className="h-7 w-7 text-pink-400" />
-                </div>
-                <div className="text-lg font-semibold text-white">DCAppAttest</div>
-                <div className="text-sm text-neutral-400">
-                  Apple&apos;s hardware attestation proving photos come from real devices
-                </div>
-              </div>
-              <div className="text-center space-y-3">
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-cyan-500/10 ring-1 ring-cyan-500/30">
-                  <Shield className="h-7 w-7 text-cyan-400" />
-                </div>
-                <div className="text-lg font-semibold text-white">LiDAR Depth</div>
-                <div className="text-sm text-neutral-400">
-                  3D depth maps from iPhone Pro sensors to detect screen captures
-                </div>
-              </div>
-              <div className="text-center space-y-3">
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-purple-500/10 ring-1 ring-purple-500/30">
-                  <Scale className="h-7 w-7 text-purple-400" />
-                </div>
-                <div className="text-lg font-semibold text-white">C2PA Standard</div>
-                <div className="text-sm text-neutral-400">
-                  Industry-standard content credentials from Adobe &amp; Microsoft
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      {/* Mission Section */}
-      <section className="container mx-auto px-6 py-20">
-        <div className="mx-auto max-w-4xl space-y-8 text-center md:text-left">
-          <h2 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-neutral-400">
-            Join the Movement Against Misinformation
-          </h2>
-          <div className="space-y-6 text-lg text-neutral-200 leading-relaxed">
-            <p className="text-lg">
-              We&apos;re building more than a verification platform—we&apos;re creating a movement. Every fake image erodes public trust. Every deepfake threatens democracy. Every synthetic face undermines human connection.
-            </p>
-            <p className="text-lg">
-              Rial is the antidote. A global platform where authenticity is guaranteed, truth is verifiable, and reality is protected. Join us in preserving what&apos;s real in an increasingly synthetic world.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
+      {/* Contact Section */}
       <section className="container mx-auto px-6 py-32 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-t from-pink-500/10 to-transparent pointer-events-none" />
-        <div className="relative mx-auto max-w-4xl space-y-10 text-center">
-          <h2 className="text-5xl font-bold text-balance drop-shadow-xl">Help us build it.</h2>
+        <div className="absolute inset-0 bg-linear-to-t from-pink-500/10 to-transparent pointer-events-none" />
+        <div className="relative mx-auto max-w-2xl space-y-8 text-center">
+          <h2 className="text-5xl font-bold text-balance drop-shadow-xl">Want early access?</h2>
           <p className="text-xl text-neutral-300 text-balance">
-            We&apos;re actively developing rial. and looking for early testers to help shape the future of photo verification.
+            Drop your email. We&apos;ll let you know when it&apos;s ready.
           </p>
-          <div className="flex justify-center">
-            <Button
-              size="lg"
-              className="h-16 px-10 text-xl font-bold text-black rounded-full bg-gradient-to-r from-pink-400 via-yellow-300 to-purple-400 hover:scale-105 transition-transform shadow-[0_0_30px_rgba(244,114,182,0.6)] border-2 border-white/20"
-            >
-              [ Join the Waitlist ]
-            </Button>
+          <div className="rounded-2xl border border-white/10 bg-black/40 p-6 backdrop-blur-md">
+            <TallyEmbed />
           </div>
-          <p className="text-sm text-neutral-500">Currently in development. Sign up to get notified when we launch.</p>
         </div>
       </section>
 
       {/* Footer */}
       <footer className="border-t border-white/10 bg-black/80 py-12 backdrop-blur-xl">
         <div className="container mx-auto px-6 text-center text-sm text-neutral-500">
-          rial. | AI Safety. Human Focus.
+          rial. — Photos that prove they&apos;re real.
         </div>
       </footer>
     </div>
