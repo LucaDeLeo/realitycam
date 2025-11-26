@@ -1,0 +1,821 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context: 7-1-arkit-video-recording-session
+  Generated: 2025-11-26
+  Epic: 7 - Video Capture with LiDAR Depth
+
+  This context file provides the single source of truth for implementing
+  Story 7.1: ARKit Video Recording Session. It includes all relevant
+  documentation, existing code interfaces, development constraints,
+  and implementation guidance.
+-->
+<story-context story-key="7-1-arkit-video-recording-session">
+  <metadata>
+    <generated>2025-11-26T00:00:00Z</generated>
+    <epic-id>7</epic-id>
+    <epic-title>Video Capture with LiDAR Depth</epic-title>
+    <story-title>ARKit Video Recording Session</story-title>
+    <priority>P0</priority>
+    <estimated-effort>L</estimated-effort>
+    <dependencies>
+      <dependency>Story 6.5 (ARKit Unified Capture Session)</dependency>
+    </dependencies>
+    <fr-coverage>FR47 (Video Recording with Depth)</fr-coverage>
+  </metadata>
+
+  <user-story>
+    <role>user</role>
+    <goal>to record video with synchronized RGB and depth streams</goal>
+    <benefit>every frame has corresponding LiDAR depth data for verification</benefit>
+  </user-story>
+
+  <acceptance-criteria>
+    <criterion id="AC-7.1.1" name="Recording Initiation">
+      <given>the user is on the capture screen with video mode selected</given>
+      <when>the user presses and holds the record button</when>
+      <then>
+        - ARSession records at 30fps with .sceneDepth frame semantics
+        - Each ARFrame contains both capturedImage (RGB) and sceneDepth (depth)
+        - Haptic feedback plays on recording start
+        - Visual "Recording..." indicator appears with elapsed time timer (0:00 format)
+      </then>
+    </criterion>
+    <criterion id="AC-7.1.2" name="Recording Duration Control">
+      <given>video recording is in progress</given>
+      <when>the user continues holding the record button</when>
+      <then>
+        - Recording continues until button release OR 15-second maximum
+        - Visual timer shows elapsed time (updating every second)
+        - Recording stops automatically at 15-second limit with haptic feedback
+      </then>
+    </criterion>
+    <criterion id="AC-7.1.3" name="Early Stop">
+      <given>video recording is in progress</given>
+      <when>the user releases the record button before 15 seconds</when>
+      <then>
+        - Recording stops immediately
+        - Haptic feedback plays on stop
+        - Recorded video is saved with all captured frames
+        - Timer displays final duration
+      </then>
+    </criterion>
+    <criterion id="AC-7.1.4" name="Frame Delivery">
+      <given>recording is in progress</given>
+      <when>ARKit delivers frames at 30fps</when>
+      <then>
+        - Each ARFrame contains synchronized RGB + depth data
+        - Frames are passed to AVAssetWriter for video encoding
+        - No frames are dropped during normal operation
+        - Frame timestamps are preserved for depth keyframe indexing
+      </then>
+    </criterion>
+  </acceptance-criteria>
+
+  <technical-requirements>
+    <requirement category="Video Encoding">
+      <detail>Codec: H.264 or HEVC (based on device capability preference)</detail>
+      <detail>Resolution: Match device camera capability (1920x1080 or 3840x2160)</detail>
+      <detail>Frame rate: 30fps to match ARKit frame delivery</detail>
+      <detail>Container: MOV (Apple native, later converted to MP4 for upload)</detail>
+      <detail>Hardware encoding via VideoToolbox for performance</detail>
+    </requirement>
+    <requirement category="ARKit Integration">
+      <detail>Extend existing ARCaptureSession or create new VideoRecordingSession class</detail>
+      <detail>Use same ARSession configuration as photo capture (.sceneDepth frame semantics)</detail>
+      <detail>Forward ARFrame data to both AVAssetWriter and depth extraction pipeline</detail>
+      <detail>Handle sessionWasInterrupted delegate for partial recording recovery</detail>
+    </requirement>
+    <requirement category="State Management">
+      <detail>Track recording state: idle, recording, processing</detail>
+      <detail>Manage frame count for depth keyframe extraction coordination</detail>
+      <detail>Store video URL, metadata, and timestamp information</detail>
+    </requirement>
+    <requirement category="Performance Constraints">
+      <detail>Recording frame rate: 30fps maintained</detail>
+      <detail>Memory during recording: less than 300MB</detail>
+      <detail>Video encoding: Real-time (no dropped frames)</detail>
+    </requirement>
+  </technical-requirements>
+
+  <documentation>
+    <doc name="architecture" path="docs/architecture.md">
+      <section name="ADR-010: Video Architecture with LiDAR Depth">
+        <description>Core architectural patterns for video capture including hash chain integrity, checkpoint attestation, 10fps depth keyframes, and edge-only overlay.</description>
+        <key-patterns>
+          <pattern name="Hash Chain Integrity">H(n) = SHA256(frame_n + depth_n + timestamp_n + H(n-1))</pattern>
+          <pattern name="Checkpoint Attestation">DCAppAttest signs hash at 5-second intervals</pattern>
+          <pattern name="10fps Depth Keyframes">Capture depth every 3rd frame (30fps video to 10fps depth)</pattern>
+          <pattern name="Edge-Only Overlay">Sobel edge detection instead of full colormap during recording</pattern>
+        </key-patterns>
+      </section>
+      <section name="ARKit Unified Capture">
+        <description>Native ARKit provides synchronized RGB + depth in single ARFrame with .sceneDepth frame semantics.</description>
+      </section>
+      <section name="Native Security Architecture">
+        <description>Attestation flow using DCAppAttest direct, CryptoKit for SHA-256, Keychain + Secure Enclave for key storage.</description>
+      </section>
+    </doc>
+
+    <doc name="tech-spec" path="docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md">
+      <section name="iOS Video Recording">
+        <files>
+          <file path="Core/Capture/VideoRecordingSession.swift" purpose="ARSession + AVAssetWriter coordination"/>
+          <file path="Core/Capture/DepthKeyframeBuffer.swift" purpose="Extract, store, index depth at 10fps"/>
+          <file path="Core/Crypto/HashChainService.swift" purpose="Compute frame hashes, maintain chain"/>
+          <file path="Core/Attestation/VideoAttestationService.swift" purpose="Checkpoint and final attestation"/>
+          <file path="Shaders/EdgeDepthVisualization.metal" purpose="Sobel edge detection for overlay"/>
+          <file path="Core/Capture/VideoProcessingPipeline.swift" purpose="Package video, depth, chain for upload"/>
+        </files>
+      </section>
+      <section name="Data Models">
+        <model name="VideoCapture">
+          <field name="id" type="UUID"/>
+          <field name="videoURL" type="URL" description="Local MP4/MOV file"/>
+          <field name="depthData" type="DepthKeyframeData" description="Compressed depth blob"/>
+          <field name="hashChain" type="HashChainData" description="All intermediate hashes"/>
+          <field name="attestation" type="VideoAttestation" description="Final or checkpoint attestation"/>
+          <field name="metadata" type="VideoMetadata"/>
+          <field name="status" type="CaptureStatus"/>
+          <field name="createdAt" type="Date"/>
+        </model>
+        <model name="VideoMetadata">
+          <field name="type" type="String" default="video"/>
+          <field name="startedAt" type="Date"/>
+          <field name="endedAt" type="Date"/>
+          <field name="durationMs" type="Int64"/>
+          <field name="frameCount" type="Int"/>
+          <field name="depthKeyframeCount" type="Int"/>
+          <field name="resolution" type="Resolution"/>
+          <field name="codec" type="String" description="h264 or hevc"/>
+          <field name="deviceModel" type="String"/>
+          <field name="location" type="CaptureLocation?"/>
+          <field name="attestationLevel" type="String"/>
+          <field name="hashChainFinal" type="String" description="Base64"/>
+          <field name="assertion" type="String" description="Base64"/>
+        </model>
+      </section>
+      <section name="Video Recording Flow">
+        <description>
+          User Hold record button -> CaptureView.startRecording() -> VideoRecordingSession.start()
+          -> AVAssetWriter.start -> [ARKit frame loop] -> onFrame(rgb, depth, timestamp)
+          -> processFrame() for hash chain -> appendDepthFrame() every 3rd frame
+          -> User Release button -> stopRecording() -> AVAssetWriter.finish
+          -> generateAttestation() -> DCAppAttest.sign(finalHash) -> VideoCapture complete
+        </description>
+      </section>
+      <section name="AVAssetWriter Configuration">
+        <code language="swift"><![CDATA[
+let videoSettings: [String: Any] = [
+    AVVideoCodecKey: AVVideoCodecType.hevc,
+    AVVideoWidthKey: 1920,
+    AVVideoHeightKey: 1080,
+    AVVideoCompressionPropertiesKey: [
+        AVVideoAverageBitRateKey: 10_000_000,
+        AVVideoProfileLevelKey: AVVideoProfileLevelHEVCMain42210
+    ]
+]
+        ]]></code>
+      </section>
+      <section name="Performance Requirements">
+        <metric name="Recording frame rate" target="30fps maintained"/>
+        <metric name="Edge overlay latency" target="less than 3ms per frame"/>
+        <metric name="Hash chain computation" target="less than 5ms per frame"/>
+        <metric name="Depth extraction (10fps)" target="less than 10ms per frame"/>
+        <metric name="Video encoding" target="Real-time (no dropped frames)"/>
+        <metric name="Memory during recording" target="less than 300MB"/>
+      </section>
+    </doc>
+
+    <doc name="story" path="docs/sprint-artifacts/stories/7-1-arkit-video-recording-session.md">
+      <section name="Implementation Tasks">
+        <task id="1" file="ios/Rial/Core/Capture/VideoRecordingSession.swift">
+          Create VideoRecordingSession class with ARSession reference,
+          RecordingState enum, startRecording(), stopRecording(), onFrameProcessed callback
+        </task>
+        <task id="2" file="ios/Rial/Core/Capture/VideoRecordingSession.swift">
+          Implement AVAssetWriter pipeline: create with temp URL, configure input for H.264/HEVC,
+          set output settings, implement appendPixelBuffer, handle writer finish
+        </task>
+        <task id="3" file="ios/Rial/Core/Capture/VideoRecordingSession.swift">
+          ARSession delegate integration: implement session(_:didUpdate:), extract capturedImage,
+          track frame count, forward frames to hash chain service, handle interruption
+        </task>
+        <task id="4" file="ios/Rial/Models/VideoCapture.swift">
+          Create VideoCapture, VideoMetadata, RecordingProgress structs with Codable conformance
+        </task>
+        <task id="5" file="ios/Rial/Features/Capture/CaptureViewModel.swift">
+          Add video recording state: isRecordingVideo, recordingDuration, startVideoRecording(),
+          stopVideoRecording(), Timer for elapsed time updates
+        </task>
+        <task id="6" file="ios/Rial/Features/Capture/CaptureView.swift">
+          Update UI: recording indicator overlay, elapsed time display, haptic feedback,
+          disable mode switching while recording
+        </task>
+        <task id="7" file="ios/Rial/Features/Capture/CaptureButton.swift">
+          Implement hold-to-record: long press gesture, visual state for recording,
+          press start/end handlers, auto-stop at 15 seconds
+        </task>
+        <task id="8" file="ios/Rial/Core/Capture/VideoRecordingSession.swift">
+          Recording interruption handling: sessionWasInterrupted, save partial video,
+          store interrupted state, implement resume/cleanup
+        </task>
+      </section>
+    </doc>
+  </documentation>
+
+  <existing-code>
+    <file path="ios/Rial/Core/Capture/ARCaptureSession.swift" relevance="HIGH">
+      <description>
+        Base ARKit capture session that this story extends. VideoRecordingSession will either
+        extend this class or use it as a reference for ARSession configuration.
+      </description>
+      <key-interfaces>
+        <interface name="ARCaptureSession">
+          <property name="session" type="ARSession" access="private"/>
+          <property name="isRunning" type="Bool" access="public"/>
+          <property name="onFrameUpdate" type="((ARFrame) -> Void)?"/>
+          <property name="onInterruption" type="(() -> Void)?"/>
+          <property name="onInterruptionEnded" type="(() -> Void)?"/>
+          <property name="onTrackingStateChanged" type="((ARCamera.TrackingState) -> Void)?"/>
+          <property name="onError" type="((Error) -> Void)?"/>
+          <method name="start()" throws="CaptureError"/>
+          <method name="stop()"/>
+          <method name="captureCurrentFrame()" returns="ARFrame?"/>
+          <static-method name="isLiDARAvailable" returns="Bool"/>
+        </interface>
+        <interface name="CaptureError" type="enum">
+          <case name="lidarNotAvailable"/>
+          <case name="sessionFailed(underlying: String?)"/>
+          <case name="interrupted"/>
+          <case name="noFrameAvailable"/>
+          <case name="cameraPermissionDenied"/>
+          <case name="trackingLost"/>
+        </interface>
+      </key-interfaces>
+      <code-excerpt name="ARSession Configuration"><![CDATA[
+let config = ARWorldTrackingConfiguration()
+config.frameSemantics.insert(.sceneDepth)
+config.planeDetection = []
+config.environmentTexturing = .none
+config.isAutoFocusEnabled = true
+session.run(config, options: [.resetTracking, .removeExistingAnchors])
+      ]]></code-excerpt>
+      <code-excerpt name="ARSessionDelegate"><![CDATA[
+public func session(_ session: ARSession, didUpdate frame: ARFrame) {
+    frameQueue.sync {
+        _currentFrame = frame
+    }
+    if frame.sceneDepth == nil {
+        Self.logger.warning("ARFrame missing sceneDepth (LiDAR data unavailable)")
+    }
+    onFrameUpdate?(frame)
+}
+
+public func sessionWasInterrupted(_ session: ARSession) {
+    Self.logger.warning("ARSession interrupted (phone call, backgrounding, etc.)")
+    onInterruption?()
+}
+      ]]></code-excerpt>
+    </file>
+
+    <file path="ios/Rial/Core/Capture/FrameProcessor.swift" relevance="MEDIUM">
+      <description>
+        Frame processing for photo capture. VideoRecordingSession will use similar patterns
+        for JPEG conversion and depth compression, but adapted for continuous frame processing.
+      </description>
+      <key-interfaces>
+        <interface name="FrameProcessor">
+          <property name="ciContext" type="CIContext" access="private"/>
+          <property name="jpegQuality" type="CGFloat"/>
+          <method name="process(_:location:)" async="true" returns="CaptureData" throws="FrameProcessingError"/>
+          <method name="convertToJPEG(_:)" async="true" returns="Data" throws="FrameProcessingError"/>
+          <method name="compressDepth(_:)" returns="Data" throws="FrameProcessingError"/>
+        </interface>
+      </key-interfaces>
+      <code-excerpt name="Depth Compression Pattern"><![CDATA[
+private func compressDepth(_ buffer: CVPixelBuffer) throws -> Data {
+    CVPixelBufferLockBaseAddress(buffer, .readOnly)
+    defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+
+    let width = CVPixelBufferGetWidth(buffer)
+    let height = CVPixelBufferGetHeight(buffer)
+
+    guard let baseAddress = CVPixelBufferGetBaseAddress(buffer) else {
+        throw FrameProcessingError.depthCompressionFailed
+    }
+
+    let dataSize = width * height * MemoryLayout<Float>.size
+    let rawData = Data(bytes: baseAddress, count: dataSize)
+    let compressedData = try (rawData as NSData).compressed(using: .zlib) as Data
+    return compressedData
+}
+      ]]></code-excerpt>
+    </file>
+
+    <file path="ios/Rial/Core/Capture/DepthVisualizer.swift" relevance="MEDIUM">
+      <description>
+        Metal-based depth visualization. Story 7.3 will add edge-only overlay variant,
+        but this provides the base Metal pipeline pattern.
+      </description>
+      <key-interfaces>
+        <interface name="DepthVisualizer">
+          <property name="device" type="MTLDevice"/>
+          <property name="nearPlane" type="Float" default="0.5"/>
+          <property name="farPlane" type="Float" default="5.0"/>
+          <method name="render(depthFrame:to:opacity:)" throws="VisualizationError"/>
+        </interface>
+        <interface name="DepthFrame" type="struct">
+          <property name="depthMap" type="CVPixelBuffer"/>
+          <property name="width" type="Int"/>
+          <property name="height" type="Int"/>
+          <property name="timestamp" type="TimeInterval"/>
+          <property name="intrinsics" type="simd_float3x3"/>
+          <property name="transform" type="simd_float4x4"/>
+          <init name="from" parameter="arFrame: ARFrame" returns="DepthFrame?"/>
+        </interface>
+      </key-interfaces>
+    </file>
+
+    <file path="ios/Rial/Core/Crypto/CryptoService.swift" relevance="HIGH">
+      <description>
+        Cryptographic operations using CryptoKit. HashChainService (Story 7.4) will use
+        similar SHA-256 patterns for frame hashing.
+      </description>
+      <key-interfaces>
+        <interface name="CryptoService" type="struct">
+          <static-method name="sha256(_:)" returns="String" description="Hex-encoded hash"/>
+          <static-method name="sha256Data(_:)" returns="Data" description="Raw 32-byte hash"/>
+          <static-method name="sha256Stream(url:)" throws="CryptoError" returns="String"/>
+          <static-method name="encrypt(_:using:)" throws="CryptoError" returns="Data"/>
+          <static-method name="decrypt(_:using:)" throws="CryptoError" returns="Data"/>
+          <static-method name="generateKey()" returns="SymmetricKey"/>
+          <static-method name="randomData(count:)" returns="Data"/>
+        </interface>
+      </key-interfaces>
+      <code-excerpt name="SHA-256 Hash"><![CDATA[
+static func sha256(_ data: Data) -> String {
+    let hash = SHA256.hash(data: data)
+    return hash.map { String(format: "%02x", $0) }.joined()
+}
+
+static func sha256Data(_ data: Data) -> Data {
+    Data(SHA256.hash(data: data))
+}
+      ]]></code-excerpt>
+    </file>
+
+    <file path="ios/Rial/Features/Capture/CaptureViewModel.swift" relevance="HIGH">
+      <description>
+        View model for capture screen. Must be extended to add video recording state
+        and methods.
+      </description>
+      <key-interfaces>
+        <interface name="CaptureViewModel" type="class" decorator="@MainActor">
+          <property name="isRunning" type="Bool" published="true"/>
+          <property name="isCapturing" type="Bool" published="true"/>
+          <property name="currentDepthFrame" type="DepthFrame?" published="true"/>
+          <property name="trackingState" type="ARCamera.TrackingState" published="true"/>
+          <property name="errorMessage" type="String?" published="true"/>
+          <property name="captureSession" type="ARCaptureSession" access="private"/>
+          <property name="frameProcessor" type="FrameProcessor" access="private"/>
+          <method name="start()"/>
+          <method name="stop()"/>
+          <method name="capture()"/>
+        </interface>
+      </key-interfaces>
+      <extension-points>
+        <point name="Video Recording Properties">
+          <add property="isRecordingVideo" type="Bool" published="true"/>
+          <add property="recordingDuration" type="TimeInterval" published="true"/>
+          <add property="videoRecordingSession" type="VideoRecordingSession?" access="private"/>
+        </point>
+        <point name="Video Recording Methods">
+          <add method="startVideoRecording()"/>
+          <add method="stopVideoRecording()"/>
+          <add method="updateRecordingTimer()" access="private"/>
+        </point>
+      </extension-points>
+    </file>
+
+    <file path="ios/Rial/Features/Capture/CaptureView.swift" relevance="HIGH">
+      <description>
+        Main capture screen UI. Must be updated to show recording indicator,
+        timer, and handle video mode.
+      </description>
+      <key-interfaces>
+        <interface name="CaptureView" type="struct">
+          <property name="viewModel" type="CaptureViewModel" decorator="@StateObject"/>
+          <property name="showDepthOverlay" type="Bool" decorator="@State"/>
+          <property name="depthOpacity" type="Float" decorator="@State"/>
+        </interface>
+      </key-interfaces>
+      <extension-points>
+        <point name="Recording Overlay">
+          <add view="RecordingIndicatorOverlay" when="viewModel.isRecordingVideo"/>
+          <add view="ElapsedTimeDisplay" showing="viewModel.recordingDuration"/>
+        </point>
+      </extension-points>
+    </file>
+
+    <file path="ios/Rial/Features/Capture/CaptureButton.swift" relevance="HIGH">
+      <description>
+        Capture button with haptic feedback. Must be extended for hold-to-record gesture.
+      </description>
+      <key-interfaces>
+        <interface name="CaptureButton" type="struct">
+          <property name="isCapturing" type="Bool"/>
+          <property name="action" type="() -> Void"/>
+          <property name="impactFeedback" type="UIImpactFeedbackGenerator"/>
+          <property name="buttonSize" type="CGFloat" default="72"/>
+        </interface>
+        <interface name="CaptureControlsBar" type="struct">
+          <property name="showDepthOverlay" type="Binding&lt;Bool&gt;"/>
+          <property name="isCapturing" type="Bool"/>
+          <property name="onCapture" type="() -> Void"/>
+          <property name="onShowHistory" type="() -> Void"/>
+        </interface>
+      </key-interfaces>
+      <extension-points>
+        <point name="Video Recording Button">
+          <add property="isRecordingVideo" type="Bool"/>
+          <add property="onRecordingStart" type="() -> Void"/>
+          <add property="onRecordingStop" type="() -> Void"/>
+          <add gesture="LongPressGesture" for="hold-to-record"/>
+          <add visual-state="pulsing red circle" when="recording"/>
+        </point>
+      </extension-points>
+    </file>
+
+    <file path="ios/Rial/Models/CaptureData.swift" relevance="MEDIUM">
+      <description>
+        Photo capture data model. VideoCapture model will follow similar patterns
+        but with video-specific fields.
+      </description>
+      <key-interfaces>
+        <interface name="CaptureData" type="struct" conformance="Codable, Identifiable, Sendable">
+          <property name="id" type="UUID"/>
+          <property name="jpeg" type="Data"/>
+          <property name="depth" type="Data"/>
+          <property name="metadata" type="CaptureMetadata"/>
+          <property name="assertion" type="Data?"/>
+          <property name="assertionStatus" type="AssertionStatus"/>
+          <property name="timestamp" type="Date"/>
+        </interface>
+        <interface name="CaptureMetadata" type="struct">
+          <property name="capturedAt" type="Date"/>
+          <property name="deviceModel" type="String"/>
+          <property name="photoHash" type="String"/>
+          <property name="location" type="LocationData?"/>
+          <property name="depthMapDimensions" type="DepthDimensions"/>
+        </interface>
+        <interface name="CaptureStatus" type="enum">
+          <case name="processing"/>
+          <case name="pending"/>
+          <case name="uploading"/>
+          <case name="paused"/>
+          <case name="uploaded"/>
+          <case name="failed"/>
+        </interface>
+      </key-interfaces>
+    </file>
+
+    <file path="ios/Rial/Core/Attestation/CaptureAssertionService.swift" relevance="LOW">
+      <description>
+        Per-capture assertion generation. VideoAttestationService (Story 7.5) will follow
+        similar patterns but with checkpoint support.
+      </description>
+      <key-interfaces>
+        <interface name="CaptureAssertionService">
+          <method name="createAssertion(for:)" async="true" returns="Data" throws="CaptureAssertionError"/>
+          <property name="isAvailable" type="Bool"/>
+        </interface>
+      </key-interfaces>
+    </file>
+
+    <file path="ios/Rial/Shaders/DepthVisualization.metal" relevance="LOW">
+      <description>
+        Metal shaders for depth visualization. Story 7.3 will add EdgeDepthVisualization.metal
+        with Sobel edge detection variant.
+      </description>
+      <code-excerpt name="Shader Structure"><![CDATA[
+struct VertexOut {
+    float4 position [[position]];
+    float2 texCoord;
+};
+
+vertex VertexOut depthVertex(
+    uint vertexID [[vertex_id]],
+    constant float2 *positions [[buffer(0)]]
+);
+
+fragment float4 depthFragment(
+    VertexOut in [[stage_in]],
+    texture2d<float> depthTex [[texture(0)]],
+    constant float &nearPlane [[buffer(0)]],
+    constant float &farPlane [[buffer(1)]],
+    constant float &opacity [[buffer(2)]]
+);
+      ]]></code-excerpt>
+    </file>
+  </existing-code>
+
+  <interfaces>
+    <interface name="VideoRecordingSession" status="TO_CREATE">
+      <description>
+        Main class coordinating ARSession with AVAssetWriter for video recording.
+        Should either extend ARCaptureSession or wrap an ARSession reference.
+      </description>
+      <properties>
+        <property name="session" type="ARSession" access="private"/>
+        <property name="assetWriter" type="AVAssetWriter?" access="private"/>
+        <property name="videoInput" type="AVAssetWriterInput?" access="private"/>
+        <property name="pixelBufferAdaptor" type="AVAssetWriterInputPixelBufferAdaptor?" access="private"/>
+        <property name="state" type="RecordingState" access="public" published="true"/>
+        <property name="frameCount" type="Int" access="public" readonly="true"/>
+        <property name="duration" type="TimeInterval" access="public" readonly="true"/>
+        <property name="outputURL" type="URL?" access="public" readonly="true"/>
+        <property name="onFrameProcessed" type="((ARFrame, Int) -> Void)?"/>
+        <property name="onRecordingStateChanged" type="((RecordingState) -> Void)?"/>
+        <property name="onError" type="((Error) -> Void)?"/>
+      </properties>
+      <methods>
+        <method name="startRecording()" async="true" throws="VideoRecordingError"/>
+        <method name="stopRecording()" async="true" throws="VideoRecordingError"/>
+        <method name="handleFrame(_:)" description="Process incoming ARFrame"/>
+      </methods>
+    </interface>
+
+    <interface name="RecordingState" type="enum" status="TO_CREATE">
+      <cases>
+        <case name="idle" description="Not recording"/>
+        <case name="recording" description="Actively recording"/>
+        <case name="processing" description="Finalizing video file"/>
+        <case name="error(Error)" description="Recording failed"/>
+      </cases>
+    </interface>
+
+    <interface name="VideoRecordingError" type="enum" status="TO_CREATE">
+      <cases>
+        <case name="sessionNotRunning"/>
+        <case name="writerCreationFailed"/>
+        <case name="inputCreationFailed"/>
+        <case name="writingFailed(Error)"/>
+        <case name="interrupted"/>
+        <case name="maxDurationReached"/>
+      </cases>
+    </interface>
+
+    <interface name="VideoRecordingSessionDelegate" type="protocol" status="TO_CREATE">
+      <description>Optional delegate protocol for VideoRecordingSession events</description>
+      <methods>
+        <method name="recordingSession(_:didProcessFrame:frameNumber:)"/>
+        <method name="recordingSession(_:didChangeState:)"/>
+        <method name="recordingSession(_:didEncounterError:)"/>
+        <method name="recordingSessionWasInterrupted(_:)"/>
+      </methods>
+    </interface>
+  </interfaces>
+
+  <dependencies>
+    <frameworks>
+      <framework name="ARKit" purpose="Unified RGB+depth capture via ARSession"/>
+      <framework name="AVFoundation" purpose="AVAssetWriter for video encoding"/>
+      <framework name="VideoToolbox" purpose="Hardware video encoding"/>
+      <framework name="CryptoKit" purpose="SHA-256 hashing for frame chain (Story 7.4)"/>
+      <framework name="DeviceCheck" purpose="DCAppAttest for attestation (Story 7.5)"/>
+    </frameworks>
+    <internal-dependencies>
+      <dependency path="ios/Rial/Core/Capture/ARCaptureSession.swift" purpose="ARSession configuration patterns"/>
+      <dependency path="ios/Rial/Core/Crypto/CryptoService.swift" purpose="SHA-256 implementation"/>
+      <dependency path="ios/Rial/Features/Capture/CaptureViewModel.swift" purpose="State management"/>
+      <dependency path="ios/Rial/Features/Capture/CaptureButton.swift" purpose="Button component"/>
+    </internal-dependencies>
+    <future-story-dependencies>
+      <dependency story="7.2" name="DepthKeyframeBuffer" description="Will consume frame callbacks to extract depth at 10fps"/>
+      <dependency story="7.4" name="HashChainService" description="Will consume frame callbacks to compute hash chain"/>
+      <dependency story="7.5" name="VideoAttestationService" description="Will consume final hash for attestation"/>
+    </future-story-dependencies>
+  </dependencies>
+
+  <development-constraints>
+    <constraint category="Architecture">
+      <rule>Use same ARSession configuration as photo capture (.sceneDepth frame semantics)</rule>
+      <rule>Follow existing patterns from ARCaptureSession for session lifecycle</rule>
+      <rule>Use actor or serial queue for thread-safe frame access</rule>
+      <rule>Implement callbacks for downstream services (depth extraction, hash chain)</rule>
+    </constraint>
+    <constraint category="Performance">
+      <rule>Maintain 30fps recording without dropped frames</rule>
+      <rule>Memory usage must stay below 300MB during 15-second recording</rule>
+      <rule>Use hardware encoding via VideoToolbox</rule>
+      <rule>Process frames on background queues, not main thread</rule>
+    </constraint>
+    <constraint category="Video Encoding">
+      <rule>Prefer HEVC codec on devices that support it (A10+ chips)</rule>
+      <rule>Fallback to H.264 if HEVC unavailable</rule>
+      <rule>Use .mov container for local storage (converts to MP4 for upload)</rule>
+      <rule>Target 10 Mbps bitrate for good quality/size balance</rule>
+    </constraint>
+    <constraint category="UX">
+      <rule>Provide haptic feedback on recording start and stop</rule>
+      <rule>Auto-stop at 15 seconds with haptic feedback</rule>
+      <rule>Show elapsed time timer updating every second</rule>
+      <rule>Disable mode switching while recording</rule>
+    </constraint>
+    <constraint category="Error Handling">
+      <rule>Handle ARSession interruption gracefully</rule>
+      <rule>Save partial video on interruption for checkpoint attestation</rule>
+      <rule>Log errors with structured logging using os.log</rule>
+      <rule>Provide user-friendly error messages</rule>
+    </constraint>
+  </development-constraints>
+
+  <testing-requirements>
+    <unit-tests file="ios/RialTests/Capture/VideoRecordingSessionTests.swift">
+      <test name="Recording state transitions">Test idle -> recording -> processing -> idle</test>
+      <test name="Frame count tracking">Test accuracy of frameCount property</test>
+      <test name="15-second auto-stop">Test automatic stop at maximum duration</test>
+      <test name="Interruption state preservation">Test state is preserved on session interruption</test>
+      <test name="Video metadata generation">Test VideoMetadata is correctly assembled</test>
+      <test name="Mock AVAssetWriter">Use mock for isolated testing without actual encoding</test>
+    </unit-tests>
+    <integration-tests file="ios/RialTests/Capture/VideoRecordingIntegrationTests.swift">
+      <test name="Full recording flow">Test complete flow with real ARSession (device only)</test>
+      <test name="Video file validity">Test that output .mov file is playable</test>
+      <test name="Synchronized depth capture">Test depth is captured alongside video</test>
+      <test name="Interruption recovery">Test recovery after phone call or backgrounding</test>
+      <test name="Memory usage">Test memory stays below 300MB during 15s recording</test>
+    </integration-tests>
+    <device-tests type="Manual">
+      <test>Record 5-second video, verify playback</test>
+      <test>Record full 15-second video, verify auto-stop</test>
+      <test>Interrupt recording with phone call, verify partial save</test>
+      <test>Verify haptic feedback on start/stop</test>
+      <test>Verify timer accuracy</test>
+      <test>Test on iPhone 12 Pro (oldest supported) for thermal behavior</test>
+    </device-tests>
+    <coverage-target>80% for VideoRecordingSession class</coverage-target>
+  </testing-requirements>
+
+  <implementation-guidance>
+    <guidance category="VideoRecordingSession Structure">
+      <recommendation>
+        Create VideoRecordingSession as a new class rather than extending ARCaptureSession.
+        This keeps concerns separated - ARCaptureSession handles photo capture while
+        VideoRecordingSession handles video-specific encoding with AVAssetWriter.
+        Both can share the same ARSession configuration patterns.
+      </recommendation>
+    </guidance>
+
+    <guidance category="AVAssetWriter Setup">
+      <recommendation>
+        Initialize AVAssetWriter lazily on startRecording(), not in init().
+        Create temporary file URL in app's temp directory.
+        Configure AVAssetWriterInput with proper video settings before starting.
+        Use AVAssetWriterInputPixelBufferAdaptor for efficient pixel buffer appending.
+      </recommendation>
+      <code-sample name="AVAssetWriter Initialization"><![CDATA[
+let tempDir = FileManager.default.temporaryDirectory
+let outputURL = tempDir.appendingPathComponent(UUID().uuidString).appendingPathExtension("mov")
+
+assetWriter = try AVAssetWriter(outputURL: outputURL, fileType: .mov)
+
+let videoSettings: [String: Any] = [
+    AVVideoCodecKey: AVVideoCodecType.hevc,
+    AVVideoWidthKey: width,
+    AVVideoHeightKey: height,
+    AVVideoCompressionPropertiesKey: [
+        AVVideoAverageBitRateKey: 10_000_000,
+        AVVideoExpectedSourceFrameRateKey: 30
+    ]
+]
+
+videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
+videoInput.expectsMediaDataInRealTime = true
+
+pixelBufferAdaptor = AVAssetWriterInputPixelBufferAdaptor(
+    assetWriterInput: videoInput,
+    sourcePixelBufferAttributes: nil
+)
+
+assetWriter.add(videoInput)
+      ]]></code-sample>
+    </guidance>
+
+    <guidance category="Frame Processing">
+      <recommendation>
+        In session(_:didUpdate:) delegate method:
+        1. Check if recording is active
+        2. Extract capturedImage CVPixelBuffer
+        3. Append to AVAssetWriter with proper timestamp
+        4. Increment frame count
+        5. Call onFrameProcessed callback for downstream services
+
+        Use CMTime for precise timestamp handling.
+      </recommendation>
+      <code-sample name="Frame Processing"><![CDATA[
+func session(_ session: ARSession, didUpdate frame: ARFrame) {
+    guard state == .recording,
+          let videoInput = videoInput,
+          let pixelBufferAdaptor = pixelBufferAdaptor,
+          videoInput.isReadyForMoreMediaData else {
+        return
+    }
+
+    let timestamp = CMTime(seconds: frame.timestamp, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+
+    if pixelBufferAdaptor.append(frame.capturedImage, withPresentationTime: timestamp) {
+        frameCount += 1
+        onFrameProcessed?(frame, frameCount)
+    }
+
+    // Check for max duration
+    if frame.timestamp - startTimestamp >= maxDuration {
+        Task { await stopRecording() }
+    }
+}
+      ]]></code-sample>
+    </guidance>
+
+    <guidance category="Recording Lifecycle">
+      <recommendation>
+        startRecording() should:
+        1. Verify ARSession is running
+        2. Create AVAssetWriter and configure inputs
+        3. Start writing
+        4. Update state to .recording
+        5. Record start timestamp
+        6. Play haptic feedback
+
+        stopRecording() should:
+        1. Mark videoInput as finished
+        2. Finish writing asynchronously
+        3. Update state to .processing then .idle
+        4. Play haptic feedback
+        5. Return output URL
+      </recommendation>
+    </guidance>
+
+    <guidance category="Interruption Handling">
+      <recommendation>
+        When sessionWasInterrupted is called:
+        1. Immediately finalize AVAssetWriter
+        2. Save partial video file
+        3. Record interrupted state for checkpoint attestation (Story 7.5)
+        4. Update state to reflect interruption
+
+        The partial video can still be verified up to the last checkpoint.
+      </recommendation>
+    </guidance>
+
+    <guidance category="UI Integration">
+      <recommendation>
+        For CaptureButton hold-to-record:
+        1. Use LongPressGesture with minimumDuration: 0.2
+        2. On gesture start (.began), call startVideoRecording()
+        3. On gesture end (.ended), call stopVideoRecording()
+        4. Use Timer for elapsed time updates (every 0.1s for smooth UI)
+        5. Change button appearance to pulsing red circle when recording
+      </recommendation>
+      <code-sample name="Long Press Gesture"><![CDATA[
+.gesture(
+    LongPressGesture(minimumDuration: 0.2)
+        .onChanged { _ in
+            if !isRecordingVideo {
+                startVideoRecording()
+            }
+        }
+        .onEnded { _ in
+            stopVideoRecording()
+        }
+)
+
+// Alternative using DragGesture for continuous tracking
+.simultaneousGesture(
+    DragGesture(minimumDistance: 0)
+        .onChanged { _ in
+            if !isRecordingVideo {
+                startVideoRecording()
+            }
+        }
+        .onEnded { _ in
+            stopVideoRecording()
+        }
+)
+      ]]></code-sample>
+    </guidance>
+  </implementation-guidance>
+
+  <definition-of-done>
+    <criterion>All acceptance criteria met (AC-7.1.1 through AC-7.1.4)</criterion>
+    <criterion>Code reviewed and approved</criterion>
+    <criterion>Unit tests passing with at least 80% coverage for VideoRecordingSession</criterion>
+    <criterion>Integration tests passing on physical device</criterion>
+    <criterion>No new lint errors (SwiftLint)</criterion>
+    <criterion>Memory usage verified less than 300MB during 15s recording</criterion>
+    <criterion>Frame rate verified at 30fps (no dropped frames)</criterion>
+    <criterion>Documentation updated (code comments, README if needed)</criterion>
+    <criterion>Haptic feedback working correctly</criterion>
+    <criterion>Timer display accurate to second precision</criterion>
+  </definition-of-done>
+</story-context>

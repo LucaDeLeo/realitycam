@@ -15,7 +15,8 @@ import ARKit
 /// ## Features
 /// - Full-screen ARKit camera preview
 /// - Real-time LiDAR depth visualization overlay
-/// - Large capture button with haptic feedback
+/// - Large capture button with haptic feedback (tap for photo, hold for video)
+/// - Video recording with timer and indicator
 /// - Capture preview with Use/Retake options
 /// - Permission handling
 ///
@@ -36,6 +37,10 @@ struct CaptureView: View {
 
     /// Whether to show history sheet
     @State private var showHistory = false
+
+    /// Haptic feedback generators
+    private let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+    private let heavyImpactFeedback = UIImpactFeedbackGenerator(style: .heavy)
 
     var body: some View {
         ZStack {
@@ -100,25 +105,87 @@ struct CaptureView: View {
                 .allowsHitTesting(false)
             }
 
+            // Recording indicator overlay (appears at top when recording)
+            if viewModel.isRecordingVideo {
+                recordingIndicatorOverlay
+            }
+
             // Controls overlay
             VStack {
-                // Top bar
-                topBar
+                // Top bar (hidden when recording)
+                if !viewModel.isRecordingVideo {
+                    topBar
+                } else {
+                    // Spacer to push content down when recording indicator is shown
+                    Spacer().frame(height: 60)
+                }
 
                 Spacer()
 
-                // Tracking state indicator
-                trackingStateIndicator
+                // Tracking state indicator (hidden when recording)
+                if !viewModel.isRecordingVideo {
+                    trackingStateIndicator
+                }
 
                 // Bottom controls
                 CaptureControlsBar(
                     showDepthOverlay: $showDepthOverlay,
                     isCapturing: viewModel.isCapturing,
+                    isRecordingVideo: viewModel.isRecordingVideo,
+                    recordingDuration: viewModel.recordingDuration,
                     onCapture: { viewModel.capture() },
+                    onRecordingStart: {
+                        impactFeedback.prepare()
+                        impactFeedback.impactOccurred()
+                        viewModel.startVideoRecording()
+                    },
+                    onRecordingStop: {
+                        heavyImpactFeedback.prepare()
+                        heavyImpactFeedback.impactOccurred()
+                        viewModel.stopVideoRecording()
+                    },
                     onShowHistory: { showHistory = true }
                 )
             }
         }
+    }
+
+    // MARK: - Recording Indicator Overlay
+
+    private var recordingIndicatorOverlay: some View {
+        VStack {
+            HStack(spacing: 8) {
+                // Pulsing red recording dot
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: 12, height: 12)
+                    .modifier(PulsingAnimation())
+
+                Text("Recording...")
+                    .font(.subheadline.bold())
+                    .foregroundColor(.white)
+
+                // Elapsed time timer
+                Text(formatDuration(viewModel.recordingDuration))
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundColor(.white)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color.black.opacity(0.6))
+            .cornerRadius(20)
+            .padding(.top, 50)
+
+            Spacer()
+        }
+    }
+
+    /// Format duration as "0:00" string
+    private func formatDuration(_ seconds: TimeInterval) -> String {
+        let totalSeconds = Int(seconds)
+        let minutes = totalSeconds / 60
+        let remainingSeconds = totalSeconds % 60
+        return String(format: "%d:%02d", minutes, remainingSeconds)
     }
 
     // MARK: - Top Bar
@@ -239,6 +306,24 @@ struct SheetPresentationModifier: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+/// Pulsing animation modifier for recording indicator.
+struct PulsingAnimation: ViewModifier {
+    @State private var isPulsing = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(isPulsing ? 0.4 : 1.0)
+            .animation(
+                Animation.easeInOut(duration: 0.8)
+                    .repeatForever(autoreverses: true),
+                value: isPulsing
+            )
+            .onAppear {
+                isPulsing = true
+            }
     }
 }
 

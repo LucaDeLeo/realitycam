@@ -18,6 +18,7 @@ import os.log
 /// - AR session lifecycle (start/stop)
 /// - Frame updates for depth visualization
 /// - Photo capture and processing
+/// - Video recording with hold-to-record
 /// - Permission checking
 /// - Error handling
 ///
@@ -66,6 +67,20 @@ final class CaptureViewModel: ObservableObject {
     /// Whether showing capture preview
     @Published var showCapturePreview = false
 
+    // MARK: - Video Recording Published Properties
+
+    /// Whether video recording is in progress
+    @Published private(set) var isRecordingVideo = false
+
+    /// Current video recording duration in seconds
+    @Published private(set) var recordingDuration: TimeInterval = 0
+
+    /// Number of frames recorded in current session
+    @Published private(set) var recordingFrameCount: Int = 0
+
+    /// Maximum video recording duration (15 seconds)
+    public static let maxRecordingDuration: TimeInterval = VideoRecordingSession.maxDuration
+
     // MARK: - Private Properties
 
     /// AR capture session
@@ -85,6 +100,12 @@ final class CaptureViewModel: ObservableObject {
 
     /// Cancellables for Combine subscriptions
     private var cancellables = Set<AnyCancellable>()
+
+    /// Video recording session
+    private var videoRecordingSession: VideoRecordingSession?
+
+    /// Timer for updating recording duration display
+    private var recordingTimer: Timer?
 
     // MARK: - Initialization
 
@@ -307,6 +328,166 @@ final class CaptureViewModel: ObservableObject {
         pendingCapture = nil
         lastCapturedPhoto = nil
         showCapturePreview = false
+    }
+
+    // MARK: - Video Recording Methods
+
+    /// Start video recording.
+    ///
+    /// Creates a VideoRecordingSession and begins capturing video frames.
+    /// Recording will automatically stop at `maxRecordingDuration` (15 seconds).
+    func startVideoRecording() {
+        guard !isRecordingVideo else {
+            Self.logger.warning("Video recording already in progress")
+            return
+        }
+
+        guard isRunning else {
+            Self.logger.error("Cannot start video recording - AR session not running")
+            errorMessage = "Camera not ready"
+            return
+        }
+
+        Self.logger.info("Starting video recording")
+
+        // Create video recording session
+        videoRecordingSession = VideoRecordingSession(arCaptureSession: captureSession)
+
+        // Set up frame callback for downstream processing (depth extraction, hash chain)
+        videoRecordingSession?.onFrameProcessed = { [weak self] frame, frameNumber in
+            DispatchQueue.main.async {
+                self?.recordingFrameCount = frameNumber
+            }
+        }
+
+        // Set up state change callback
+        videoRecordingSession?.onRecordingStateChanged = { [weak self] state in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+
+                switch state {
+                case .recording:
+                    self.isRecordingVideo = true
+                case .idle, .processing:
+                    self.isRecordingVideo = false
+                case .error(let error):
+                    self.isRecordingVideo = false
+                    self.errorMessage = error.localizedDescription
+                }
+            }
+        }
+
+        // Set up error callback
+        videoRecordingSession?.onError = { [weak self] error in
+            DispatchQueue.main.async {
+                Self.logger.error("Video recording error: \(error.localizedDescription)")
+                // maxDurationReached is not really an error, just a notification
+                if error != .maxDurationReached {
+                    self?.errorMessage = error.localizedDescription
+                }
+            }
+        }
+
+        // Start recording
+        Task {
+            do {
+                try await videoRecordingSession?.startRecording()
+
+                // Start duration timer
+                startRecordingTimer()
+
+            } catch {
+                Self.logger.error("Failed to start video recording: \(error.localizedDescription)")
+                errorMessage = "Failed to start recording: \(error.localizedDescription)"
+                isRecordingVideo = false
+            }
+        }
+    }
+
+    /// Stop video recording.
+    ///
+    /// Finalizes the video file and prepares it for processing.
+    func stopVideoRecording() {
+        guard isRecordingVideo else {
+            Self.logger.debug("stopVideoRecording called but not recording")
+            return
+        }
+
+        Self.logger.info("Stopping video recording")
+
+        // Stop timer
+        stopRecordingTimer()
+
+        Task {
+            do {
+                guard let outputURL = try await videoRecordingSession?.stopRecording() else {
+                    Self.logger.error("No output URL from video recording")
+                    return
+                }
+
+                Self.logger.info("Video recording saved to: \(outputURL.lastPathComponent)")
+
+                // TODO: Story 7.2+ will process the video (depth keyframes, hash chain, attestation)
+                // For now, just log completion
+                let frameCount = recordingFrameCount
+                let duration = recordingDuration
+
+                Self.logger.info("Recording complete: \(frameCount) frames, \(String(format: "%.1f", duration))s")
+
+                // Reset state
+                resetRecordingState()
+
+            } catch {
+                Self.logger.error("Failed to stop video recording: \(error.localizedDescription)")
+                errorMessage = "Failed to save recording: \(error.localizedDescription)"
+                resetRecordingState()
+            }
+        }
+    }
+
+    /// Cancel video recording without saving.
+    func cancelVideoRecording() {
+        guard isRecordingVideo else { return }
+
+        Self.logger.info("Cancelling video recording")
+        stopRecordingTimer()
+        videoRecordingSession?.cancelRecording()
+        resetRecordingState()
+    }
+
+    // MARK: - Recording Timer
+
+    /// Start the recording duration update timer.
+    private func startRecordingTimer() {
+        recordingDuration = 0
+        recordingFrameCount = 0
+
+        // Update every 0.1 seconds for smooth UI
+        recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self = self, let session = self.videoRecordingSession else { return }
+                self.recordingDuration = session.duration
+
+                // Auto-stop at max duration (handled by VideoRecordingSession, but update UI)
+                if self.recordingDuration >= CaptureViewModel.maxRecordingDuration {
+                    self.stopVideoRecording()
+                }
+            }
+        }
+    }
+
+    /// Stop the recording duration update timer.
+    private func stopRecordingTimer() {
+        recordingTimer?.invalidate()
+        recordingTimer = nil
+    }
+
+    /// Reset video recording state.
+    private func resetRecordingState() {
+        isRecordingVideo = false
+        recordingDuration = 0
+        recordingFrameCount = 0
+        videoRecordingSession = nil
     }
 }
 

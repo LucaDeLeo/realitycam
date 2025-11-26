@@ -111,3 +111,23 @@ development_status:
   6-15-result-detail-view: done
   6-16-feature-parity-validation: done
   epic-6-retrospective: optional
+
+  # Epic 7: Video Capture with LiDAR Depth (14 stories)
+  # Extends photo capture to video with frame-by-frame depth verification
+  # Tech spec created: 2025-11-26
+  epic-7: contexted
+  7-1-arkit-video-recording-session: done
+  7-2-depth-keyframe-extraction: backlog
+  7-3-realtime-edge-depth-overlay: backlog
+  7-4-frame-hash-chain: backlog
+  7-5-video-attestation-checkpoints: backlog
+  7-6-video-metadata-collection: backlog
+  7-7-video-local-processing-pipeline: backlog
+  7-8-video-upload-endpoint: backlog
+  7-9-video-depth-analysis-service: backlog
+  7-10-video-hash-chain-verification: backlog
+  7-11-video-evidence-package: backlog
+  7-12-c2pa-video-manifest-generation: backlog
+  7-13-video-verification-page: backlog
+  7-14-video-capture-ui: backlog
+  epic-7-retrospective: optional

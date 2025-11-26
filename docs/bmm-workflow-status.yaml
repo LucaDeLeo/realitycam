@@ -83,7 +83,8 @@ workflow_status:
         status: "docs/epics.md"
         agent: "pm"
         command: "create-epics-and-stories"
-        output: "5 epics, 41 stories, 46 FRs covered"
+        output: "6 epics, 55 stories, 55 FRs covered"
+        note: "Epic 7 (Video Capture) added 2025-11-26 with 14 stories"
 
       - id: "test-design"
         status: "docs/test-design.md"
@@ -114,4 +115,12 @@ workflow_status:
         status: "docs/sprint-artifacts/sprint-status.yaml"
         agent: "sm"
         command: "sprint-planning"
-        output: "5 epics, 41 stories initialized in backlog"
+        output: "6 epics, 55 stories initialized in backlog"
+
+      - id: "epic-7-tech-spec"
+        status: "docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md"
+        agent: "architect"
+        command: "epic-tech-context"
+        output: "Video Capture with LiDAR Depth - 14 stories, FR47-FR55"
+        completed: "2025-11-26"
+        note: "Validated 2025-11-26 - needs story files generated"
