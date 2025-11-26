@@ -868,9 +868,7 @@ mod tests {
         let gap: i64 = 999;
         assert!(
             gap <= COUNTER_GAP_WARNING_THRESHOLD,
-            "Gap of {} should be below threshold {}",
-            gap,
-            COUNTER_GAP_WARNING_THRESHOLD
+            "Gap of {gap} should be below threshold {COUNTER_GAP_WARNING_THRESHOLD}"
         );
     }
 
@@ -880,9 +878,7 @@ mod tests {
         let gap: i64 = 1001;
         assert!(
             gap > COUNTER_GAP_WARNING_THRESHOLD,
-            "Gap of {} should be above threshold {} and trigger warning",
-            gap,
-            COUNTER_GAP_WARNING_THRESHOLD
+            "Gap of {gap} should be above threshold {COUNTER_GAP_WARNING_THRESHOLD} and trigger warning"
         );
     }
 
@@ -892,8 +888,7 @@ mod tests {
         let gap: i64 = 1_000_000;
         assert!(
             gap > COUNTER_GAP_WARNING_THRESHOLD,
-            "Large gap of {} should trigger security warning",
-            gap
+            "Large gap of {gap} should trigger security warning"
         );
     }
 
@@ -905,8 +900,7 @@ mod tests {
         for gap in normal_gaps {
             assert!(
                 gap <= COUNTER_GAP_WARNING_THRESHOLD,
-                "Normal gap of {} should not trigger warning",
-                gap
+                "Normal gap of {gap} should not trigger warning"
             );
         }
     }
@@ -921,9 +915,7 @@ mod tests {
         for counter in replay_counters {
             assert!(
                 counter <= stored_counter,
-                "Counter {} should be detected as replay (stored: {})",
-                counter,
-                stored_counter
+                "Counter {counter} should be detected as replay (stored: {stored_counter})"
             );
         }
     }
