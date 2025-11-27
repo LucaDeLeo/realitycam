@@ -14,39 +14,14 @@ configuration:
   auto_push: true
 
 checkpoint:
-  story_key: 7-8-video-upload-endpoint
-  phase: verify
-  saved_at: 2025-11-27T11:45:00Z
-  data:
-    story_file_path: docs/sprint-artifacts/stories/7-8-video-upload-endpoint.md
-    context_file_path: docs/sprint-artifacts/story-contexts/7-8-video-upload-endpoint-context.xml
-    validation_attempts: 2
-    review_cycles: 1
-    files_created:
-      - backend/migrations/20251127000001_add_video_captures.sql
-      - backend/src/types/video_capture.rs
-      - backend/src/routes/captures_video.rs
-      - ios/Rial/Core/Storage/VideoCaptureEntity.swift
-      - ios/Rial/Core/Networking/VideoUploadService.swift
-    files_modified:
-      - backend/src/types/mod.rs
-      - backend/src/services/storage.rs
-      - backend/src/models/capture.rs
-      - backend/src/routes/mod.rs
-      - backend/src/routes/captures.rs
-      - ios/Rial/Core/Storage/CaptureStore.swift
-      - ios/Rial/App/AppDelegate.swift
-      - ios/Rial.xcodeproj/project.pbxproj
-    verification:
-      typecheck: pass
-      tests: pass
-      lint: pass
+  story_key: 7-10-video-hash-chain-verification
+  phase: starting
+  saved_at: 2025-11-27T15:20:00Z
+  data: null
 
 epics_contexted: []
 
 stories_pending:
-  - 7-8-video-upload-endpoint
-  - 7-9-video-depth-analysis-service
   - 7-10-video-hash-chain-verification
   - 7-11-video-evidence-package
   - 7-12-c2pa-video-manifest-generation
@@ -66,10 +41,22 @@ stories_processed:
     review_cycles: 1
     started_at: 2025-11-27T10:56:00Z
     completed_at: 2025-11-27T11:20:00Z
+  - story_key: 7-8-video-upload-endpoint
+    status: success
+    commit: 4c6d5fa
+    review_cycles: 2
+    started_at: 2025-11-27T11:21:00Z
+    completed_at: 2025-11-27T12:00:00Z
+  - story_key: 7-9-video-depth-analysis-service
+    status: success
+    commit: ac4574d
+    review_cycles: 1
+    started_at: 2025-11-27T14:30:00Z
+    completed_at: 2025-11-27T15:20:00Z
 
 statistics:
   epics_contexted_jit: 0
   epics_already_contexted: 1
   total_stories: 9
-  success_count: 2
+  success_count: 4
   failed_count: 0
