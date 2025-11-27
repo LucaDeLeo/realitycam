@@ -120,7 +120,7 @@ development_status:
   7-2-depth-keyframe-extraction: done
   7-3-realtime-edge-depth-overlay: done
   7-4-frame-hash-chain: done
-  7-5-video-attestation-checkpoints: backlog
+  7-5-video-attestation-checkpoints: done
   7-6-video-metadata-collection: backlog
   7-7-video-local-processing-pipeline: backlog
   7-8-video-upload-endpoint: backlog

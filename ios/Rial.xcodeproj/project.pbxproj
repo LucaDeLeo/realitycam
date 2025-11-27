@@ -68,6 +68,9 @@
 		'3089F9DB004C' = {isa = PBXBuildFile; fileRef = 3089F9DB1068; };
 		'3089F9DB004D' = {isa = PBXBuildFile; fileRef = 3089F9DB1069; };
 		'3089F9DB004E' = {isa = PBXBuildFile; fileRef = 3089F9DB1070; };
+		'3089F9DB004F' = {isa = PBXBuildFile; fileRef = 3089F9DB1071; };
+		'3089F9DB0050' = {isa = PBXBuildFile; fileRef = 3089F9DB1072; };
+		'3089F9DB0051' = {isa = PBXBuildFile; fileRef = 3089F9DB1073; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -153,6 +156,9 @@
 		'3089F9DB1068' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeDepthVisualizerTests.swift; sourceTree = "<group>"; };
 		'3089F9DB1069' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashChainService.swift; sourceTree = "<group>"; };
 		'3089F9DB1070' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashChainServiceTests.swift; sourceTree = "<group>"; };
+		'3089F9DB1071' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoAttestationService.swift; sourceTree = "<group>"; };
+		'3089F9DB1072' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PartialVideoBadge.swift; sourceTree = "<group>"; };
+		'3089F9DB1073' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoAttestationServiceTests.swift; sourceTree = "<group>"; };
 		D9A44E098094F0E08456FEE9 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppEnvironment.swift; path = Rial/Core/Configuration/AppEnvironment.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -303,6 +309,7 @@
 			children = (
 				3089F9DB1028,
 				3089F9DB1017,
+				3089F9DB1071,
 			);
 			path = Attestation;
 			sourceTree = "<group>";
@@ -389,6 +396,7 @@
 			children = (
 				3089F9DB1057,
 				3089F9DB1058,
+				3089F9DB1072,
 				3089F9DB1056,
 				3089F9DB1059,
 			);
@@ -419,6 +427,7 @@
 			children = (
 				3089F9DB1029,
 				3089F9DB1018,
+				3089F9DB1073,
 			);
 			path = Attestation;
 			sourceTree = "<group>";
@@ -615,6 +624,8 @@
 				3089F9DB004A,
 				3089F9DB004B,
 				3089F9DB004D,
+				3089F9DB004F,
+				3089F9DB0050,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -638,6 +649,7 @@
 				3089F9DB0048,
 				3089F9DB004C,
 				3089F9DB004E,
+				3089F9DB0051,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

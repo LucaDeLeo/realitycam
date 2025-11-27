@@ -1,0 +1,791 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-id>7-5-video-attestation-checkpoints</story-id>
+    <story-title>Video Attestation with Checkpoints</story-title>
+    <epic-id>7</epic-id>
+    <epic-title>Video Capture with LiDAR Depth</epic-title>
+    <priority>P0</priority>
+    <estimated-effort>M</estimated-effort>
+    <generated-at>2025-11-26T00:00:00Z</generated-at>
+    <dependencies>
+      <dependency story-id="7-4">Frame Hash Chain (HashChainService)</dependency>
+      <dependency story-id="7-1">ARKit Video Recording Session</dependency>
+      <dependency story-id="2-3">DCAppAttest Integration (CaptureAssertionService)</dependency>
+    </dependencies>
+  </metadata>
+
+  <story-reference>
+    <file-path>docs/sprint-artifacts/stories/7-5-video-attestation-checkpoints.md</file-path>
+    <description>Complete story specification including user story, acceptance criteria, technical requirements, and implementation tasks</description>
+  </story-reference>
+
+  <epic-context>
+    <tech-spec-file>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md</tech-spec-file>
+    <description>Epic 7 Technical Specification: Video Capture with LiDAR Depth</description>
+    <relevant-sections>
+      <section>
+        <name>AC-7.5: Normal Recording Completion</name>
+        <excerpt>
+**Given** user completes 15s recording (or releases early)
+**When** recording finishes normally
+**Then**:
+- Final hash signed with DCAppAttest assertion
+- Full hash chain saved
+- VideoCapture with isPartial=false created
+        </excerpt>
+      </section>
+      <section>
+        <name>AC-7.6: Interrupted Recording</name>
+        <excerpt>
+**Given** recording is interrupted (phone call, background)
+**When** interruption occurs at 12 seconds
+**Then**:
+- Last checkpoint (10s) hash is attested
+- VideoCapture with isPartial=true, checkpointIndex=1 created
+- Preview shows "Verified: 10s of 12s recorded"
+        </excerpt>
+      </section>
+      <section>
+        <name>VideoAttestation Data Model</name>
+        <excerpt>
+struct VideoAttestation: Codable, Equatable {
+    let finalHash: Data                  // Hash that was attested (final or checkpoint)
+    let assertion: Data                  // DCAppAttest signature
+    let durationMs: Int64                // Attested duration (may be partial)
+    let frameCount: Int                  // Attested frame count (may be partial)
+    let isPartial: Bool                  // True if interrupted
+    let checkpointIndex: Int?            // Which checkpoint (if partial, nil otherwise)
+
+    var assertionBase64: String {
+        assertion.base64EncodedString()
+    }
+
+    var finalHashBase64: String {
+        finalHash.base64EncodedString()
+    }
+}
+        </excerpt>
+      </section>
+      <section>
+        <name>Recording Interruption Flow</name>
+        <excerpt>
+Recording in progress (8 seconds elapsed)
+         |
+         V  [Phone call / App backgrounded]
+         |
++--------------------+
+| Interruption       |
+| Detected           |
++--------------------+
+         |
+         V
++--------------------+
+| Check last         |
+| checkpoint         |
+| (5s = checkpoint 0)|
++--------------------+
+         |
+         V
++--------------------+
+| Sign checkpoint    |
+| hash with          |
+| DCAppAttest        |
++--------------------+
+         |
+         V
++--------------------+
+| Save partial       |
+| VideoCapture       |
+| isPartial = true   |
+| checkpointIndex = 0|
++--------------------+
+        </excerpt>
+      </section>
+    </relevant-sections>
+  </epic-context>
+
+  <documentation-artifacts>
+    <artifact>
+      <path>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md</path>
+      <type>Technical Specification</type>
+      <description>Complete Epic 7 tech spec including VideoAttestationService design, data models, acceptance criteria, and workflows</description>
+      <relevant-for>Service design patterns, data structures, acceptance criteria validation</relevant-for>
+    </artifact>
+    <artifact>
+      <path>docs/sprint-artifacts/stories/7-4-frame-hash-chain.md</path>
+      <type>Previous Story</type>
+      <description>Story 7-4: Frame Hash Chain implementation with HashChainService and HashChainData structures</description>
+      <relevant-for>Understanding hash chain data structures, checkpoint mechanism, testing patterns</relevant-for>
+    </artifact>
+    <artifact>
+      <path>docs/sprint-artifacts/stories/2-3-dcappattest-integration.md</path>
+      <type>Previous Story</type>
+      <description>Story 2-3: DCAppAttest Integration with CaptureAssertionService patterns</description>
+      <relevant-for>Assertion service integration patterns, error handling, testing approach</relevant-for>
+    </artifact>
+    <artifact>
+      <path>docs/sprint-artifacts/stories/7-1-arkit-video-recording-session.md</path>
+      <type>Previous Story</type>
+      <description>Story 7-1: ARKit Video Recording Session with VideoRecordingSession implementation</description>
+      <relevant-for>Recording lifecycle, interruption handling, integration points</relevant-for>
+    </artifact>
+  </documentation-artifacts>
+
+  <existing-code-interfaces>
+    <interface>
+      <file-path>ios/Rial/Core/Crypto/HashChainService.swift</file-path>
+      <type>Actor Service</type>
+      <description>Thread-safe service for computing frame hash chain during video recording</description>
+      <key-interfaces>
+        <interface-method>
+          <signature>func processFrame(rgbBuffer: CVPixelBuffer, depthBuffer: CVPixelBuffer?, timestamp: TimeInterval, frameNumber: Int) -> Data</signature>
+          <description>Process a frame and add to hash chain, returns computed hash for frame</description>
+        </interface-method>
+        <interface-method>
+          <signature>func getChainData() -> HashChainData</signature>
+          <description>Get complete hash chain data including frameHashes, checkpoints, and finalHash</description>
+        </interface-method>
+        <interface-method>
+          <signature>func reset()</signature>
+          <description>Reset all state for new recording</description>
+        </interface-method>
+        <interface-property>
+          <signature>var lastCheckpoint: HashCheckpoint?</signature>
+          <description>Most recent checkpoint for interruption handling</description>
+        </interface-property>
+      </key-interfaces>
+      <data-structures>
+        <structure>
+          <name>HashChainData</name>
+          <definition>
+struct HashChainData: Codable, Sendable {
+    let frameHashes: [Data]              // All frame hashes at 30fps (up to 450)
+    let checkpoints: [HashCheckpoint]    // Checkpoint hashes every 5s (up to 3)
+    let finalHash: Data                  // Last frame hash for attestation (32 bytes)
+    var frameCount: Int { frameHashes.count }
+    var checkpointCount: Int { checkpoints.count }
+}
+          </definition>
+        </structure>
+        <structure>
+          <name>HashCheckpoint</name>
+          <definition>
+struct HashCheckpoint: Codable, Sendable, Equatable {
+    let index: Int                       // Checkpoint index (0=5s, 1=10s, 2=15s)
+    let frameNumber: Int                 // Frame number at checkpoint (150, 300, 450)
+    let hash: Data                       // Chain hash at this checkpoint (32 bytes)
+    let timestamp: TimeInterval          // Video timestamp in seconds
+}
+          </definition>
+        </structure>
+      </data-structures>
+      <usage-notes>
+        <note>Checkpoints are created every 5 seconds (150 frames at 30fps)</note>
+        <note>Checkpoint index: 0=5s, 1=10s, 2=15s</note>
+        <note>Use lastCheckpoint property to get most recent checkpoint on interruption</note>
+        <note>HashChainService is an actor - all methods must be called with await</note>
+      </usage-notes>
+    </interface>
+
+    <interface>
+      <file-path>ios/Rial/Core/Attestation/CaptureAssertionService.swift</file-path>
+      <type>Service Class</type>
+      <description>Service for generating per-capture DCAppAttest assertions (from Story 2-3)</description>
+      <key-interfaces>
+        <interface-method>
+          <signature>func createAssertion(for capture: CaptureData) async throws -> Data</signature>
+          <description>Generate DCAppAttest assertion for capture data. Returns CBOR-encoded signature and counter.</description>
+          <performance-target>Less than 100ms total</performance-target>
+        </interface-method>
+        <interface-property>
+          <signature>var isAvailable: Bool</signature>
+          <description>Check if assertion generation is available on this device</description>
+        </interface-property>
+      </key-interfaces>
+      <internal-dependencies>
+        <dependency>DeviceAttestationService.generateAssertion(keyId, clientData: Data) -> Data</dependency>
+        <dependency>KeychainService for key ID retrieval</dependency>
+      </internal-dependencies>
+      <error-types>
+        <error>
+enum CaptureAssertionError: Error, LocalizedError, Equatable {
+    case attestationKeyNotFound          // Device not registered
+    case assertionGenerationFailed(Error) // DCAppAttest failed
+    case hashComputationFailed           // Hash computation failed
+}
+        </error>
+      </error-types>
+      <usage-notes>
+        <note>Service already handles SHA256 hashing internally via DeviceAttestationService</note>
+        <note>Pass combined data (JPEG + depth for photos, hash for videos)</note>
+        <note>Assertion counter increments with each call (prevents replay)</note>
+      </usage-notes>
+    </interface>
+
+    <interface>
+      <file-path>ios/Rial/Core/Capture/VideoRecordingSession.swift</file-path>
+      <type>Class</type>
+      <description>Coordinates ARKit video recording with AVAssetWriter</description>
+      <key-interfaces>
+        <interface-method>
+          <signature>func startRecording() async throws</signature>
+          <description>Start video recording, initializes AVAssetWriter and begins capturing frames</description>
+        </interface-method>
+        <interface-method>
+          <signature>func stopRecording() async throws -> VideoRecordingResult</signature>
+          <description>Stop recording and finalize video, returns result with video URL and depth data</description>
+        </interface-method>
+        <interface-method>
+          <signature>func handleInterruption()</signature>
+          <description>Handle session interruption (phone call, backgrounding). Sets wasInterrupted flag and finalizes recording.</description>
+        </interface-method>
+        <interface-property>
+          <signature>var wasInterrupted: Bool</signature>
+          <description>Whether recording was interrupted (set by handleInterruption)</description>
+        </interface-property>
+      </key-interfaces>
+      <data-structures>
+        <structure>
+          <name>VideoRecordingResult</name>
+          <definition>
+struct VideoRecordingResult: Sendable {
+    let videoURL: URL
+    let frameCount: Int
+    let duration: TimeInterval
+    let resolution: (width: Int, height: Int)
+    let codec: String
+    let wasInterrupted: Bool
+    let startedAt: Date
+    let endedAt: Date
+    let depthKeyframeData: DepthKeyframeData?
+    let hashChainData: HashChainData?
+
+    var depthKeyframeCount: Int { depthKeyframeData?.keyframeCount ?? 0 }
+    var finalHash: Data? { hashChainData?.finalHash }
+    var hashCheckpointCount: Int { hashChainData?.checkpointCount ?? 0 }
+}
+          </definition>
+        </structure>
+      </data-structures>
+      <integration-points>
+        <point>
+          <location>Line 283: private let hashChainService = HashChainService()</location>
+          <description>Hash chain service instance for frame-by-frame integrity</description>
+        </point>
+        <point>
+          <location>Line 447: let hashChainData = await hashChainService.getChainData()</location>
+          <description>Finalize hash chain in stopRecording() - this is where attestation should be added</description>
+        </point>
+        <point>
+          <location>Line 507-532: func handleInterruption()</location>
+          <description>ARSession interruption handler - this is where checkpoint attestation should be triggered</description>
+        </point>
+      </integration-points>
+      <usage-notes>
+        <note>VideoRecordingSession already has hashChainService instance</note>
+        <note>Need to add videoAttestationService property and initialize it</note>
+        <note>Call attestCompletedRecording() in stopRecording() for normal completion</note>
+        <note>Call attestInterruptedRecording() in handleInterruption() for interrupted recordings</note>
+        <note>VideoRecordingResult needs to be extended with attestation: VideoAttestation? property</note>
+      </usage-notes>
+    </interface>
+
+    <interface>
+      <file-path>ios/Rial/Core/Attestation/DeviceAttestationService.swift</file-path>
+      <type>Service Class (Pattern Reference)</type>
+      <description>Reference implementation for attestation service patterns from Story 2-3</description>
+      <patterns-to-follow>
+        <pattern>
+          <name>Service initialization with dependencies</name>
+          <example>
+init(keychain: KeychainService = KeychainService()) {
+    self.keychain = keychain
+}
+          </example>
+        </pattern>
+        <pattern>
+          <name>Async method with performance logging</name>
+          <example>
+func generateAssertion(_ keyId: String, clientData: Data) async throws -> Data {
+    let startTime = Date()
+    // ... operation ...
+    let duration = Date().timeIntervalSince(startTime) * 1000
+    if duration > 50 {
+        logger.warning("Assertion took \(duration)ms (target: 50ms)")
+    }
+    return assertion
+}
+          </example>
+        </pattern>
+        <pattern>
+          <name>Error enum with LocalizedError</name>
+          <example>
+enum AttestationError: Error, LocalizedError {
+    case unsupported
+    case keyGenerationFailed(Error)
+    case assertionFailed(Error)
+
+    var errorDescription: String? {
+        switch self {
+        case .unsupported: return "..."
+        case .keyGenerationFailed(let error): return "Failed: \(error.localizedDescription)"
+        }
+    }
+}
+          </example>
+        </pattern>
+        <pattern>
+          <name>Logger setup</name>
+          <example>
+private static let logger = Logger(subsystem: "app.rial", category: "videoattestation")
+          </example>
+        </pattern>
+      </patterns-to-follow>
+    </interface>
+
+    <interface>
+      <file-path>ios/Rial/Features/Result/ResultDetailView.swift</file-path>
+      <type>SwiftUI View</type>
+      <description>Detail view for capture results - needs partial video display support</description>
+      <integration-points>
+        <point>
+          <location>Line 81-113: uploadedContent</location>
+          <description>Content displayed for uploaded captures - needs to check isPartial flag and show partial verification status</description>
+        </point>
+      </integration-points>
+      <required-changes>
+        <change>Check capture.attestation?.isPartial flag</change>
+        <change>Display "Verified: Xs of Ys recorded" for partial videos</change>
+        <change>Show checkpoint index and verified frame count</change>
+        <change>Use badge/pill UI component for visibility</change>
+      </required-changes>
+    </interface>
+  </existing-code-interfaces>
+
+  <development-constraints>
+    <constraint>
+      <type>Architecture Decision</type>
+      <description>Reuse CaptureAssertionService from Story 2-3 for consistency</description>
+      <rationale>Same DCAppAttest flow for photos and videos, consistent counter management, established error handling patterns</rationale>
+      <impact>VideoAttestationService wraps CaptureAssertionService instead of calling DCAppAttest directly</impact>
+    </constraint>
+
+    <constraint>
+      <type>Data Model</type>
+      <description>VideoAttestation must include both normal and partial recording metadata</description>
+      <fields>
+        <field name="finalHash">Hash that was attested (final or checkpoint)</field>
+        <field name="assertion">DCAppAttest signature data</field>
+        <field name="durationMs">Attested duration (may be partial)</field>
+        <field name="frameCount">Attested frame count (may be partial)</field>
+        <field name="isPartial">True if interrupted</field>
+        <field name="checkpointIndex">Which checkpoint if partial, nil otherwise</field>
+      </fields>
+    </constraint>
+
+    <constraint>
+      <type>Performance</type>
+      <description>Attestation must not block recording or UI</description>
+      <targets>
+        <target>Normal attestation: Less than 100ms (after recording complete, not on critical path)</target>
+        <target>Interrupted attestation: Less than 200ms (during interruption handling)</target>
+        <target>Logging performance timing for both paths</target>
+      </targets>
+    </constraint>
+
+    <constraint>
+      <type>Error Handling</type>
+      <description>Attestation failures should not prevent video save</description>
+      <behavior>Log errors but allow VideoRecordingResult to be created without attestation (attestation: nil)</behavior>
+      <rationale>User should not lose video evidence due to attestation service failures</rationale>
+    </constraint>
+
+    <constraint>
+      <type>Thread Safety</type>
+      <description>VideoAttestationService can be a class (not actor) since CaptureAssertionService provides thread safety</description>
+      <rationale>CaptureAssertionService already handles async operations safely. No shared mutable state in VideoAttestationService.</rationale>
+    </constraint>
+
+    <constraint>
+      <type>Checkpoint Selection Logic</type>
+      <description>On interruption, use last COMPLETED checkpoint, not partial frames</description>
+      <algorithm>
+        <step>Get hashChainData.checkpoints array</step>
+        <step>If checkpoints.isEmpty, return error (no checkpoint available)</step>
+        <step>Use checkpoints.last (most recent completed checkpoint)</step>
+        <step>Attest checkpoint.hash (not finalHash)</step>
+        <step>Set durationMs from checkpoint.timestamp (not interrupted time)</step>
+        <step>Set frameCount from checkpoint.frameNumber (not total frames)</step>
+      </algorithm>
+    </constraint>
+
+    <constraint>
+      <type>Logging Strategy</type>
+      <description>Follow Story 7-4 logging pattern with hash prefixes</description>
+      <requirements>
+        <requirement>Include hash prefix (first 8 chars hex) in logs for debugging</requirement>
+        <requirement>Log normal attestation completion with frame count and duration</requirement>
+        <requirement>Log checkpoint attestation with index and verified duration</requirement>
+        <requirement>Log attestation failures with error details</requirement>
+        <requirement>Add performance timing for attestation generation</requirement>
+      </requirements>
+    </constraint>
+  </development-constraints>
+
+  <dependencies>
+    <external-dependency>
+      <name>DCAppAttest</name>
+      <version>iOS 14+</version>
+      <usage>Device attestation via CaptureAssertionService wrapper</usage>
+      <notes>Physical device required for integration tests</notes>
+    </external-dependency>
+
+    <external-dependency>
+      <name>CryptoKit</name>
+      <version>iOS 15+</version>
+      <usage>SHA256 hashing (handled by CaptureAssertionService)</usage>
+    </external-dependency>
+
+    <external-dependency>
+      <name>Foundation</name>
+      <version>iOS 15+</version>
+      <usage>Data, Date, UUID, Codable</usage>
+    </external-dependency>
+
+    <external-dependency>
+      <name>os.log</name>
+      <version>iOS 15+</version>
+      <usage>Logger for observability</usage>
+    </external-dependency>
+
+    <internal-dependency>
+      <name>CaptureAssertionService</name>
+      <location>ios/Rial/Core/Attestation/CaptureAssertionService.swift</location>
+      <usage>Generate DCAppAttest assertions (Story 2-3)</usage>
+      <methods-used>
+        <method>createAssertion(for: CaptureData) async throws -> Data</method>
+      </methods-used>
+      <notes>Will need to add method: generateAssertion(hash: Data) async throws -> Data for video hash signing</notes>
+    </internal-dependency>
+
+    <internal-dependency>
+      <name>HashChainService</name>
+      <location>ios/Rial/Core/Crypto/HashChainService.swift</location>
+      <usage>Provides hash chain data and checkpoints (Story 7-4)</usage>
+      <methods-used>
+        <method>getChainData() -> HashChainData</method>
+      </methods-used>
+    </internal-dependency>
+
+    <internal-dependency>
+      <name>VideoRecordingSession</name>
+      <location>ios/Rial/Core/Capture/VideoRecordingSession.swift</location>
+      <usage>Integration point for attestation during recording lifecycle (Story 7-1)</usage>
+      <integration-required>
+        <step>Add videoAttestationService property</step>
+        <step>Call attestCompletedRecording() in stopRecording()</step>
+        <step>Call attestInterruptedRecording() in handleInterruption()</step>
+        <step>Extend VideoRecordingResult with attestation property</step>
+      </integration-required>
+    </internal-dependency>
+  </dependencies>
+
+  <testing-context>
+    <test-framework>XCTest</test-framework>
+    <test-file-location>ios/RialTests/Attestation/VideoAttestationServiceTests.swift</test-file-location>
+
+    <testing-patterns>
+      <pattern>
+        <name>Mock Service for Unit Tests</name>
+        <description>Use MockCaptureAssertionService to simulate assertion generation without device</description>
+        <example-from>ios/RialTests/Attestation/CaptureAssertionServiceTests.swift</example-from>
+        <code>
+var sut: VideoAttestationService!
+var mockAssertionService: MockCaptureAssertionService!
+
+override func setUp() {
+    super.setUp()
+    mockAssertionService = MockCaptureAssertionService()
+    sut = VideoAttestationService(assertionService: mockAssertionService)
+}
+        </code>
+      </pattern>
+
+      <pattern>
+        <name>XCTSkip for Device-Only Tests</name>
+        <description>Skip integration tests on simulator using XCTSkip</description>
+        <example-from>ios/RialTests/Attestation/DeviceAttestationServiceTests.swift</example-from>
+        <code>
+func testRealAttestationOnDevice() async throws {
+    #if targetEnvironment(simulator)
+    throw XCTSkip("DCAppAttest not available on simulator")
+    #else
+    // Real device test...
+    #endif
+}
+        </code>
+      </pattern>
+
+      <pattern>
+        <name>Test Fixture Creation</name>
+        <description>Create test fixtures for HashChainData with known values</description>
+        <code>
+func createMockHashChainData(frameCount: Int = 450, checkpointCount: Int = 3) -> HashChainData {
+    let frameHashes = (0..&lt;frameCount).map { _ in Data(repeating: 0x42, count: 32) }
+    let checkpoints = (0..&lt;checkpointCount).map { index in
+        HashCheckpoint(
+            index: index,
+            frameNumber: (index + 1) * 150,
+            hash: Data(repeating: UInt8(index), count: 32),
+            timestamp: TimeInterval((index + 1) * 5)
+        )
+    }
+    return HashChainData(
+        frameHashes: frameHashes,
+        checkpoints: checkpoints,
+        finalHash: frameHashes.last ?? Data()
+    )
+}
+        </code>
+      </pattern>
+
+      <pattern>
+        <name>Codable Testing</name>
+        <description>Test Codable conformance for data structures</description>
+        <code>
+func testVideoAttestationCodable() throws {
+    let attestation = VideoAttestation(
+        finalHash: Data(repeating: 0x42, count: 32),
+        assertion: Data(repeating: 0x43, count: 1024),
+        durationMs: 15000,
+        frameCount: 450,
+        isPartial: false,
+        checkpointIndex: nil
+    )
+
+    let encoder = JSONEncoder()
+    let data = try encoder.encode(attestation)
+
+    let decoder = JSONDecoder()
+    let decoded = try decoder.decode(VideoAttestation.self, from: data)
+
+    XCTAssertEqual(decoded, attestation)
+}
+        </code>
+      </pattern>
+
+      <pattern>
+        <name>Performance Timing Assertions</name>
+        <description>Verify operations complete within target time</description>
+        <code>
+func testAttestationPerformance() async throws {
+    let hashChainData = createMockHashChainData()
+
+    let startTime = Date()
+    _ = try await sut.attestCompletedRecording(hashChainData: hashChainData, durationMs: 15000)
+    let duration = Date().timeIntervalSince(startTime)
+
+    XCTAssertLessThan(duration, 0.1, "Attestation should complete in less than 100ms")
+}
+        </code>
+      </pattern>
+    </testing-patterns>
+
+    <test-requirements>
+      <unit-tests>
+        <test>Test normal completion attestation succeeds</test>
+        <test>Test completed attestation has isPartial=false</test>
+        <test>Test completed attestation has nil checkpointIndex</test>
+        <test>Test completed attestation frame count matches hash chain</test>
+        <test>Test interrupted attestation uses last checkpoint</test>
+        <test>Test interrupted attestation has isPartial=true</test>
+        <test>Test interrupted attestation has correct checkpointIndex</test>
+        <test>Test interrupted attestation frame count matches checkpoint</test>
+        <test>Test interrupted attestation duration matches checkpoint timestamp</test>
+        <test>Test interrupted recording with no checkpoints returns error</test>
+        <test>Test attestation service propagates assertion service errors</test>
+        <test>Test VideoAttestation Codable conformance (encode/decode)</test>
+        <test>Test VideoAttestation Equatable conformance</test>
+        <test>Test assertionBase64 property encoding</test>
+        <test>Test finalHashBase64 property encoding</test>
+      </unit-tests>
+
+      <integration-tests>
+        <test device-required="true">Test full recording flow with attestation (device only)</test>
+        <test device-required="true">Test recording with interruption at 12s attestation (device only)</test>
+        <test device-required="true">Test attestation assertion is valid DCAppAttest signature (device only)</test>
+        <test device-required="true">Test multiple recordings increment assertion counter (device only)</test>
+        <test device-required="true">Test checkpoint attestation at 5s, 10s boundaries (device only)</test>
+      </integration-tests>
+
+      <coverage-target>80% for VideoAttestationService</coverage-target>
+    </test-requirements>
+
+    <test-data>
+      <mock-hash-chain>
+        <description>Mock HashChainData for testing</description>
+        <frame-count>450</frame-count>
+        <checkpoint-count>3</checkpoint-count>
+        <checkpoint-intervals>5s, 10s, 15s (frames 150, 300, 450)</checkpoint-intervals>
+      </mock-hash-chain>
+
+      <mock-assertion>
+        <description>Mock DCAppAttest assertion data</description>
+        <size>1024 bytes</size>
+        <format>CBOR-encoded signature + counter</format>
+      </mock-assertion>
+    </test-data>
+  </testing-context>
+
+  <implementation-notes>
+    <note priority="high">
+      <title>CaptureAssertionService Extension Required</title>
+      <description>
+        CaptureAssertionService currently only has createAssertion(for: CaptureData) method.
+        Need to add generateAssertion(hash: Data) method for video hash signing.
+
+        Alternative approach: Create wrapper that constructs a temporary CaptureData with hash as JPEG field.
+
+        Recommended: Add generateAssertion(hash: Data) method to CaptureAssertionService for cleaner API.
+      </description>
+    </note>
+
+    <note priority="high">
+      <title>Checkpoint Selection Algorithm</title>
+      <description>
+        When recording interrupted at arbitrary time (e.g., 12.3s):
+        1. hashChainData.checkpoints = [checkpoint0(5s), checkpoint1(10s)]
+        2. Use checkpoints.last → checkpoint1 at 10s
+        3. Attest checkpoint1.hash (NOT finalHash)
+        4. Set durationMs = 10000 (NOT 12300)
+        5. Set frameCount = 300 (NOT 369)
+        6. Discard frames 301-369 (not at checkpoint boundary)
+      </description>
+    </note>
+
+    <note priority="medium">
+      <title>Error Handling Strategy</title>
+      <description>
+        Attestation failures should not prevent video save:
+        - Wrap attestation calls in do-catch
+        - Log errors with full context
+        - Set VideoRecordingResult.attestation = nil on failure
+        - User can still view/upload video without attestation
+        - Backend will note missing attestation in confidence score
+      </description>
+    </note>
+
+    <note priority="medium">
+      <title>Base64 Encoding Properties</title>
+      <description>
+        VideoAttestation includes computed properties for base64 encoding:
+        - assertionBase64: String → for JSON serialization
+        - finalHashBase64: String → for logging and metadata
+
+        These are used in VideoMetadata for upload.
+      </description>
+    </note>
+
+    <note priority="low">
+      <title>Partial Video Preview UI</title>
+      <description>
+        ResultDetailView needs to check isPartial flag and display:
+        - "Verified: 10s of 12s recorded" (checkpoint.timestamp vs total duration)
+        - Checkpoint index: "Checkpoint 1 (10s)"
+        - Verified frame count: "300 frames verified"
+
+        Consider using badge/pill UI for visibility.
+      </description>
+    </note>
+
+    <note priority="low">
+      <title>Assertion Counter Management</title>
+      <description>
+        CaptureAssertionService manages counter state in Keychain (from Story 2-3).
+        Each attestation (photo, video completion, checkpoint) increments counter.
+        Counter prevents replay attacks - backend verifies counter is incrementing.
+      </description>
+    </note>
+  </implementation-notes>
+
+  <validation-checklist>
+    <validation-step>
+      <id>1</id>
+      <description>VideoAttestationService.swift created in ios/Rial/Core/Attestation/</description>
+      <acceptance-criteria>File exists with proper structure</acceptance-criteria>
+    </validation-step>
+
+    <validation-step>
+      <id>2</id>
+      <description>VideoAttestation struct defined with all required fields</description>
+      <acceptance-criteria>Includes finalHash, assertion, durationMs, frameCount, isPartial, checkpointIndex, Codable, Equatable</acceptance-criteria>
+    </validation-step>
+
+    <validation-step>
+      <id>3</id>
+      <description>Normal recording attestation implemented</description>
+      <acceptance-criteria>attestCompletedRecording() signs finalHash with isPartial=false</acceptance-criteria>
+    </validation-step>
+
+    <validation-step>
+      <id>4</id>
+      <description>Interrupted recording attestation implemented</description>
+      <acceptance-criteria>attestInterruptedRecording() signs last checkpoint hash with isPartial=true</acceptance-criteria>
+    </validation-step>
+
+    <validation-step>
+      <id>5</id>
+      <description>VideoRecordingSession integration complete</description>
+      <acceptance-criteria>Calls attestation in stopRecording() and handleInterruption()</acceptance-criteria>
+    </validation-step>
+
+    <validation-step>
+      <id>6</id>
+      <description>VideoRecordingResult extended with attestation</description>
+      <acceptance-criteria>Has attestation: VideoAttestation? property</acceptance-criteria>
+    </validation-step>
+
+    <validation-step>
+      <id>7</id>
+      <description>Error handling comprehensive</description>
+      <acceptance-criteria>VideoAttestationError enum with all cases, LocalizedError conformance</acceptance-criteria>
+    </validation-step>
+
+    <validation-step>
+      <id>8</id>
+      <description>Logging and diagnostics complete</description>
+      <acceptance-criteria>Logs attestation success/failure, hash prefixes, performance timing</acceptance-criteria>
+    </validation-step>
+
+    <validation-step>
+      <id>9</id>
+      <description>Unit tests passing</description>
+      <acceptance-criteria>VideoAttestationServiceTests.swift with 15+ tests, 80%+ coverage</acceptance-criteria>
+    </validation-step>
+
+    <validation-step>
+      <id>10</id>
+      <description>Integration tests on device</description>
+      <acceptance-criteria>Real DCAppAttest assertions for normal and interrupted recordings</acceptance-criteria>
+    </validation-step>
+
+    <validation-step>
+      <id>11</id>
+      <description>Preview UI updated for partial videos</description>
+      <acceptance-criteria>ResultDetailView shows "Verified: Xs of Ys" for partial recordings</acceptance-criteria>
+    </validation-step>
+
+    <validation-step>
+      <id>12</id>
+      <description>No lint errors</description>
+      <acceptance-criteria>SwiftLint passes with no new warnings</acceptance-criteria>
+    </validation-step>
+  </validation-checklist>
+
+  <next-steps>
+    <step>Story 7-6: Video Metadata Collection - Assemble complete VideoMetadata with attestation data</step>
+    <step>Story 7-7: Video Local Processing Pipeline - Package video, depth, hash chain, attestation for upload</step>
+    <step>Story 7-10: Video Hash Chain Verification (Backend) - Verify attestation signatures</step>
+  </next-steps>
+</story-context>

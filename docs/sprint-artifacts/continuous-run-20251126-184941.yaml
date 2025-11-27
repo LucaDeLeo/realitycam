@@ -14,16 +14,14 @@ configuration:
   auto_push: true
 
 checkpoint:
-  story_key: 7-4-frame-hash-chain
+  story_key: 7-6-video-metadata-collection
   phase: starting
-  saved_at: 2025-11-26T19:35:00Z
+  saved_at: 2025-11-26T22:30:00Z
   data: null
 
 epics_contexted: []
 
 stories_pending:
-  - 7-4-frame-hash-chain
-  - 7-5-video-attestation-checkpoints
   - 7-6-video-metadata-collection
   - 7-7-video-local-processing-pipeline
   - 7-8-video-upload-endpoint
@@ -53,10 +51,22 @@ stories_processed:
     review_cycles: 1
     started_at: 2025-11-26T19:20:00Z
     completed_at: 2025-11-26T19:35:00Z
+  - story_key: 7-4-frame-hash-chain
+    status: success
+    commit: fdf131e
+    review_cycles: 1
+    started_at: 2025-11-26T19:35:00Z
+    completed_at: 2025-11-26T19:50:00Z
+  - story_key: 7-5-video-attestation-checkpoints
+    status: success
+    commit: 16885f3
+    review_cycles: 2
+    started_at: 2025-11-26T19:50:00Z
+    completed_at: 2025-11-26T22:30:00Z
 
 statistics:
   epics_contexted_jit: 0
   epics_already_contexted: 1
   total_stories: 14
-  success_count: 3
+  success_count: 5
   failed_count: 0

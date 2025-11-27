@@ -250,6 +250,9 @@ public final class VideoRecordingSession: NSObject {
     /// Whether recording was interrupted
     public private(set) var wasInterrupted: Bool = false
 
+    /// Attestation generated during interruption (for checkpoint attestation)
+    private var interruptedAttestation: VideoAttestation?
+
     // MARK: - Callbacks
 
     /// Callback invoked for each processed frame during recording.
@@ -282,13 +285,25 @@ public final class VideoRecordingSession: NSObject {
     /// Hash chain service for frame-by-frame cryptographic integrity
     private let hashChainService = HashChainService()
 
+    /// Video attestation service for signing hash chains
+    private let videoAttestationService: VideoAttestationService
+
     // MARK: - Initialization
 
     /// Creates a new VideoRecordingSession.
     ///
-    /// - Parameter arCaptureSession: The ARCaptureSession to record from.
+    /// - Parameters:
+    ///   - arCaptureSession: The ARCaptureSession to record from.
     public init(arCaptureSession: ARCaptureSession) {
         self.arCaptureSession = arCaptureSession
+
+        // Initialize attestation service
+        let captureAssertionService = CaptureAssertionService(
+            attestation: DeviceAttestationService(),
+            keychain: KeychainService()
+        )
+        self.videoAttestationService = VideoAttestationService(assertionService: captureAssertionService)
+
         super.init()
         Self.logger.debug("VideoRecordingSession initialized")
     }
@@ -326,6 +341,7 @@ public final class VideoRecordingSession: NSObject {
         startTimestamp = nil
         recordingStartTime = nil
         wasInterrupted = false
+        interruptedAttestation = nil
         hasConfiguredDimensions = false
 
         // Initialize depth keyframe buffer for new recording
@@ -447,6 +463,28 @@ public final class VideoRecordingSession: NSObject {
         let hashChainData = await hashChainService.getChainData()
         let hashChainFrameCount = hashChainData.frameCount
 
+        // Generate video attestation
+        // Use interrupted attestation if available (generated during handleInterruption),
+        // otherwise generate normal completion attestation
+        var attestation: VideoAttestation?
+        if let interrupted = interruptedAttestation {
+            attestation = interrupted
+            interruptedAttestation = nil  // Clear for next recording
+            Self.logger.info("Using interrupted attestation (checkpoint \(interrupted.checkpointIndex ?? -1))")
+        } else if hashChainFrameCount > 0 {
+            do {
+                let durationMs = Int64(self.duration * 1000)
+                attestation = try await videoAttestationService.attestCompletedRecording(
+                    hashChainData: hashChainData,
+                    durationMs: durationMs
+                )
+                Self.logger.info("Video attestation generated successfully")
+            } catch {
+                Self.logger.error("Failed to generate video attestation: \(error.localizedDescription)")
+                // Don't fail the recording - attestation is optional
+            }
+        }
+
         let duration = self.duration
         Self.logger.info("Recording complete - \(finalFrameCount) frames, \(depthKeyframeCount) depth keyframes, \(hashChainFrameCount) hashes, \(String(format: "%.1f", duration))s, output: \(outputURL.lastPathComponent)")
 
@@ -473,7 +511,8 @@ public final class VideoRecordingSession: NSObject {
             startedAt: startTime,
             endedAt: endTime,
             depthKeyframeData: depthData,
-            hashChainData: hashChainData.frameCount > 0 ? hashChainData : nil
+            hashChainData: hashChainData.frameCount > 0 ? hashChainData : nil,
+            attestation: attestation
         )
 
         return result
@@ -509,11 +548,35 @@ public final class VideoRecordingSession: NSObject {
 
         wasInterrupted = true
 
+        // Capture interruption time for checkpoint attestation
+        let interruptionDuration = self.duration
+
         recordingQueue.async { [weak self] in
             guard let self = self, self.state == .recording else { return }
 
-            // Finalize what we have
+            // Generate checkpoint attestation before finalization
             Task {
+                // Get hash chain data for checkpoint attestation
+                let hashChainData = await self.hashChainService.getChainData()
+
+                if hashChainData.checkpoints.isEmpty {
+                    Self.logger.warning("No checkpoints available for interrupted recording at \(String(format: "%.1f", interruptionDuration))s")
+                } else {
+                    // Attempt to generate checkpoint attestation
+                    do {
+                        let interruptedAtMs = Int64(interruptionDuration * 1000)
+                        self.interruptedAttestation = try await self.videoAttestationService.attestInterruptedRecording(
+                            hashChainData: hashChainData,
+                            interruptedAt: interruptedAtMs
+                        )
+                        Self.logger.info("Checkpoint attestation generated for interrupted recording")
+                    } catch {
+                        Self.logger.error("Failed to generate checkpoint attestation: \(error.localizedDescription)")
+                        // Don't fail the interruption handling - continue to save what we have
+                    }
+                }
+
+                // Finalize what we have
                 do {
                     _ = try await self.stopRecording()
                     DispatchQueue.main.async {
@@ -778,6 +841,9 @@ public struct VideoRecordingResult: Sendable {
     /// Hash chain data for frame-by-frame cryptographic integrity (optional)
     public let hashChainData: HashChainData?
 
+    /// Video attestation (DCAppAttest signature, optional if attestation failed)
+    let attestation: VideoAttestation?
+
     /// Number of depth keyframes captured (convenience property)
     public var depthKeyframeCount: Int {
         depthKeyframeData?.keyframeCount ?? 0
@@ -791,5 +857,18 @@ public struct VideoRecordingResult: Sendable {
     /// Number of hash chain checkpoints (convenience property)
     public var hashCheckpointCount: Int {
         hashChainData?.checkpointCount ?? 0
+    }
+
+    /// Whether this is a partial recording (convenience property)
+    public var isPartial: Bool {
+        attestation?.isPartial ?? false
+    }
+
+    /// Verified duration in seconds (uses checkpoint duration if partial)
+    public var verifiedDuration: TimeInterval {
+        if let attestation = attestation {
+            return TimeInterval(attestation.durationMs) / 1000.0
+        }
+        return duration
     }
 }
