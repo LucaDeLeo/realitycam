@@ -29,6 +29,25 @@ pub fn depth_map_s3_key(capture_id: Uuid) -> String {
     format!("captures/{capture_id}/depth.gz")
 }
 
+/// Generates the S3 key for a capture's video file
+/// Pattern: captures/{capture_id}/video.mp4
+pub fn video_s3_key(capture_id: Uuid) -> String {
+    format!("captures/{capture_id}/video.mp4")
+}
+
+/// Generates the S3 key for a capture's hash chain
+/// Pattern: captures/{capture_id}/hash_chain.json
+pub fn hash_chain_s3_key(capture_id: Uuid) -> String {
+    format!("captures/{capture_id}/hash_chain.json")
+}
+
+/// Generates the S3 key for a video capture's depth data
+/// Pattern: captures/{capture_id}/video_depth.gz
+/// Note: Uses different key from photo depth to avoid collision
+pub fn video_depth_s3_key(capture_id: Uuid) -> String {
+    format!("captures/{capture_id}/video_depth.gz")
+}
+
 // ============================================================================
 // Storage Service
 // ============================================================================
@@ -221,6 +240,190 @@ impl StorageService {
         &self.bucket
     }
 
+    /// Uploads a video file to S3
+    ///
+    /// # Arguments
+    /// * `capture_id` - Unique capture identifier
+    /// * `video_bytes` - Raw video file data (MP4/MOV)
+    ///
+    /// # Returns
+    /// The S3 key where the video was stored
+    pub async fn upload_video(
+        &self,
+        capture_id: Uuid,
+        video_bytes: Vec<u8>,
+    ) -> Result<String, ApiError> {
+        let key = video_s3_key(capture_id);
+        let size = video_bytes.len();
+
+        info!(
+            capture_id = %capture_id,
+            key = %key,
+            size_bytes = size,
+            "Uploading video to S3"
+        );
+
+        self.client
+            .put_object()
+            .bucket(&self.bucket)
+            .key(&key)
+            .body(ByteStream::from(video_bytes))
+            .content_type("video/mp4")
+            .send()
+            .await
+            .map_err(|e| {
+                warn!(
+                    capture_id = %capture_id,
+                    error = %e,
+                    "Failed to upload video to S3"
+                );
+                ApiError::StorageError("Failed to upload video".to_string())
+            })?;
+
+        info!(
+            capture_id = %capture_id,
+            key = %key,
+            "Video uploaded successfully"
+        );
+
+        Ok(key)
+    }
+
+    /// Uploads video depth data to S3
+    ///
+    /// # Arguments
+    /// * `capture_id` - Unique capture identifier
+    /// * `depth_bytes` - Gzipped depth keyframe data
+    ///
+    /// # Returns
+    /// The S3 key where the depth data was stored
+    pub async fn upload_video_depth(
+        &self,
+        capture_id: Uuid,
+        depth_bytes: Vec<u8>,
+    ) -> Result<String, ApiError> {
+        let key = video_depth_s3_key(capture_id);
+        let size = depth_bytes.len();
+
+        info!(
+            capture_id = %capture_id,
+            key = %key,
+            size_bytes = size,
+            "Uploading video depth data to S3"
+        );
+
+        self.client
+            .put_object()
+            .bucket(&self.bucket)
+            .key(&key)
+            .body(ByteStream::from(depth_bytes))
+            .content_type("application/gzip")
+            .send()
+            .await
+            .map_err(|e| {
+                warn!(
+                    capture_id = %capture_id,
+                    error = %e,
+                    "Failed to upload video depth data to S3"
+                );
+                ApiError::StorageError("Failed to upload video depth data".to_string())
+            })?;
+
+        info!(
+            capture_id = %capture_id,
+            key = %key,
+            "Video depth data uploaded successfully"
+        );
+
+        Ok(key)
+    }
+
+    /// Uploads hash chain JSON to S3
+    ///
+    /// # Arguments
+    /// * `capture_id` - Unique capture identifier
+    /// * `hash_chain_bytes` - JSON hash chain data
+    ///
+    /// # Returns
+    /// The S3 key where the hash chain was stored
+    pub async fn upload_hash_chain(
+        &self,
+        capture_id: Uuid,
+        hash_chain_bytes: Vec<u8>,
+    ) -> Result<String, ApiError> {
+        let key = hash_chain_s3_key(capture_id);
+        let size = hash_chain_bytes.len();
+
+        info!(
+            capture_id = %capture_id,
+            key = %key,
+            size_bytes = size,
+            "Uploading hash chain to S3"
+        );
+
+        self.client
+            .put_object()
+            .bucket(&self.bucket)
+            .key(&key)
+            .body(ByteStream::from(hash_chain_bytes))
+            .content_type("application/json")
+            .send()
+            .await
+            .map_err(|e| {
+                warn!(
+                    capture_id = %capture_id,
+                    error = %e,
+                    "Failed to upload hash chain to S3"
+                );
+                ApiError::StorageError("Failed to upload hash chain".to_string())
+            })?;
+
+        info!(
+            capture_id = %capture_id,
+            key = %key,
+            "Hash chain uploaded successfully"
+        );
+
+        Ok(key)
+    }
+
+    /// Uploads all video capture files to S3 in parallel
+    ///
+    /// # Arguments
+    /// * `capture_id` - Unique capture identifier
+    /// * `video_bytes` - Raw video file data
+    /// * `depth_bytes` - Gzipped depth keyframe data
+    /// * `hash_chain_bytes` - JSON hash chain data
+    ///
+    /// # Returns
+    /// Tuple of (video_s3_key, depth_s3_key, hash_chain_s3_key)
+    pub async fn upload_video_files(
+        &self,
+        capture_id: Uuid,
+        video_bytes: Vec<u8>,
+        depth_bytes: Vec<u8>,
+        hash_chain_bytes: Vec<u8>,
+    ) -> Result<(String, String, String), ApiError> {
+        // Clone self for parallel uploads
+        let storage_video = self.clone();
+        let storage_depth = self.clone();
+        let storage_hash = self.clone();
+
+        // Upload in parallel
+        let (video_result, depth_result, hash_result) = tokio::join!(
+            storage_video.upload_video(capture_id, video_bytes),
+            storage_depth.upload_video_depth(capture_id, depth_bytes),
+            storage_hash.upload_hash_chain(capture_id, hash_chain_bytes),
+        );
+
+        // Handle results
+        let video_key = video_result?;
+        let depth_key = depth_result?;
+        let hash_key = hash_result?;
+
+        Ok((video_key, depth_key, hash_key))
+    }
+
     /// Downloads a depth map from S3
     ///
     /// # Arguments
@@ -305,6 +508,36 @@ mod tests {
         assert_eq!(
             key,
             "captures/550e8400-e29b-41d4-a716-446655440000/depth.gz"
+        );
+    }
+
+    #[test]
+    fn test_video_s3_key() {
+        let capture_id = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+        let key = video_s3_key(capture_id);
+        assert_eq!(
+            key,
+            "captures/550e8400-e29b-41d4-a716-446655440000/video.mp4"
+        );
+    }
+
+    #[test]
+    fn test_hash_chain_s3_key() {
+        let capture_id = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+        let key = hash_chain_s3_key(capture_id);
+        assert_eq!(
+            key,
+            "captures/550e8400-e29b-41d4-a716-446655440000/hash_chain.json"
+        );
+    }
+
+    #[test]
+    fn test_video_depth_s3_key() {
+        let capture_id = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+        let key = video_depth_s3_key(capture_id);
+        assert_eq!(
+            key,
+            "captures/550e8400-e29b-41d4-a716-446655440000/video_depth.gz"
         );
     }
 }

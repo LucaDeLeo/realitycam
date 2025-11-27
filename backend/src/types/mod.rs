@@ -3,11 +3,19 @@
 //! Defines the standard API response format per architecture specification.
 
 pub mod capture;
+pub mod video_capture;
 
 pub use capture::{
     CaptureDetailsResponse, CaptureLocation, CaptureMetadataPayload, CaptureUploadResponse,
     DepthMapDimensions, ParsedCaptureUpload, MAX_DEPTH_DIMENSION, MAX_DEPTH_MAP_SIZE,
     MAX_PHOTO_SIZE,
+};
+
+pub use video_capture::{
+    validate_hash_chain_size, validate_video_depth_size, validate_video_metadata_size,
+    validate_video_size, HashCheckpoint, Resolution, VideoUploadMetadata, VideoUploadResponse,
+    MAX_HASH_CHAIN_SIZE, MAX_VIDEO_DEPTH_SIZE, MAX_VIDEO_METADATA_SIZE, MAX_VIDEO_SIZE,
+    VIDEO_RATE_LIMIT_PER_HOUR,
 };
 
 use chrono::{DateTime, Utc};

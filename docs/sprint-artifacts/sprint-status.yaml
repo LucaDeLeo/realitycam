@@ -122,8 +122,8 @@ development_status:
   7-4-frame-hash-chain: done
   7-5-video-attestation-checkpoints: done
   7-6-video-metadata-collection: done
-  7-7-video-local-processing-pipeline: review
-  7-8-video-upload-endpoint: backlog
+  7-7-video-local-processing-pipeline: done
+  7-8-video-upload-endpoint: in-progress
   7-9-video-depth-analysis-service: backlog
   7-10-video-hash-chain-verification: backlog
   7-11-video-evidence-package: backlog

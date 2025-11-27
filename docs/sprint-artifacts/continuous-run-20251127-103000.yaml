@@ -14,19 +14,28 @@ configuration:
   auto_push: true
 
 checkpoint:
-  story_key: 7-7-video-local-processing-pipeline
+  story_key: 7-8-video-upload-endpoint
   phase: verify
-  saved_at: 2025-11-27T11:15:00Z
+  saved_at: 2025-11-27T11:45:00Z
   data:
-    story_file_path: docs/sprint-artifacts/stories/7-7-video-local-processing-pipeline.md
-    context_file_path: docs/sprint-artifacts/story-contexts/7-7-video-local-processing-pipeline-context.xml
-    validation_attempts: 1
+    story_file_path: docs/sprint-artifacts/stories/7-8-video-upload-endpoint.md
+    context_file_path: docs/sprint-artifacts/story-contexts/7-8-video-upload-endpoint-context.xml
+    validation_attempts: 2
     review_cycles: 1
     files_created:
-      - ios/Rial/Models/ProcessedVideoCapture.swift
-      - ios/Rial/Core/Capture/VideoProcessingPipeline.swift
-      - ios/RialTests/Capture/VideoProcessingPipelineTests.swift
+      - backend/migrations/20251127000001_add_video_captures.sql
+      - backend/src/types/video_capture.rs
+      - backend/src/routes/captures_video.rs
+      - ios/Rial/Core/Storage/VideoCaptureEntity.swift
+      - ios/Rial/Core/Networking/VideoUploadService.swift
     files_modified:
+      - backend/src/types/mod.rs
+      - backend/src/services/storage.rs
+      - backend/src/models/capture.rs
+      - backend/src/routes/mod.rs
+      - backend/src/routes/captures.rs
+      - ios/Rial/Core/Storage/CaptureStore.swift
+      - ios/Rial/App/AppDelegate.swift
       - ios/Rial.xcodeproj/project.pbxproj
     verification:
       typecheck: pass
@@ -36,7 +45,6 @@ checkpoint:
 epics_contexted: []
 
 stories_pending:
-  - 7-7-video-local-processing-pipeline
   - 7-8-video-upload-endpoint
   - 7-9-video-depth-analysis-service
   - 7-10-video-hash-chain-verification
@@ -52,10 +60,16 @@ stories_processed:
     review_cycles: 1
     started_at: 2025-11-27T10:30:00Z
     completed_at: 2025-11-27T10:55:00Z
+  - story_key: 7-7-video-local-processing-pipeline
+    status: success
+    commit: fe369cb
+    review_cycles: 1
+    started_at: 2025-11-27T10:56:00Z
+    completed_at: 2025-11-27T11:20:00Z
 
 statistics:
   epics_contexted_jit: 0
   epics_already_contexted: 1
   total_stories: 9
-  success_count: 1
+  success_count: 2
   failed_count: 0

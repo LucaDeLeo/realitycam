@@ -438,6 +438,202 @@ final class CaptureStore {
             .appendingPathComponent("Rial.sqlite")
     }
 
+    // MARK: - Video Capture Methods (Story 7-8)
+
+    /// Save a new video capture to the store.
+    ///
+    /// Creates a VideoCaptureEntity with pending_upload status.
+    ///
+    /// - Parameter capture: ProcessedVideoCapture to save
+    /// - Throws: `CaptureStoreError` if save fails
+    func saveVideoCapture(_ capture: ProcessedVideoCapture) async throws {
+        let context = container.newBackgroundContext()
+
+        try await context.perform {
+            let entity = VideoCaptureEntity(context: context)
+            entity.configure(from: capture)
+
+            try context.save()
+        }
+
+        Self.logger.info("Saved video capture: \(capture.id.uuidString, privacy: .public)")
+
+        // Check storage quota after save
+        await checkStorageQuota()
+    }
+
+    /// Fetch a single video capture by ID.
+    ///
+    /// - Parameter id: Video capture UUID
+    /// - Returns: ProcessedVideoCapture if found, nil otherwise
+    func loadVideoCapture(id: UUID) async throws -> ProcessedVideoCapture? {
+        let context = container.viewContext
+
+        return try await context.perform {
+            let request = VideoCaptureEntity.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+            request.fetchLimit = 1
+
+            guard let entity = try context.fetch(request).first else {
+                return nil
+            }
+
+            return entity.toProcessedVideoCapture()
+        }
+    }
+
+    /// Update video capture status.
+    ///
+    /// - Parameters:
+    ///   - status: New status
+    ///   - captureId: Video capture UUID
+    /// - Throws: `CaptureStoreError.notFound` if capture doesn't exist
+    func updateVideoCaptureStatus(_ status: VideoCaptureStatus, for captureId: UUID) async throws {
+        let context = container.newBackgroundContext()
+
+        try await context.perform {
+            let request = VideoCaptureEntity.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", captureId as CVarArg)
+            request.fetchLimit = 1
+
+            guard let entity = try context.fetch(request).first else {
+                throw CaptureStoreError.notFound
+            }
+
+            entity.status = status.rawValue
+
+            if status == .uploading || status == .failed {
+                entity.lastAttemptAt = Date()
+                entity.attemptCount += 1
+            }
+
+            try context.save()
+        }
+
+        Self.logger.info("Updated video capture \(captureId.uuidString, privacy: .public) status to \(status.rawValue)")
+    }
+
+    /// Update video capture with server response after successful upload.
+    ///
+    /// - Parameters:
+    ///   - captureId: Local video capture UUID
+    ///   - serverCaptureId: Server-assigned capture UUID
+    ///   - verificationUrl: Verification page URL
+    func updateVideoUploadResult(
+        for captureId: UUID,
+        serverCaptureId: UUID,
+        verificationUrl: String
+    ) async throws {
+        let context = container.newBackgroundContext()
+
+        try await context.perform {
+            let request = VideoCaptureEntity.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", captureId as CVarArg)
+            request.fetchLimit = 1
+
+            guard let entity = try context.fetch(request).first else {
+                throw CaptureStoreError.notFound
+            }
+
+            entity.status = VideoCaptureStatus.uploaded.rawValue
+            entity.serverCaptureId = serverCaptureId
+            entity.verificationUrl = verificationUrl
+            entity.uploadedAt = Date()
+
+            try context.save()
+        }
+
+        Self.logger.info("Video upload complete for capture \(captureId.uuidString, privacy: .public)")
+    }
+
+    /// Fetch all video captures with pending_upload or failed status.
+    ///
+    /// - Returns: Array of ProcessedVideoCapture ready for upload
+    func pendingVideoUploads() async throws -> [ProcessedVideoCapture] {
+        let context = container.viewContext
+
+        return try await context.perform {
+            let request = VideoCaptureEntity.fetchRequest()
+            request.predicate = NSPredicate(
+                format: "status == %@ OR status == %@",
+                VideoCaptureStatus.pendingUpload.rawValue,
+                VideoCaptureStatus.failed.rawValue
+            )
+            request.sortDescriptors = [NSSortDescriptor(keyPath: \VideoCaptureEntity.createdAt, ascending: true)]
+
+            let entities = try context.fetch(request)
+            return entities.filter { $0.canRetry || $0.status == VideoCaptureStatus.pendingUpload.rawValue }
+                .map { $0.toProcessedVideoCapture() }
+        }
+    }
+
+    /// Fetch all video captures (for history view).
+    ///
+    /// - Returns: Array of all video captures, newest first
+    func fetchAllVideoCaptures() async throws -> [ProcessedVideoCapture] {
+        let context = container.viewContext
+
+        return try await context.perform {
+            let request = VideoCaptureEntity.fetchRequest()
+            request.sortDescriptors = [NSSortDescriptor(keyPath: \VideoCaptureEntity.createdAt, ascending: false)]
+
+            let entities = try context.fetch(request)
+            return entities.map { $0.toProcessedVideoCapture() }
+        }
+    }
+
+    /// Delete a video capture by ID.
+    ///
+    /// Also cleans up the local video file if it exists.
+    ///
+    /// - Parameter id: Video capture UUID
+    func deleteVideoCapture(byId id: UUID) async throws {
+        let context = container.newBackgroundContext()
+
+        var videoURLToDelete: URL?
+
+        try await context.perform {
+            let request = VideoCaptureEntity.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+            request.fetchLimit = 1
+
+            guard let entity = try context.fetch(request).first else {
+                return // Already deleted
+            }
+
+            videoURLToDelete = entity.videoURL
+
+            context.delete(entity)
+            try context.save()
+        }
+
+        // Clean up local video file
+        if let url = videoURLToDelete {
+            try? FileManager.default.removeItem(at: url)
+            Self.logger.debug("Cleaned up video file for capture \(id.uuidString, privacy: .public)")
+        }
+
+        Self.logger.info("Deleted video capture: \(id.uuidString, privacy: .public)")
+    }
+
+    /// Get count of video captures by status.
+    ///
+    /// - Parameter status: Status to count, or nil for all
+    /// - Returns: Number of video captures matching the status
+    func videoCaptureCount(status: VideoCaptureStatus? = nil) async throws -> Int {
+        let context = container.viewContext
+
+        return try await context.perform {
+            let request = VideoCaptureEntity.fetchRequest()
+            if let status = status {
+                request.predicate = NSPredicate(format: "status == %@", status.rawValue)
+            }
+            return try context.count(for: request)
+        }
+    }
+
+    // MARK: - Private Model Creation
+
     /// Create managed object model programmatically.
     ///
     /// This avoids needing an .xcdatamodeld file.
@@ -538,7 +734,10 @@ final class CaptureStore {
             uploadedAtAttr, thumbnailAttr, isEncryptedAttr
         ]
 
-        model.entities = [captureEntity]
+        // VideoCaptureEntity (Story 7-8)
+        let videoCaptureEntity = createVideoCaptureEntityDescription()
+
+        model.entities = [captureEntity, videoCaptureEntity]
         return model
     }
 }

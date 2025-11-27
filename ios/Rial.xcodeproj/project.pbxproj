@@ -77,6 +77,8 @@
 		'3089F9DB0055' = {isa = PBXBuildFile; fileRef = 3089F9DB1077; };
 		'3089F9DB0056' = {isa = PBXBuildFile; fileRef = 3089F9DB1078; };
 		'3089F9DB0057' = {isa = PBXBuildFile; fileRef = 3089F9DB1079; };
+		'3089F9DB0058' = {isa = PBXBuildFile; fileRef = 3089F9DB1080; };
+		'3089F9DB0059' = {isa = PBXBuildFile; fileRef = 3089F9DB1081; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -171,6 +173,8 @@
 		'3089F9DB1077' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessedVideoCapture.swift; sourceTree = "<group>"; };
 		'3089F9DB1078' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoProcessingPipeline.swift; sourceTree = "<group>"; };
 		'3089F9DB1079' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoProcessingPipelineTests.swift; sourceTree = "<group>"; };
+		'3089F9DB1080' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoUploadService.swift; sourceTree = "<group>"; };
+		'3089F9DB1081' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoCaptureEntity.swift; sourceTree = "<group>"; };
 		D9A44E098094F0E08456FEE9 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppEnvironment.swift; path = Rial/Core/Configuration/AppEnvironment.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -361,6 +365,7 @@
 				3089F9DB1046,
 				3089F9DB1045,
 				3089F9DB1042,
+				3089F9DB1080,
 			);
 			path = Networking;
 			sourceTree = "<group>";
@@ -372,6 +377,7 @@
 				3089F9DB1030,
 				3089F9DB1015,
 				3089F9DB1031,
+				3089F9DB1081,
 			);
 			path = Storage;
 			sourceTree = "<group>";
@@ -648,6 +654,8 @@
 				3089F9DB0053,
 				3089F9DB0055,
 				3089F9DB0056,
+				3089F9DB0058,
+				3089F9DB0059,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

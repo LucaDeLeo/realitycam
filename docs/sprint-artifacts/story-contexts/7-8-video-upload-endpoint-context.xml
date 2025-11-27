@@ -1,0 +1,870 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML: 7-8-video-upload-endpoint
+  Generated: 2025-11-27
+  Epic: 7 - Video Capture with LiDAR Depth
+
+  This file provides comprehensive implementation context for Story 7-8.
+  It serves as the single source of truth for story implementation.
+-->
+<story-context version="1.0">
+  <metadata>
+    <story-id>7-8-video-upload-endpoint</story-id>
+    <story-title>Video Upload Endpoint</story-title>
+    <epic-id>7</epic-id>
+    <epic-title>Video Capture with LiDAR Depth</epic-title>
+    <priority>P0</priority>
+    <estimated-effort>L</estimated-effort>
+    <created-at>2025-11-27</created-at>
+  </metadata>
+
+  <!-- ============================================================== -->
+  <!-- STORY REFERENCE                                                -->
+  <!-- ============================================================== -->
+  <story-reference>
+    <file-path>docs/sprint-artifacts/stories/7-8-video-upload-endpoint.md</file-path>
+    <user-story>
+      As a mobile app,
+      I want to upload video captures with depth and attestation data,
+      So that the backend can verify and process them.
+    </user-story>
+    <summary>
+      Implements full video upload pipeline spanning iOS and Rust backend:
+      - iOS VideoUploadService: Background URLSession uploads for ~30-45MB video packages
+      - Backend POST /api/v1/captures/video: Multipart parsing, S3 storage, database record
+      - CoreData persistence for video captures (deferred from Story 7-7)
+    </summary>
+    <acceptance-criteria>
+      <criterion id="AC-7.8.1">Video Upload Endpoint receives multipart/form-data with video, depth_data, hash_chain, metadata parts</criterion>
+      <criterion id="AC-7.8.2">Response returns capture_id, type="video", status="processing", verification_url</criterion>
+      <criterion id="AC-7.8.3">Size limits: video 100MB, depth_data 20MB, hash_chain 1MB, metadata 100KB</criterion>
+      <criterion id="AC-7.8.4">iOS VideoUploadService creates multipart with device auth headers, background URLSession</criterion>
+      <criterion id="AC-7.8.5">CoreData persistence with status tracking: pending_upload, uploading, uploaded, failed</criterion>
+      <criterion id="AC-7.8.6">Rate limiting: 5 videos/hour/device, 429 response with retry-after</criterion>
+      <criterion id="AC-7.8.7">Error handling for network, auth, size, rate limit, and server errors</criterion>
+    </acceptance-criteria>
+    <dependencies>
+      <dependency story-id="7-7" status="complete">ProcessedVideoCapture model from VideoProcessingPipeline</dependency>
+      <dependency story-id="4-1" status="complete">Photo upload endpoint patterns</dependency>
+      <dependency story-id="6-9" status="complete">CoreData CaptureStore patterns</dependency>
+      <dependency story-id="6-12" status="complete" path="docs/sprint-artifacts/stories/6-12-certificate-pinning-retry-logic.md">UploadService background URLSession patterns (see ios/Rial/Core/Networking/UploadService.swift for implementation)</dependency>
+    </dependencies>
+  </story-reference>
+
+  <!-- ============================================================== -->
+  <!-- EPIC CONTEXT                                                   -->
+  <!-- ============================================================== -->
+  <epic-context>
+    <tech-spec-path>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md</tech-spec-path>
+    <architecture-path>docs/architecture.md</architecture-path>
+    <relevant-sections>
+      <section name="APIs and Interfaces - Video Upload Endpoint">
+        POST /api/v1/captures/video with multipart: video, depth_data, hash_chain, metadata
+      </section>
+      <section name="Data Models - VideoUploadMetadata">
+        Rust struct with started_at, ended_at, duration_ms, frame_count, depth_keyframe_count,
+        resolution, codec, device_model, location, attestation_level, hash_chain_final, assertion, checkpoints, is_partial
+      </section>
+      <section name="AC-7.7 Video Upload">
+        Multipart upload with video + depth + chain + metadata, background upload survives app termination
+      </section>
+      <section name="ADR-010 Video Architecture">
+        Separate video endpoint, hash chain integrity, checkpoint attestation, 10fps depth keyframes
+      </section>
+    </relevant-sections>
+  </epic-context>
+
+  <!-- ============================================================== -->
+  <!-- DOCUMENTATION ARTIFACTS                                        -->
+  <!-- ============================================================== -->
+  <documentation-artifacts>
+    <artifact type="story">
+      <path>docs/sprint-artifacts/stories/7-8-video-upload-endpoint.md</path>
+      <description>Full story specification with acceptance criteria and implementation tasks</description>
+    </artifact>
+    <artifact type="tech-spec">
+      <path>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md</path>
+      <description>Epic 7 technical specification with video upload API contract</description>
+    </artifact>
+    <artifact type="architecture">
+      <path>docs/architecture.md</path>
+      <description>System architecture with ADR-010 for video patterns</description>
+    </artifact>
+  </documentation-artifacts>
+
+  <!-- ============================================================== -->
+  <!-- EXISTING CODE INTERFACES                                       -->
+  <!-- ============================================================== -->
+  <existing-code-interfaces>
+
+    <!-- BACKEND: Photo capture endpoint (pattern to follow) -->
+    <interface type="rust-route">
+      <path>backend/src/routes/captures.rs</path>
+      <description>Photo upload endpoint - follow this pattern for video endpoint</description>
+      <key-patterns>
+        <pattern name="multipart-parsing">
+          parse_multipart() function extracts parts with size validation
+        </pattern>
+        <pattern name="device-auth">
+          DeviceContext extension injected by DeviceAuthLayer middleware
+        </pattern>
+        <pattern name="s3-upload">
+          storage.upload_capture_files() for parallel S3 uploads
+        </pattern>
+        <pattern name="database-insert">
+          insert_capture_with_evidence() with InsertCaptureWithEvidenceParams
+        </pattern>
+        <pattern name="response-format">
+          Returns (StatusCode::ACCEPTED, Json(ApiResponse::new(response_data, request_id)))
+        </pattern>
+      </key-patterns>
+      <code-snippet name="router-pattern">
+<![CDATA[
+pub fn router() -> Router<AppState> {
+    Router::new()
+        .route("/", post(upload_capture))
+        .route("/{id}", get(get_capture))
+}
+]]>
+      </code-snippet>
+      <code-snippet name="handler-signature">
+<![CDATA[
+async fn upload_capture(
+    State(state): State<AppState>,
+    Extension(request_id): Extension<Uuid>,
+    Extension(device_ctx): Extension<DeviceContext>,
+    multipart: Multipart,
+) -> Result<(StatusCode, Json<ApiResponse<CaptureUploadResponse>>), ApiErrorWithRequestId>
+]]>
+      </code-snippet>
+    </interface>
+
+    <!-- BACKEND: Capture model -->
+    <interface type="rust-model">
+      <path>backend/src/models/capture.rs</path>
+      <description>Capture entity - needs video-specific fields added</description>
+      <current-fields>
+        id, device_id, target_media_hash, photo_s3_key, depth_map_s3_key,
+        thumbnail_s3_key, evidence, confidence_level, status, location_precise,
+        location_coarse, captured_at, uploaded_at
+      </current-fields>
+      <fields-to-add>
+        capture_type, video_s3_key, hash_chain_s3_key, duration_ms, frame_count, is_partial, checkpoint_index
+      </fields-to-add>
+    </interface>
+
+    <!-- BACKEND: Capture types -->
+    <interface type="rust-types">
+      <path>backend/src/types/capture.rs</path>
+      <description>Request/response types - add video-specific types in new file</description>
+      <constants>
+        MAX_PHOTO_SIZE: 10MB, MAX_DEPTH_MAP_SIZE: 5MB
+      </constants>
+      <video-constants-needed>
+        MAX_VIDEO_SIZE: 100MB, MAX_VIDEO_DEPTH_SIZE: 20MB, MAX_HASH_CHAIN_SIZE: 1MB, MAX_VIDEO_METADATA_SIZE: 100KB
+      </video-constants-needed>
+    </interface>
+
+    <!-- BACKEND: Storage service -->
+    <interface type="rust-service">
+      <path>backend/src/services/storage.rs</path>
+      <description>S3 storage - add video upload methods</description>
+      <existing-methods>
+        upload_photo(), upload_depth_map(), upload_capture_files()
+      </existing-methods>
+      <methods-to-add>
+        upload_video_files(capture_id, video_bytes, depth_bytes, hash_chain_bytes)
+        video_s3_key(capture_id), hash_chain_s3_key(capture_id)
+      </methods-to-add>
+      <code-snippet name="s3-key-pattern">
+<![CDATA[
+pub fn photo_s3_key(capture_id: Uuid) -> String {
+    format!("captures/{capture_id}/photo.jpg")
+}
+// Video pattern:
+// captures/{capture_id}/video.mp4
+// captures/{capture_id}/depth.gz
+// captures/{capture_id}/hash_chain.json
+]]>
+      </code-snippet>
+    </interface>
+
+    <!-- BACKEND: Routes mod -->
+    <interface type="rust-module">
+      <path>backend/src/routes/mod.rs</path>
+      <description>Route registration - add video route</description>
+      <code-snippet name="route-registration">
+<![CDATA[
+// Current captures router:
+let captures_router = captures::router()
+    .with_state(state.clone())
+    .layer(DeviceAuthLayer::new(state.db.clone(), device_auth_config));
+
+// Add video router similarly:
+// .nest("/captures/video", captures_video::router())
+// with same DeviceAuthLayer
+]]>
+      </code-snippet>
+    </interface>
+
+    <!-- BACKEND: Device auth middleware -->
+    <interface type="rust-middleware">
+      <path>backend/src/middleware/device_auth.rs</path>
+      <description>Device authentication - reuse for video endpoint</description>
+      <key-types>
+        DeviceContext { device_id, attestation_level, model, has_lidar, is_verified }
+        DeviceAuthLayer, DeviceAuthConfig
+      </key-types>
+      <headers>
+        X-Device-Id, X-Device-Timestamp, X-Device-Signature
+      </headers>
+    </interface>
+
+    <!-- BACKEND: Database migrations -->
+    <interface type="sql-migration">
+      <path>backend/migrations/20251122000002_create_captures.sql</path>
+      <description>Captures table - needs video columns via new migration</description>
+      <current-schema>
+        id, device_id, target_media_hash, depth_map_key, evidence, confidence_level, status, captured_at, uploaded_at
+      </current-schema>
+      <migration-to-create>
+        <filename>YYYYMMDDHHMMSS_add_video_captures.sql</filename>
+        <columns>
+          capture_type VARCHAR(16) DEFAULT 'photo',
+          video_s3_key VARCHAR(255),
+          hash_chain_s3_key VARCHAR(255),
+          duration_ms BIGINT,
+          frame_count INT,
+          is_partial BOOLEAN DEFAULT FALSE,
+          checkpoint_index INT
+        </columns>
+        <indexes>
+          CREATE INDEX idx_captures_type ON captures(capture_type)
+        </indexes>
+      </migration-to-create>
+    </interface>
+
+    <!-- iOS: ProcessedVideoCapture model (from Story 7-7) -->
+    <interface type="swift-model">
+      <path>ios/Rial/Models/ProcessedVideoCapture.swift</path>
+      <description>Input model from VideoProcessingPipeline - ready for upload</description>
+      <properties>
+        id: UUID, videoURL: URL, compressedDepthData: Data, hashChainJSON: Data,
+        metadataJSON: Data, thumbnailData: Data, createdAt: Date, status: VideoCaptureStatus,
+        frameCount: Int, depthKeyframeCount: Int, durationMs: Int64, isPartial: Bool
+      </properties>
+      <computed>
+        totalSizeBytes, totalSizeFormatted, durationSeconds, hasDepthData, hasThumbnail, hasHashChain
+      </computed>
+      <code-snippet name="status-enum">
+<![CDATA[
+public enum VideoCaptureStatus: String, Codable, Sendable, CaseIterable {
+    case processing
+    case pendingUpload = "pending_upload"
+    case uploading
+    case paused
+    case uploaded
+    case failed
+}
+]]>
+      </code-snippet>
+    </interface>
+
+    <!-- iOS: UploadService (pattern to follow) -->
+    <interface type="swift-service">
+      <path>ios/Rial/Core/Networking/UploadService.swift</path>
+      <description>Photo upload service - follow pattern for VideoUploadService</description>
+      <key-patterns>
+        <pattern name="background-session">
+          URLSessionConfiguration.background(withIdentifier: "app.rial.upload")
+          sessionSendsLaunchEvents = true, waitsForConnectivity = true
+        </pattern>
+        <pattern name="multipart-encoding">
+          multipartPart(name:filename:contentType:data:boundary:)
+        </pattern>
+        <pattern name="device-auth-headers">
+          X-Device-Id, X-Device-Timestamp, X-Device-Signature
+        </pattern>
+        <pattern name="task-tracking">
+          taskToCaptureMap: [Int: UUID] with NSLock
+        </pattern>
+        <pattern name="delegate-methods">
+          URLSessionDelegate, URLSessionTaskDelegate, URLSessionDataDelegate
+        </pattern>
+      </key-patterns>
+      <code-snippet name="background-config">
+<![CDATA[
+private lazy var backgroundSession: URLSession = {
+    let config = URLSessionConfiguration.background(withIdentifier: Self.sessionIdentifier)
+    config.isDiscretionary = false
+    config.sessionSendsLaunchEvents = true
+    config.waitsForConnectivity = true
+    config.timeoutIntervalForResource = 3600 // 1 hour max
+    return URLSession(configuration: config, delegate: self, delegateQueue: nil)
+}()
+]]>
+      </code-snippet>
+    </interface>
+
+    <!-- iOS: CaptureStore (pattern for video persistence) -->
+    <interface type="swift-service">
+      <path>ios/Rial/Core/Storage/CaptureStore.swift</path>
+      <description>CoreData persistence - extend for video captures</description>
+      <key-patterns>
+        <pattern name="programmatic-model">
+          createManagedObjectModel() creates NSManagedObjectModel without .xcdatamodeld
+        </pattern>
+        <pattern name="background-context">
+          container.newBackgroundContext() for writes
+        </pattern>
+        <pattern name="status-updates">
+          updateStatus(_:for:) and updateUploadResult(for:serverCaptureId:verificationUrl:)
+        </pattern>
+      </key-patterns>
+      <methods-to-add>
+        saveVideoCapture(_:), loadVideoCapture(id:), updateVideoCaptureStatus(_:for:),
+        updateVideoUploadResult(for:serverCaptureId:verificationUrl:), pendingVideoUploads()
+      </methods-to-add>
+      <code-snippet name="entity-pattern">
+<![CDATA[
+@objc(CaptureEntity)
+public class CaptureEntity: NSManagedObject, Identifiable {
+    @NSManaged public var id: UUID
+    @NSManaged public var jpeg: Data
+    @NSManaged public var depth: Data
+    @NSManaged public var status: String
+    // ... etc
+}
+]]>
+      </code-snippet>
+    </interface>
+
+    <!-- iOS: CaptureData (reference model) -->
+    <interface type="swift-model">
+      <path>ios/Rial/Models/CaptureData.swift</path>
+      <description>Photo capture model - reference for video CoreData entity design</description>
+      <properties>
+        id, jpeg, depth, metadata, assertion, assertionStatus, timestamp
+      </properties>
+    </interface>
+
+    <!-- iOS: VideoProcessingPipeline -->
+    <interface type="swift-service">
+      <path>ios/Rial/Core/Capture/VideoProcessingPipeline.swift</path>
+      <description>Produces ProcessedVideoCapture - integration point for upload</description>
+      <deferred-features>
+        TODO comments indicate Story 7-8 should add CoreData persistence
+      </deferred-features>
+    </interface>
+
+  </existing-code-interfaces>
+
+  <!-- ============================================================== -->
+  <!-- DEVELOPMENT CONSTRAINTS                                        -->
+  <!-- ============================================================== -->
+  <development-constraints>
+
+    <constraint type="architecture">
+      <name>Separate Video Endpoint</name>
+      <description>
+        Video uploads use /api/v1/captures/video rather than extending /api/v1/captures.
+        Rationale: Different size limits, more multipart parts, different rate limits, async processing.
+      </description>
+    </constraint>
+
+    <constraint type="performance">
+      <name>Size Limits</name>
+      <description>
+        Video: 100MB max (allows 4K), Depth: 20MB max (compressed), Hash chain: 1MB, Metadata: 100KB
+        Typical uploads: ~30-45MB total for 15s video
+      </description>
+    </constraint>
+
+    <constraint type="security">
+      <name>Device Authentication</name>
+      <description>
+        All video uploads must use DeviceAuthLayer middleware.
+        Headers: X-Device-Id, X-Device-Timestamp, X-Device-Signature
+        Reuse existing middleware from photo uploads.
+      </description>
+    </constraint>
+
+    <constraint type="reliability">
+      <name>Background Upload</name>
+      <description>
+        iOS must use URLSessionConfiguration.background for video uploads.
+        sessionSendsLaunchEvents = true ensures app woken on completion.
+        Uploads must survive app termination.
+      </description>
+    </constraint>
+
+    <constraint type="rate-limiting">
+      <name>Video Rate Limit</name>
+      <description>
+        5 videos per hour per device. Return 429 with Retry-After header when exceeded.
+        Use tower_governor middleware (currently disabled for hackathon but implement structure).
+      </description>
+    </constraint>
+
+    <constraint type="status">
+      <name>Processing Status</name>
+      <description>
+        Backend returns status="processing" immediately.
+        Actual verification (hash chain, depth analysis) happens in Stories 7-9, 7-10.
+      </description>
+    </constraint>
+
+    <constraint type="database">
+      <name>Schema Extension</name>
+      <description>
+        Extend captures table with video columns via new migration.
+        capture_type discriminator: 'photo' (default) or 'video'.
+        Run sqlx prepare after migration for offline build.
+      </description>
+    </constraint>
+
+  </development-constraints>
+
+  <!-- ============================================================== -->
+  <!-- DEPENDENCIES                                                   -->
+  <!-- ============================================================== -->
+  <dependencies>
+
+    <external-dependencies>
+      <dependency name="aws-sdk-s3" version="1" purpose="S3 video file storage"/>
+      <dependency name="axum-extra" version="0.10" purpose="Multipart form parsing"/>
+      <dependency name="tower-governor" version="latest" purpose="Rate limiting (structure)"/>
+    </external-dependencies>
+
+    <internal-modules>
+      <module name="routes/captures" purpose="Reference patterns for video route"/>
+      <module name="middleware/device_auth" purpose="Device authentication layer"/>
+      <module name="services/storage" purpose="S3 upload service to extend"/>
+      <module name="types" purpose="API types module to extend"/>
+      <module name="models/capture" purpose="Capture model to extend"/>
+    </internal-modules>
+
+    <ios-frameworks>
+      <framework name="Foundation" purpose="URLSession, Data handling"/>
+      <framework name="CoreData" purpose="Video capture persistence"/>
+    </ios-frameworks>
+
+  </dependencies>
+
+  <!-- ============================================================== -->
+  <!-- TESTING CONTEXT                                                -->
+  <!-- ============================================================== -->
+  <testing-context>
+
+    <test-frameworks>
+      <framework name="cargo test" platform="backend" purpose="Unit and integration tests"/>
+      <framework name="XCTest" platform="ios" purpose="Unit tests"/>
+    </test-frameworks>
+
+    <test-requirements>
+      <requirement type="unit">Test multipart parsing with valid 4-part data</requirement>
+      <requirement type="unit">Test multipart parsing with missing parts</requirement>
+      <requirement type="unit">Test size validation rejects oversized video/depth</requirement>
+      <requirement type="unit">Test VideoUploadMetadata JSON deserialization</requirement>
+      <requirement type="unit">Test VideoUploadResponse serialization</requirement>
+      <requirement type="unit">Test iOS multipart request creation</requirement>
+      <requirement type="unit">Test iOS device auth headers included</requirement>
+      <requirement type="integration">Test full video upload flow with fixtures</requirement>
+      <requirement type="integration">Test S3 upload creates correct keys</requirement>
+      <requirement type="integration">Test database record created with video fields</requirement>
+      <requirement type="integration">Test rate limiting (structure, not enforced in demo)</requirement>
+      <requirement type="integration">Test CoreData save/load video capture</requirement>
+    </test-requirements>
+
+    <test-file-locations>
+      <location>backend/src/routes/captures_video.rs (inline #[cfg(test)])</location>
+      <location>backend/tests/video_upload_integration.rs</location>
+      <location>ios/RialTests/Networking/VideoUploadServiceTests.swift</location>
+      <location>ios/RialTests/Storage/VideoCaptureStoreTests.swift</location>
+    </test-file-locations>
+
+    <test-fixtures>
+      <fixture name="sample_video" description="Small MP4 test video (few KB)"/>
+      <fixture name="sample_depth" description="Gzipped depth keyframe blob"/>
+      <fixture name="sample_hash_chain" description="JSON with base64 hashes"/>
+      <fixture name="sample_metadata" description="VideoUploadMetadata JSON"/>
+    </test-fixtures>
+
+  </testing-context>
+
+  <!-- ============================================================== -->
+  <!-- IMPLEMENTATION NOTES                                           -->
+  <!-- ============================================================== -->
+  <implementation-notes>
+
+    <note priority="high">
+      <topic>Multipart Part Order</topic>
+      <content>
+        The video endpoint expects 4 parts in multipart/form-data:
+        1. video: MP4/MOV binary
+        2. depth_data: gzipped depth keyframes
+        3. hash_chain: JSON with frame hashes
+        4. metadata: JSON with attestation
+        Parse in any order but validate all 4 present.
+      </content>
+    </note>
+
+    <note priority="high">
+      <topic>S3 Key Structure</topic>
+      <content>
+        Video captures use same prefix as photos:
+        captures/{capture_id}/video.mp4
+        captures/{capture_id}/depth.gz (video depth, different from photo depth.gz)
+        captures/{capture_id}/hash_chain.json
+        Thumbnail not uploaded separately - generate server-side if needed.
+      </content>
+    </note>
+
+    <note priority="high">
+      <topic>Background Session Identifier and AppDelegate Integration</topic>
+      <content>
+        VideoUploadService should use DIFFERENT session identifier than UploadService:
+        - UploadService: "app.rial.upload"
+        - VideoUploadService: "app.rial.video-upload"
+        This prevents task ID collisions and allows independent session management.
+
+        Both services MUST be singletons to ensure proper background session handling.
+
+        AppDelegate.application(_:handleEventsForBackgroundURLSession:completionHandler:)
+        must dispatch to the appropriate service based on session identifier:
+<![CDATA[
+func application(
+    _ application: UIApplication,
+    handleEventsForBackgroundURLSession identifier: String,
+    completionHandler: @escaping () -> Void
+) {
+    switch identifier {
+    case "app.rial.upload":
+        // Dispatch to photo UploadService singleton
+        UploadService.shared.backgroundCompletionHandler = completionHandler
+    case "app.rial.video-upload":
+        // Dispatch to VideoUploadService singleton
+        VideoUploadService.shared.backgroundCompletionHandler = completionHandler
+    default:
+        // Unknown session - call completion handler immediately
+        completionHandler()
+    }
+}
+]]>
+      </content>
+    </note>
+
+    <note priority="high">
+      <topic>CoreData Model Extension - VideoCaptureEntity</topic>
+      <content>
+        CaptureStore uses programmatic model (createManagedObjectModel).
+        Add VideoCaptureEntity as a SEPARATE entity following the existing CaptureEntity pattern.
+        This provides cleaner separation of concerns and avoids polluting the photo entity.
+
+        Add the VideoCaptureEntity to createManagedObjectModel() as a second entity:
+<![CDATA[
+// In CaptureStore.createManagedObjectModel() - add after captureEntity setup:
+
+// VideoCaptureEntity
+let videoCaptureEntity = NSEntityDescription()
+videoCaptureEntity.name = "VideoCaptureEntity"
+videoCaptureEntity.managedObjectClassName = NSStringFromClass(VideoCaptureEntity.self)
+
+// Video-specific attributes
+let videoIdAttr = NSAttributeDescription()
+videoIdAttr.name = "id"
+videoIdAttr.attributeType = .UUIDAttributeType
+videoIdAttr.isOptional = false
+
+let videoURLAttr = NSAttributeDescription()
+videoURLAttr.name = "videoURL"
+videoURLAttr.attributeType = .URIAttributeType
+videoURLAttr.isOptional = false
+
+let compressedDepthAttr = NSAttributeDescription()
+compressedDepthAttr.name = "compressedDepthData"
+compressedDepthAttr.attributeType = .binaryDataAttributeType
+compressedDepthAttr.isOptional = false
+compressedDepthAttr.allowsExternalBinaryDataStorage = true
+
+let hashChainAttr = NSAttributeDescription()
+hashChainAttr.name = "hashChainJSON"
+hashChainAttr.attributeType = .binaryDataAttributeType
+hashChainAttr.isOptional = false
+
+let videoMetadataAttr = NSAttributeDescription()
+videoMetadataAttr.name = "metadataJSON"
+videoMetadataAttr.attributeType = .binaryDataAttributeType
+videoMetadataAttr.isOptional = false
+
+let thumbnailAttr = NSAttributeDescription()
+thumbnailAttr.name = "thumbnailData"
+thumbnailAttr.attributeType = .binaryDataAttributeType
+thumbnailAttr.isOptional = true
+
+let videoStatusAttr = NSAttributeDescription()
+videoStatusAttr.name = "status"
+videoStatusAttr.attributeType = .stringAttributeType
+videoStatusAttr.isOptional = false
+videoStatusAttr.defaultValue = "pending_upload"
+
+let frameCountAttr = NSAttributeDescription()
+frameCountAttr.name = "frameCount"
+frameCountAttr.attributeType = .integer32AttributeType
+frameCountAttr.isOptional = false
+
+let depthKeyframeCountAttr = NSAttributeDescription()
+depthKeyframeCountAttr.name = "depthKeyframeCount"
+depthKeyframeCountAttr.attributeType = .integer32AttributeType
+depthKeyframeCountAttr.isOptional = false
+
+let durationMsAttr = NSAttributeDescription()
+durationMsAttr.name = "durationMs"
+durationMsAttr.attributeType = .integer64AttributeType
+durationMsAttr.isOptional = false
+
+let isPartialAttr = NSAttributeDescription()
+isPartialAttr.name = "isPartial"
+isPartialAttr.attributeType = .booleanAttributeType
+isPartialAttr.isOptional = false
+isPartialAttr.defaultValue = false
+
+// ... add createdAt, attemptCount, lastAttemptAt, serverCaptureId, verificationUrl, uploadedAt
+
+videoCaptureEntity.properties = [
+    videoIdAttr, videoURLAttr, compressedDepthAttr, hashChainAttr,
+    videoMetadataAttr, thumbnailAttr, videoStatusAttr, frameCountAttr,
+    depthKeyframeCountAttr, durationMsAttr, isPartialAttr,
+    /* ... timestamp and upload tracking attrs ... */
+]
+
+// Update model.entities to include both:
+model.entities = [captureEntity, videoCaptureEntity]
+]]>
+
+        Create the entity class in VideoCaptureEntity.swift:
+<![CDATA[
+@objc(VideoCaptureEntity)
+public class VideoCaptureEntity: NSManagedObject, Identifiable {
+    @NSManaged public var id: UUID
+    @NSManaged public var videoURL: URL
+    @NSManaged public var compressedDepthData: Data
+    @NSManaged public var hashChainJSON: Data
+    @NSManaged public var metadataJSON: Data
+    @NSManaged public var thumbnailData: Data?
+    @NSManaged public var status: String
+    @NSManaged public var frameCount: Int32
+    @NSManaged public var depthKeyframeCount: Int32
+    @NSManaged public var durationMs: Int64
+    @NSManaged public var isPartial: Bool
+    @NSManaged public var createdAt: Date
+    @NSManaged public var attemptCount: Int16
+    @NSManaged public var lastAttemptAt: Date?
+    @NSManaged public var serverCaptureId: UUID?
+    @NSManaged public var verificationUrl: String?
+    @NSManaged public var uploadedAt: Date?
+}
+
+extension VideoCaptureEntity {
+    @nonobjc public class func fetchRequest() -> NSFetchRequest<VideoCaptureEntity> {
+        return NSFetchRequest<VideoCaptureEntity>(entityName: "VideoCaptureEntity")
+    }
+}
+]]>
+      </content>
+    </note>
+
+    <note priority="medium">
+      <topic>Database Migration Filename</topic>
+      <content>
+        The migration filename must replace YYYYMMDDHHMMSS with the current timestamp.
+        Use sqlx CLI to generate the migration file with correct timestamp:
+
+        cd backend && sqlx migrate add add_video_captures
+
+        This creates backend/migrations/{timestamp}_add_video_captures.sql with the current
+        timestamp. Then add the schema changes to the generated file.
+      </content>
+    </note>
+
+    <note priority="medium">
+      <topic>Rate Limiting Implementation</topic>
+      <content>
+        Implement rate limiting directly in the video upload handler with a SQL check.
+        Do NOT rely on tower_governor which is disabled for hackathon.
+
+        Rate limit: 5 videos per hour per device.
+
+        Implementation approach:
+<![CDATA[
+// At the start of upload_video handler, before any processing:
+let recent_count: i64 = sqlx::query_scalar(
+    "SELECT COUNT(*) FROM captures
+     WHERE device_id = $1
+     AND capture_type = 'video'
+     AND uploaded_at > NOW() - INTERVAL '1 hour'"
+)
+.bind(&device_ctx.device_id)
+.fetch_one(&state.db)
+.await?;
+
+if recent_count >= 5 {
+    // Calculate retry-after (seconds until oldest upload expires from window)
+    let retry_after = calculate_retry_after(&state.db, &device_ctx.device_id).await?;
+
+    return Err(ApiErrorWithRequestId::new(
+        StatusCode::TOO_MANY_REQUESTS,
+        "RATE_LIMITED",
+        format!("Video upload limit exceeded. Maximum 5 videos per hour. Retry after {} seconds.", retry_after),
+        request_id,
+    ).with_header("Retry-After", retry_after.to_string()));
+}
+]]>
+
+        Return 429 immediately if limit exceeded, with Retry-After header indicating seconds
+        until the rate limit window resets.
+      </content>
+    </note>
+
+    <note priority="medium">
+      <topic>Test Fixture Locations and Generation</topic>
+      <content>
+        Test fixtures should be placed in standard locations:
+        - Backend: backend/tests/fixtures/
+        - iOS: ios/RialTests/Fixtures/
+
+        Required fixtures and generation guidance:
+
+        1. sample_video.mp4 (small MP4 for tests):
+           - Create minimal valid MP4 with ffmpeg: ffmpeg -f lavfi -i testsrc=duration=1:size=320x240:rate=30 -c:v libx264 -pix_fmt yuv420p sample_video.mp4
+           - Should be ~10-50KB for fast test execution
+
+        2. sample_depth.gz (gzipped depth keyframe blob):
+           - Create mock depth data structure matching DepthKeyframeData format
+           - Gzip compress and save as binary fixture
+           - Example: [{"timestamp_ms":0,"depth_values":[...]}]
+
+        3. sample_hash_chain.json (JSON with base64 frame hashes):
+           - JSON array of HashChainEntry objects
+           - Example: [{"frame_index":0,"timestamp_ms":0,"frame_hash":"base64...","cumulative_hash":"base64..."}]
+
+        4. sample_metadata.json (VideoUploadMetadata JSON):
+           - Complete VideoUploadMetadata matching schema from tech-spec
+           - Include all required fields: started_at, ended_at, duration_ms, frame_count, etc.
+
+        Load fixtures in tests using include_bytes! (Rust) or Bundle.module (Swift).
+      </content>
+    </note>
+
+    <note priority="medium">
+      <topic>Verification URL Configuration Source</topic>
+      <content>
+        The verification_base_url is configured in the backend Config struct:
+        - Source: backend/src/config.rs
+        - Environment variable: VERIFICATION_BASE_URL
+        - Default (test): "https://test.realitycam.app/verify"
+        - Production: Set via VERIFICATION_BASE_URL env var on Fly.io
+
+        Access via state.config.verification_base_url in handlers.
+        Build verification URL as: format!("{}/{capture_id}", config.verification_base_url)
+      </content>
+    </note>
+
+    <note priority="low">
+      <topic>Error Response Consistency</topic>
+      <content>
+        Use same ApiErrorWithRequestId pattern as captures.rs.
+        Error codes: VALIDATION_ERROR (400), PAYLOAD_TOO_LARGE (413),
+        RATE_LIMITED (429), DEVICE_NOT_FOUND (404), etc.
+      </content>
+    </note>
+
+    <note priority="low">
+      <topic>Related Story Reference</topic>
+      <content>
+        Story 6-12 (Certificate Pinning and Retry Logic) provides background URLSession patterns.
+        Reference: docs/sprint-artifacts/stories/6-12-certificate-pinning-retry-logic.md
+
+        Note: The actual UploadService implementation in ios/Rial/Core/Networking/UploadService.swift
+        shows the concrete patterns for background session, delegate methods, and task tracking.
+      </content>
+    </note>
+
+  </implementation-notes>
+
+  <!-- ============================================================== -->
+  <!-- FILES TO CREATE/MODIFY                                         -->
+  <!-- ============================================================== -->
+  <file-operations>
+
+    <files-to-create>
+      <file>
+        <path>backend/src/routes/captures_video.rs</path>
+        <description>Video upload endpoint handler</description>
+      </file>
+      <file>
+        <path>backend/src/types/video_capture.rs</path>
+        <description>Video capture request/response types</description>
+      </file>
+      <file>
+        <path>backend/migrations/YYYYMMDDHHMMSS_add_video_captures.sql</path>
+        <description>Schema extension for video columns</description>
+      </file>
+      <file>
+        <path>ios/Rial/Core/Networking/VideoUploadService.swift</path>
+        <description>Video upload service with background session</description>
+      </file>
+      <file>
+        <path>ios/Rial/Core/Storage/VideoCaptureEntity.swift</path>
+        <description>CoreData entity for video captures</description>
+      </file>
+      <file>
+        <path>ios/RialTests/Networking/VideoUploadServiceTests.swift</path>
+        <description>Unit tests for video upload service</description>
+      </file>
+      <file>
+        <path>ios/RialTests/Storage/VideoCaptureStoreTests.swift</path>
+        <description>Integration tests for video persistence</description>
+      </file>
+      <file>
+        <path>backend/tests/video_upload_integration.rs</path>
+        <description>Backend integration tests</description>
+      </file>
+    </files-to-create>
+
+    <files-to-modify>
+      <file>
+        <path>backend/src/routes/mod.rs</path>
+        <description>Register video routes</description>
+        <changes>Add captures_video module, nest /captures/video route</changes>
+      </file>
+      <file>
+        <path>backend/src/services/storage.rs</path>
+        <description>Add video upload methods</description>
+        <changes>upload_video_files(), video_s3_key(), hash_chain_s3_key()</changes>
+      </file>
+      <file>
+        <path>backend/src/models/capture.rs</path>
+        <description>Extend for video fields</description>
+        <changes>Add video-specific fields, CaptureType enum</changes>
+      </file>
+      <file>
+        <path>backend/src/types/mod.rs</path>
+        <description>Export video types</description>
+        <changes>Add video_capture module</changes>
+      </file>
+      <file>
+        <path>ios/Rial/Core/Storage/CaptureStore.swift</path>
+        <description>Add video persistence methods</description>
+        <changes>saveVideoCapture, loadVideoCapture, updateVideoCaptureStatus, pendingVideoUploads</changes>
+      </file>
+      <file>
+        <path>ios/Rial/App/AppDelegate.swift</path>
+        <description>Handle video upload background events</description>
+        <changes>Register VideoUploadService session, handleEventsForBackgroundURLSession</changes>
+      </file>
+    </files-to-modify>
+
+  </file-operations>
+
+</story-context>

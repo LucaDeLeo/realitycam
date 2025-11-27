@@ -663,17 +663,19 @@ async fn get_capture(
     );
 
     // Query the capture from database
-    let capture = sqlx::query_as!(
-        crate::models::Capture,
+    // NOTE: Using runtime query to avoid SQLX_OFFLINE cache issues when schema changes
+    let capture = sqlx::query_as::<_, crate::models::Capture>(
         r#"
         SELECT id, device_id, target_media_hash, photo_s3_key, depth_map_s3_key,
                thumbnail_s3_key, evidence, confidence_level, status,
-               location_precise, location_coarse, captured_at, uploaded_at
+               location_precise, location_coarse, captured_at, uploaded_at,
+               capture_type, video_s3_key, hash_chain_s3_key, duration_ms,
+               frame_count, is_partial, checkpoint_index
         FROM captures
         WHERE id = $1
         "#,
-        capture_id
     )
+    .bind(capture_id)
     .fetch_optional(&state.db)
     .await
     .map_err(|e| ApiErrorWithRequestId {
