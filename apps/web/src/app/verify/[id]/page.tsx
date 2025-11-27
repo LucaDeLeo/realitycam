@@ -3,7 +3,9 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ConfidenceBadge } from '@/components/Evidence/ConfidenceBadge';
 import { EvidencePanel } from '@/components/Evidence/EvidencePanel';
+import { PartialVideoBanner } from '@/components/Evidence/PartialVideoBanner';
 import { ImagePlaceholder } from '@/components/Media/ImagePlaceholder';
+import { VideoPlayer, VideoPlaceholder } from '@/components/Media/VideoPlayer';
 import { apiClient, formatDate, type ConfidenceLevel, type CheckStatus } from '@/lib/api';
 import { mapToEvidenceStatus } from '@/lib/status';
 
@@ -11,7 +13,7 @@ interface VerifyPageProps {
   params: Promise<{ id: string }>;
 }
 
-// Demo data for /verify/demo route (works without backend)
+// Demo data for /verify/demo route (works without backend - photo)
 const DEMO_CAPTURE: CapturePublicData = {
   capture_id: 'demo',
   confidence_level: 'high',
@@ -19,6 +21,7 @@ const DEMO_CAPTURE: CapturePublicData = {
   uploaded_at: new Date().toISOString(),
   location_coarse: 'San Francisco, CA',
   evidence: {
+    type: 'photo',
     hardware_attestation: {
       status: 'pass',
       level: 'full',
@@ -49,6 +52,153 @@ const DEMO_CAPTURE: CapturePublicData = {
   photo_url: '/images/WhatsApp Image 2025-11-23 at 20.24.05.jpeg',
 };
 
+// Demo data for /verify/demo-video route (works without backend - video)
+const DEMO_VIDEO_CAPTURE: CapturePublicData = {
+  capture_id: 'demo-video',
+  confidence_level: 'high',
+  captured_at: new Date().toISOString(),
+  uploaded_at: new Date().toISOString(),
+  location_coarse: 'San Francisco, CA',
+  evidence: {
+    type: 'video',
+    duration_ms: 15000,
+    frame_count: 450,
+    hardware_attestation: {
+      status: 'pass',
+      level: 'full',
+      verified: true,
+      device_model: 'iPhone 15 Pro',
+      assertion_valid: true,
+    },
+    depth_analysis: {
+      status: 'pass',
+      is_likely_real_scene: true,
+    },
+    hash_chain: {
+      status: 'pass',
+      verified_frames: 450,
+      total_frames: 450,
+      chain_intact: true,
+      attestation_valid: true,
+      verified_duration_ms: 15000,
+      checkpoint_verified: false,
+    },
+    video_depth_analysis: {
+      depth_consistency: 0.85,
+      motion_coherence: 0.72,
+      scene_stability: 0.95,
+      is_likely_real_scene: true,
+      suspicious_frames: [],
+    },
+    partial_attestation: {
+      is_partial: false,
+      verified_frames: 450,
+      total_frames: 450,
+    },
+    metadata: {
+      timestamp_valid: true,
+      timestamp_delta_seconds: 2,
+      model_verified: true,
+      model_name: 'iPhone 15 Pro',
+      device_model: 'iPhone 15 Pro',
+      location_available: true,
+      location_opted_out: false,
+    },
+    processing: {
+      processed_at: new Date().toISOString(),
+      processing_time_ms: 2150,
+      version: '1.0.0',
+    },
+  },
+  video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+};
+
+// Demo data for partial video
+const DEMO_PARTIAL_VIDEO_CAPTURE: CapturePublicData = {
+  capture_id: 'demo-video-partial',
+  confidence_level: 'medium',
+  captured_at: new Date().toISOString(),
+  uploaded_at: new Date().toISOString(),
+  location_coarse: 'San Francisco, CA',
+  evidence: {
+    type: 'video',
+    duration_ms: 10000,
+    frame_count: 300,
+    hardware_attestation: {
+      status: 'pass',
+      level: 'full',
+      verified: true,
+      device_model: 'iPhone 15 Pro',
+      assertion_valid: true,
+    },
+    depth_analysis: {
+      status: 'unavailable',
+    },
+    hash_chain: {
+      status: 'partial',
+      verified_frames: 300,
+      total_frames: 450,
+      chain_intact: true,
+      attestation_valid: true,
+      partial_reason: 'Recording interrupted',
+      verified_duration_ms: 10000,
+      checkpoint_verified: true,
+      checkpoint_index: 1,
+    },
+    partial_attestation: {
+      is_partial: true,
+      checkpoint_index: 1,
+      verified_frames: 300,
+      total_frames: 450,
+      reason: 'checkpoint_attestation',
+    },
+    metadata: {
+      timestamp_valid: true,
+      timestamp_delta_seconds: 3,
+      model_verified: true,
+      model_name: 'iPhone 15 Pro',
+      device_model: 'iPhone 15 Pro',
+      location_available: true,
+      location_opted_out: false,
+    },
+    processing: {
+      processed_at: new Date().toISOString(),
+      processing_time_ms: 1850,
+      version: '1.0.0',
+    },
+  },
+  video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+};
+
+// Video-specific evidence types (Story 7-13)
+interface HashChainEvidence {
+  status: string; // 'pass' | 'partial' | 'fail'
+  verified_frames: number;
+  total_frames: number;
+  chain_intact: boolean;
+  attestation_valid: boolean;
+  partial_reason?: string;
+  verified_duration_ms: number;
+  checkpoint_verified: boolean;
+  checkpoint_index?: number;
+}
+
+interface DepthAnalysisEvidence {
+  depth_consistency: number;
+  motion_coherence: number;
+  scene_stability: number;
+  is_likely_real_scene: boolean;
+  suspicious_frames: number[];
+}
+
+interface PartialAttestationInfo {
+  is_partial: boolean;
+  checkpoint_index?: number;
+  verified_frames: number;
+  total_frames: number;
+  reason?: string;
+}
+
 interface CapturePublicData {
   capture_id: string;
   confidence_level: string;
@@ -56,12 +206,16 @@ interface CapturePublicData {
   uploaded_at: string;
   location_coarse?: string;
   evidence: {
+    // Common fields
+    type?: string; // 'photo' | 'video'
     hardware_attestation: {
       status: string;
       level?: string;
       verified?: boolean;
       device_model?: string;
+      assertion_valid?: boolean; // Video-specific
     };
+    // Photo-specific depth analysis
     depth_analysis: {
       status: string;
       is_likely_real_scene?: boolean;
@@ -76,25 +230,48 @@ interface CapturePublicData {
       model_name?: string;
       location_available?: boolean;
       location_opted_out?: boolean;
+      device_model?: string; // Video uses metadata.device_model
     };
     processing: {
       processed_at?: string;
       processing_time_ms?: number;
       version?: string;
     };
+    // Video-specific fields (Story 7-13)
+    hash_chain?: HashChainEvidence;
+    video_depth_analysis?: DepthAnalysisEvidence;
+    partial_attestation?: PartialAttestationInfo;
+    duration_ms?: number;
+    frame_count?: number;
   };
   photo_url?: string;
+  video_url?: string;
   depth_map_url?: string;
+}
+
+// Helper to format video duration
+function formatDuration(ms: number): string {
+  const seconds = ms / 1000;
+  return `${seconds.toFixed(1)}s`;
+}
+
+// Helper to format depth metrics
+function formatDepthMetrics(depth: DepthAnalysisEvidence): string {
+  return `Consistency: ${(depth.depth_consistency * 100).toFixed(0)}%, Coherence: ${(depth.motion_coherence * 100).toFixed(0)}%, Stability: ${(depth.scene_stability * 100).toFixed(0)}%`;
 }
 
 export default async function VerifyPage({ params }: VerifyPageProps) {
   const { id } = await params;
 
-  // Handle demo route specially (works without backend)
+  // Handle demo routes specially (works without backend)
   let capture: CapturePublicData | null = null;
 
   if (id === 'demo') {
     capture = DEMO_CAPTURE;
+  } else if (id === 'demo-video') {
+    capture = DEMO_VIDEO_CAPTURE;
+  } else if (id === 'demo-video-partial') {
+    capture = DEMO_PARTIAL_VIDEO_CAPTURE;
   } else {
     // Fetch capture data from backend
     const response = await apiClient.getCapturePublic(id);
@@ -106,36 +283,115 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
     notFound();
   }
 
-  // Build evidence items from capture data
-  const evidenceItems = capture?.evidence ? [
-    {
-      label: 'Hardware Attestation',
-      status: mapToEvidenceStatus(capture.evidence.hardware_attestation?.status),
-      value: capture.evidence.hardware_attestation?.device_model || undefined,
-    },
-    {
-      label: 'LiDAR Depth Analysis',
-      status: mapToEvidenceStatus(capture.evidence.depth_analysis?.status),
-      value: capture.evidence.depth_analysis?.is_likely_real_scene ? 'Real 3D scene detected' : 'Analysis complete',
-    },
-    {
-      label: 'Timestamp',
-      status: capture.evidence.metadata?.timestamp_valid ? 'pass' as CheckStatus : 'fail' as CheckStatus,
-      value: capture.evidence.metadata?.timestamp_delta_seconds !== undefined
-        ? `${Math.abs(capture.evidence.metadata.timestamp_delta_seconds)}s delta`
-        : undefined,
-    },
-    {
-      label: 'Device Model',
-      status: capture.evidence.metadata?.model_verified ? 'pass' as CheckStatus : 'unavailable' as CheckStatus,
-      value: capture.evidence.metadata?.model_name || undefined,
-    },
-    {
-      label: 'Location',
-      status: capture.evidence.metadata?.location_available ? 'pass' as CheckStatus : 'unavailable' as CheckStatus,
-      value: capture.location_coarse || (capture.evidence.metadata?.location_opted_out ? 'Opted out' : undefined),
-    },
-  ] : undefined;
+  // Detect if this is a video capture
+  const isVideo = capture?.evidence?.type === 'video';
+  const mediaType = isVideo ? 'Video' : 'Photo';
+
+  // Build evidence items based on capture type
+  let evidenceItems;
+  if (capture?.evidence) {
+    if (isVideo) {
+      // Video evidence items (Story 7-13)
+      const items = [
+        {
+          label: 'Hardware Attestation',
+          status: mapToEvidenceStatus(capture.evidence.hardware_attestation?.status),
+          value: capture.evidence.hardware_attestation?.device_model || capture.evidence.metadata?.device_model || undefined,
+        },
+      ];
+
+      // Hash chain integrity (video-specific)
+      if (capture.evidence.hash_chain) {
+        const hc = capture.evidence.hash_chain;
+        const chainStatus = hc.chain_intact ? hc.status : 'fail';
+        const framesValue = `${hc.verified_frames.toLocaleString()}/${hc.total_frames.toLocaleString()} frames verified`;
+        items.push({
+          label: 'Hash Chain Integrity',
+          status: mapToEvidenceStatus(chainStatus),
+          value: hc.chain_intact ? framesValue : 'Chain broken (tampering detected)',
+        });
+      }
+
+      // Temporal depth analysis (video-specific)
+      if (capture.evidence.video_depth_analysis) {
+        const depth = capture.evidence.video_depth_analysis;
+        items.push({
+          label: 'Temporal Depth Analysis',
+          status: depth.is_likely_real_scene ? 'pass' as CheckStatus : 'fail' as CheckStatus,
+          value: depth.is_likely_real_scene
+            ? `Real 3D scene - ${formatDepthMetrics(depth)}`
+            : 'Suspicious scene detected',
+        });
+      } else {
+        items.push({
+          label: 'Temporal Depth Analysis',
+          status: 'unavailable' as CheckStatus,
+          value: 'Not available',
+        });
+      }
+
+      // Common evidence items
+      items.push(
+        {
+          label: 'Timestamp',
+          status: capture.evidence.metadata?.timestamp_valid ? 'pass' as CheckStatus : 'fail' as CheckStatus,
+          value: capture.evidence.metadata?.timestamp_delta_seconds !== undefined
+            ? `${Math.abs(capture.evidence.metadata.timestamp_delta_seconds)}s delta`
+            : undefined,
+        },
+        {
+          label: 'Device Model',
+          status: capture.evidence.metadata?.model_verified ? 'pass' as CheckStatus : 'unavailable' as CheckStatus,
+          value: capture.evidence.metadata?.model_name || capture.evidence.metadata?.device_model || undefined,
+        },
+        {
+          label: 'Location',
+          status: capture.evidence.metadata?.location_available ? 'pass' as CheckStatus : 'unavailable' as CheckStatus,
+          value: capture.location_coarse || (capture.evidence.metadata?.location_opted_out ? 'Opted out' : undefined),
+        }
+      );
+
+      evidenceItems = items;
+    } else {
+      // Photo evidence items (existing logic)
+      evidenceItems = [
+        {
+          label: 'Hardware Attestation',
+          status: mapToEvidenceStatus(capture.evidence.hardware_attestation?.status),
+          value: capture.evidence.hardware_attestation?.device_model || undefined,
+        },
+        {
+          label: 'LiDAR Depth Analysis',
+          status: mapToEvidenceStatus(capture.evidence.depth_analysis?.status),
+          value: capture.evidence.depth_analysis?.is_likely_real_scene ? 'Real 3D scene detected' : 'Analysis complete',
+        },
+        {
+          label: 'Timestamp',
+          status: capture.evidence.metadata?.timestamp_valid ? 'pass' as CheckStatus : 'fail' as CheckStatus,
+          value: capture.evidence.metadata?.timestamp_delta_seconds !== undefined
+            ? `${Math.abs(capture.evidence.metadata.timestamp_delta_seconds)}s delta`
+            : undefined,
+        },
+        {
+          label: 'Device Model',
+          status: capture.evidence.metadata?.model_verified ? 'pass' as CheckStatus : 'unavailable' as CheckStatus,
+          value: capture.evidence.metadata?.model_name || undefined,
+        },
+        {
+          label: 'Location',
+          status: capture.evidence.metadata?.location_available ? 'pass' as CheckStatus : 'unavailable' as CheckStatus,
+          value: capture.location_coarse || (capture.evidence.metadata?.location_opted_out ? 'Opted out' : undefined),
+        },
+      ];
+    }
+  }
+
+  // Video-specific data
+  const isPartialVideo = isVideo && capture?.evidence?.partial_attestation?.is_partial;
+  const partialAttestation = capture?.evidence?.partial_attestation;
+  const hashChain = capture?.evidence?.hash_chain;
+  const durationMs = capture?.evidence?.duration_ms ?? 0;
+  const frameCount = capture?.evidence?.frame_count ?? 0;
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
@@ -150,7 +406,7 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
               rial.
             </Link>
             <span className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
-              Photo Verification
+              {mediaType} Verification
             </span>
           </div>
         </div>
@@ -162,34 +418,55 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
           {/* Page Title */}
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-black dark:text-white">
-              Photo Verification
+              {mediaType} Verification
             </h1>
             <p className="mt-2 text-sm sm:text-base text-zinc-600 dark:text-zinc-400">
               Capture ID: <code className="font-mono text-zinc-800 dark:text-zinc-300">{id}</code>
             </p>
           </div>
 
+          {/* Partial Video Banner (Story 7-13) */}
+          {isPartialVideo && partialAttestation && hashChain && (
+            <PartialVideoBanner
+              verifiedFrames={partialAttestation.verified_frames}
+              totalFrames={partialAttestation.total_frames}
+              verifiedDurationMs={hashChain.verified_duration_ms}
+              totalDurationMs={durationMs}
+              checkpointIndex={partialAttestation.checkpoint_index}
+            />
+          )}
+
           {/* Main Results Card */}
           <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden">
             {/* Results Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-              {/* Image Section */}
+              {/* Media Section */}
               <div className="p-4 sm:p-6 md:border-r border-b md:border-b-0 border-zinc-200 dark:border-zinc-800">
                 <h2 className="text-sm font-semibold text-zinc-900 dark:text-white uppercase tracking-wide mb-4">
-                  Captured Image
+                  Captured {mediaType}
                 </h2>
-                {capture?.photo_url ? (
-                  <div className="relative w-full aspect-[4/3]">
-                    <Image
-                      src={capture.photo_url}
-                      alt="Captured photo"
-                      fill
-                      className="rounded-lg object-cover"
-                      unoptimized
-                    />
-                  </div>
+                {isVideo ? (
+                  // Video Player (Story 7-13)
+                  capture?.video_url ? (
+                    <VideoPlayer src={capture.video_url} aspectRatio="16:9" />
+                  ) : (
+                    <VideoPlaceholder aspectRatio="16:9" />
+                  )
                 ) : (
-                  <ImagePlaceholder aspectRatio="4:3" />
+                  // Photo Image (existing)
+                  capture?.photo_url ? (
+                    <div className="relative w-full aspect-[4/3]">
+                      <Image
+                        src={capture.photo_url}
+                        alt="Captured photo"
+                        fill
+                        className="rounded-lg object-cover"
+                        unoptimized
+                      />
+                    </div>
+                  ) : (
+                    <ImagePlaceholder aspectRatio="4:3" />
+                  )
                 )}
               </div>
 
@@ -211,6 +488,27 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
 
                 {/* Metadata */}
                 <div className="space-y-4">
+                  {/* Video Duration (Story 7-13) */}
+                  {isVideo && durationMs > 0 && (
+                    <div>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">
+                        Duration
+                      </p>
+                      <p className="text-sm text-zinc-700 dark:text-zinc-300">
+                        {isPartialVideo && partialAttestation ? (
+                          `${formatDuration(hashChain?.verified_duration_ms ?? 0)} of ${formatDuration(durationMs)} (partial)`
+                        ) : (
+                          formatDuration(durationMs)
+                        )}
+                        {frameCount > 0 && (
+                          <span className="text-zinc-500 dark:text-zinc-400 ml-2">
+                            ({frameCount.toLocaleString()} frames)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+
                   <div>
                     <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">
                       Captured At

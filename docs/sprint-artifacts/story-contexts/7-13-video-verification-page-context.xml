@@ -1,0 +1,470 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>7</epicId>
+    <storyId>7-13</storyId>
+    <title>Video Verification Page</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/7-13-video-verification-page.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>video verification page user</asA>
+    <iWant>to view and verify video captures with their evidence packages</iWant>
+    <soThat>I can assess the authenticity of video evidence through playback and comprehensive verification data</soThat>
+    <tasks>
+      - Task 1: Extend verify page to detect video captures (AC: #1)
+      - Task 2: Create VideoPlayer component (AC: #2, #9)
+      - Task 3: Update evidence panel for video data (AC: #3)
+      - Task 4: Implement hash chain evidence display (AC: #4)
+      - Task 5: Implement temporal depth evidence display (AC: #5)
+      - Task 6: Implement partial video UI (AC: #6)
+      - Task 7: Add video metadata display (AC: #7)
+      - Task 8: Add error states and loading (AC: #10)
+      - Task 9: Update TypeScript types (AC: #1, #3)
+      - Task 10: Write tests (AC: All)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+### AC 1: Video Detection and Routing
+- Detect if capture type is "video" (from evidence.type field)
+- Display video player instead of static image
+- Show video-specific evidence panel
+- Maintain same layout structure as photo verification
+
+### AC 2: Video Player Component
+- Display HTML5 video player with native controls
+- Support play/pause, scrubbing, volume control
+- Video loaded from photo_url (or video_url if different)
+- Aspect ratio preserved (16:9 or 4:3)
+- Player responsive on mobile and desktop
+- Loading state while video fetches
+
+### AC 3: Video-Specific Evidence Panel
+Include:
+- Hardware Attestation - Same as photos (device model, status)
+- Hash Chain Integrity - Show chain_intact, verified_frames/total_frames
+- Temporal Depth Analysis - Show depth_consistency, motion_coherence, scene_stability
+- Timestamp - Same as photos (timestamp_valid, delta)
+- Device Model - Same as photos
+- Location - Same as photos
+
+### AC 4: Hash Chain Evidence Display
+- Status: "pass" if chain_intact=true, "fail" if false, "partial" if status=partial
+- Value: "450/450 frames verified" (or actual counts)
+- If broken_at_frame exists, show "Broken at frame {N}"
+- If attestation_valid=false, indicate "Attestation invalid"
+
+### AC 5: Temporal Depth Evidence Display
+- Status: "pass" if is_likely_real_scene=true, "fail" if false, "unavailable" if missing
+- Value: "Consistency: 0.85, Coherence: 0.72, Stability: 0.95" (formatted metrics)
+- Show "Real 3D scene detected" if is_likely_real_scene=true
+- Handle missing depth_analysis gracefully (status="unavailable")
+
+### AC 6: Partial Video Verification Display
+- Show banner: "Partial Verification: 10s of 12s verified"
+- Display verified_frames/total_frames in hash chain evidence
+- Show checkpoint_index if present: "Checkpoint 1 (10s)"
+- Confidence badge reflects partial verification (likely MEDIUM)
+- Evidence panel shows which checks were performed on verified portion
+
+### AC 7: Video Metadata Display
+Show:
+- Duration: "15.0s" or "10.0s of 12.0s (partial)" if partial
+- Frame count: "450 frames (30fps)"
+- Captured at timestamp (same as photos)
+- Location (same as photos)
+- Device model (same as photos)
+
+### AC 8: C2PA Video Manifest Display (Future Enhancement)
+- Add "C2PA Content Credentials" evidence row
+- Status: "pass" if manifest valid
+- Value: "Video manifest verified"
+- Link to manifest JSON or detailed view
+- Note: Manifest data will be available after Story 7-12 implementation
+
+### AC 9: Mobile Responsive Video Player
+- Player fills available width
+- Controls touch-friendly (minimum 44x44px tap targets)
+- Orientation changes handled gracefully
+- Video can be viewed in fullscreen
+- Performance acceptable on iPhone 12 Pro and newer
+
+### AC 10: Error States and Loading
+Handle:
+- Video file not found: Show placeholder with error message
+- Video still processing: Show "Video processing..." indicator
+- Network timeout: Show retry button
+- Unsupported format: Show format error message
+- Loading spinner while video fetches
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <!-- PRD: Video capture requirements -->
+      <artifact path="docs/prd.md" type="requirements">
+        Product Requirements Document - FR47-FR55 (Video Capture features)
+      </artifact>
+
+      <!-- Epic Tech Spec: Detailed video architecture -->
+      <artifact path="docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md" type="technical-spec">
+        Epic 7 Technical Specification - AC-7.12 (Video Verification Page)
+        - Data Models: VideoEvidence structure
+        - Components: Video Verification Page design
+        - API Contracts: Video evidence response format
+      </artifact>
+
+      <!-- Architecture: System design patterns -->
+      <artifact path="docs/architecture.md" type="architecture">
+        Architecture Document - Web application structure, Next.js App Router patterns, Component design patterns
+      </artifact>
+
+      <!-- Related Stories: Reference implementations -->
+      <artifact path="docs/sprint-artifacts/stories/7-11-video-evidence-package.md" type="story">
+        Story 7-11: Video Evidence Package - VideoEvidence structure definition
+      </artifact>
+
+      <artifact path="docs/sprint-artifacts/stories/7-12-c2pa-video-manifest-generation.md" type="story">
+        Story 7-12: C2PA Video Manifest Generation - C2PA manifest integration patterns
+      </artifact>
+
+      <artifact path="docs/sprint-artifacts/stories/5-4-verification-page-summary-view.md" type="story">
+        Story 5-4: Photo Verification Page - Photo verification patterns to replicate for video
+      </artifact>
+
+      <artifact path="docs/sprint-artifacts/stories/5-5-evidence-panel-component.md" type="story">
+        Story 5-5: Evidence Panel Component - Evidence panel component design and reuse patterns
+      </artifact>
+    </docs>
+
+    <code>
+      <!-- Existing Photo Verification Page: Template for video implementation -->
+      <artifact path="apps/web/src/app/verify/[id]/page.tsx" type="page-component">
+        Photo Verification Page - Server component with evidence panel, confidence badge, metadata display
+        - REUSE: Page layout structure (header, main content grid, evidence panel, footer)
+        - REUSE: Evidence item building pattern (buildEvidenceItems function)
+        - REUSE: Demo route pattern (DEMO_CAPTURE constant)
+        - EXTEND: Add video type detection logic
+        - EXTEND: Conditional rendering for VideoPlayer vs Image
+        - EXTEND: Video-specific evidence mapping (hash chain, temporal depth)
+      </artifact>
+
+      <!-- Evidence Components: Reusable for video verification -->
+      <artifact path="apps/web/src/components/Evidence/EvidencePanel.tsx" type="component">
+        Evidence Panel Component - Expandable panel with evidence rows
+        - REUSE AS-IS: Accepts array of {label, status, value} items
+        - REUSE AS-IS: Expand/collapse functionality
+        - No changes needed for video support
+      </artifact>
+
+      <artifact path="apps/web/src/components/Evidence/EvidenceRow.tsx" type="component">
+        Evidence Row Component - Individual evidence check display with status icons
+        - REUSE AS-IS: Supports pass/fail/unavailable/pending states
+        - REUSE AS-IS: Status icon rendering
+        - REUSE AS-IS: Value display with status colors
+        - No changes needed for video support
+      </artifact>
+
+      <artifact path="apps/web/src/components/Evidence/ConfidenceBadge.tsx" type="component">
+        Confidence Badge Component - Color-coded confidence level badge
+        - REUSE AS-IS: Supports high/medium/low/suspicious levels
+        - REUSE AS-IS: Dark mode support
+        - Works for video confidence levels without changes
+      </artifact>
+
+      <!-- Media Components: Image placeholder as reference for video player -->
+      <artifact path="apps/web/src/components/Media/ImagePlaceholder.tsx" type="component">
+        Image Placeholder Component - Placeholder with loading state
+        - REFERENCE: Pattern for creating VideoPlaceholder component
+        - REFERENCE: Aspect ratio handling, loading animation patterns
+      </artifact>
+
+      <!-- API Client: Types and utilities -->
+      <artifact path="apps/web/src/lib/api.ts" type="api-client">
+        API Client Library - Type definitions and API methods
+        - EXTEND: CapturePublicData interface with video fields
+        - EXTEND: EvidencePackage interface with video evidence types
+        - REUSE: formatDate utility function
+        - REUSE: apiClient.getCapturePublic method (already returns video data)
+      </artifact>
+
+      <!-- Type Definitions: Status mapping utilities -->
+      <artifact path="apps/web/src/lib/status.ts" type="utility">
+        Status Utilities - Evidence status mapping functions
+        - REUSE: mapToEvidenceStatus function for hash chain status
+        - REUSE: getStatusText function for evidence display
+      </artifact>
+
+      <!-- Shared Types: Evidence type definitions -->
+      <artifact path="packages/shared/src/types/evidence.ts" type="types">
+        Shared Evidence Types - ConfidenceLevel, EvidenceStatus, HardwareAttestation, etc.
+        - REUSE: Existing evidence types for shared fields
+        - NOTE: Video-specific types (HashChainEvidence, VideoDepthAnalysis) defined in frontend
+      </artifact>
+    </code>
+
+    <dependencies>
+      <!-- Next.js Framework -->
+      <dependency name="next" version="16.x" type="framework">
+        Next.js App Router for server component rendering
+      </dependency>
+
+      <!-- React -->
+      <dependency name="react" version="19.x" type="framework">
+        React for client components (VideoPlayer will be client component)
+      </dependency>
+
+      <!-- Shared Package -->
+      <dependency name="@realitycam/shared" type="internal">
+        Shared TypeScript types for evidence structures
+      </dependency>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <!-- Architecture Constraints -->
+    <constraint type="architecture">
+      Server Component Pattern: Verify page is server component that fetches data, VideoPlayer is client component for interactivity
+    </constraint>
+
+    <constraint type="architecture">
+      Type Detection: Use evidence.type field to distinguish photo vs video (set by backend VideoEvidenceService)
+    </constraint>
+
+    <constraint type="architecture">
+      Component Reuse: MUST reuse existing EvidencePanel, EvidenceRow, ConfidenceBadge components without modification
+    </constraint>
+
+    <constraint type="architecture">
+      Layout Consistency: Video verification page MUST maintain same layout structure as photo verification (two-column grid, same spacing)
+    </constraint>
+
+    <!-- Performance Constraints -->
+    <constraint type="performance">
+      Video File Size: Videos may be ~20MB, use streaming delivery from S3, consider video poster image for faster initial render
+    </constraint>
+
+    <constraint type="performance">
+      Mobile Performance: Video player must perform acceptably on iPhone 12 Pro and newer
+    </constraint>
+
+    <!-- Implementation Constraints -->
+    <constraint type="implementation">
+      HTML5 Video: Use native HTML5 video element with controls attribute, avoid third-party players for MVP
+    </constraint>
+
+    <constraint type="implementation">
+      Mobile Video Attributes: Use playsinline attribute to prevent fullscreen on iOS, preload="metadata" for faster render
+    </constraint>
+
+    <constraint type="implementation">
+      Evidence Mapping: Extend buildEvidenceItems() function with video-specific branches, keep photo logic intact
+    </constraint>
+
+    <!-- Testing Constraints -->
+    <constraint type="testing">
+      E2E Video Testing: Playwright tests verify video player rendering, not playback (Playwright limitation)
+    </constraint>
+
+    <constraint type="testing">
+      Component Tests: Mock video URLs in component tests, use data URLs or test fixtures
+    </constraint>
+
+    <!-- Data Constraints -->
+    <constraint type="data">
+      Partial Video Transparency: Partial videos are valid evidence, display with info styling (blue), NOT error styling (red)
+    </constraint>
+
+    <constraint type="data">
+      Optional Fields: depth_analysis may be missing (gracefully show "unavailable"), location may be opted out
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <!-- Backend Video Evidence Structure (from Story 7-11) -->
+    <interface type="backend-type" source="backend/src/types/video_evidence.rs">
+      VideoEvidence Structure:
+      ```rust
+      pub struct VideoEvidence {
+          pub evidence_type: String,          // "video"
+          pub duration_ms: u64,
+          pub frame_count: u32,
+          pub hardware_attestation: HardwareAttestationEvidence,
+          pub hash_chain: HashChainEvidence,
+          pub depth_analysis: Option&lt;DepthAnalysisEvidence&gt;,
+          pub metadata: MetadataEvidence,
+          pub partial_attestation: PartialAttestationInfo,
+          pub processing: ProcessingInfo,
+      }
+      ```
+    </interface>
+
+    <interface type="backend-type" source="backend/src/types/video_evidence.rs">
+      HashChainEvidence Structure:
+      ```rust
+      pub struct HashChainEvidence {
+          pub status: String,              // "pass", "partial", "fail"
+          pub verified_frames: u32,
+          pub total_frames: u32,
+          pub chain_intact: bool,
+          pub attestation_valid: bool,
+          pub partial_reason: Option&lt;String&gt;,
+          pub verified_duration_ms: u32,
+          pub checkpoint_verified: bool,
+          pub checkpoint_index: Option&lt;u32&gt;,
+      }
+      ```
+    </interface>
+
+    <interface type="backend-type" source="backend/src/types/video_evidence.rs">
+      DepthAnalysisEvidence Structure:
+      ```rust
+      pub struct DepthAnalysisEvidence {
+          pub depth_consistency: f32,      // 0-1
+          pub motion_coherence: f32,       // 0-1
+          pub scene_stability: f32,        // 0-1
+          pub is_likely_real_scene: bool,
+          pub suspicious_frames: Vec&lt;u32&gt;,
+      }
+      ```
+    </interface>
+
+    <interface type="backend-type" source="backend/src/types/video_evidence.rs">
+      PartialAttestationInfo Structure:
+      ```rust
+      pub struct PartialAttestationInfo {
+          pub is_partial: bool,
+          pub checkpoint_index: Option&lt;u32&gt;,
+          pub verified_frames: u32,
+          pub total_frames: u32,
+          pub reason: Option&lt;String&gt;,
+      }
+      ```
+    </interface>
+
+    <interface type="api-endpoint" source="backend/src/routes/verify.rs">
+      GET /api/v1/verify/{id}
+
+      Returns CapturePublicResponse with:
+      - data.evidence.type: "video" (for video captures)
+      - data.evidence: VideoEvidence structure
+      - data.photo_url: Video file URL (or video_url if different)
+      - data.confidence_level: "high" | "medium" | "low" | "suspicious"
+    </interface>
+
+    <interface type="frontend-component" source="apps/web/src/components/Evidence/EvidencePanel.tsx">
+      EvidencePanel Component Interface:
+      ```typescript
+      interface EvidenceItem {
+        label: string;
+        status: ExtendedEvidenceStatus;  // 'pass' | 'fail' | 'unavailable' | 'pending'
+        value?: string;
+      }
+
+      interface EvidencePanelProps {
+        items?: EvidenceItem[];
+        className?: string;
+        defaultExpanded?: boolean;
+      }
+      ```
+    </interface>
+
+    <interface type="frontend-type" source="apps/web/src/lib/api.ts">
+      CapturePublicData Interface (TO BE EXTENDED):
+      ```typescript
+      interface CapturePublicData {
+        capture_id: string;
+        confidence_level: string;
+        captured_at: string;
+        uploaded_at: string;
+        location_coarse?: string;
+        evidence: EvidencePackage;      // Will include VideoEvidence
+        photo_url?: string;              // Also used for video URL
+        depth_map_url?: string;
+      }
+      ```
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit Tests (Vitest):
+      - Video evidence mapping functions
+      - Type guards for video detection
+      - Evidence item builders (buildVideoEvidenceItems)
+      - Duration formatting utilities
+      - Hash chain status mapping
+
+      Component Tests (React Testing Library):
+      - VideoPlayer with mock video URL
+      - PartialVideoBanner with various checkpoint scenarios
+      - Evidence panel with video-specific items
+      - Error states (video not found, processing)
+
+      E2E Tests (Playwright):
+      - Full video verification flow (navigate to /verify/{id}, video renders)
+      - Partial video display (banner shows verified/total duration)
+      - Error states (video not found shows error, processing shows indicator)
+      - Mobile responsive video player (player renders, controls visible)
+
+      Test Coverage Target: 80% for new code
+    </standards>
+
+    <locations>
+      Unit Tests:
+      - apps/web/src/lib/__tests__/video-evidence.test.ts (new)
+      - apps/web/src/lib/__tests__/video-utils.test.ts (new)
+
+      Component Tests:
+      - apps/web/src/components/Media/__tests__/VideoPlayer.test.tsx (new)
+      - apps/web/src/components/Evidence/__tests__/PartialVideoBanner.test.tsx (new)
+
+      E2E Tests:
+      - apps/web/tests/e2e/verify-video.spec.ts (new)
+
+      Test Fixtures:
+      - apps/web/tests/fixtures/video-evidence.json (new)
+      - apps/web/tests/support/fixtures/video.ts (new)
+    </locations>
+
+    <ideas>
+      Unit Test Ideas:
+      - Test video type detection returns true for evidence.type === "video"
+      - Test buildVideoEvidenceItems creates correct evidence array
+      - Test hash chain status mapping (pass, partial, fail)
+      - Test depth analysis status mapping (pass, fail, unavailable)
+      - Test partial attestation formatting ("10s of 12s")
+      - Test frame count formatting ("450 frames (30fps)")
+      - Test duration formatting with partial notation
+
+      Component Test Ideas:
+      - VideoPlayer renders video element with correct src
+      - VideoPlayer shows loading spinner before video loads
+      - VideoPlayer shows error placeholder on load error
+      - PartialVideoBanner shows correct verified/total duration
+      - PartialVideoBanner shows checkpoint index
+      - PartialVideoBanner uses info styling (blue, not red)
+      - Evidence panel shows hash chain row with frame counts
+      - Evidence panel shows temporal depth row with metrics
+
+      E2E Test Ideas:
+      - Navigate to /verify/demo-video shows video player
+      - Video player has playback controls visible
+      - Hash chain evidence shows "450/450 frames verified"
+      - Temporal depth shows formatted metrics
+      - Partial video shows banner with "10s of 12s verified"
+      - Confidence badge shows correct level
+      - Mobile viewport: video player fills width
+      - Error state: Navigate to non-existent video shows error
+      - Processing state: Pending video shows processing indicator
+
+      Integration Test Ideas:
+      - Backend returns video evidence → Frontend displays correctly
+      - Partial video evidence → Banner and evidence reflect partial state
+      - Missing depth analysis → Evidence shows "unavailable"
+      - Broken hash chain → Evidence shows "fail" status
+    </ideas>
+  </tests>
+</story-context>
