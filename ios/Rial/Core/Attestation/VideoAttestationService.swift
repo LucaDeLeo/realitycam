@@ -162,10 +162,15 @@ final class VideoAttestationService {
     // MARK: - Properties
 
     /// Assertion service for DCAppAttest integration
-    private let assertionService: CaptureAssertionService
+    let assertionService: CaptureAssertionService
 
     /// Logger for attestation events
     private static let logger = Logger(subsystem: "app.rial", category: "videoattestation")
+
+    /// Whether hardware attestation is supported on this device.
+    var isAttestationSupported: Bool {
+        assertionService.attestation.isSupported
+    }
 
     // MARK: - Initialization
 

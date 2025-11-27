@@ -1,0 +1,59 @@
+run_id: continuous-run-20251127-103000
+run_started: 2025-11-27T10:30:00Z
+run_ended: null
+branch: main
+initial_commit: 203e242
+
+configuration:
+  jit_epic_context: true
+  max_epic_validation_attempts: 3
+  max_stories: null
+  max_validation_attempts: 3
+  max_review_cycles: 3
+  auto_commit: true
+  auto_push: true
+
+checkpoint:
+  story_key: 7-6-video-metadata-collection
+  phase: verify
+  saved_at: 2025-11-27T10:50:00Z
+  data:
+    story_file_path: docs/sprint-artifacts/stories/7-6-video-metadata-collection.md
+    context_file_path: docs/sprint-artifacts/story-contexts/7-6-video-metadata-collection-context.xml
+    validation_attempts: 1
+    review_cycles: 1
+    files_created:
+      - ios/Rial/Models/VideoMetadata.swift
+      - ios/Rial/Core/Capture/VideoMetadataCollector.swift
+      - ios/RialTests/Capture/VideoMetadataCollectorTests.swift
+    files_modified:
+      - ios/Rial/Core/Capture/VideoRecordingSession.swift
+      - ios/Rial/Core/Attestation/VideoAttestationService.swift
+      - ios/Rial/Core/Attestation/CaptureAssertionService.swift
+      - ios/Rial.xcodeproj/project.pbxproj
+    verification:
+      typecheck: pass
+      tests: pass
+      lint: pass
+
+epics_contexted: []
+
+stories_pending:
+  - 7-6-video-metadata-collection
+  - 7-7-video-local-processing-pipeline
+  - 7-8-video-upload-endpoint
+  - 7-9-video-depth-analysis-service
+  - 7-10-video-hash-chain-verification
+  - 7-11-video-evidence-package
+  - 7-12-c2pa-video-manifest-generation
+  - 7-13-video-verification-page
+  - 7-14-video-capture-ui
+
+stories_processed: []
+
+statistics:
+  epics_contexted_jit: 0
+  epics_already_contexted: 0
+  total_stories: 9
+  success_count: 0
+  failed_count: 0

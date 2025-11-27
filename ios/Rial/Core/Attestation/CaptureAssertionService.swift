@@ -41,7 +41,7 @@ import os.log
 /// captureData.assertion = assertion
 /// ```
 class CaptureAssertionService {
-    private let attestation: DeviceAttestationService
+    let attestation: DeviceAttestationService
     private let keychain: KeychainService
     private static let logger = Logger(subsystem: "app.rial", category: "capture-assertion")
 

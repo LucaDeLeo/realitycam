@@ -1,0 +1,964 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML for 7-6-video-metadata-collection
+  Generated: 2025-11-27
+  Purpose: Implementation context for Video Metadata Collection story
+-->
+<story-context version="1.0">
+
+  <!-- STORY REFERENCE -->
+  <story>
+    <id>7-6-video-metadata-collection</id>
+    <title>Video Metadata Collection</title>
+    <epic>7 - Video Capture with LiDAR Depth</epic>
+    <priority>P0</priority>
+    <effort>S</effort>
+    <file-path>docs/sprint-artifacts/stories/7-6-video-metadata-collection.md</file-path>
+    <dependencies>
+      <dependency>Story 7-1-arkit-video-recording-session</dependency>
+      <dependency>Story 7-5-video-attestation-checkpoints</dependency>
+      <dependency>Story 6-6-frame-processing-pipeline (GPS/device metadata patterns)</dependency>
+    </dependencies>
+    <fr-coverage>FR51 - Video metadata collection (same as photos)</fr-coverage>
+  </story>
+
+  <!-- EPIC CONTEXT -->
+  <epic-context>
+    <tech-spec-path>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md</tech-spec-path>
+    <architecture-path>docs/architecture.md</architecture-path>
+    <summary>
+      Epic 7 extends photo capture to video with 30fps recording, 10fps depth keyframes,
+      hash chain integrity, and checkpoint attestation. Story 7-6 handles metadata collection
+      to match the same metadata structure used for photos but with video-specific fields.
+    </summary>
+  </epic-context>
+
+  <!-- ACCEPTANCE CRITERIA -->
+  <acceptance-criteria>
+    <criterion id="AC-7.6.1" name="Temporal Metadata Collection">
+      <given>video recording starts</given>
+      <when>metadata is collected</when>
+      <then>
+        - Recording start timestamp (UTC, ISO 8601)
+        - Recording end timestamp (UTC, ISO 8601)
+        - Duration in milliseconds (calculated from start/end)
+        - Total frame count (from hash chain)
+        - Depth keyframe count (from DepthKeyframeBuffer)
+      </then>
+    </criterion>
+    <criterion id="AC-7.6.2" name="Device and Location Metadata">
+      <given>video recording starts</given>
+      <when>metadata is collected</when>
+      <then>
+        - Device model (e.g., "iPhone 15 Pro")
+        - iOS version
+        - GPS coordinates at recording start (if location permission granted)
+        - Attestation level ("secure_enclave" or "unverified")
+      </then>
+    </criterion>
+    <criterion id="AC-7.6.3" name="Video-Specific Metadata">
+      <given>video recording completes</given>
+      <when>metadata is finalized</when>
+      <then>
+        - Video resolution (width x height)
+        - Codec ("h264" or "hevc")
+        - Hash chain final hash (base64 encoded)
+        - Assertion from DCAppAttest (base64 encoded)
+      </then>
+    </criterion>
+    <criterion id="AC-7.6.4" name="Metadata Structure Compliance">
+      <given>metadata is collected for a video</given>
+      <when>metadata is serialized to JSON</when>
+      <then>structure matches VideoMetadata spec with snake_case keys</then>
+    </criterion>
+  </acceptance-criteria>
+
+  <!-- TECHNICAL INTERFACES FROM TECH SPEC -->
+  <technical-interfaces>
+
+    <interface name="VideoMetadata" type="struct" location="ios/Rial/Core/Models/VideoMetadata.swift">
+      <description>
+        Metadata collected during video recording for evidence package.
+        Must match the backend VideoUploadMetadata structure with snake_case JSON keys.
+      </description>
+      <swift-definition><![CDATA[
+/// Metadata collected during video recording for evidence package
+struct VideoMetadata: Codable, Equatable {
+    /// Media type identifier
+    let type: String  // Always "video"
+
+    /// Recording start timestamp (UTC)
+    let startedAt: Date
+
+    /// Recording end timestamp (UTC)
+    let endedAt: Date
+
+    /// Total recording duration in milliseconds
+    let durationMs: Int64
+
+    /// Total frame count (30fps * duration)
+    let frameCount: Int
+
+    /// Depth keyframe count (10fps * duration)
+    let depthKeyframeCount: Int
+
+    /// Video resolution
+    let resolution: Resolution
+
+    /// Video codec ("h264" or "hevc")
+    let codec: String
+
+    /// Device model (e.g., "iPhone 15 Pro")
+    let deviceModel: String
+
+    /// iOS version string
+    let iosVersion: String
+
+    /// GPS location at recording start (optional)
+    let location: CaptureLocation?
+
+    /// Attestation level from DCAppAttest
+    let attestationLevel: String
+
+    /// Base64-encoded final hash from hash chain
+    let hashChainFinal: String
+
+    /// Base64-encoded DCAppAttest assertion
+    let assertion: String
+}
+
+/// Video resolution dimensions
+struct Resolution: Codable, Equatable {
+    let width: Int
+    let height: Int
+}
+
+/// GPS location with latitude and longitude (for video - simpler than photo LocationData)
+struct CaptureLocation: Codable, Equatable {
+    let lat: Double
+    let lng: Double
+}
+      ]]></swift-definition>
+      <notes>
+        - Use CodingKeys enum for snake_case JSON serialization
+        - ISO8601DateFormatter for date encoding
+        - CaptureLocation is simpler than existing LocationData (lat/lng only for API)
+      </notes>
+    </interface>
+
+    <interface name="VideoMetadataCollector" type="class" location="ios/Rial/Core/Capture/VideoMetadataCollector.swift">
+      <description>
+        Service that collects metadata during video recording lifecycle.
+        Called at recording start (captures timestamp, location) and end (assembles full metadata).
+      </description>
+      <swift-definition><![CDATA[
+/// Collects metadata during video recording
+final class VideoMetadataCollector {
+    private let logger = Logger(subsystem: "com.rial.app", category: "VideoMetadata")
+    private let locationManager: CLLocationManager
+
+    private var startedAt: Date?
+    private var startLocation: CLLocation?
+
+    init(locationManager: CLLocationManager = CLLocationManager())
+
+    /// Called when recording starts to capture initial metadata
+    func recordingStarted()
+
+    /// Called when recording ends to finalize metadata
+    func recordingEnded(
+        frameCount: Int,
+        depthKeyframeCount: Int,
+        resolution: Resolution,
+        codec: String,
+        hashChainFinal: Data,
+        assertion: Data,
+        attestationLevel: String
+    ) -> VideoMetadata
+
+    /// Get current device model
+    func getDeviceModel() -> String
+
+    /// Get iOS version string
+    func getIOSVersion() -> String
+
+    /// Reset collector for next recording
+    func reset()
+}
+      ]]></swift-definition>
+    </interface>
+
+    <interface name="VideoUploadMetadata" type="rust-struct" location="backend/src/routes/captures_video.rs">
+      <description>Backend expected metadata structure for video upload</description>
+      <rust-definition><![CDATA[
+#[derive(Debug, Deserialize)]
+pub struct VideoUploadMetadata {
+    pub started_at: DateTime<Utc>,
+    pub ended_at: DateTime<Utc>,
+    pub duration_ms: u64,
+    pub frame_count: u32,
+    pub depth_keyframe_count: u32,
+    pub resolution: Resolution,
+    pub codec: String,
+    pub device_model: String,
+    pub location: Option<CaptureLocation>,
+    pub attestation_level: String,
+    pub hash_chain_final: String,      // Base64
+    pub assertion: String,             // Base64 DCAppAttest
+    pub checkpoints: Vec<HashCheckpoint>,
+    pub is_partial: bool,
+}
+      ]]></rust-definition>
+    </interface>
+
+  </technical-interfaces>
+
+  <!-- EXISTING CODE PATTERNS TO FOLLOW -->
+  <existing-code-patterns>
+
+    <pattern name="Photo Metadata Collection" source="ios/Rial/Models/CaptureData.swift">
+      <description>
+        CaptureMetadata struct shows the established pattern for photo metadata.
+        VideoMetadata should follow similar structure with additional video-specific fields.
+      </description>
+      <relevant-code><![CDATA[
+/// Metadata associated with a capture.
+public struct CaptureMetadata: Codable, Sendable, Equatable {
+    /// Timestamp when the frame was captured
+    public let capturedAt: Date
+
+    /// Device model string (e.g., "iPhone 15 Pro")
+    public let deviceModel: String
+
+    /// SHA-256 hash of JPEG data (64-character hex string)
+    public let photoHash: String
+
+    /// GPS location data (optional - nil if denied or unavailable)
+    public let location: LocationData?
+
+    /// Depth map dimensions for reconstruction
+    public let depthMapDimensions: DepthDimensions
+
+    /// iOS version at capture time
+    public let iosVersion: String
+
+    /// App version at capture time
+    public let appVersion: String
+
+    public init(
+        capturedAt: Date,
+        deviceModel: String,
+        photoHash: String,
+        location: LocationData?,
+        depthMapDimensions: DepthDimensions,
+        iosVersion: String = ProcessInfo.processInfo.operatingSystemVersionString,
+        appVersion: String = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    ) {
+        // ...
+    }
+}
+      ]]></relevant-code>
+    </pattern>
+
+    <pattern name="Device Model Detection" source="ios/Rial/Core/Capture/FrameProcessor.swift">
+      <description>
+        Existing pattern for getting device model using UIDevice.
+        Use this exact approach in VideoMetadataCollector.
+      </description>
+      <relevant-code><![CDATA[
+// From FrameProcessor.buildMetadata()
+let deviceModel = UIDevice.current.model
+
+// From CaptureMetadata init
+iosVersion: String = ProcessInfo.processInfo.operatingSystemVersionString
+      ]]></relevant-code>
+    </pattern>
+
+    <pattern name="Location Data" source="ios/Rial/Models/CaptureData.swift">
+      <description>
+        Existing LocationData struct for photos. VideoMetadata uses simpler CaptureLocation
+        (lat/lng only) for API compatibility, but can convert from CLLocation similarly.
+      </description>
+      <relevant-code><![CDATA[
+/// GPS location data for a capture.
+public struct LocationData: Codable, Sendable, Equatable {
+    /// Latitude in decimal degrees (-90 to 90)
+    public let latitude: Double
+
+    /// Longitude in decimal degrees (-180 to 180)
+    public let longitude: Double
+
+    /// Altitude in meters above sea level (optional)
+    public let altitude: Double?
+
+    /// Horizontal accuracy in meters
+    public let accuracy: Double
+
+    /// Timestamp of location measurement
+    public let timestamp: Date
+
+    /// Creates LocationData from a CLLocation.
+    public init(from location: CLLocation) {
+        self.latitude = location.coordinate.latitude
+        self.longitude = location.coordinate.longitude
+        self.altitude = location.altitude.isNaN ? nil : location.altitude
+        self.accuracy = location.horizontalAccuracy
+        self.timestamp = location.timestamp
+    }
+}
+      ]]></relevant-code>
+    </pattern>
+
+    <pattern name="Hash Chain Data" source="ios/Rial/Core/Crypto/HashChainService.swift">
+      <description>
+        HashChainData provides finalHash and frameCount needed for VideoMetadata.
+        The finalHash is Data and needs base64 encoding.
+      </description>
+      <relevant-code><![CDATA[
+/// Container for all frame hashes and checkpoints from a video recording.
+public struct HashChainData: Codable, Sendable {
+    /// All frame hashes at 30fps (up to 450 for 15-second video)
+    public let frameHashes: [Data]
+
+    /// Checkpoint hashes every 5 seconds (up to 3)
+    public let checkpoints: [HashCheckpoint]
+
+    /// Last frame hash for attestation signing (32 bytes)
+    public let finalHash: Data
+
+    /// Total number of frames in chain
+    public var frameCount: Int { frameHashes.count }
+
+    /// Number of checkpoints stored
+    public var checkpointCount: Int { checkpoints.count }
+}
+      ]]></relevant-code>
+    </pattern>
+
+    <pattern name="Video Attestation" source="ios/Rial/Core/Attestation/VideoAttestationService.swift">
+      <description>
+        VideoAttestation provides assertion data needed for VideoMetadata.
+        The assertion is Data and needs base64 encoding.
+      </description>
+      <relevant-code><![CDATA[
+/// Represents a DCAppAttest attestation for a video capture.
+struct VideoAttestation: Codable, Equatable, Sendable {
+    /// Hash that was attested (final hash for complete, checkpoint hash for partial)
+    let finalHash: Data
+
+    /// DCAppAttest signature (CBOR-encoded assertion)
+    let assertion: Data
+
+    /// Attested duration in milliseconds (may be partial if interrupted)
+    let durationMs: Int64
+
+    /// Attested frame count (may be partial if interrupted)
+    let frameCount: Int
+
+    /// True if recording was interrupted and only partial video is attested
+    let isPartial: Bool
+
+    /// Which checkpoint was attested (0=5s, 1=10s, 2=15s), nil for complete recordings
+    let checkpointIndex: Int?
+
+    /// Base64-encoded assertion for JSON serialization.
+    var assertionBase64: String {
+        assertion.base64EncodedString()
+    }
+
+    /// Base64-encoded final hash for logging and metadata.
+    var finalHashBase64: String {
+        finalHash.base64EncodedString()
+    }
+}
+      ]]></relevant-code>
+    </pattern>
+
+    <pattern name="Depth Keyframe Data" source="ios/Rial/Core/Capture/DepthKeyframeBuffer.swift">
+      <description>
+        DepthKeyframeData provides keyframeCount needed for VideoMetadata.
+      </description>
+      <relevant-code><![CDATA[
+/// Container for all depth keyframes captured during video recording.
+public struct DepthKeyframeData: Codable, Sendable {
+    /// Array of keyframe metadata (10fps, up to 150 frames for 15s video)
+    public let frames: [DepthKeyframe]
+
+    /// Depth map resolution (typically 256x192 for LiDAR)
+    public let resolution: CGSize
+
+    /// Gzip-compressed Float32 depth data for all frames
+    public let compressedBlob: Data
+
+    /// Uncompressed size in bytes (for decompression buffer allocation)
+    public let uncompressedSize: Int
+
+    /// Number of keyframes captured
+    public var keyframeCount: Int {
+        frames.count
+    }
+}
+      ]]></relevant-code>
+    </pattern>
+
+    <pattern name="VideoRecordingResult" source="ios/Rial/Core/Capture/VideoRecordingSession.swift">
+      <description>
+        VideoRecordingResult is returned from stopRecording() and contains all the
+        data needed to construct VideoMetadata. The collector should integrate with
+        this result or be called during stopRecording().
+      </description>
+      <relevant-code><![CDATA[
+/// Result of a video recording session.
+public struct VideoRecordingResult: Sendable {
+    /// URL of the recorded video file
+    public let videoURL: URL
+
+    /// Number of frames captured
+    public let frameCount: Int
+
+    /// Recording duration in seconds
+    public let duration: TimeInterval
+
+    /// Video resolution
+    public let resolution: (width: Int, height: Int)
+
+    /// Codec used for encoding
+    public let codec: String
+
+    /// Whether recording was interrupted
+    public let wasInterrupted: Bool
+
+    /// Recording start time
+    public let startedAt: Date
+
+    /// Recording end time
+    public let endedAt: Date
+
+    /// Depth keyframe data captured at 10fps (optional, may be nil if no depth data)
+    public let depthKeyframeData: DepthKeyframeData?
+
+    /// Hash chain data for frame-by-frame cryptographic integrity (optional)
+    public let hashChainData: HashChainData?
+
+    /// Video attestation (DCAppAttest signature, optional if attestation failed)
+    let attestation: VideoAttestation?
+
+    /// Number of depth keyframes captured (convenience property)
+    public var depthKeyframeCount: Int {
+        depthKeyframeData?.keyframeCount ?? 0
+    }
+
+    /// Final hash for attestation signing (convenience property)
+    public var finalHash: Data? {
+        hashChainData?.finalHash
+    }
+}
+      ]]></relevant-code>
+    </pattern>
+
+    <pattern name="Attestation Level Detection" source="ios/Rial/Core/Attestation/DeviceAttestationService.swift">
+      <description>
+        DeviceAttestationService.isSupported can determine attestation level.
+        If supported -> "secure_enclave", otherwise -> "unverified".
+      </description>
+      <relevant-code><![CDATA[
+/// Check if DCAppAttest is supported on this device
+var isSupported: Bool {
+    service.isSupported
+}
+
+// Usage for attestationLevel:
+// let attestationLevel = attestationService.isSupported ? "secure_enclave" : "unverified"
+      ]]></relevant-code>
+    </pattern>
+
+    <pattern name="Logger Usage" source="ios/Rial/Core/Capture/VideoRecordingSession.swift">
+      <description>Standard Logger pattern used throughout the codebase.</description>
+      <relevant-code><![CDATA[
+import os.log
+
+// Class-level static logger
+private static let logger = Logger(subsystem: "app.rial", category: "videorecording")
+
+// Usage
+Self.logger.info("Video recording started - output: \(outputURL.lastPathComponent)")
+Self.logger.debug("Recorded \(currentFrameCount) frames")
+Self.logger.warning("Processing exceeded target")
+Self.logger.error("Failed to append pixel buffer")
+      ]]></relevant-code>
+    </pattern>
+
+  </existing-code-patterns>
+
+  <!-- FILES TO CREATE/MODIFY -->
+  <file-operations>
+
+    <create path="ios/Rial/Core/Models/VideoMetadata.swift">
+      <description>
+        New file defining VideoMetadata, Resolution, and CaptureLocation structs.
+        Must include CodingKeys for snake_case JSON serialization.
+      </description>
+      <template><![CDATA[
+//
+//  VideoMetadata.swift
+//  Rial
+//
+//  Created by RealityCam on 2025-11-27.
+//
+//  Metadata collected during video recording for evidence package.
+//
+
+import Foundation
+import CoreLocation
+
+// MARK: - VideoMetadata
+
+/// Metadata collected during video recording for evidence package.
+///
+/// Contains temporal, device, location, and attestation information
+/// needed for video evidence verification. Designed for JSON serialization
+/// with snake_case keys to match backend API expectations.
+///
+/// ## Usage
+/// ```swift
+/// let metadata = VideoMetadata(
+///     startedAt: recordingStart,
+///     endedAt: recordingEnd,
+///     durationMs: 15000,
+///     frameCount: 450,
+///     depthKeyframeCount: 150,
+///     resolution: Resolution(width: 1920, height: 1080),
+///     codec: "hevc",
+///     deviceModel: "iPhone 15 Pro",
+///     iosVersion: "17.4",
+///     location: CaptureLocation(lat: 37.7749, lng: -122.4194),
+///     attestationLevel: "secure_enclave",
+///     hashChainFinal: "base64...",
+///     assertion: "base64..."
+/// )
+/// ```
+public struct VideoMetadata: Codable, Equatable, Sendable {
+    // TODO: Implement struct with all fields
+    // TODO: Add CodingKeys enum for snake_case
+    // TODO: Add Equatable conformance for testing
+}
+
+// MARK: - Resolution
+
+/// Video resolution dimensions.
+public struct Resolution: Codable, Equatable, Sendable {
+    // TODO: Implement
+}
+
+// MARK: - CaptureLocation
+
+/// GPS location with latitude and longitude for video capture.
+///
+/// Simplified location structure matching backend API expectations.
+/// For more detailed location data (altitude, accuracy), see LocationData.
+public struct CaptureLocation: Codable, Equatable, Sendable {
+    // TODO: Implement
+    // TODO: Add convenience init from CLLocation
+}
+      ]]></template>
+    </create>
+
+    <create path="ios/Rial/Core/Capture/VideoMetadataCollector.swift">
+      <description>
+        New service class that collects metadata during recording lifecycle.
+        Integrates with VideoRecordingSession.
+      </description>
+      <template><![CDATA[
+//
+//  VideoMetadataCollector.swift
+//  Rial
+//
+//  Created by RealityCam on 2025-11-27.
+//
+//  Service for collecting metadata during video recording.
+//
+
+import Foundation
+import CoreLocation
+import UIKit
+import os.log
+
+// MARK: - VideoMetadataCollector
+
+/// Collects metadata during video recording for evidence package.
+///
+/// VideoMetadataCollector captures temporal, device, and location metadata
+/// at recording start and assembles complete VideoMetadata at recording end.
+///
+/// ## Usage
+/// ```swift
+/// let collector = VideoMetadataCollector()
+///
+/// // At recording start
+/// collector.recordingStarted()
+///
+/// // At recording end
+/// let metadata = collector.recordingEnded(
+///     frameCount: result.frameCount,
+///     depthKeyframeCount: result.depthKeyframeCount,
+///     resolution: Resolution(width: 1920, height: 1080),
+///     codec: result.codec,
+///     hashChainFinal: result.finalHash ?? Data(),
+///     assertion: result.attestation?.assertion ?? Data(),
+///     attestationLevel: "secure_enclave"
+/// )
+/// ```
+public final class VideoMetadataCollector {
+    // TODO: Implement
+}
+      ]]></template>
+    </create>
+
+    <modify path="ios/Rial/Core/Capture/VideoRecordingSession.swift">
+      <description>
+        Add VideoMetadataCollector integration to VideoRecordingSession.
+        Call recordingStarted() in startRecording() and recordingEnded() in stopRecording().
+        Add metadata to VideoRecordingResult.
+      </description>
+      <changes>
+        <change location="properties">
+          Add: private let metadataCollector = VideoMetadataCollector()
+        </change>
+        <change location="startRecording()">
+          Add: metadataCollector.recordingStarted() after state = .recording
+        </change>
+        <change location="stopRecording()">
+          Call metadataCollector.recordingEnded() with all parameters
+          Add metadata to VideoRecordingResult
+        </change>
+        <change location="VideoRecordingResult">
+          Add: public let metadata: VideoMetadata? property
+        </change>
+      </changes>
+    </modify>
+
+    <create path="ios/RialTests/Capture/VideoMetadataCollectorTests.swift">
+      <description>Unit tests for VideoMetadataCollector</description>
+    </create>
+
+  </file-operations>
+
+  <!-- INTEGRATION POINTS -->
+  <integration-points>
+
+    <integration name="VideoRecordingSession">
+      <file>ios/Rial/Core/Capture/VideoRecordingSession.swift</file>
+      <description>
+        VideoMetadataCollector should be integrated into VideoRecordingSession:
+        - recordingStarted() called when recording begins
+        - recordingEnded() called when stopRecording() completes
+        - Result added to VideoRecordingResult
+
+        IMPORTANT: VideoRecordingResult.resolution is a tuple (width: Int, height: Int),
+        but VideoMetadataCollector.recordingEnded() expects a Resolution struct.
+        Convert the tuple to struct before calling:
+        ```swift
+        let resolutionStruct = Resolution(
+            width: result.resolution.width,
+            height: result.resolution.height
+        )
+        ```
+      </description>
+      <integration-code><![CDATA[
+// In stopRecording(), after getting all recording data:
+
+// CRITICAL: Convert resolution tuple to Resolution struct
+// VideoRecordingResult.resolution is (width: Int, height: Int) tuple
+// VideoMetadata expects Resolution struct
+let resolutionStruct = Resolution(
+    width: result.resolution.width,
+    height: result.resolution.height
+)
+
+let metadata = metadataCollector.recordingEnded(
+    frameCount: finalFrameCount,
+    depthKeyframeCount: depthKeyframeCount,
+    resolution: resolutionStruct,  // Use converted struct, NOT the tuple
+    codec: "hevc",  // or detect from selectCodec()
+    hashChainFinal: hashChainData.finalHash,
+    assertion: attestation?.assertion ?? Data(),
+    attestationLevel: videoAttestationService.assertionService.attestation.isSupported
+        ? "secure_enclave"
+        : "unverified"
+)
+      ]]></integration-code>
+    </integration>
+
+    <integration name="HashChainService">
+      <file>ios/Rial/Core/Crypto/HashChainService.swift</file>
+      <description>
+        HashChainData.finalHash provides the hash chain final hash for metadata.
+        Must be base64-encoded for JSON serialization.
+      </description>
+      <usage>hashChainFinal: hashChainData.finalHash.base64EncodedString()</usage>
+    </integration>
+
+    <integration name="VideoAttestationService">
+      <file>ios/Rial/Core/Attestation/VideoAttestationService.swift</file>
+      <description>
+        VideoAttestation.assertion provides the DCAppAttest assertion for metadata.
+        Must be base64-encoded for JSON serialization.
+      </description>
+      <usage>assertion: attestation?.assertion.base64EncodedString() ?? ""</usage>
+    </integration>
+
+    <integration name="DepthKeyframeBuffer">
+      <file>ios/Rial/Core/Capture/DepthKeyframeBuffer.swift</file>
+      <description>
+        DepthKeyframeData.keyframeCount provides depth keyframe count for metadata.
+      </description>
+      <usage>depthKeyframeCount: depthData?.keyframeCount ?? 0</usage>
+    </integration>
+
+    <integration name="DeviceAttestationService">
+      <file>ios/Rial/Core/Attestation/DeviceAttestationService.swift</file>
+      <description>
+        DeviceAttestationService.isSupported determines attestation level.
+      </description>
+      <usage>
+        let attestationLevel = attestationService.isSupported ? "secure_enclave" : "unverified"
+      </usage>
+    </integration>
+
+    <integration name="CLLocationManager">
+      <file>CoreLocation framework</file>
+      <description>
+        Location captured at recording start using CLLocationManager.location.
+        Handle nil gracefully when location unavailable or unauthorized.
+      </description>
+      <usage><![CDATA[
+if let location = locationManager.location {
+    startLocation = CaptureLocation(
+        lat: location.coordinate.latitude,
+        lng: location.coordinate.longitude
+    )
+}
+      ]]></usage>
+    </integration>
+
+  </integration-points>
+
+  <!-- DEVELOPMENT CONSTRAINTS -->
+  <constraints>
+
+    <constraint name="JSON Serialization">
+      <description>
+        VideoMetadata must serialize to JSON with snake_case keys.
+        Use CodingKeys enum for key mapping.
+      </description>
+      <example><![CDATA[
+private enum CodingKeys: String, CodingKey {
+    case type
+    case startedAt = "started_at"
+    case endedAt = "ended_at"
+    case durationMs = "duration_ms"
+    case frameCount = "frame_count"
+    case depthKeyframeCount = "depth_keyframe_count"
+    case resolution
+    case codec
+    case deviceModel = "device_model"
+    case iosVersion = "ios_version"
+    case location
+    case attestationLevel = "attestation_level"
+    case hashChainFinal = "hash_chain_final"
+    case assertion
+}
+      ]]></example>
+    </constraint>
+
+    <constraint name="Date Formatting">
+      <description>
+        Dates must be ISO 8601 format for backend compatibility.
+        Use ISO8601DateFormatter with fractional seconds.
+      </description>
+      <example><![CDATA[
+let formatter = ISO8601DateFormatter()
+formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+// Result: "2025-11-27T10:30:00.123Z"
+      ]]></example>
+    </constraint>
+
+    <constraint name="Base64 Encoding">
+      <description>
+        Hash chain final hash and assertion must be base64 encoded strings.
+        Use Data.base64EncodedString() for encoding.
+      </description>
+      <example><![CDATA[
+hashChainFinal: hashData.base64EncodedString()
+assertion: assertionData.base64EncodedString()
+      ]]></example>
+    </constraint>
+
+    <constraint name="Location at Start Only">
+      <description>
+        GPS location is captured only at recording start (not continuously).
+        This matches photo capture behavior and optimizes battery usage.
+      </description>
+    </constraint>
+
+    <constraint name="Graceful Degradation">
+      <description>
+        GPS and device detection should fail gracefully without blocking video capture.
+        Log errors but continue with nil/default values.
+      </description>
+    </constraint>
+
+    <constraint name="Thread Safety">
+      <description>
+        VideoMetadataCollector may be called from different threads.
+        Use appropriate synchronization (NSLock or actor pattern).
+      </description>
+    </constraint>
+
+  </constraints>
+
+  <!-- TESTING REQUIREMENTS -->
+  <testing>
+
+    <unit-tests file="ios/RialTests/Capture/VideoMetadataCollectorTests.swift">
+      <test name="testRecordingStartedCapturesTimestamp">
+        Verify recordingStarted() captures current Date as startedAt
+      </test>
+      <test name="testRecordingEndedCreatesCompleteMetadata">
+        Verify recordingEnded() creates VideoMetadata with all fields populated
+      </test>
+      <test name="testDurationMsCalculation">
+        Verify durationMs is accurately calculated from start/end times
+      </test>
+      <test name="testGetDeviceModelReturnsValidString">
+        Verify getDeviceModel() returns non-empty string
+      </test>
+      <test name="testGetIOSVersionReturnsValidString">
+        Verify getIOSVersion() returns valid version string
+      </test>
+      <test name="testLocationIsNilWhenNotAuthorized">
+        Verify location is nil when CLLocationManager returns nil
+      </test>
+      <test name="testLocationIsCapturedWhenAuthorized">
+        Verify location is captured when CLLocationManager has location (mock)
+      </test>
+      <test name="testHashChainFinalIsBase64Encoded">
+        Verify hashChainFinal is properly base64 encoded
+      </test>
+      <test name="testAssertionIsBase64Encoded">
+        Verify assertion is properly base64 encoded
+      </test>
+      <test name="testResetClearsInternalState">
+        Verify reset() clears startedAt and startLocation
+      </test>
+      <test name="testVideoMetadataCodable">
+        Verify VideoMetadata encodes/decodes correctly
+      </test>
+      <test name="testVideoMetadataEquatable">
+        Verify VideoMetadata Equatable conformance
+      </test>
+      <test name="testJSONSerializationProducesSnakeCaseKeys">
+        Verify JSON output has snake_case keys (started_at, not startedAt)
+      </test>
+      <test name="testJSONRoundTripPreservesAllFields">
+        Verify encode -> decode preserves all field values
+      </test>
+    </unit-tests>
+
+    <integration-tests>
+      <test name="testFullRecordingFlowCapturesAllMetadata" device-required="true">
+        End-to-end test capturing all metadata during actual recording
+      </test>
+      <test name="testMetadataMatchesVideoRecordingResult" device-required="true">
+        Verify metadata values match VideoRecordingResult values
+      </test>
+    </integration-tests>
+
+    <device-tests>
+      <test>Record video and verify startedAt/endedAt timestamps are accurate</test>
+      <test>Record video and verify duration matches actual recording length</test>
+      <test>Verify device model is detected correctly (iPhone 15 Pro, etc.)</test>
+      <test>Verify iOS version is detected correctly</test>
+      <test>Verify GPS coordinates are captured (with location permission)</test>
+      <test>Verify GPS is nil without location permission</test>
+      <test>Verify hash chain final is included in metadata</test>
+      <test>Verify assertion is included in metadata</test>
+    </device-tests>
+
+  </testing>
+
+  <!-- IMPLEMENTATION NOTES -->
+  <implementation-notes>
+
+    <note name="Device Model Detection">
+      <content>
+        UIDevice.current.model returns generic strings like "iPhone" on simulator.
+        For real device model (e.g., "iPhone 15 Pro"), use sysctlbyname or
+        UIDevice.current.modelName extension. The existing FrameProcessor uses
+        UIDevice.current.model which is acceptable for MVP.
+      </content>
+    </note>
+
+    <note name="iOS Version">
+      <content>
+        ProcessInfo.processInfo.operatingSystemVersionString returns the full
+        version string (e.g., "Version 17.4 (Build 21E219)"). Consider using
+        ProcessInfo.processInfo.operatingSystemVersion for structured version.
+      </content>
+    </note>
+
+    <note name="Location Authorization">
+      <content>
+        VideoMetadataCollector should not request location authorization.
+        It should use whatever location is currently available from
+        CLLocationManager.location. If nil, location metadata is nil.
+        Authorization should be handled at app level (CaptureView/ViewModel).
+      </content>
+    </note>
+
+    <note name="Codec Detection">
+      <content>
+        VideoRecordingSession.selectCodec() determines codec (HEVC or H.264).
+        The codec string for metadata should be lowercase: "hevc" or "h264".
+      </content>
+    </note>
+
+    <note name="Frame Count Sources">
+      <content>
+        - frameCount: From HashChainData.frameCount (all 30fps frames)
+        - depthKeyframeCount: From DepthKeyframeData.keyframeCount (10fps)
+
+        Expected values:
+        - 15-second video: 450 frames, 150 depth keyframes
+        - 10-second video: 300 frames, 100 depth keyframes
+      </content>
+    </note>
+
+    <note name="Resolution Tuple to Struct">
+      <content>
+        VideoRecordingResult uses tuple (width: Int, height: Int) for resolution.
+        VideoMetadata needs Resolution struct. Convert:
+        Resolution(width: result.resolution.width, height: result.resolution.height)
+      </content>
+    </note>
+
+  </implementation-notes>
+
+  <!-- DEFINITION OF DONE -->
+  <definition-of-done>
+    <item>All acceptance criteria met (AC-7.6.1 through AC-7.6.4)</item>
+    <item>Code reviewed and approved</item>
+    <item>Unit tests passing with >= 80% coverage for VideoMetadataCollector</item>
+    <item>Integration tests passing on physical device</item>
+    <item>No new lint errors (SwiftLint)</item>
+    <item>VideoMetadata struct matches tech spec structure</item>
+    <item>JSON serialization produces correct snake_case format</item>
+    <item>All temporal fields captured accurately</item>
+    <item>Device and location metadata captured correctly</item>
+    <item>Hash chain and attestation data included</item>
+    <item>Documentation updated (code comments, DocC)</item>
+    <item>VideoRecordingResult includes complete metadata</item>
+    <item>Ready for Story 7.7 (Video Local Processing Pipeline) integration</item>
+  </definition-of-done>
+
+</story-context>

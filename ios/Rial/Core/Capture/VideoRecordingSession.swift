@@ -288,6 +288,9 @@ public final class VideoRecordingSession: NSObject {
     /// Video attestation service for signing hash chains
     private let videoAttestationService: VideoAttestationService
 
+    /// Metadata collector for video evidence package
+    private let metadataCollector = VideoMetadataCollector()
+
     // MARK: - Initialization
 
     /// Creates a new VideoRecordingSession.
@@ -344,6 +347,9 @@ public final class VideoRecordingSession: NSObject {
         interruptedAttestation = nil
         hasConfiguredDimensions = false
 
+        // Reset metadata collector for new recording
+        metadataCollector.reset()
+
         // Initialize depth keyframe buffer for new recording
         depthKeyframeBuffer.startRecording()
 
@@ -382,6 +388,9 @@ public final class VideoRecordingSession: NSObject {
             // Update state
             state = .recording
             recordingStartTime = Date()
+
+            // Start metadata collection
+            metadataCollector.recordingStarted()
 
             // Subscribe to frame updates
             setupFrameCallback()
@@ -494,6 +503,22 @@ public final class VideoRecordingSession: NSObject {
         let savedHeight = videoHeight
         let savedWasInterrupted = wasInterrupted
 
+        // Determine attestation level
+        let attestationLevel = videoAttestationService.isAttestationSupported
+            ? "secure_enclave"
+            : "unverified"
+
+        // Generate video metadata
+        let metadata = metadataCollector.recordingEnded(
+            frameCount: finalFrameCount,
+            depthKeyframeCount: depthKeyframeCount,
+            resolution: Resolution(width: savedWidth, height: savedHeight),
+            codec: "hevc",
+            hashChainFinal: hashChainData.finalHash,
+            assertion: attestation?.assertion ?? Data(),
+            attestationLevel: attestationLevel
+        )
+
         // Cleanup resources
         self.assetWriter = nil
         self.videoInput = nil
@@ -512,7 +537,8 @@ public final class VideoRecordingSession: NSObject {
             endedAt: endTime,
             depthKeyframeData: depthData,
             hashChainData: hashChainData.frameCount > 0 ? hashChainData : nil,
-            attestation: attestation
+            attestation: attestation,
+            metadata: metadata
         )
 
         return result
@@ -843,6 +869,9 @@ public struct VideoRecordingResult: Sendable {
 
     /// Video attestation (DCAppAttest signature, optional if attestation failed)
     let attestation: VideoAttestation?
+
+    /// Video metadata for evidence package (device info, location, timestamps)
+    public let metadata: VideoMetadata
 
     /// Number of depth keyframes captured (convenience property)
     public var depthKeyframeCount: Int {
