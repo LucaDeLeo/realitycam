@@ -14,22 +14,19 @@ configuration:
   auto_push: true
 
 checkpoint:
-  story_key: 7-6-video-metadata-collection
+  story_key: 7-7-video-local-processing-pipeline
   phase: verify
-  saved_at: 2025-11-27T10:50:00Z
+  saved_at: 2025-11-27T11:15:00Z
   data:
-    story_file_path: docs/sprint-artifacts/stories/7-6-video-metadata-collection.md
-    context_file_path: docs/sprint-artifacts/story-contexts/7-6-video-metadata-collection-context.xml
+    story_file_path: docs/sprint-artifacts/stories/7-7-video-local-processing-pipeline.md
+    context_file_path: docs/sprint-artifacts/story-contexts/7-7-video-local-processing-pipeline-context.xml
     validation_attempts: 1
     review_cycles: 1
     files_created:
-      - ios/Rial/Models/VideoMetadata.swift
-      - ios/Rial/Core/Capture/VideoMetadataCollector.swift
-      - ios/RialTests/Capture/VideoMetadataCollectorTests.swift
+      - ios/Rial/Models/ProcessedVideoCapture.swift
+      - ios/Rial/Core/Capture/VideoProcessingPipeline.swift
+      - ios/RialTests/Capture/VideoProcessingPipelineTests.swift
     files_modified:
-      - ios/Rial/Core/Capture/VideoRecordingSession.swift
-      - ios/Rial/Core/Attestation/VideoAttestationService.swift
-      - ios/Rial/Core/Attestation/CaptureAssertionService.swift
       - ios/Rial.xcodeproj/project.pbxproj
     verification:
       typecheck: pass
@@ -39,7 +36,6 @@ checkpoint:
 epics_contexted: []
 
 stories_pending:
-  - 7-6-video-metadata-collection
   - 7-7-video-local-processing-pipeline
   - 7-8-video-upload-endpoint
   - 7-9-video-depth-analysis-service
@@ -49,11 +45,17 @@ stories_pending:
   - 7-13-video-verification-page
   - 7-14-video-capture-ui
 
-stories_processed: []
+stories_processed:
+  - story_key: 7-6-video-metadata-collection
+    status: success
+    commit: 7a27118
+    review_cycles: 1
+    started_at: 2025-11-27T10:30:00Z
+    completed_at: 2025-11-27T10:55:00Z
 
 statistics:
   epics_contexted_jit: 0
-  epics_already_contexted: 0
+  epics_already_contexted: 1
   total_stories: 9
-  success_count: 0
+  success_count: 1
   failed_count: 0
