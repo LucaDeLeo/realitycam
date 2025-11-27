@@ -250,10 +250,10 @@ struct CaptureControlsBar: View {
 
     var body: some View {
         HStack {
-            // Depth toggle (disabled during recording)
+            // Depth/Edge toggle (Story 7.3: ENABLED during recording for edge overlay)
+            // In video mode, this toggles the edge overlay visibility
+            // In photo mode, this toggles the full colormap overlay
             DepthOverlayToggleButton(isVisible: $showDepthOverlay)
-                .opacity(isRecordingVideo ? 0.3 : 1.0)
-                .disabled(isRecordingVideo)
 
             Spacer()
 

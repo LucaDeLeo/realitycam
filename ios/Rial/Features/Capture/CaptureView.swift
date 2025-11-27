@@ -14,11 +14,20 @@ import ARKit
 ///
 /// ## Features
 /// - Full-screen ARKit camera preview
-/// - Real-time LiDAR depth visualization overlay
+/// - Real-time LiDAR depth visualization overlay (photo mode: full colormap)
+/// - Real-time edge depth overlay (video mode: Sobel edge detection, Story 7.3)
 /// - Large capture button with haptic feedback (tap for photo, hold for video)
 /// - Video recording with timer and indicator
 /// - Capture preview with Use/Retake options
 /// - Permission handling
+///
+/// ## Depth Overlay Modes
+/// - **Photo mode**: Full colormap depth visualization (red=near, blue=far)
+/// - **Video mode**: Edge-only depth visualization (cyan=near, magenta=far)
+///
+/// The edge overlay in video mode is sparse and doesn't obscure the preview,
+/// while still providing depth feedback. It renders to preview ONLY - the
+/// recorded video contains raw RGB frames without any overlay.
 ///
 /// ## Usage
 /// ```swift
@@ -29,10 +38,10 @@ import ARKit
 struct CaptureView: View {
     @StateObject private var viewModel = CaptureViewModel()
 
-    /// Whether to show depth overlay
+    /// Whether to show depth overlay (photo mode - full colormap)
     @State private var showDepthOverlay = true
 
-    /// Depth overlay opacity
+    /// Depth overlay opacity (photo mode)
     @State private var depthOpacity: Float = 0.4
 
     /// Whether to show history sheet
@@ -94,8 +103,21 @@ struct CaptureView: View {
                     .ignoresSafeArea()
             }
 
-            // Depth Overlay
-            if showDepthOverlay {
+            // Depth Overlay - mode-dependent (Story 7.3)
+            // Video mode: Edge-only overlay (sparse, doesn't obscure preview)
+            // Photo mode: Full colormap overlay (red=near, blue=far)
+            if viewModel.isRecordingVideo {
+                // Edge overlay for video mode (Story 7.3)
+                // Renders to preview ONLY - NOT in recorded video
+                EdgeDepthOverlayView(
+                    depthFrame: viewModel.currentDepthFrame,
+                    edgeThreshold: viewModel.edgeThreshold,
+                    isVisible: $viewModel.showEdgeOverlay
+                )
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+            } else if showDepthOverlay {
+                // Full colormap overlay for photo mode
                 DepthOverlayView(
                     depthFrame: viewModel.currentDepthFrame,
                     opacity: $depthOpacity,
@@ -128,8 +150,9 @@ struct CaptureView: View {
                 }
 
                 // Bottom controls
+                // Toggle binding switches between photo (colormap) and video (edge) overlay
                 CaptureControlsBar(
-                    showDepthOverlay: $showDepthOverlay,
+                    showDepthOverlay: viewModel.isRecordingVideo ? $viewModel.showEdgeOverlay : $showDepthOverlay,
                     isCapturing: viewModel.isCapturing,
                     isRecordingVideo: viewModel.isRecordingVideo,
                     recordingDuration: viewModel.recordingDuration,

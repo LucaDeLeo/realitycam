@@ -1,0 +1,848 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML for 7-3-realtime-edge-depth-overlay
+  Generated: 2025-11-26
+  Epic: 7 - Video Capture with LiDAR Depth
+
+  This context file provides all relevant documentation, code references,
+  and implementation guidance for story 7-3.
+-->
+<story-context>
+  <metadata>
+    <story-key>7-3-realtime-edge-depth-overlay</story-key>
+    <story-title>Real-time Edge Depth Overlay</story-title>
+    <epic-id>7</epic-id>
+    <epic-title>Video Capture with LiDAR Depth</epic-title>
+    <priority>P1</priority>
+    <effort>M</effort>
+    <generated-at>2025-11-26</generated-at>
+  </metadata>
+
+  <!-- Story Reference -->
+  <story-reference>
+    <file-path>docs/sprint-artifacts/stories/7-3-realtime-edge-depth-overlay.md</file-path>
+    <description>Full story definition with acceptance criteria and implementation tasks</description>
+    <summary>
+      Implement real-time Sobel edge detection overlay on depth buffer during video recording.
+      Edge-only visualization (not full colormap) provides depth feedback without obscuring
+      camera preview. Near edges render cyan, far edges render magenta. Overlay renders to
+      preview only - recorded video contains raw RGB frames. Toggle button persists state.
+    </summary>
+  </story-reference>
+
+  <!-- Epic Context -->
+  <epic-context>
+    <tech-spec-path>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md</tech-spec-path>
+    <architecture-path>docs/architecture.md</architecture-path>
+    <relevant-sections>
+      <section name="Edge Detection Shader (Metal)">Lines 361-415 of tech-spec</section>
+      <section name="AC-7.3: Edge Depth Overlay">Lines 615-620 of tech-spec</section>
+      <section name="ADR-010: Video Architecture Pattern 4">Edge-only overlay pattern</section>
+      <section name="Performance Requirements">Edge shader < 3ms per frame</section>
+    </relevant-sections>
+  </epic-context>
+
+  <!-- Acceptance Criteria Summary -->
+  <acceptance-criteria>
+    <criterion id="AC-7.3.1" title="Edge-Only Overlay Rendering">
+      Sobel edge detection applied to depth buffer (NOT full colormap).
+      Edge-only overlay renders at 30fps. Near edges cyan, far edges magenta.
+      Performance target: less than 3ms per frame GPU time.
+    </criterion>
+    <criterion id="AC-7.3.2" title="Preview-Only Rendering">
+      Overlay renders ONLY to preview layer (MTKView).
+      Recorded video does NOT contain any overlay.
+      Video file contains original RGB frames only.
+    </criterion>
+    <criterion id="AC-7.3.3" title="Toggle Button Control">
+      Toggle button shows overlay state with SF Symbol: eye (on) / eye.slash (off).
+      Toggle state persists in UserDefaults.
+      Overlay visibility changes instantly (same frame).
+      Toggle works during active recording.
+    </criterion>
+    <criterion id="AC-7.3.4" title="Performance Budget Compliance">
+      Edge shader execution less than 3ms per frame.
+      CPU impact less than 15% additional.
+      GPU impact less than 25% additional.
+      No dropped frames in recorded video.
+    </criterion>
+    <criterion id="AC-7.3.5" title="Edge Detection Configuration">
+      Edge threshold configurable (default: 0.1).
+      Near plane set to 0.5m for edge coloring.
+      Far plane set to 5.0m for edge coloring.
+      Invalid depth values (NaN, Inf) handled gracefully (transparent).
+    </criterion>
+  </acceptance-criteria>
+
+  <!-- Documentation Artifacts -->
+  <documentation-artifacts>
+    <artifact type="tech-spec">
+      <path>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md</path>
+      <description>Epic 7 technical specification with Edge Detection Shader design</description>
+      <relevance>
+        Contains complete Metal shader implementation for Sobel edge detection.
+        Defines data models, API contracts, and performance requirements.
+        Section "Edge Detection Shader (Metal)" provides the fragment shader code.
+      </relevance>
+    </artifact>
+
+    <artifact type="architecture">
+      <path>docs/architecture.md</path>
+      <description>System architecture with ADR-010 Video Architecture patterns</description>
+      <relevance>
+        ADR-010 Pattern 4: Edge-Only Overlay explains why edge detection instead of colormap.
+        Metal shader patterns and performance targets defined.
+        Project structure shows Shaders/ directory location.
+      </relevance>
+    </artifact>
+
+    <artifact type="dependency-story">
+      <path>docs/sprint-artifacts/stories/6-7-metal-depth-visualization.md</path>
+      <description>Story 6.7 - Metal depth visualization (photo mode)</description>
+      <relevance>
+        Provides patterns for DepthVisualizer class, Metal pipeline setup,
+        texture creation, and SwiftUI wrapper (DepthOverlayView).
+        Edge overlay should follow similar patterns but with Sobel shader.
+      </relevance>
+    </artifact>
+
+    <artifact type="dependency-story">
+      <path>docs/sprint-artifacts/stories/7-1-arkit-video-recording-session.md</path>
+      <description>Story 7.1 - ARKit Video Recording Session</description>
+      <relevance>
+        VideoRecordingSession is the integration point for edge overlay.
+        Frame callbacks provide depth data for edge visualization.
+        Recording pipeline must remain separate from preview overlay.
+      </relevance>
+    </artifact>
+
+    <artifact type="dependency-story">
+      <path>docs/sprint-artifacts/stories/7-2-depth-keyframe-extraction.md</path>
+      <description>Story 7.2 - Depth Keyframe Extraction</description>
+      <relevance>
+        DepthKeyframeBuffer patterns for depth buffer handling.
+        Thread safety patterns with NSLock.
+        Depth buffer pixel format validation.
+      </relevance>
+    </artifact>
+  </documentation-artifacts>
+
+  <!-- Existing Code Interfaces -->
+  <existing-code>
+    <interface type="class" priority="critical">
+      <name>DepthVisualizer</name>
+      <path>ios/Rial/Core/Capture/DepthVisualizer.swift</path>
+      <description>
+        Existing Metal-based depth visualization for photo mode (Story 6.7).
+        Renders full colormap overlay at 60fps. EdgeDepthVisualizer should
+        follow the same patterns but use Sobel edge detection shader instead.
+      </description>
+      <key-patterns>
+        <pattern name="Metal Pipeline Setup">
+          setupPipeline() creates MTLRenderPipelineState from shader library.
+          Uses vertex/fragment function names from .metal file.
+        </pattern>
+        <pattern name="Vertex Buffer">
+          Full-screen quad with 6 vertices (2 triangles).
+          Clip space coordinates -1 to 1.
+        </pattern>
+        <pattern name="Texture Creation">
+          createDepthTexture(from: CVPixelBuffer) converts depth to r32Float texture.
+          Uses shared storage mode for CPU/GPU access.
+        </pattern>
+        <pattern name="Render Method">
+          render(depthFrame:, to:, opacity:) encodes draw commands.
+          Sets fragment textures and parameter buffers.
+          Alpha blending enabled for transparency.
+        </pattern>
+      </key-patterns>
+      <code-snippet title="Pipeline Setup Pattern">
+<![CDATA[
+private func setupPipeline() throws {
+    guard let library = device.makeDefaultLibrary() else {
+        throw VisualizationError.shaderCompilationFailed
+    }
+
+    guard let vertexFunction = library.makeFunction(name: "depthVertex"),
+          let fragmentFunction = library.makeFunction(name: "depthFragment") else {
+        throw VisualizationError.shaderCompilationFailed
+    }
+
+    let descriptor = MTLRenderPipelineDescriptor()
+    descriptor.vertexFunction = vertexFunction
+    descriptor.fragmentFunction = fragmentFunction
+    descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+
+    // Enable alpha blending for overlay transparency
+    descriptor.colorAttachments[0].isBlendingEnabled = true
+    descriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
+    descriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+
+    pipelineState = try device.makeRenderPipelineState(descriptor: descriptor)
+}
+]]>
+      </code-snippet>
+    </interface>
+
+    <interface type="shader" priority="critical">
+      <name>DepthVisualization.metal</name>
+      <path>ios/Rial/Shaders/DepthVisualization.metal</path>
+      <description>
+        Existing Metal shader for full colormap depth visualization.
+        Edge shader should reuse VertexOut struct and depthVertex function.
+        New edgeDepthFragment function implements Sobel edge detection.
+      </description>
+      <key-patterns>
+        <pattern name="VertexOut Struct">
+          position [[position]] and texCoord for full-screen quad.
+        </pattern>
+        <pattern name="Texture Sampling">
+          constexpr sampler with linear filter, clamp_to_edge addressing.
+        </pattern>
+        <pattern name="Invalid Depth Handling">
+          Check isinf(depth), isnan(depth), depth less than 0 for transparent output.
+        </pattern>
+        <pattern name="Depth Normalization">
+          saturate((depth - nearPlane) / (farPlane - nearPlane))
+        </pattern>
+      </key-patterns>
+      <code-snippet title="Shader Structure Pattern">
+<![CDATA[
+struct VertexOut {
+    float4 position [[position]];
+    float2 texCoord;
+};
+
+vertex VertexOut depthVertex(
+    uint vertexID [[vertex_id]],
+    constant float2 *positions [[buffer(0)]]
+) {
+    VertexOut out;
+    float2 pos = positions[vertexID];
+    out.position = float4(pos, 0.0, 1.0);
+    out.texCoord = (pos + 1.0) * 0.5;
+    out.texCoord.y = 1.0 - out.texCoord.y;  // Flip Y
+    return out;
+}
+]]>
+      </code-snippet>
+    </interface>
+
+    <interface type="view" priority="critical">
+      <name>DepthOverlayView</name>
+      <path>ios/Rial/Features/Capture/DepthOverlayView.swift</path>
+      <description>
+        SwiftUI wrapper for Metal-based depth overlay.
+        EdgeDepthOverlayView should follow the same UIViewRepresentable pattern.
+        Includes toggle button and opacity slider components.
+      </description>
+      <key-patterns>
+        <pattern name="UIViewRepresentable">
+          makeUIView creates MTKView with Metal device.
+          updateUIView passes depthFrame, opacity, isVisible to Coordinator.
+          Coordinator implements MTKViewDelegate.
+        </pattern>
+        <pattern name="MTKView Configuration">
+          framebufferOnly = false, isPaused = false, enableSetNeedsDisplay = false.
+          preferredFramesPerSecond = 60 (use 30 for video mode).
+          Transparent background with clearColor alpha = 0.
+        </pattern>
+        <pattern name="Toggle Button">
+          DepthOverlayToggleButton uses eye/eye.slash SF Symbols.
+        </pattern>
+      </key-patterns>
+      <code-snippet title="UIViewRepresentable Pattern">
+<![CDATA[
+public struct DepthOverlayView: UIViewRepresentable {
+    public let depthFrame: DepthFrame?
+    @Binding public var opacity: Float
+    @Binding public var isVisible: Bool
+
+    public func makeUIView(context: Context) -> MTKView {
+        let metalView = MTKView()
+        metalView.device = context.coordinator.visualizer?.device
+        metalView.delegate = context.coordinator
+        metalView.framebufferOnly = false
+        metalView.isPaused = false
+        metalView.enableSetNeedsDisplay = false
+        metalView.preferredFramesPerSecond = 60
+        metalView.clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
+        metalView.isOpaque = false
+        metalView.backgroundColor = .clear
+        return metalView
+    }
+
+    public func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+}
+]]>
+      </code-snippet>
+    </interface>
+
+    <interface type="class" priority="high">
+      <name>VideoRecordingSession</name>
+      <path>ios/Rial/Core/Capture/VideoRecordingSession.swift</path>
+      <description>
+        Video recording session that integrates with ARCaptureSession.
+        Edge overlay should render during recording but NOT into the recorded video.
+        Frame callbacks (onFrameProcessed) provide ARFrame with depth data.
+      </description>
+      <key-patterns>
+        <pattern name="Frame Callback">
+          onFrameProcessed: ((ARFrame, Int) -> Void)? delivers frames during recording.
+          Frame contains sceneDepth for edge visualization.
+        </pattern>
+        <pattern name="Recording State">
+          RecordingState enum: idle, recording, processing, error.
+          isRecording check for conditional overlay rendering.
+        </pattern>
+        <pattern name="Separation Verification">
+          AVAssetWriter only receives raw RGB pixel buffers (frame.capturedImage).
+          No overlay compositing in recording pipeline.
+        </pattern>
+      </key-patterns>
+    </interface>
+
+    <interface type="class" priority="high">
+      <name>CaptureView</name>
+      <path>ios/Rial/Features/Capture/CaptureView.swift</path>
+      <description>
+        Main capture screen integrating camera preview, depth overlay, and controls.
+        Edge overlay needs to be added for video mode (currently uses DepthOverlayView for photo mode).
+      </description>
+      <key-patterns>
+        <pattern name="Overlay Layering">
+          ZStack with ARViewContainer, DepthOverlayView, controls overlay.
+          Edge overlay should be conditionally rendered when in video mode.
+        </pattern>
+        <pattern name="State Variables">
+          @State showDepthOverlay: Bool controls visibility.
+          @State depthOpacity: Float controls transparency.
+        </pattern>
+        <pattern name="Recording UI">
+          isRecordingVideo state shows/hides certain controls.
+          Edge overlay toggle should work during recording.
+        </pattern>
+      </key-patterns>
+      <modification-guidance>
+        Add EdgeDepthOverlayView conditionally when isRecordingVideo is true.
+        Use same toggle button for both photo mode (colormap) and video mode (edge).
+        Add UserDefaults persistence for overlay visibility preference.
+      </modification-guidance>
+    </interface>
+
+    <interface type="class" priority="high">
+      <name>CaptureViewModel</name>
+      <path>ios/Rial/Features/Capture/CaptureViewModel.swift</path>
+      <description>
+        View model managing capture state including video recording.
+        Provides currentDepthFrame for visualization.
+      </description>
+      <key-patterns>
+        <pattern name="Depth Frame Publishing">
+          @Published currentDepthFrame: DepthFrame? updated from ARKit frame callback.
+          Already available during video recording.
+        </pattern>
+        <pattern name="Video State">
+          @Published isRecordingVideo: Bool indicates video mode.
+          recordingDuration, recordingFrameCount for UI.
+        </pattern>
+      </key-patterns>
+      <modification-guidance>
+        Add @Published showEdgeOverlay: Bool with UserDefaults persistence.
+        Add edgeThreshold: Float constant (default 0.1).
+        Ensure currentDepthFrame is published during video recording (already done).
+      </modification-guidance>
+    </interface>
+
+    <interface type="struct" priority="medium">
+      <name>DepthFrame</name>
+      <path>ios/Rial/Core/Capture/DepthVisualizer.swift</path>
+      <description>
+        Data structure containing depth map and metadata for visualization.
+        Used by both DepthVisualizer and EdgeDepthVisualizer.
+      </description>
+      <code-snippet title="DepthFrame Definition">
+<![CDATA[
+public struct DepthFrame: Sendable {
+    public let depthMap: CVPixelBuffer
+    public let width: Int
+    public let height: Int
+    public let timestamp: TimeInterval
+    public let intrinsics: simd_float3x3
+    public let transform: simd_float4x4
+
+    public init?(from arFrame: ARFrame) {
+        guard let sceneDepth = arFrame.sceneDepth else { return nil }
+        self.depthMap = sceneDepth.depthMap
+        // ... other properties
+    }
+}
+]]>
+      </code-snippet>
+    </interface>
+
+    <interface type="enum" priority="medium">
+      <name>VisualizationError</name>
+      <path>ios/Rial/Core/Capture/DepthVisualizer.swift</path>
+      <description>
+        Error enum for depth visualization failures.
+        EdgeDepthVisualizer should use same or similar error cases.
+      </description>
+      <code-snippet title="Error Enum">
+<![CDATA[
+public enum VisualizationError: Error, LocalizedError, Equatable {
+    case metalNotAvailable
+    case shaderCompilationFailed
+    case commandQueueCreationFailed
+    case depthTextureCreationFailed
+    case renderEncodingFailed
+
+    public var errorDescription: String? {
+        switch self {
+        case .metalNotAvailable:
+            return "Metal graphics not available on this device"
+        // ... other cases
+        }
+    }
+}
+]]>
+      </code-snippet>
+    </interface>
+
+    <interface type="class" priority="medium">
+      <name>DepthKeyframeBuffer</name>
+      <path>ios/Rial/Core/Capture/DepthKeyframeBuffer.swift</path>
+      <description>
+        Thread-safe buffer for depth keyframes (Story 7.2).
+        Provides patterns for NSLock thread safety and depth buffer validation.
+      </description>
+      <key-patterns>
+        <pattern name="Thread Safety">
+          NSLock for synchronized access to mutable state.
+          lock.lock() / defer { lock.unlock() } pattern.
+        </pattern>
+        <pattern name="Pixel Format Validation">
+          CVPixelBufferGetPixelFormatType() == kCVPixelFormatType_DepthFloat32
+        </pattern>
+      </key-patterns>
+    </interface>
+
+    <interface type="class" priority="medium">
+      <name>ARCaptureSession</name>
+      <path>ios/Rial/Core/Capture/ARCaptureSession.swift</path>
+      <description>
+        ARKit session wrapper providing synchronized RGB+depth frames.
+        Provides depth data via onFrameUpdate callback.
+      </description>
+      <key-patterns>
+        <pattern name="Frame Callback">
+          onFrameUpdate: ((ARFrame) -> Void)? for frame delivery.
+          ARFrame.sceneDepth?.depthMap provides CVPixelBuffer.
+        </pattern>
+      </key-patterns>
+    </interface>
+  </existing-code>
+
+  <!-- Development Constraints -->
+  <development-constraints>
+    <constraint type="performance" priority="critical">
+      <name>Edge Shader Performance</name>
+      <requirement>Edge shader execution must be less than 3ms per frame at 30fps</requirement>
+      <rationale>
+        Video encoding consumes significant GPU resources. Edge-only detection
+        is ~3x faster than full colormap, fitting within performance budget.
+      </rationale>
+      <validation>
+        Profile with Xcode Metal debugger to verify GPU time.
+        Test on iPhone 12 Pro (oldest supported device).
+      </validation>
+    </constraint>
+
+    <constraint type="performance" priority="critical">
+      <name>No Dropped Frames</name>
+      <requirement>Recording pipeline must maintain 30fps with no dropped frames</requirement>
+      <rationale>
+        Edge overlay renders to preview only, not to recorded video.
+        This separation ensures recording pipeline is not impacted.
+      </rationale>
+      <validation>
+        Record 15-second video with overlay enabled.
+        Verify frameCount matches expected (450 frames).
+      </validation>
+    </constraint>
+
+    <constraint type="architecture" priority="critical">
+      <name>Preview/Recording Separation</name>
+      <requirement>Overlay must render ONLY to MTKView preview, NOT to recorded video</requirement>
+      <rationale>
+        Users need depth feedback during recording, but final video must be
+        clean for verification and C2PA embedding.
+      </rationale>
+      <implementation>
+        AVAssetWriter receives raw frame.capturedImage (RGB only).
+        EdgeDepthOverlayView renders to separate MTKView layer.
+        No compositing between overlay and recording pipeline.
+      </implementation>
+    </constraint>
+
+    <constraint type="ux" priority="high">
+      <name>Toggle State Persistence</name>
+      <requirement>Overlay visibility preference must persist in UserDefaults</requirement>
+      <rationale>
+        Users should not need to re-enable overlay every time they open the app.
+        Consistent with standard iOS app behavior.
+      </rationale>
+      <implementation>
+        Use UserDefaults.standard with key like "edgeOverlayEnabled".
+        Initialize @Published property from UserDefaults in init().
+        Update UserDefaults when toggle changes.
+      </implementation>
+    </constraint>
+
+    <constraint type="algorithm" priority="high">
+      <name>Sobel Edge Detection</name>
+      <requirement>Must use Sobel operator for depth edge detection</requirement>
+      <rationale>
+        Sobel operator is efficient (3x3 convolution) and produces clean edges.
+        Standard algorithm with well-understood performance characteristics.
+      </rationale>
+      <implementation>
+        Gx kernel: [[-1,0,1],[-2,0,2],[-1,0,1]]
+        Gy kernel: [[-1,-2,-1],[0,0,0],[1,2,1]]
+        edge = sqrt(Gx^2 + Gy^2)
+        Threshold at 0.1 for sparse edge output.
+      </implementation>
+    </constraint>
+
+    <constraint type="visual" priority="medium">
+      <name>Edge Color Scheme</name>
+      <requirement>Near edges cyan (0,1,1), far edges magenta (1,0,1)</requirement>
+      <rationale>
+        High contrast against typical scene colors.
+        Different from photo mode's red-blue gradient (avoids confusion).
+        Visible on both light and dark backgrounds.
+      </rationale>
+    </constraint>
+  </development-constraints>
+
+  <!-- Dependencies -->
+  <dependencies>
+    <internal-dependency type="framework">
+      <name>Metal</name>
+      <version>iOS 15+</version>
+      <usage>GPU shader execution for edge detection</usage>
+    </internal-dependency>
+
+    <internal-dependency type="framework">
+      <name>MetalKit</name>
+      <version>iOS 15+</version>
+      <usage>MTKView for preview rendering, MTKViewDelegate</usage>
+    </internal-dependency>
+
+    <internal-dependency type="framework">
+      <name>ARKit</name>
+      <version>iOS 15+</version>
+      <usage>ARFrame.sceneDepth for LiDAR depth data</usage>
+    </internal-dependency>
+
+    <internal-dependency type="module">
+      <name>DepthVisualizer</name>
+      <path>ios/Rial/Core/Capture/DepthVisualizer.swift</path>
+      <usage>Reuse patterns for Metal pipeline, texture creation, error handling</usage>
+    </internal-dependency>
+
+    <internal-dependency type="module">
+      <name>DepthOverlayView</name>
+      <path>ios/Rial/Features/Capture/DepthOverlayView.swift</path>
+      <usage>Reuse UIViewRepresentable pattern for SwiftUI wrapper</usage>
+    </internal-dependency>
+
+    <internal-dependency type="module">
+      <name>VideoRecordingSession</name>
+      <path>ios/Rial/Core/Capture/VideoRecordingSession.swift</path>
+      <usage>Integration point - verify recording pipeline separation</usage>
+    </internal-dependency>
+
+    <internal-dependency type="struct">
+      <name>DepthFrame</name>
+      <path>ios/Rial/Core/Capture/DepthVisualizer.swift</path>
+      <usage>Input data structure for edge visualization</usage>
+    </internal-dependency>
+  </dependencies>
+
+  <!-- Testing Context -->
+  <testing-context>
+    <framework>XCTest</framework>
+    <coverage-target>80% for EdgeDepthVisualizer</coverage-target>
+
+    <unit-tests>
+      <test name="EdgeDepthVisualizerInitializationTests">
+        <description>Test EdgeDepthVisualizer initialization and pipeline setup</description>
+        <file>ios/RialTests/Capture/EdgeDepthVisualizerTests.swift</file>
+        <cases>
+          <case>testInitSuccess - Verify initializer succeeds on Metal-capable device</case>
+          <case>testShaderCompilation - Verify edgeDepthVertex/edgeDepthFragment load</case>
+          <case>testPipelineStateCreation - Verify MTLRenderPipelineState created</case>
+          <case>testVertexBufferSetup - Verify full-screen quad vertices</case>
+        </cases>
+        <note>Use XCTSkip for tests requiring Metal GPU on simulator</note>
+      </test>
+
+      <test name="EdgeDepthVisualizerParameterTests">
+        <description>Test parameter buffer setup for shader uniforms</description>
+        <file>ios/RialTests/Capture/EdgeDepthVisualizerTests.swift</file>
+        <cases>
+          <case>testNearPlaneDefault - Verify nearPlane defaults to 0.5</case>
+          <case>testFarPlaneDefault - Verify farPlane defaults to 5.0</case>
+          <case>testEdgeThresholdDefault - Verify edgeThreshold defaults to 0.1</case>
+          <case>testParameterBufferBinding - Verify parameters passed to shader</case>
+        </cases>
+      </test>
+
+      <test name="EdgeDepthVisualizerErrorTests">
+        <description>Test error handling for edge detection failures</description>
+        <file>ios/RialTests/Capture/EdgeDepthVisualizerTests.swift</file>
+        <cases>
+          <case>testMetalNotAvailableError - Verify error thrown when Metal unavailable</case>
+          <case>testShaderCompilationError - Verify error for missing shaders</case>
+          <case>testTextureCreationError - Verify error for invalid pixel buffer</case>
+          <case>testErrorLocalizedDescription - Verify LocalizedError conformance</case>
+        </cases>
+      </test>
+    </unit-tests>
+
+    <integration-tests>
+      <test name="EdgeOverlayRenderingTests" device-required="true">
+        <description>Full rendering flow with real depth data</description>
+        <cases>
+          <case>testFullRenderingFlow - Render edge overlay with ARFrame depth</case>
+          <case>testToggleDuringRecording - Toggle overlay on/off while recording</case>
+          <case>testOverlayVisibilityPersistence - Verify UserDefaults persistence</case>
+          <case>testModeSwitching - Switch between photo mode and video mode</case>
+        </cases>
+      </test>
+    </integration-tests>
+
+    <device-tests type="manual">
+      <test>Record 5-second video with edge overlay enabled, verify no overlay in output</test>
+      <test>Record 15-second video, verify no dropped frames</test>
+      <test>Toggle overlay during recording, verify instant response</test>
+      <test>Verify edge colors match depth (cyan near, magenta far)</test>
+      <test>Test on iPhone 12 Pro for thermal/performance behavior</test>
+      <test>Verify overlay disabled state has no performance impact</test>
+    </device-tests>
+
+    <performance-tests>
+      <test>Profile with Xcode Metal debugger for GPU time less than 3ms</test>
+      <test>Monitor CPU usage stays less than 15% additional</test>
+      <test>Monitor GPU usage stays less than 25% additional</test>
+      <test>Memory impact less than 20MB additional</test>
+    </performance-tests>
+  </testing-context>
+
+  <!-- Implementation Notes -->
+  <implementation-notes>
+    <note priority="critical" title="Sobel Edge Detection Algorithm">
+      The Sobel operator computes depth gradient magnitude using 3x3 convolution:
+
+      Gx kernel (horizontal edges):
+      [-1  0  1]
+      [-2  0  2]
+      [-1  0  1]
+
+      Gy kernel (vertical edges):
+      [-1 -2 -1]
+      [ 0  0  0]
+      [ 1  2  1]
+
+      Edge magnitude: edge = sqrt(Gx^2 + Gy^2)
+
+      Only pixels where edge > threshold are rendered (sparse edge visualization).
+      This is ~3x faster than full colormap and doesn't obscure the camera preview.
+    </note>
+
+    <note priority="critical" title="Metal Shader Reference">
+      The tech spec provides the complete edgeDepthFragment shader implementation.
+      Copy from tech-spec-epic-7.md lines 361-415 to EdgeDepthVisualization.metal.
+      Vertex shader can be shared with DepthVisualization.metal (same depthVertex).
+    </note>
+
+    <note priority="high" title="Preview/Recording Separation Architecture">
+      Recording Pipeline (AVAssetWriter):
+        ARFrame.capturedImage -> pixelBufferAdaptor.append() -> .mov file
+
+      Preview Pipeline (MTKView):
+        ARFrame.sceneDepth -> EdgeDepthVisualizer -> MTKView layer
+
+      These are completely separate - overlay never touches recorded video.
+      Verify by checking AVAssetWriterInputPixelBufferAdaptor only receives RGB.
+    </note>
+
+    <note priority="high" title="UserDefaults Persistence Pattern">
+      Store edge overlay preference in UserDefaults:
+
+      private static let edgeOverlayKey = "app.rial.edgeOverlayEnabled"
+
+      // Read on init
+      @Published var showEdgeOverlay: Bool = UserDefaults.standard.bool(forKey: edgeOverlayKey)
+
+      // Write on change
+      didSet {
+          UserDefaults.standard.set(showEdgeOverlay, forKey: edgeOverlayKey)
+      }
+
+      Default to true if key doesn't exist (first launch).
+    </note>
+
+    <note priority="medium" title="Performance Optimization">
+      Edge detection is faster than colormap because:
+      1. Fewer fragment operations (no color interpolation for non-edge pixels)
+      2. Early exit for pixels below threshold (alpha = 0)
+      3. Single texture sample per neighbor (9 samples vs continuous)
+
+      Target: less than 3ms GPU time vs ~2ms for colormap (extra headroom for video encoding).
+    </note>
+
+    <note priority="medium" title="Frame Rate Difference">
+      Photo mode (DepthOverlayView): 60fps preferredFramesPerSecond
+      Video mode (EdgeDepthOverlayView): 30fps preferredFramesPerSecond
+
+      Match MTKView frame rate to video recording rate (30fps) during video mode.
+      This reduces GPU load and matches the depth keyframe extraction rate.
+    </note>
+
+    <note priority="medium" title="Learnings from Stories 7-1 and 7-2">
+      Apply these patterns from previous stories:
+
+      1. Thread Safety: Use NSLock for shared state (if needed)
+      2. Metal Pipeline: Lazy initialization, resource reuse
+      3. Testing: Use XCTSkip for device-only tests
+      4. Documentation: Comprehensive DocC comments
+      5. Error Handling: LocalizedError conformance
+      6. SwiftUI: UIViewRepresentable with Coordinator pattern
+      7. Logging: Add timing logs for performance tracking
+    </note>
+  </implementation-notes>
+
+  <!-- Files to Create -->
+  <files-to-create>
+    <file>
+      <path>ios/Rial/Shaders/EdgeDepthVisualization.metal</path>
+      <description>Sobel edge detection Metal shader for depth overlay</description>
+      <content-guidance>
+        Include VertexOut struct (can share with DepthVisualization.metal).
+        Implement edgeDepthVertex (same as depthVertex or share).
+        Implement edgeDepthFragment with Sobel edge detection.
+        Define nearColor (cyan) and farColor (magenta) constants.
+        Handle invalid depth values (NaN, Inf) with transparent output.
+      </content-guidance>
+    </file>
+
+    <file>
+      <path>ios/Rial/Core/Capture/EdgeDepthVisualizer.swift</path>
+      <description>Metal rendering pipeline for edge overlay</description>
+      <content-guidance>
+        Follow DepthVisualizer patterns.
+        Initialize MTLDevice, MTLCommandQueue.
+        Load edge shader library and create render pipeline state.
+        Create vertex buffer for full-screen quad.
+        Implement render(depthFrame:, to:, edgeThreshold:) method.
+        Add nearPlane, farPlane, edgeThreshold properties.
+        Add performance timing logging.
+      </content-guidance>
+    </file>
+
+    <file>
+      <path>ios/Rial/Features/Capture/EdgeDepthOverlayView.swift</path>
+      <description>SwiftUI wrapper for edge overlay MTKView</description>
+      <content-guidance>
+        Follow DepthOverlayView UIViewRepresentable pattern.
+        Create MTKView in makeUIView.
+        Implement Coordinator as MTKViewDelegate.
+        Pass depthFrame, edgeThreshold, isVisible via updateUIView.
+        Use 30fps preferredFramesPerSecond (match video rate).
+        Handle nil depth gracefully (render transparent).
+      </content-guidance>
+    </file>
+
+    <file>
+      <path>ios/RialTests/Capture/EdgeDepthVisualizerTests.swift</path>
+      <description>Unit tests for EdgeDepthVisualizer</description>
+      <content-guidance>
+        Test initialization and pipeline creation.
+        Test error handling for invalid inputs.
+        Test parameter buffer setup.
+        Use XCTSkip for tests requiring Metal GPU on simulator.
+        Target 80% coverage for EdgeDepthVisualizer.
+      </content-guidance>
+    </file>
+  </files-to-create>
+
+  <!-- Files to Modify -->
+  <files-to-modify>
+    <file>
+      <path>ios/Rial/Features/Capture/CaptureView.swift</path>
+      <description>Add EdgeDepthOverlayView for video mode</description>
+      <modifications>
+        <modification>
+          Add conditional rendering of EdgeDepthOverlayView when isRecordingVideo is true.
+          Keep DepthOverlayView for photo mode (full colormap).
+          Use same toggle button for both modes.
+        </modification>
+        <modification>
+          Add UserDefaults binding for overlay visibility persistence.
+          Initialize showDepthOverlay from UserDefaults.
+        </modification>
+      </modifications>
+    </file>
+
+    <file>
+      <path>ios/Rial/Features/Capture/CaptureViewModel.swift</path>
+      <description>Add edge overlay state management</description>
+      <modifications>
+        <modification>
+          Add @Published var showEdgeOverlay: Bool with UserDefaults persistence.
+          Default to true if UserDefaults key doesn't exist.
+        </modification>
+        <modification>
+          Add edgeThreshold: Float = 0.1 constant.
+        </modification>
+        <modification>
+          Verify currentDepthFrame is published during video recording (already done).
+        </modification>
+      </modifications>
+    </file>
+
+    <file>
+      <path>ios/Rial.xcodeproj/project.pbxproj</path>
+      <description>Add new files to Xcode project</description>
+      <modifications>
+        <modification>
+          Add EdgeDepthVisualization.metal to Shaders group.
+          Add EdgeDepthVisualizer.swift to Core/Capture group.
+          Add EdgeDepthOverlayView.swift to Features/Capture group.
+          Add EdgeDepthVisualizerTests.swift to RialTests/Capture group.
+        </modification>
+      </modifications>
+    </file>
+  </files-to-modify>
+
+  <!-- Validation Checklist -->
+  <validation-checklist>
+    <check category="completeness">Context includes all required documentation artifacts</check>
+    <check category="completeness">Context includes all relevant code interfaces</check>
+    <check category="completeness">Context includes development constraints</check>
+    <check category="completeness">Context includes testing requirements</check>
+    <check category="completeness">Context includes implementation notes</check>
+    <check category="accuracy">All file paths are project-relative</check>
+    <check category="accuracy">Code snippets match actual implementation</check>
+    <check category="accuracy">Acceptance criteria correctly summarized</check>
+    <check category="testability">Unit test cases defined</check>
+    <check category="testability">Integration test cases defined</check>
+    <check category="testability">Manual device tests specified</check>
+    <check category="navigability">Clear section organization</check>
+    <check category="navigability">Descriptions explain relevance</check>
+  </validation-checklist>
+</story-context>

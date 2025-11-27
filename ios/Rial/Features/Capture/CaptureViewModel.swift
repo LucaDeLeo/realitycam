@@ -19,6 +19,7 @@ import os.log
 /// - Frame updates for depth visualization
 /// - Photo capture and processing
 /// - Video recording with hold-to-record
+/// - Edge depth overlay for video mode (Story 7.3)
 /// - Permission checking
 /// - Error handling
 ///
@@ -37,6 +38,11 @@ import os.log
 @MainActor
 final class CaptureViewModel: ObservableObject {
     private static let logger = Logger(subsystem: "app.rial", category: "capture-viewmodel")
+
+    // MARK: - UserDefaults Keys
+
+    /// UserDefaults key for edge overlay visibility preference
+    private static let edgeOverlayEnabledKey = "app.rial.edgeOverlayEnabled"
 
     // MARK: - Published Properties
 
@@ -81,6 +87,30 @@ final class CaptureViewModel: ObservableObject {
     /// Maximum video recording duration (15 seconds)
     public static let maxRecordingDuration: TimeInterval = VideoRecordingSession.maxDuration
 
+    // MARK: - Edge Overlay Properties (Story 7.3)
+
+    /// Whether edge overlay is visible during video recording.
+    /// Persisted to UserDefaults so preference survives app restarts.
+    @Published var showEdgeOverlay: Bool {
+        didSet {
+            UserDefaults.standard.set(showEdgeOverlay, forKey: Self.edgeOverlayEnabledKey)
+            Self.logger.debug("Edge overlay visibility changed: \(self.showEdgeOverlay)")
+        }
+    }
+
+    /// Edge detection threshold for Sobel operator.
+    /// Higher values show fewer, more prominent edges.
+    /// Default: 0.1 as specified in AC-7.3.5.
+    public let edgeThreshold: Float = 0.1
+
+    /// Near plane for edge coloring (meters).
+    /// Objects closer than this appear cyan.
+    public let edgeNearPlane: Float = 0.5
+
+    /// Far plane for edge coloring (meters).
+    /// Objects farther than this appear magenta.
+    public let edgeFarPlane: Float = 5.0
+
     // MARK: - Private Properties
 
     /// AR capture session
@@ -121,6 +151,15 @@ final class CaptureViewModel: ObservableObject {
         let keychain = KeychainService()
         let attestation = DeviceAttestationService(keychain: keychain)
         self.assertionService = assertionService ?? CaptureAssertionService(attestation: attestation, keychain: keychain)
+
+        // Load edge overlay preference from UserDefaults
+        // Default to true if key doesn't exist (first launch)
+        if UserDefaults.standard.object(forKey: Self.edgeOverlayEnabledKey) == nil {
+            self.showEdgeOverlay = true
+            UserDefaults.standard.set(true, forKey: Self.edgeOverlayEnabledKey)
+        } else {
+            self.showEdgeOverlay = UserDefaults.standard.bool(forKey: Self.edgeOverlayEnabledKey)
+        }
 
         setupCallbacks()
         checkCameraPermission()
