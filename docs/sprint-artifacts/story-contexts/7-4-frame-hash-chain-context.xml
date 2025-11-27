@@ -1,0 +1,629 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context: 7-4-frame-hash-chain
+  Epic: 7 - Video Capture with LiDAR Depth
+  Generated: 2025-11-26
+  Purpose: Single source of truth for HashChainService implementation
+-->
+<story-context version="1.0">
+
+  <!-- ==================== STORY REFERENCE ==================== -->
+  <story-reference>
+    <story-key>7-4-frame-hash-chain</story-key>
+    <story-file>docs/sprint-artifacts/stories/7-4-frame-hash-chain.md</story-file>
+    <epic-id>7</epic-id>
+    <epic-title>Video Capture with LiDAR Depth</epic-title>
+    <priority>P0</priority>
+    <effort>M</effort>
+    <dependencies>
+      <dependency>Story 6-3-cryptokit-integration</dependency>
+      <dependency>Story 7-1-arkit-video-recording-session</dependency>
+    </dependencies>
+    <fr-coverage>FR49 (App computes frame hash chain)</fr-coverage>
+  </story-reference>
+
+  <!-- ==================== EPIC CONTEXT ==================== -->
+  <epic-context>
+    <tech-spec>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md</tech-spec>
+    <architecture-adr>ADR-010: Video Architecture with LiDAR Depth</architecture-adr>
+    <key-pattern>Pattern 1: Hash Chain Integrity</key-pattern>
+    <pattern-description>
+      Each video frame is cryptographically chained to the previous frame:
+      H(n) = SHA256(frame_n + depth_n + timestamp_n + H(n-1))
+
+      This ensures:
+      - No frames can be inserted (chain would break)
+      - No frames can be removed (chain would break)
+      - No frames can be reordered (previous hash wouldn't match)
+    </pattern-description>
+  </epic-context>
+
+  <!-- ==================== ACCEPTANCE CRITERIA ==================== -->
+  <acceptance-criteria>
+    <criterion id="AC-7.4.1" title="Hash Chain Computation">
+      <given>Video recording is in progress at 30fps</given>
+      <when>Each frame is captured</when>
+      <then>
+        - Hash computed using SHA256: H(n) = SHA256(frame + depth? + timestamp + H(n-1))
+        - First frame hash: H(1) = SHA256(frame1 + depth1 + timestamp1) (no previous hash)
+        - All 30fps frames included in chain (450 hashes for 15s video)
+        - Hash computation uses CryptoKit for hardware acceleration
+        - Hash computed on background queue (not blocking recording)
+      </then>
+    </criterion>
+    <criterion id="AC-7.4.2" title="Depth Inclusion in Hash">
+      <given>Depth keyframes are captured at 10fps</given>
+      <when>A frame has associated depth data (every 3rd frame)</when>
+      <then>
+        - Depth data is included in hash input for frames with depth
+        - Frames without depth still include RGB + timestamp + previous hash
+        - Depth data is the raw Float32 buffer from DepthKeyframeBuffer
+        - Consistent handling whether depth is available or not
+      </then>
+    </criterion>
+    <criterion id="AC-7.4.3" title="Checkpoint Hash Storage">
+      <given>Recording continues past 5-second intervals</given>
+      <when>Frame count reaches checkpoint boundaries (150, 300, 450)</when>
+      <then>
+        - Checkpoint hash saved with: index, frameNumber, hash, timestamp
+        - Checkpoints stored at 5s (frame 150), 10s (frame 300), 15s (frame 450)
+        - Maximum 3 checkpoints for 15-second video
+        - Checkpoints enable partial attestation (Story 7.5)
+      </then>
+    </criterion>
+    <criterion id="AC-7.4.4" title="Final Hash Chain Data">
+      <given>Recording completes (normal or interrupted)</given>
+      <when>Hash chain is finalized</when>
+      <then>
+        - HashChainData struct contains all frame hashes
+        - Final hash (Hn) is accessible for attestation signing
+        - Checkpoints array contains all completed checkpoints
+        - Total frame count matches hash count
+      </then>
+    </criterion>
+    <criterion id="AC-7.4.5" title="Performance Requirements">
+      <given>30fps frame processing</given>
+      <when>Hash chain computes each frame</when>
+      <then>
+        - Hash computation completes in less than 5ms per frame (from tech spec)
+        - No dropped frames due to hash computation
+        - Memory overhead minimal (only store hashes, not frame data)
+        - Background queue processing ensures non-blocking operation
+      </then>
+    </criterion>
+    <criterion id="AC-7.4.6" title="Integration with VideoRecordingSession">
+      <given>VideoRecordingSession is recording</given>
+      <when>Frames arrive via onFrameProcessed callback</when>
+      <then>
+        - HashChainService receives each frame for hashing
+        - Service handles frame regardless of depth availability
+        - Service respects recording state (reset on new recording)
+        - Final hash chain data available in VideoRecordingResult
+      </then>
+    </criterion>
+  </acceptance-criteria>
+
+  <!-- ==================== DOCUMENTATION ARTIFACTS ==================== -->
+  <documentation-artifacts>
+    <artifact type="tech-spec" priority="high">
+      <path>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md</path>
+      <description>Epic 7 technical specification with HashChainService design, data models, and performance requirements</description>
+      <relevant-sections>
+        <section>APIs and Interfaces - Hash Chain Computation (Swift)</section>
+        <section>Data Models and Contracts - HashChainData, HashCheckpoint</section>
+        <section>Acceptance Criteria - AC-7.4</section>
+        <section>Non-Functional Requirements - Performance (less than 5ms per frame)</section>
+      </relevant-sections>
+    </artifact>
+    <artifact type="architecture" priority="high">
+      <path>docs/architecture.md</path>
+      <description>Architecture document with ADR-010 defining hash chain integrity pattern</description>
+      <relevant-sections>
+        <section>ADR-010: Video Architecture with LiDAR Depth - Pattern 1: Hash Chain Integrity</section>
+        <section>Project Structure - iOS Core/Crypto directory</section>
+        <section>Technology Stack - CryptoKit for hash chain</section>
+      </relevant-sections>
+    </artifact>
+    <artifact type="story" priority="high">
+      <path>docs/sprint-artifacts/stories/7-4-frame-hash-chain.md</path>
+      <description>Story specification with detailed implementation tasks and test requirements</description>
+    </artifact>
+  </documentation-artifacts>
+
+  <!-- ==================== EXISTING CODE INTERFACES ==================== -->
+  <existing-code>
+    <interface priority="critical" type="integration-point">
+      <path>ios/Rial/Core/Capture/VideoRecordingSession.swift</path>
+      <description>Primary integration point - HashChainService must be called from appendFrame() method</description>
+      <key-integration-points>
+        <point>Line 656: appendFrame(_ frame: ARFrame) - Entry point for hash chain processing</point>
+        <point>Line 684: depthKeyframeBuffer.processFrame() - Depth data coordination pattern</point>
+        <point>Line 692-695: Callback pattern for downstream processing</point>
+        <point>Line 281: depthKeyframeBuffer property - Pattern for adding HashChainService property</point>
+        <point>Line 329: depthKeyframeBuffer.startRecording() - Pattern for initializing services</point>
+        <point>Lines 386-469: stopRecording() - Pattern for finalizing and including data in result</point>
+        <point>Lines 725-757: VideoRecordingResult struct - Must be extended to include hashChainData</point>
+      </key-integration-points>
+      <code-example><![CDATA[
+// Current pattern in appendFrame() for depth extraction (line 684):
+depthKeyframeBuffer.processFrame(frame, frameNumber: currentFrameCount)
+
+// HashChainService should be called similarly:
+// Task { await hashChainService.processFrame(...) }
+
+// VideoRecordingResult currently includes (lines 725-757):
+public struct VideoRecordingResult: Sendable {
+    public let videoURL: URL
+    public let frameCount: Int
+    public let duration: TimeInterval
+    public let resolution: (width: Int, height: Int)
+    public let codec: String
+    public let wasInterrupted: Bool
+    public let startedAt: Date
+    public let endedAt: Date
+    public let depthKeyframeData: DepthKeyframeData?
+    // ADD: public let hashChainData: HashChainData?
+}
+      ]]></code-example>
+    </interface>
+
+    <interface priority="critical" type="reference-implementation">
+      <path>ios/Rial/Core/Crypto/CryptoService.swift</path>
+      <description>SHA256 implementation patterns from Story 6-3. Use these patterns for hash computation.</description>
+      <key-patterns>
+        <pattern>Line 34-37: sha256(_ data: Data) -> String - Hex string output</pattern>
+        <pattern>Line 43-45: sha256Data(_ data: Data) -> Data - Raw bytes output (USE THIS)</pattern>
+        <pattern>Line 76-96: SHA256 hasher with streaming update pattern</pattern>
+        <pattern>Line 16: Logger initialization pattern</pattern>
+        <pattern>Lines 276-311: CryptoError enum pattern for error handling</pattern>
+      </key-patterns>
+      <code-example><![CDATA[
+// SHA256 hasher pattern from CryptoService (lines 76-96):
+var hasher = SHA256()
+hasher.update(data: Data(bytes: buffer, count: bytesRead))
+let hash = hasher.finalize()
+
+// sha256Data returns raw 32-byte Data (line 43-45):
+static func sha256Data(_ data: Data) -> Data {
+    Data(SHA256.hash(data: data))
+}
+
+// Logger pattern (line 16):
+private static let logger = Logger(subsystem: "app.rial", category: "crypto")
+      ]]></code-example>
+    </interface>
+
+    <interface priority="high" type="reference-implementation">
+      <path>ios/Rial/Core/Capture/DepthKeyframeBuffer.swift</path>
+      <description>Reference for thread-safe buffer implementation, NSLock pattern, and depth data coordination</description>
+      <key-patterns>
+        <pattern>Lines 175-193: NSLock-based thread safety pattern</pattern>
+        <pattern>Lines 379-415: extractDepthData from CVPixelBuffer pattern</pattern>
+        <pattern>Lines 268-279: startRecording() initialization pattern</pattern>
+        <pattern>Lines 421-432: reset() cleanup pattern</pattern>
+        <pattern>Lines 442-481: finalize() pattern for producing final data</pattern>
+        <pattern>Lines 293-369: processFrame() with performance timing</pattern>
+      </key-patterns>
+      <code-example><![CDATA[
+// Thread-safe state access pattern (lines 175-193):
+private let lock = NSLock()
+private var _accumulatedData = Data()
+
+public var keyframeCount: Int {
+    lock.lock()
+    defer { lock.unlock() }
+    return _keyframes.count
+}
+
+// Performance timing pattern (lines 294, 354-364):
+let startTime = CFAbsoluteTimeGetCurrent()
+// ... processing ...
+let processingTime = CFAbsoluteTimeGetCurrent() - startTime
+if processingTime > 0.010 {
+    Self.logger.warning("Processing exceeded 10ms target: \(processingTime * 1000)ms")
+}
+
+// CVPixelBuffer extraction pattern (lines 388-414):
+CVPixelBufferLockBaseAddress(depthMap, .readOnly)
+defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
+guard let baseAddress = CVPixelBufferGetBaseAddress(depthMap) else { ... }
+let data = Data(bytes: baseAddress, count: dataSize)
+      ]]></code-example>
+    </interface>
+
+    <interface priority="high" type="reference">
+      <path>ios/Rial/Core/Capture/ARCaptureSession.swift</path>
+      <description>ARFrame structure and depth data access patterns</description>
+      <key-patterns>
+        <pattern>Lines 338-360: ARFrame extensions for depth data access</pattern>
+        <pattern>capturedImage: CVPixelBuffer - RGB pixel data</pattern>
+        <pattern>sceneDepth?.depthMap: CVPixelBuffer - Depth pixel data</pattern>
+        <pattern>timestamp: TimeInterval - Frame timestamp</pattern>
+      </key-patterns>
+    </interface>
+  </existing-code>
+
+  <!-- ==================== DATA STRUCTURES ==================== -->
+  <data-structures>
+    <structure name="HashChainData" location="ios/Rial/Core/Crypto/HashChainService.swift (new file)">
+      <description>Container for all frame hashes and checkpoints from a video recording</description>
+      <fields>
+        <field name="frameHashes" type="[Data]" description="All frame hashes at 30fps (up to 450 for 15s)"/>
+        <field name="checkpoints" type="[HashCheckpoint]" description="Checkpoint hashes every 5 seconds"/>
+        <field name="finalHash" type="Data" description="Last frame hash (32 bytes SHA256)"/>
+      </fields>
+      <conformances>Codable, Sendable</conformances>
+    </structure>
+
+    <structure name="HashCheckpoint" location="ios/Rial/Core/Crypto/HashChainService.swift (new file)">
+      <description>Checkpoint hash at 5-second intervals for partial attestation</description>
+      <fields>
+        <field name="index" type="Int" description="0=5s, 1=10s, 2=15s"/>
+        <field name="frameNumber" type="Int" description="Frame number at checkpoint (150, 300, 450)"/>
+        <field name="hash" type="Data" description="Chain hash at this point (32 bytes)"/>
+        <field name="timestamp" type="TimeInterval" description="Video timestamp in seconds"/>
+      </fields>
+      <conformances>Codable, Sendable, Equatable</conformances>
+    </structure>
+  </data-structures>
+
+  <!-- ==================== DEVELOPMENT CONSTRAINTS ==================== -->
+  <development-constraints>
+    <constraint type="architecture" priority="critical">
+      <title>Swift Actor for Thread Safety</title>
+      <description>HashChainService MUST be implemented as a Swift actor, not a class with NSLock</description>
+      <rationale>
+        - Actor provides automatic serialization of method calls
+        - Recording happens on background queue, actor handles async naturally
+        - previousHash and frameHashes need synchronized access
+        - Follows Swift concurrency best practices
+      </rationale>
+    </constraint>
+
+    <constraint type="performance" priority="critical">
+      <title>Hash Computation Time Limit</title>
+      <description>Hash computation must complete in less than 5ms per frame</description>
+      <measurement>Use CFAbsoluteTimeGetCurrent() for timing, log warnings if exceeded</measurement>
+      <rationale>30fps = 33ms per frame budget; hash chain is one of several operations</rationale>
+    </constraint>
+
+    <constraint type="performance" priority="high">
+      <title>Background Queue Processing</title>
+      <description>Hash computation must not block the recording pipeline</description>
+      <rationale>Recording frame rate must be maintained at 30fps</rationale>
+    </constraint>
+
+    <constraint type="data" priority="high">
+      <title>Memory Efficiency</title>
+      <description>Only store hashes (32 bytes each), not frame data</description>
+      <calculation>450 frames * 32 bytes = ~14KB for hashes (negligible)</calculation>
+    </constraint>
+
+    <constraint type="integration" priority="high">
+      <title>Depth Data Coordination</title>
+      <description>Depth is available every 3rd frame (10fps from 30fps)</description>
+      <handling>Hash includes depth when available, omits depth field when not</handling>
+    </constraint>
+
+    <constraint type="api" priority="high">
+      <title>Checkpoint Interval</title>
+      <description>Checkpoints at frame 150, 300, 450 (5s intervals at 30fps)</description>
+      <formula>frameNumber % 150 == 0 AND frameNumber > 0</formula>
+      <max-checkpoints>3 (for 15-second max video)</max-checkpoints>
+    </constraint>
+  </development-constraints>
+
+  <!-- ==================== DEPENDENCIES ==================== -->
+  <dependencies>
+    <framework name="CryptoKit" type="system" usage="SHA256 hash computation">
+      <import>import CryptoKit</import>
+      <key-types>SHA256, SHA256.Digest</key-types>
+    </framework>
+    <framework name="Foundation" type="system" usage="Data, TimeInterval, CVPixelBuffer">
+      <import>import Foundation</import>
+    </framework>
+    <framework name="ARKit" type="system" usage="ARFrame, CVPixelBuffer types">
+      <import>import ARKit</import>
+    </framework>
+    <framework name="os.log" type="system" usage="Logger for observability">
+      <import>import os.log</import>
+    </framework>
+    <internal-dependency name="CryptoService" path="ios/Rial/Core/Crypto/CryptoService.swift">
+      <usage>Reference for SHA256 patterns (do not call directly, use CryptoKit directly in actor)</usage>
+    </internal-dependency>
+    <internal-dependency name="DepthKeyframeBuffer" path="ios/Rial/Core/Capture/DepthKeyframeBuffer.swift">
+      <usage>Provides depth data via depthKeyframeBuffer.shouldExtractDepth() pattern</usage>
+    </internal-dependency>
+  </dependencies>
+
+  <!-- ==================== TESTING CONTEXT ==================== -->
+  <testing-context>
+    <test-file>ios/RialTests/Crypto/HashChainServiceTests.swift (new file)</test-file>
+    <test-framework>XCTest</test-framework>
+    <coverage-target>80% minimum for HashChainService</coverage-target>
+
+    <unit-tests>
+      <test name="First frame hash computation (no previous hash)"/>
+      <test name="Subsequent frame hash includes previous hash"/>
+      <test name="Hash chain determinism (same input = same output)"/>
+      <test name="Depth data inclusion affects hash"/>
+      <test name="Timestamp inclusion affects hash"/>
+      <test name="Checkpoint creation at frame 150"/>
+      <test name="Checkpoint creation at frames 150, 300, 450"/>
+      <test name="Reset clears all state"/>
+      <test name="getChainData returns correct structure"/>
+      <test name="finalHash equals last frame hash"/>
+      <test name="Empty state handling"/>
+      <test name="Pixel buffer extraction produces consistent data"/>
+      <test name="Performance: hash computation less than 5ms"/>
+      <test name="Concurrent access to actor (thread safety)"/>
+      <test name="Frame count tracking accuracy"/>
+    </unit-tests>
+
+    <integration-tests require-device="true">
+      <test name="Full recording flow with hash chain"/>
+      <test name="Hash chain matches expected count for 5s recording"/>
+      <test name="Hash chain matches expected count for 15s recording"/>
+      <test name="Checkpoint hashes match corresponding frame hashes"/>
+      <test name="Integration with DepthKeyframeBuffer"/>
+    </integration-tests>
+
+    <reference-test-file>ios/RialTests/Crypto/CryptoServiceTests.swift</reference-test-file>
+    <reference-test-file>ios/RialTests/Capture/DepthKeyframeBufferTests.swift</reference-test-file>
+
+    <testing-patterns>
+      <pattern name="XCTSkip for device-only tests">
+        <code><![CDATA[
+guard ARCaptureSession.isLiDARAvailable else {
+    throw XCTSkip("LiDAR not available - run on physical iPhone Pro device")
+}
+        ]]></code>
+      </pattern>
+      <pattern name="Performance measurement">
+        <code><![CDATA[
+measure {
+    _ = try? hashChainService.processFrame(...)
+}
+// Target: < 5ms per frame
+        ]]></code>
+      </pattern>
+      <pattern name="Mock pixel buffer creation">
+        <description>Create test CVPixelBuffer for simulator testing</description>
+      </pattern>
+    </testing-patterns>
+  </testing-context>
+
+  <!-- ==================== IMPLEMENTATION GUIDANCE ==================== -->
+  <implementation-guidance>
+    <file-to-create>
+      <path>ios/Rial/Core/Crypto/HashChainService.swift</path>
+      <purpose>Core hash chain computation actor</purpose>
+      <template><![CDATA[
+//
+//  HashChainService.swift
+//  Rial
+//
+//  Created by RealityCam on 2025-11-26.
+//
+//  Thread-safe actor for computing frame hash chain during video recording.
+//  Chains each frame's hash with the previous frame's hash for tamper detection.
+//
+
+import Foundation
+import ARKit
+import CryptoKit
+import os.log
+
+// MARK: - HashCheckpoint
+
+/// Checkpoint hash at 5-second intervals for partial attestation.
+public struct HashCheckpoint: Codable, Sendable, Equatable {
+    /// Checkpoint index (0=5s, 1=10s, 2=15s)
+    public let index: Int
+    /// Frame number at checkpoint (150, 300, 450)
+    public let frameNumber: Int
+    /// Chain hash at this checkpoint (32 bytes SHA256)
+    public let hash: Data
+    /// Video timestamp in seconds
+    public let timestamp: TimeInterval
+}
+
+// MARK: - HashChainData
+
+/// Container for all frame hashes and checkpoints from a video recording.
+public struct HashChainData: Codable, Sendable {
+    /// All frame hashes at 30fps
+    public let frameHashes: [Data]
+    /// Checkpoint hashes every 5 seconds
+    public let checkpoints: [HashCheckpoint]
+    /// Last frame hash for attestation signing
+    public let finalHash: Data
+
+    /// Total number of frames in chain
+    public var frameCount: Int { frameHashes.count }
+}
+
+// MARK: - HashChainService
+
+/// Thread-safe actor for computing frame hash chain during video recording.
+///
+/// HashChainService computes SHA256 hashes for each video frame, chaining
+/// each hash with the previous frame's hash to create a tamper-evident
+/// structure. Checkpoints are saved every 5 seconds for partial attestation.
+///
+/// ## Hash Chain Formula
+/// - H(1) = SHA256(frame1 + depth1 + timestamp1)
+/// - H(n) = SHA256(frameN + depthN + timestampN + H(n-1))
+///
+/// ## Usage
+/// ```swift
+/// let hashService = HashChainService()
+///
+/// // During recording (called for each frame):
+/// let hash = await hashService.processFrame(
+///     rgbBuffer: frame.capturedImage,
+///     depthBuffer: frame.sceneDepth?.depthMap,
+///     timestamp: relativeTimestamp,
+///     frameNumber: frameCount
+/// )
+///
+/// // On recording complete:
+/// let chainData = await hashService.getChainData()
+/// ```
+public actor HashChainService {
+
+    // MARK: - Constants
+
+    /// Checkpoint interval in frames (5 seconds at 30fps)
+    private static let checkpointInterval: Int = 150
+
+    /// Maximum checkpoints (3 for 15-second video)
+    private static let maxCheckpoints: Int = 3
+
+    // MARK: - Properties
+
+    private static let logger = Logger(subsystem: "app.rial", category: "hashchain")
+
+    /// Previous frame's hash (nil for first frame)
+    private var previousHash: Data? = nil
+
+    /// All computed frame hashes
+    private var frameHashes: [Data] = []
+
+    /// Checkpoint hashes at 5-second intervals
+    private var checkpoints: [HashCheckpoint] = []
+
+    // MARK: - Public Methods
+
+    /// Process a frame and add to hash chain.
+    ///
+    /// Computes SHA256 hash including RGB data, optional depth data,
+    /// timestamp, and previous hash (if not first frame).
+    ///
+    /// - Parameters:
+    ///   - rgbBuffer: RGB pixel buffer from ARFrame.capturedImage
+    ///   - depthBuffer: Optional depth buffer (available every 3rd frame)
+    ///   - timestamp: Relative frame timestamp (seconds since recording start)
+    ///   - frameNumber: 1-based frame number
+    /// - Returns: The computed hash for this frame (32 bytes)
+    public func processFrame(
+        rgbBuffer: CVPixelBuffer,
+        depthBuffer: CVPixelBuffer?,
+        timestamp: TimeInterval,
+        frameNumber: Int
+    ) -> Data {
+        // Implementation per Task 2-4 in story
+    }
+
+    /// Get the complete hash chain data.
+    ///
+    /// - Returns: HashChainData containing all hashes and checkpoints
+    public func getChainData() -> HashChainData {
+        // Implementation per Task 5 in story
+    }
+
+    /// Reset all state for a new recording.
+    public func reset() {
+        previousHash = nil
+        frameHashes = []
+        checkpoints = []
+        Self.logger.info("HashChainService reset")
+    }
+
+    /// Number of frames processed
+    public var frameCount: Int { frameHashes.count }
+
+    /// Most recent checkpoint (for interruption handling)
+    public var lastCheckpoint: HashCheckpoint? { checkpoints.last }
+
+    // MARK: - Private Methods
+
+    /// Extract raw pixel data from CVPixelBuffer.
+    private func extractPixelData(_ buffer: CVPixelBuffer) -> Data {
+        // Implementation per Task 2 in story
+    }
+}
+      ]]></template>
+    </file-to-create>
+
+    <key-implementation-notes>
+      <note priority="critical">
+        Use Swift actor (not class with NSLock) for thread safety
+      </note>
+      <note priority="critical">
+        Hash includes: RGB data + depth data (if available) + timestamp (8 bytes) + previous hash (32 bytes)
+      </note>
+      <note priority="high">
+        Timestamp must be converted to 8 bytes using:
+        var ts = timestamp; Data(bytes: &amp;ts, count: MemoryLayout&lt;TimeInterval&gt;.size)
+      </note>
+      <note priority="high">
+        Checkpoint logic: frameNumber % 150 == 0 AND frameNumber > 0
+      </note>
+      <note priority="high">
+        Lock CVPixelBuffer before reading: CVPixelBufferLockBaseAddress(buffer, .readOnly)
+        Always unlock in defer block
+      </note>
+      <note priority="medium">
+        Log frame hash computation every 30th frame to avoid log spam
+      </note>
+      <note priority="medium">
+        Log checkpoint creation with full details
+      </note>
+      <note priority="medium">
+        Add performance timing and warn if exceeds 5ms
+      </note>
+    </key-implementation-notes>
+
+    <videorecordingsession-integration>
+      <changes-required>
+        <change file="ios/Rial/Core/Capture/VideoRecordingSession.swift">
+          Add hashChainService property (line ~281, after depthKeyframeBuffer)
+        </change>
+        <change file="ios/Rial/Core/Capture/VideoRecordingSession.swift">
+          Initialize hashChainService in startRecording() (line ~329)
+        </change>
+        <change file="ios/Rial/Core/Capture/VideoRecordingSession.swift">
+          Call hashChainService.processFrame() in appendFrame() (after line 684)
+        </change>
+        <change file="ios/Rial/Core/Capture/VideoRecordingSession.swift">
+          Get hash chain data in stopRecording() (line ~437, before building result)
+        </change>
+        <change file="ios/Rial/Core/Capture/VideoRecordingSession.swift">
+          Reset hashChainService in cancelRecording() (after line 487)
+        </change>
+        <change file="ios/Rial/Core/Capture/VideoRecordingSession.swift">
+          Extend VideoRecordingResult to include hashChainData (line ~750)
+        </change>
+      </changes-required>
+    </videorecordingsession-integration>
+  </implementation-guidance>
+
+  <!-- ==================== WARNINGS AND GAPS ==================== -->
+  <warnings>
+    <warning type="complexity" severity="medium">
+      <description>Actor async calls from sync context in appendFrame()</description>
+      <mitigation>Use Task { await hashChainService.processFrame(...) } pattern, or consider if hash chain can be computed synchronously given 5ms budget</mitigation>
+    </warning>
+    <warning type="testing" severity="low">
+      <description>Creating mock CVPixelBuffer for unit tests requires additional setup</description>
+      <mitigation>Consider creating a test helper or using XCTSkip for tests requiring real pixel buffers</mitigation>
+    </warning>
+  </warnings>
+
+  <!-- ==================== DEFINITION OF DONE ==================== -->
+  <definition-of-done>
+    <item>All acceptance criteria met</item>
+    <item>Code reviewed and approved</item>
+    <item>Unit tests passing with >= 80% coverage for HashChainService</item>
+    <item>Integration tests passing on physical device</item>
+    <item>No new lint errors (SwiftLint)</item>
+    <item>Hash computation verified less than 5ms per frame</item>
+    <item>No dropped frames during 15-second recording with hash chain enabled</item>
+    <item>Documentation updated (code comments, DocC)</item>
+    <item>VideoRecordingResult includes hash chain data</item>
+    <item>Checkpoints created at correct intervals</item>
+    <item>Ready for Story 7.5 (Video Attestation) integration</item>
+  </definition-of-done>
+
+</story-context>

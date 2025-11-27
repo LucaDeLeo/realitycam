@@ -14,15 +14,14 @@ configuration:
   auto_push: true
 
 checkpoint:
-  story_key: 7-3-realtime-edge-depth-overlay
+  story_key: 7-4-frame-hash-chain
   phase: starting
-  saved_at: 2025-11-26T19:20:00Z
+  saved_at: 2025-11-26T19:35:00Z
   data: null
 
 epics_contexted: []
 
 stories_pending:
-  - 7-3-realtime-edge-depth-overlay
   - 7-4-frame-hash-chain
   - 7-5-video-attestation-checkpoints
   - 7-6-video-metadata-collection
@@ -48,10 +47,16 @@ stories_processed:
     review_cycles: 1
     started_at: 2025-11-26T19:05:00Z
     completed_at: 2025-11-26T19:20:00Z
+  - story_key: 7-3-realtime-edge-depth-overlay
+    status: success
+    commit: 442e133
+    review_cycles: 1
+    started_at: 2025-11-26T19:20:00Z
+    completed_at: 2025-11-26T19:35:00Z
 
 statistics:
   epics_contexted_jit: 0
   epics_already_contexted: 1
   total_stories: 14
-  success_count: 2
+  success_count: 3
   failed_count: 0

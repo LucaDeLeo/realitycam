@@ -279,6 +279,9 @@ public final class VideoRecordingSession: NSObject {
     /// Buffer for accumulating depth keyframes at 10fps
     private let depthKeyframeBuffer = DepthKeyframeBuffer()
 
+    /// Hash chain service for frame-by-frame cryptographic integrity
+    private let hashChainService = HashChainService()
+
     // MARK: - Initialization
 
     /// Creates a new VideoRecordingSession.
@@ -327,6 +330,9 @@ public final class VideoRecordingSession: NSObject {
 
         // Initialize depth keyframe buffer for new recording
         depthKeyframeBuffer.startRecording()
+
+        // Reset hash chain service for new recording
+        Task { await hashChainService.reset() }
 
         // Create output URL
         let tempDir = FileManager.default.temporaryDirectory
@@ -437,8 +443,12 @@ public final class VideoRecordingSession: NSObject {
         let depthData = depthKeyframeBuffer.finalize()
         let depthKeyframeCount = depthData?.keyframeCount ?? 0
 
+        // Finalize hash chain service
+        let hashChainData = await hashChainService.getChainData()
+        let hashChainFrameCount = hashChainData.frameCount
+
         let duration = self.duration
-        Self.logger.info("Recording complete - \(finalFrameCount) frames, \(depthKeyframeCount) depth keyframes, \(String(format: "%.1f", duration))s, output: \(outputURL.lastPathComponent)")
+        Self.logger.info("Recording complete - \(finalFrameCount) frames, \(depthKeyframeCount) depth keyframes, \(hashChainFrameCount) hashes, \(String(format: "%.1f", duration))s, output: \(outputURL.lastPathComponent)")
 
         // Capture values before cleanup
         let savedURL = outputURL
@@ -462,7 +472,8 @@ public final class VideoRecordingSession: NSObject {
             wasInterrupted: savedWasInterrupted,
             startedAt: startTime,
             endedAt: endTime,
-            depthKeyframeData: depthData
+            depthKeyframeData: depthData,
+            hashChainData: hashChainData.frameCount > 0 ? hashChainData : nil
         )
 
         return result
@@ -485,6 +496,9 @@ public final class VideoRecordingSession: NSObject {
 
         // Reset depth buffer
         depthKeyframeBuffer.reset()
+
+        // Reset hash chain service
+        Task { await hashChainService.reset() }
 
         cleanup()
     }
@@ -683,6 +697,17 @@ public final class VideoRecordingSession: NSObject {
             // This is done synchronously on the recording queue for thread safety
             depthKeyframeBuffer.processFrame(frame, frameNumber: currentFrameCount)
 
+            // Process frame for hash chain (all frames at 30fps)
+            // Uses async Task to not block the recording queue
+            Task {
+                _ = await self.hashChainService.processFrame(
+                    rgbBuffer: frame.capturedImage,
+                    depthBuffer: frame.sceneDepth?.depthMap,
+                    timestamp: relativeTime,
+                    frameNumber: currentFrameCount
+                )
+            }
+
             // Log progress periodically
             if currentFrameCount % 30 == 0 {
                 Self.logger.debug("Recorded \(currentFrameCount) frames (\(String(format: "%.1f", relativeTime))s)")
@@ -750,8 +775,21 @@ public struct VideoRecordingResult: Sendable {
     /// Depth keyframe data captured at 10fps (optional, may be nil if no depth data)
     public let depthKeyframeData: DepthKeyframeData?
 
+    /// Hash chain data for frame-by-frame cryptographic integrity (optional)
+    public let hashChainData: HashChainData?
+
     /// Number of depth keyframes captured (convenience property)
     public var depthKeyframeCount: Int {
         depthKeyframeData?.keyframeCount ?? 0
+    }
+
+    /// Final hash for attestation signing (convenience property)
+    public var finalHash: Data? {
+        hashChainData?.finalHash
+    }
+
+    /// Number of hash chain checkpoints (convenience property)
+    public var hashCheckpointCount: Int {
+        hashChainData?.checkpointCount ?? 0
     }
 }
