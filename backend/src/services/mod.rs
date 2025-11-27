@@ -20,7 +20,9 @@ pub use attestation::{
     VerificationResult,
 };
 pub use c2pa::{
-    c2pa_manifest_s3_key, c2pa_photo_s3_key, C2paError, C2paManifest, C2paManifestInfo, C2paService,
+    c2pa_manifest_s3_key, c2pa_photo_s3_key, c2pa_video_manifest_s3_key, C2paError, C2paManifest,
+    C2paManifestInfo, C2paService, C2paVideoManifest, HashChainSummaryData, PartialAttestationData,
+    RealityCamVideoAssertion, TemporalDepthSummaryData,
 };
 pub use capture_attestation::{
     verify_capture_assertion, CaptureAssertionError, CaptureAssertionResult,

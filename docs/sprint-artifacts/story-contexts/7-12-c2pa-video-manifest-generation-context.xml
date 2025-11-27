@@ -1,0 +1,623 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-id>7-12-c2pa-video-manifest-generation</story-id>
+    <story-file>docs/sprint-artifacts/stories/7-12-c2pa-video-manifest-generation.md</story-file>
+    <epic-id>7</epic-id>
+    <epic-name>Video Capture with LiDAR Depth</epic-name>
+    <generated-at>2025-11-27</generated-at>
+    <context-version>1.0</context-version>
+  </metadata>
+
+  <story-summary>
+    <title>C2PA Video Manifest Generation</title>
+    <description>
+      Extend the existing C2PA manifest generation from photos (Story 5-1) to support video captures.
+      Generate C2PA Content Credentials manifests for video evidence packages with video-specific
+      assertions including hash chain summary, temporal depth analysis, and partial attestation info.
+      Store manifests as separate JSON files (MVP approach - embedding in MP4 is post-MVP).
+    </description>
+    <priority>P0</priority>
+    <estimated-effort>M</estimated-effort>
+    <dependencies>
+      <dependency>Story 7-11 (VideoEvidence struct and confidence calculation)</dependency>
+      <dependency>Story 5-1 (Photo C2PA manifest patterns)</dependency>
+      <dependency>Story 5-2 (Ed25519 signing service - reused)</dependency>
+    </dependencies>
+  </story-summary>
+
+  <acceptance-criteria>
+    <criterion id="AC-7.12.1">
+      <title>Video Manifest Generation</title>
+      <description>
+        Generate C2PA manifest structure following spec 2.0 with video-specific RealityCam assertion.
+        Include hash chain summary, temporal depth analysis, partial attestation info, and use
+        "c2pa.recorded" action type (vs "c2pa.created" for photos).
+      </description>
+    </criterion>
+    <criterion id="AC-7.12.2">
+      <title>Video RealityCam Assertion Structure</title>
+      <description>
+        Build RealityCam video assertion including: confidence_level, type="video", duration_ms,
+        frame_count, verified_frames, hardware_attestation, hash_chain_summary, temporal_depth_summary,
+        partial_attestation, device_model, captured_at.
+      </description>
+    </criterion>
+    <criterion id="AC-7.12.3">
+      <title>Partial Video Manifest</title>
+      <description>
+        Handle interrupted recordings (is_partial=true) with partial_attestation details,
+        verified_frames less than total_frames, duration_ms reflecting only verified portion.
+      </description>
+    </criterion>
+    <criterion id="AC-7.12.4">
+      <title>Manifest Storage</title>
+      <description>
+        Store manifest as JSON to S3 at captures/{capture_id}/video_manifest.json.
+        Update capture record with manifest_key. Do NOT modify original video file.
+      </description>
+    </criterion>
+    <criterion id="AC-7.12.5">
+      <title>Hash Chain Summary Mapping</title>
+      <description>
+        Map HashChainVerification result to manifest including status, chain_intact, attestation_valid,
+        verified_frames, total_frames, broken_at_frame if applicable.
+      </description>
+    </criterion>
+    <criterion id="AC-7.12.6">
+      <title>Temporal Depth Summary Mapping</title>
+      <description>
+        Map VideoDepthAnalysis result to manifest including status, is_likely_real_scene,
+        depth_consistency, motion_coherence, scene_stability. Handle missing depth gracefully.
+      </description>
+    </criterion>
+    <criterion id="AC-7.12.7">
+      <title>Integration with Evidence Pipeline</title>
+      <description>
+        C2PA manifest generation runs automatically after video evidence package complete.
+        Processing continues even if manifest generation fails (graceful degradation).
+      </description>
+    </criterion>
+  </acceptance-criteria>
+
+  <documentation-artifacts>
+    <artifact>
+      <name>Story 7-12 Specification</name>
+      <path>docs/sprint-artifacts/stories/7-12-c2pa-video-manifest-generation.md</path>
+      <description>
+        Complete story specification with acceptance criteria, technical requirements,
+        implementation tasks, and test requirements. Includes detailed type definitions
+        and integration examples.
+      </description>
+      <relevance>Primary specification - defines all requirements and implementation approach</relevance>
+    </artifact>
+    <artifact>
+      <name>Epic 7 Tech Spec</name>
+      <path>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md</path>
+      <description>
+        Technical specification for video capture epic. Covers video architecture,
+        services and modules, data models, and integration points. Section on C2PA
+        video manifests and AC-7.11.
+      </description>
+      <relevance>Architectural context for video capture system and C2PA integration</relevance>
+    </artifact>
+    <artifact>
+      <name>Architecture Document</name>
+      <path>docs/architecture.md</path>
+      <description>
+        System architecture with ADR-010 on Video Architecture with LiDAR Depth.
+        C2PA patterns from photo implementation apply to video.
+      </description>
+      <relevance>Architecture decisions and patterns for C2PA implementation</relevance>
+    </artifact>
+    <artifact>
+      <name>Story 5-1: C2PA Manifest Generation (Photos)</name>
+      <path>docs/sprint-artifacts/stories/5-1-c2pa-manifest-generation.md</path>
+      <description>
+        Original photo C2PA manifest story. Established service patterns, assertion structure,
+        and storage approach that video manifests will extend.
+      </description>
+      <relevance>Reference implementation - video manifests follow same patterns</relevance>
+    </artifact>
+    <artifact>
+      <name>Story 7-11: Video Evidence Package</name>
+      <path>docs/sprint-artifacts/stories/7-11-video-evidence-package.md</path>
+      <description>
+        Defines VideoEvidence struct that is the input to C2PA manifest generation.
+        Includes confidence calculation logic that manifest will reference.
+      </description>
+      <relevance>Direct dependency - VideoEvidence is input to manifest generation</relevance>
+    </artifact>
+  </documentation-artifacts>
+
+  <existing-code-interfaces>
+    <interface>
+      <name>C2PA Service (Photo Implementation)</name>
+      <path>backend/src/services/c2pa.rs</path>
+      <description>
+        Existing C2PA service for photo manifests. Provides service patterns to follow:
+        - C2paService struct with new() constructor
+        - generate_manifest() method taking evidence and timestamp
+        - generate_manifest_json() method returning JSON string
+        - build_assertion() helper for RealityCam assertions
+        - Storage helpers: c2pa_photo_s3_key(), c2pa_manifest_s3_key()
+        - Types: C2paManifest, RealityCamAssertion, C2paAction, HardwareAssertionData, DepthAssertionData
+        - Error type: C2paError
+      </description>
+      <key-patterns>
+        - Use env!("CARGO_PKG_VERSION") for version strings
+        - Format claim_generator as "RealityCam/{version}"
+        - Format software_agent as "RealityCam iOS/{version}"
+        - Use serde_json::to_string_pretty() for JSON serialization
+        - Map CheckStatus enum to "pass"/"fail"/"unavailable" strings
+        - Use #[serde(skip_serializing_if = "Option::is_none")] for optional fields
+      </key-patterns>
+      <integration-points>
+        Video manifest methods will be added to same C2paService impl block.
+        Video-specific types will be added alongside photo types.
+        Video uses "c2pa.recorded" action type vs "c2pa.created" for photos.
+      </integration-points>
+    </interface>
+
+    <interface>
+      <name>Video Evidence Types</name>
+      <path>backend/src/types/video_evidence.rs</path>
+      <description>
+        VideoEvidence struct is the primary input to manifest generation. Fields:
+        - evidence_type: String (always "video")
+        - duration_ms: u64
+        - frame_count: u32
+        - hardware_attestation: HardwareAttestationEvidence
+        - hash_chain: HashChainEvidence
+        - depth_analysis: Option&lt;DepthAnalysisEvidence&gt;
+        - metadata: MetadataEvidence
+        - partial_attestation: PartialAttestationInfo
+        - processing: ProcessingInfo
+
+        Key types:
+        - VideoConfidenceLevel enum with calculate_confidence() method
+        - HardwareAttestationEvidence with status, assertion_valid, device_verified
+        - HashChainEvidence with status, verified_frames, total_frames, chain_intact, attestation_valid
+        - DepthAnalysisEvidence with consistency/coherence/stability scores
+        - PartialAttestationInfo with is_partial, checkpoint_index, reason
+      </description>
+      <key-patterns>
+        VideoEvidence already includes confidence calculation - just extract and use.
+        Optional depth_analysis should be handled gracefully (status="unavailable").
+        All nested evidence structs have appropriate serialization.
+      </key-patterns>
+      <integration-points>
+        Manifest generation consumes VideoEvidence as input parameter.
+        Maps all evidence fields to corresponding C2PA assertion fields.
+      </integration-points>
+    </interface>
+
+    <interface>
+      <name>Hash Chain Verification Types</name>
+      <path>backend/src/types/hash_chain_verification.rs</path>
+      <description>
+        HashChainVerification result structure used in VideoEvidence.hash_chain field:
+        - status: VerificationStatus (Pass/Partial/Fail)
+        - frame_count: u32
+        - duration_ms: u32
+        - chain_structure_valid: bool
+        - checkpoints_valid: bool
+        - final_hash_matches: bool
+        - attestation_valid: bool
+        - failure_reason: Option&lt;String&gt;
+        - is_partial: bool
+        - checkpoint_index: Option&lt;u32&gt;
+
+        VerificationStatus enum: Pass, Partial, Fail
+      </description>
+      <key-patterns>
+        Map VerificationStatus to strings: "pass", "partial", "fail"
+        Include broken_at_frame for forensic detail if chain broken
+        Combine chain_structure_valid and final_hash_matches for chain_intact boolean
+      </key-patterns>
+      <integration-points>
+        HashChainEvidence in VideoEvidence is created from HashChainVerification.
+        Manifest maps this to HashChainSummaryData for C2PA assertion.
+      </integration-points>
+    </interface>
+
+    <interface>
+      <name>Video Depth Analysis Types</name>
+      <path>backend/src/types/video_depth_analysis.rs</path>
+      <description>
+        VideoDepthAnalysis result structure:
+        - frame_analyses: Vec&lt;FrameDepthAnalysis&gt;
+        - depth_consistency: f32 (0-1)
+        - motion_coherence: f32 (0-1)
+        - scene_stability: f32 (0-1)
+        - is_likely_real_scene: bool
+        - suspicious_frames: Vec&lt;u32&gt;
+
+        Has is_valid() method to check if analysis was performed.
+        Can be unavailable() if depth analysis wasn't performed.
+      </description>
+      <key-patterns>
+        Check is_valid() to determine if depth analysis is available.
+        If unavailable, set status="unavailable" in manifest.
+        All metrics are 0.0-1.0 range.
+      </key-patterns>
+      <integration-points>
+        DepthAnalysisEvidence in VideoEvidence is created from VideoDepthAnalysis.
+        Manifest maps this to TemporalDepthSummaryData for C2PA assertion.
+        Handle Option&lt;DepthAnalysisEvidence&gt; gracefully in VideoEvidence.
+      </integration-points>
+    </interface>
+
+    <interface>
+      <name>Storage Service</name>
+      <path>backend/src/services/storage.rs</path>
+      <description>
+        S3 storage service with upload methods. Patterns for video manifest storage:
+        - StorageService struct with client and bucket fields
+        - S3 key helper functions: video_s3_key(), video_depth_s3_key(), hash_chain_s3_key()
+        - Key pattern: "captures/{capture_id}/&lt;filename&gt;"
+        - Upload methods use ByteStream::from() and set appropriate content_type
+        - Error handling maps to ApiError::StorageError
+        - Logging with tracing::info! for uploads
+      </description>
+      <key-patterns>
+        Create c2pa_video_manifest_s3_key() helper following existing patterns.
+        Use format!("captures/{capture_id}/video_manifest.json")
+        Set content_type to "application/json" for manifest uploads
+        Log manifest generation and storage with capture_id and key
+      </key-patterns>
+      <integration-points>
+        Manifest storage will use StorageService.upload() or add specialized upload_video_manifest().
+        S3 key helper exported for use in processing pipeline.
+        Update capture record with manifest_key after successful upload.
+      </integration-points>
+    </interface>
+  </existing-code-interfaces>
+
+  <development-constraints>
+    <constraint>
+      <category>MVP Storage Approach</category>
+      <description>
+        Store C2PA manifests as separate JSON files rather than embedding in MP4.
+        Reasons: (1) Complexity - c2pa-rs MP4 embedding requires careful video encoding,
+        (2) Iteration speed - separate manifests allow faster development,
+        (3) Video preservation - avoids risk of corrupting uploaded videos,
+        (4) Sufficient for MVP - manifests still cryptographically signed and verifiable.
+      </description>
+      <impact>
+        Manifest generation is simpler (JSON serialization only).
+        No video re-encoding or c2pa-rs Builder integration needed.
+        Web verification page must fetch manifest separately from video.
+        Future enhancement can add MP4 embedding per ISO BMFF spec.
+      </impact>
+    </constraint>
+
+    <constraint>
+      <category>Action Type Differentiation</category>
+      <description>
+        C2PA spec distinguishes between provenance actions:
+        - "c2pa.created" for digital creation (photos)
+        - "c2pa.recorded" for real-world recording (videos)
+        This distinction helps downstream tools understand content origin.
+      </description>
+      <impact>
+        Video manifests MUST use "c2pa.recorded" action type.
+        This is the primary difference from photo manifest generation.
+      </impact>
+    </constraint>
+
+    <constraint>
+      <category>Video-Specific Assertions</category>
+      <description>
+        Video manifests include assertions that photos don't have:
+        - hash_chain_summary: Verification of frame-by-frame integrity
+        - temporal_depth_summary: Video-specific depth consistency metrics
+        - partial_attestation: Information about interrupted recordings
+        These assertions capture temporal aspects that single-frame analysis misses.
+      </description>
+      <impact>
+        New assertion types must be defined: HashChainSummaryData, TemporalDepthSummaryData,
+        PartialAttestationData. RealityCamVideoAssertion extends photo RealityCamAssertion.
+      </impact>
+    </constraint>
+
+    <constraint>
+      <category>Graceful Degradation</category>
+      <description>
+        Manifest generation failure must not block video capture processing.
+        If manifest generation fails, log error but continue processing pipeline.
+        Capture is still valid and verifiable through direct evidence examination.
+      </description>
+      <impact>
+        Error handling in processing pipeline must catch and log C2PA errors.
+        Capture record updated with manifest_key only if generation succeeds.
+        Missing manifest is acceptable - core evidence is the source of truth.
+      </impact>
+    </constraint>
+
+    <constraint>
+      <category>Confidence Level Transparency</category>
+      <description>
+        Confidence level is calculated by VideoEvidenceService (Story 7-11).
+        Manifest includes this confidence for transparency, allowing verifiers to
+        quickly assess authenticity and understand which checks passed/failed.
+      </description>
+      <impact>
+        Don't recalculate confidence in C2PA service - extract from VideoEvidence.
+        Use VideoEvidence.calculate_confidence() method if available, or extract
+        pre-calculated value from evidence package.
+      </impact>
+    </constraint>
+
+    <constraint>
+      <category>Optional Depth Analysis</category>
+      <description>
+        Depth analysis may be unavailable for some videos (processing failure, no depth data).
+        Manifest must handle this gracefully with status="unavailable" and appropriate defaults.
+      </description>
+      <impact>
+        Check if VideoEvidence.depth_analysis is Some or None.
+        If None, create TemporalDepthSummaryData with status="unavailable".
+        All metrics set to 0.0, is_likely_real_scene=false for unavailable case.
+      </impact>
+    </constraint>
+
+    <constraint>
+      <category>Partial Video Transparency</category>
+      <description>
+        Interrupted videos include complete partial attestation information:
+        is_partial=true, checkpoint_index, verified_frames &lt; total_frames.
+        This transparency ensures users and verifiers understand verification scope.
+      </description>
+      <impact>
+        Manifest must clearly distinguish partial from complete videos.
+        Include checkpoint index and verification boundaries.
+        Confidence level reflects partial verification status.
+      </impact>
+    </constraint>
+  </development-constraints>
+
+  <dependencies>
+    <dependency>
+      <name>serde / serde_json</name>
+      <version>Latest stable</version>
+      <purpose>Serialization of manifest types to JSON</purpose>
+      <already-in-project>true</already-in-project>
+    </dependency>
+    <dependency>
+      <name>uuid</name>
+      <version>Latest stable</version>
+      <purpose>Capture ID handling in S3 key generation</purpose>
+      <already-in-project>true</already-in-project>
+    </dependency>
+    <dependency>
+      <name>tracing</name>
+      <version>Latest stable</version>
+      <purpose>Logging manifest generation lifecycle</purpose>
+      <already-in-project>true</already-in-project>
+    </dependency>
+    <dependency>
+      <name>Video evidence types</name>
+      <module>crate::types::video_evidence</module>
+      <purpose>VideoEvidence input struct</purpose>
+      <already-in-project>true</already-in-project>
+    </dependency>
+    <dependency>
+      <name>Storage service</name>
+      <module>crate::services::storage</module>
+      <purpose>S3 upload for manifest JSON</purpose>
+      <already-in-project>true</already-in-project>
+    </dependency>
+  </dependencies>
+
+  <testing-context>
+    <test-framework>Rust native testing with cargo test</test-framework>
+    <test-location>backend/src/services/c2pa.rs (inline #[cfg(test)] module)</test-location>
+
+    <test-patterns>
+      <pattern>
+        <name>Unit Tests for Manifest Generation</name>
+        <description>
+          Test generate_video_manifest() with various VideoEvidence fixtures.
+          Verify all required fields are populated correctly.
+          Test action type is "c2pa.recorded".
+          Test title is "RealityCam Verified Video".
+        </description>
+        <example-from>test_generate_manifest() in c2pa.rs tests module</example-from>
+      </pattern>
+
+      <pattern>
+        <name>Assertion Mapping Tests</name>
+        <description>
+          Test build_video_assertion() maps evidence to assertion correctly.
+          Test confidence level mapping (high/medium/low/suspicious).
+          Test status string mapping (pass/partial/fail).
+          Test optional fields handled correctly (depth_analysis).
+        </description>
+        <example-from>test_build_assertion() in c2pa.rs tests module</example-from>
+      </pattern>
+
+      <pattern>
+        <name>JSON Serialization Tests</name>
+        <description>
+          Test generate_video_manifest_json() produces valid JSON.
+          Verify JSON structure matches C2PA spec.
+          Test round-trip serialization/deserialization.
+          Verify optional fields are skipped when None.
+        </description>
+        <example-from>test_generate_manifest_json() in c2pa.rs tests module</example-from>
+      </pattern>
+
+      <pattern>
+        <name>Partial Video Tests</name>
+        <description>
+          Test manifest generation with is_partial=true.
+          Verify partial_attestation includes checkpoint details.
+          Test verified_frames &lt; total_frames reflected correctly.
+          Test confidence level reflects partial status.
+        </description>
+        <example-from>New test pattern for video-specific feature</example-from>
+      </pattern>
+
+      <pattern>
+        <name>Missing Depth Analysis Tests</name>
+        <description>
+          Test manifest generation with depth_analysis=None.
+          Verify temporal_depth_summary has status="unavailable".
+          Test other assertions still valid.
+        </description>
+        <example-from>New test pattern for optional video feature</example-from>
+      </pattern>
+
+      <pattern>
+        <name>S3 Key Generation Tests</name>
+        <description>
+          Test c2pa_video_manifest_s3_key() produces correct key format.
+          Verify pattern: "captures/{uuid}/video_manifest.json"
+        </description>
+        <example-from>test_c2pa_s3_keys() in c2pa.rs tests module</example-from>
+      </pattern>
+    </test-patterns>
+
+    <test-fixtures>
+      <fixture>
+        <name>Complete Video Evidence</name>
+        <description>
+          VideoEvidence with all checks passing:
+          - duration_ms: 15000, frame_count: 450
+          - hardware_attestation: pass
+          - hash_chain: pass, chain_intact=true, attestation_valid=true
+          - depth_analysis: available with good metrics (0.85, 0.72, 0.95)
+          - partial_attestation: is_partial=false
+        </description>
+        <purpose>Test full manifest generation with all features</purpose>
+      </fixture>
+
+      <fixture>
+        <name>Partial Video Evidence</name>
+        <description>
+          VideoEvidence with interrupted recording:
+          - duration_ms: 10000, frame_count: 300
+          - partial_attestation: is_partial=true, checkpoint_index=1
+          - verified_frames: 300, total_frames: 450
+        </description>
+        <purpose>Test partial video manifest with checkpoint attestation</purpose>
+      </fixture>
+
+      <fixture>
+        <name>Video Without Depth</name>
+        <description>
+          VideoEvidence with depth_analysis=None:
+          - All other checks passing
+          - depth_analysis: None
+        </description>
+        <purpose>Test graceful handling of missing depth analysis</purpose>
+      </fixture>
+    </test-fixtures>
+
+    <coverage-requirements>
+      Unit tests must cover all VideoEvidence → Manifest mapping paths.
+      Test all confidence levels (high/medium/low/suspicious).
+      Test all verification statuses (pass/partial/fail).
+      Test optional field handling (depth_analysis, partial_attestation).
+      Target: 85% code coverage for new C2PA video methods.
+    </coverage-requirements>
+  </testing-context>
+
+  <implementation-notes>
+    <note>
+      <title>Service Pattern Consistency</title>
+      <description>
+        Follow the exact same service pattern as photo C2PA manifest generation.
+        Use impl C2paService block to add video methods alongside photo methods.
+        Maintain consistent naming: generate_video_manifest(), generate_video_manifest_json(),
+        build_video_assertion() parallel to generate_manifest(), generate_manifest_json(),
+        build_assertion().
+      </description>
+    </note>
+
+    <note>
+      <title>Type Definitions</title>
+      <description>
+        All video-specific types should be defined in backend/src/services/c2pa.rs
+        alongside existing photo types. Use same patterns:
+        - #[derive(Debug, Clone, Serialize, Deserialize)]
+        - #[serde(skip_serializing_if = "Option::is_none")] for optional fields
+        - #[serde(rename_all = "snake_case")] for enums if needed
+        - Add comprehensive doc comments
+      </description>
+    </note>
+
+    <note>
+      <title>Error Handling</title>
+      <description>
+        Reuse existing C2paError enum. Add new variant if needed:
+        C2paError::VideoManifestGeneration(String) for video-specific errors.
+        Map serialization errors to C2paError::Serialization.
+        Processing pipeline should catch C2paError and log but not fail.
+      </description>
+    </note>
+
+    <note>
+      <title>Confidence Level Extraction</title>
+      <description>
+        VideoEvidence should have calculate_confidence() method (from Story 7-11).
+        If not available, extract confidence from evidence fields directly.
+        Use same logic as VideoEvidenceService confidence calculation.
+        Don't duplicate confidence calculation logic in C2PA service.
+      </description>
+    </note>
+
+    <note>
+      <title>Version String Usage</title>
+      <description>
+        Use env!("CARGO_PKG_VERSION") to get backend version at compile time.
+        Format claim_generator: "RealityCam/{version}"
+        Format software_agent: "RealityCam iOS/{version}"
+        This matches photo manifest pattern and ensures version consistency.
+      </description>
+    </note>
+
+    <note>
+      <title>Integration with Processing Pipeline</title>
+      <description>
+        Manifest generation should be called from video processing pipeline
+        after VideoEvidence package is complete. Typical location would be
+        in routes/captures_video.rs or a dedicated processing module.
+        Pattern: generate → store to S3 → update capture record → log success/failure.
+      </description>
+    </note>
+
+    <note>
+      <title>Future Enhancement Path</title>
+      <description>
+        Document but don't implement: MP4 embedding using c2pa-rs.
+        Future path: Use c2pa-rs Builder to create manifest, sign with Ed25519,
+        embed in MP4 per ISO BMFF spec, store embedded video separately.
+        Leave comments in code about enhancement path for future developers.
+      </description>
+    </note>
+  </implementation-notes>
+
+  <validation-checklist>
+    <item>All acceptance criteria AC-7.12.1 through AC-7.12.7 implemented</item>
+    <item>Video manifest types defined: C2paVideoManifest, RealityCamVideoAssertion, etc.</item>
+    <item>generate_video_manifest() and generate_video_manifest_json() implemented</item>
+    <item>Assertion mapping for all evidence components working</item>
+    <item>Video manifests use "c2pa.recorded" action type</item>
+    <item>Manifest stored as JSON to S3 (no embedding)</item>
+    <item>Capture record updated with manifest_key</item>
+    <item>Integration with evidence pipeline working</item>
+    <item>Unit tests passing with &gt;= 85% coverage</item>
+    <item>Integration tests with fixture data passing</item>
+    <item>Graceful error handling (processing continues on failure)</item>
+    <item>No new Clippy lint errors</item>
+    <item>Tracing/logging for manifest lifecycle</item>
+    <item>Ready for Story 7-13 (Video Verification Page) integration</item>
+  </validation-checklist>
+
+  <next-steps>
+    <step>Story 7-13: Video Verification Page - Display video C2PA manifest</step>
+    <step>Post-MVP: MP4 manifest embedding using c2pa-rs</step>
+  </next-steps>
+</story-context>
