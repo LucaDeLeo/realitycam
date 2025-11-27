@@ -1,0 +1,483 @@
+<story-context id=".bmad/bmm/workflows/4-implementation/story-context/template" v="1.0">
+  <metadata>
+    <epicId>7</epicId>
+    <storyId>7-11-video-evidence-package</storyId>
+    <title>Video Evidence Package &amp; Confidence Calculation</title>
+    <status>drafted</status>
+    <generatedAt>2025-11-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/7-11-video-evidence-package.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>backend processing system</asA>
+    <iWant>to aggregate all video verification results into a comprehensive evidence package</iWant>
+    <soThat>I can provide a complete assessment of video authenticity with accurate confidence scoring</soThat>
+    <tasks>
+      - Create VideoEvidence types (VideoEvidence, PartialAttestationInfo, ProcessingInfo)
+      - Create VideoEvidenceService with evidence aggregation logic
+      - Implement video-specific confidence calculation (stricter than photos)
+      - Handle partial video confidence (checkpoint-based verification)
+      - Integrate with video upload processing pipeline
+      - Record processing metadata (timing, version, checks performed)
+      - Store evidence package in database as JSONB
+      - Add comprehensive unit and integration tests
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    AC-7.11.1: Evidence Package Aggregation
+    - All verification components aggregated into VideoEvidence struct
+    - ProcessingInfo added with timestamp, duration, version
+    - Partial attestation info included if is_partial=true
+    - Package serialized to JSONB for database storage
+
+    AC-7.11.2: Video Confidence Level Calculation
+    - SUSPICIOUS: hardware attestation fail OR hash chain fail OR depth analysis fail
+    - HIGH: All checks pass with strong metrics (hash chain intact, depth consistent)
+    - MEDIUM: Core checks pass but depth unavailable/degraded OR partial verification
+    - LOW: Multiple checks unavailable but no explicit failures
+
+    AC-7.11.3: Partial Video Confidence
+    - Use hash_chain.checkpoint_verified status for partial videos
+    - Only consider verified frames for confidence
+    - Checkpoint passing all checks can achieve HIGH confidence
+    - Include partial_reason in evidence
+    - verified_duration_ms reflects only verified portion
+
+    AC-7.11.4: Processing Info Recording
+    - processed_at: ISO 8601 timestamp
+    - processing_time_ms: Total time from upload to completion
+    - backend_version: From CARGO_PKG_VERSION
+    - checks_performed: List of checks run
+
+    AC-7.11.5: VideoEvidence Output Structure
+    - Complete JSON structure with all verification components
+    - Matches specification in story document
+
+    AC-7.11.6: Store Final Evidence Package
+    - Serialize to JSONB and store in captures.evidence column
+    - Update captures.confidence_level column
+    - Update captures.status to "complete"
+    - Update captures.processed_at timestamp
+
+    AC-7.11.7: Integration with Processing Pipeline
+    - Hash chain verification runs (Story 7-10)
+    - Depth analysis runs (Story 7-9)
+    - Evidence package aggregates results
+    - Confidence level calculated
+    - Capture record updated with final evidence
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      STORY SPECIFICATION:
+      - File: docs/sprint-artifacts/stories/7-11-video-evidence-package.md
+        Description: Complete story specification with acceptance criteria, technical requirements, and confidence calculation matrix
+
+      EPIC DOCUMENTATION:
+      - File: docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md
+        Description: Epic 7 technical specification covering video architecture, data models, and services
+
+      ARCHITECTURE REFERENCE:
+      - File: docs/architecture.md
+        Description: System architecture with backend services patterns and evidence package structure
+
+      PHOTO EVIDENCE REFERENCE (Pattern to follow):
+      - File: docs/sprint-artifacts/stories/4-7-evidence-package-confidence-calculation.md
+        Description: Photo evidence package patterns - reference for confidence calculation approach
+    </docs>
+
+    <code>
+      TYPE DEPENDENCIES (Story 7-9, 7-10):
+      - File: backend/src/types/video_depth_analysis.rs
+        Description: VideoDepthAnalysis type with temporal depth metrics (depth_consistency, motion_coherence, scene_stability, is_likely_real_scene, suspicious_frames)
+        Key Types: VideoDepthAnalysis, FrameDepthAnalysis, VideoDepthAnalysisConfig
+
+      - File: backend/src/types/hash_chain_verification.rs
+        Description: HashChainVerification type with chain integrity results (status, chain_intact, attestation_valid, checkpoint_verified, verified_frames, total_frames)
+        Key Types: HashChainVerification, VerificationStatus, HashChainData, VideoAttestation
+
+      - File: backend/src/types/video_capture.rs
+        Description: Video upload types including VideoUploadMetadata, Resolution, HashCheckpoint, VideoUploadResponse
+        Key Types: VideoUploadMetadata, Resolution, HashCheckpoint
+
+      - File: backend/src/types/capture.rs
+        Description: Photo capture types for reference (CaptureLocation, validation patterns)
+        Key Types: CaptureLocation, CaptureMetadataPayload
+
+      SERVICE IMPLEMENTATIONS (Patterns to follow):
+      - File: backend/src/services/video_depth_analysis.rs
+        Description: VideoDepthAnalysisService implementation showing service pattern with graceful error handling, tracing, and configuration
+        Pattern: Service struct with config, new(), with_config(), analyze() method that wraps analyze_inner() for graceful degradation
+
+      - File: backend/src/services/hash_chain_verifier.rs
+        Description: HashChainVerifier implementation showing verification service pattern with detailed logging and structured results
+        Pattern: Service with verify() method returning structured result, extensive validation steps, tracing instrumentation
+
+      PHOTO EVIDENCE MODEL (Reference for structure):
+      - File: backend/src/models/evidence.rs
+        Description: Photo evidence types showing CheckStatus, ConfidenceLevel, HardwareAttestation, DepthAnalysis, EvidencePackage patterns
+        Key Patterns: CheckStatus enum, ConfidenceLevel calculation logic, graceful handling of unavailable checks
+
+      VIDEO UPLOAD ROUTE (Integration point):
+      - File: backend/src/routes/captures_video.rs
+        Description: Video upload endpoint where evidence service will be integrated during processing
+        Integration Point: After multipart parsing, rate limiting, S3 upload - evidence aggregation happens here
+    </code>
+
+    <dependencies>
+      RUST CRATES:
+      - serde = { version = "1.0", features = ["derive"] } - Serialization for JSONB storage
+      - serde_json = "1.0" - JSON serialization for evidence package
+      - chrono = { version = "0.4", features = ["serde"] } - Timestamp handling
+      - uuid = { version = "1.0", features = ["serde", "v4"] } - Capture IDs
+      - sqlx = { version = "0.8", features = ["postgres", "runtime-tokio", "json"] } - Database updates
+      - tracing = "0.1" - Logging and instrumentation
+      - thiserror = "2.0" - Error types
+
+      INTERNAL DEPENDENCIES:
+      - crate::types::video_depth_analysis::VideoDepthAnalysis - Depth analysis results from Story 7-9
+      - crate::types::hash_chain_verification::HashChainVerification - Hash chain results from Story 7-10
+      - crate::services::video_depth_analysis::VideoDepthAnalysisService - Depth analysis service
+      - crate::services::hash_chain_verifier::HashChainVerifier - Hash chain verification service
+      - crate::models::evidence::ConfidenceLevel - Shared confidence level enum (if reusing)
+
+      DATABASE:
+      - captures table: evidence JSONB column, confidence_level VARCHAR column, status VARCHAR column, processed_at TIMESTAMPTZ column
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    VIDEO VS PHOTO CONFIDENCE DIFFERENCES:
+    - Videos require STRICTER confidence thresholds than photos due to higher manipulation risk
+    - Photos: HIGH = hardware pass AND depth pass
+    - Videos: HIGH = hardware pass AND hash chain pass (intact + attested) AND depth pass (consistent + stable)
+    - Videos prioritize hash chain integrity and temporal depth consistency
+    - Rationale: Videos easier to manipulate (splice, insert frames) so require more evidence
+
+    PARTIAL VIDEO HANDLING:
+    - Interrupted videos (is_partial=true) can still achieve MEDIUM or HIGH confidence
+    - Must use checkpoint_verified status from hash chain verification
+    - Only count verified frames/duration for confidence calculation
+    - Include partial_reason in evidence (e.g., "checkpoint_attestation")
+    - Checkpoint passing all checks can achieve same confidence as full video
+
+    CONFIDENCE PRIORITY RULES:
+    - SUSPICIOUS takes precedence (any explicit failure)
+    - Then HIGH (all checks pass with strong thresholds)
+    - Then MEDIUM (core checks pass, degraded/partial/unavailable depth)
+    - Then LOW (everything unavailable)
+
+    GRACEFUL DEGRADATION:
+    - If depth analysis unavailable (storage failure, processing error), continue with other checks
+    - If hash chain verification fails, still record failure in evidence
+    - Never throw errors - always return complete evidence package with failure states
+    - Confidence level reflects all failures and unavailable checks
+
+    PERFORMANCE BUDGET:
+    - Total processing time target: &lt; 5 seconds
+    - Hash chain verification: ~2s
+    - Depth analysis: ~1s
+    - Hardware attestation: ~100ms
+    - Evidence aggregation: ~10ms
+    - Database update: ~50ms
+
+    PROCESSING INFO REQUIREMENTS:
+    - processed_at: Use Utc::now() at evidence completion
+    - processing_time_ms: Use Instant::elapsed() from upload start time
+    - backend_version: Use env!("CARGO_PKG_VERSION") at compile time
+    - checks_performed: Dynamic list based on what actually ran
+
+    DATABASE SCHEMA:
+    - evidence column: JSONB type, stores complete VideoEvidence structure
+    - confidence_level column: VARCHAR, stores lowercase string ("high", "medium", "low", "suspicious")
+    - status column: VARCHAR, update to "complete" after evidence stored
+    - processed_at column: TIMESTAMPTZ, update with current timestamp
+  </constraints>
+
+  <interfaces>
+    VIDEOEVIDENCE SERVICE API:
+
+    Service Creation:
+    ```rust
+    pub struct VideoEvidenceService {
+        backend_version: String,
+    }
+
+    impl VideoEvidenceService {
+        pub fn new() -> Self
+        pub fn build_evidence(
+            &amp;self,
+            hw_attestation: AttestationEvidence,
+            hash_chain: HashChainVerification,
+            depth_analysis: Option&lt;VideoDepthAnalysis&gt;,
+            metadata: MetadataEvidence,
+            is_partial: bool,
+            checkpoint_index: Option&lt;u32&gt;,
+            duration_ms: u64,
+            frame_count: u32,
+            start_time: Instant,
+        ) -> VideoEvidence
+        pub fn calculate_confidence(&amp;self, evidence: &amp;VideoEvidence) -> ConfidenceLevel
+    }
+    ```
+
+    VideoEvidence Structure (Output):
+    ```rust
+    pub struct VideoEvidence {
+        pub r#type: String,                          // "video"
+        pub duration_ms: u64,
+        pub frame_count: u32,
+        pub hardware_attestation: AttestationEvidence,
+        pub hash_chain: HashChainVerification,
+        pub depth_analysis: Option&lt;VideoDepthAnalysis&gt;,
+        pub metadata: MetadataEvidence,
+        pub partial_attestation: PartialAttestationInfo,
+        pub processing: ProcessingInfo,
+    }
+
+    pub struct PartialAttestationInfo {
+        pub is_partial: bool,
+        pub checkpoint_index: Option&lt;u32&gt;,
+        pub verified_frames: u32,
+        pub total_frames: u32,
+        pub reason: Option&lt;String&gt;,
+    }
+
+    pub struct AttestationEvidence {
+        pub status: String,              // "pass", "fail", "unavailable"
+        pub assertion_valid: bool,
+        pub device_verified: bool,
+        pub attestation_time: DateTime&lt;Utc&gt;,
+    }
+
+    pub struct MetadataEvidence {
+        pub device_model: String,
+        pub location_valid: bool,
+        pub timestamp_valid: bool,
+    }
+
+    pub struct ProcessingInfo {
+        pub processed_at: DateTime&lt;Utc&gt;,
+        pub processing_time_ms: u64,
+        pub backend_version: String,
+        pub checks_performed: Vec&lt;String&gt;,
+    }
+    ```
+
+    INTEGRATION WITH VIDEO PROCESSING PIPELINE:
+    Location: backend/src/routes/captures_video.rs (upload handler)
+
+    ```rust
+    async fn process_video_capture(
+        capture_id: Uuid,
+        video_s3_key: &amp;str,
+        depth_data_s3_key: &amp;str,
+        hash_chain_data: &amp;HashChainData,
+        attestation: &amp;VideoAttestation,
+        metadata: &amp;VideoUploadMetadata,
+        pool: &amp;PgPool,
+        storage: &amp;StorageService,
+    ) -> Result&lt;(), ProcessingError&gt; {
+        let start_time = Instant::now();
+
+        // 1. Verify hardware attestation
+        let hw_attestation = verify_hardware_attestation(...).await?;
+
+        // 2. Verify hash chain (Story 7-10)
+        let hash_verifier = HashChainVerifier::new();
+        let hash_chain_result = hash_verifier.verify(...).await
+            .unwrap_or_else(|e| HashChainVerification::failed());
+
+        // 3. Analyze temporal depth (Story 7-9)
+        let depth_analysis_result = if let Ok(depth_data) = storage.download(...).await {
+            let depth_analyzer = VideoDepthAnalysisService::new();
+            depth_analyzer.analyze(&amp;depth_data).await.ok()
+        } else {
+            None
+        };
+
+        // 4. Validate metadata
+        let metadata_evidence = MetadataEvidence { ... };
+
+        // 5. Build evidence package (THIS STORY)
+        let evidence_service = VideoEvidenceService::new();
+        let evidence = evidence_service.build_evidence(
+            hw_attestation,
+            hash_chain_result,
+            depth_analysis_result,
+            metadata_evidence,
+            metadata.is_partial,
+            attestation.checkpoint_index,
+            metadata.duration_ms,
+            metadata.frame_count,
+            start_time,
+        );
+
+        // 6. Calculate confidence (THIS STORY)
+        let confidence = evidence_service.calculate_confidence(&amp;evidence);
+
+        // 7. Store evidence and update capture
+        let evidence_json = serde_json::to_value(&amp;evidence)?;
+        sqlx::query!(
+            r#"
+            UPDATE captures
+            SET evidence = $1,
+                confidence_level = $2,
+                status = 'complete',
+                processed_at = NOW()
+            WHERE id = $3
+            "#,
+            evidence_json,
+            confidence.to_string(),
+            capture_id
+        )
+        .execute(pool)
+        .await?;
+
+        Ok(())
+    }
+    ```
+
+    EXISTING SERVICE INTERFACES (Dependencies from Stories 7-9, 7-10):
+
+    From Story 7-9 (VideoDepthAnalysisService):
+    ```rust
+    pub fn analyze(&amp;self, depth_data: &amp;[u8]) -> VideoDepthAnalysis
+    ```
+    Returns VideoDepthAnalysis with:
+    - depth_consistency: f32
+    - motion_coherence: f32
+    - scene_stability: f32
+    - is_likely_real_scene: bool
+    - suspicious_frames: Vec&lt;u32&gt;
+
+    From Story 7-10 (HashChainVerifier):
+    ```rust
+    pub fn verify(&amp;self, chain_data: &amp;HashChainData, attestation: &amp;VideoAttestation) -> HashChainVerification
+    ```
+    Returns HashChainVerification with:
+    - status: VerificationStatus (Pass, Partial, Fail)
+    - chain_intact: bool
+    - attestation_valid: bool
+    - checkpoint_verified: bool (for partial)
+    - verified_frames: u32
+    - total_frames: u32
+  </interfaces>
+
+  <tests>
+    <standards>
+      UNIT TEST REQUIREMENTS (backend/src/services/video_evidence_tests.rs):
+      - Use #[cfg(test)] mod tests pattern
+      - Test all confidence calculation scenarios
+      - Test evidence package construction
+      - Test partial attestation handling
+      - Test processing info generation
+      - Mock input data using helper functions
+      - Verify JSON serialization/deserialization
+      - Test edge cases (all unavailable, all fail, partial combinations)
+      - Target: &gt;= 85% code coverage
+
+      INTEGRATION TEST REQUIREMENTS (backend/tests/video_evidence_integration.rs):
+      - Test full evidence pipeline with fixture data
+      - Test database storage and retrieval
+      - Test JSONB serialization to database
+      - Test confidence level stored correctly
+      - Test processing time realistic (&lt; 5s)
+      - Use test fixtures from backend/tests/fixtures/
+      - Verify evidence package completeness
+
+      TEST FIXTURE REQUIREMENTS:
+      Create JSON fixtures in backend/tests/fixtures/:
+      - video_evidence_high.json - All checks pass
+      - video_evidence_medium_partial.json - Partial with checkpoint
+      - video_evidence_suspicious_chain.json - Broken hash chain
+      - video_evidence_suspicious_depth.json - Failed depth analysis
+      - video_evidence_low.json - Multiple checks unavailable
+
+      CONFIDENCE CALCULATION TEST MATRIX:
+      Test all scenarios from confidence calculation matrix in story:
+      - (hardware=pass, chain=pass+intact, depth=pass) -> HIGH
+      - (hardware=pass, chain=pass+intact, depth=unavailable) -> MEDIUM
+      - (hardware=pass, chain=pass+intact, depth=degraded) -> MEDIUM
+      - (hardware=pass, chain=checkpoint_verified, depth=pass, partial=yes) -> MEDIUM
+      - (hardware=pass, chain=fail, depth=any) -> SUSPICIOUS
+      - (hardware=fail, chain=any, depth=any) -> SUSPICIOUS
+      - (hardware=pass, chain=pass, depth=fail) -> SUSPICIOUS
+      - (hardware=unavailable, chain=unavailable, depth=unavailable) -> LOW
+    </standards>
+
+    <locations>
+      Unit Tests:
+      - backend/src/services/video_evidence.rs - Inline #[cfg(test)] module
+      - Test all public methods of VideoEvidenceService
+      - Test helper functions for evidence construction
+
+      Integration Tests:
+      - backend/tests/video_evidence_integration.rs - New file
+      - Tests full pipeline from verification results to database storage
+
+      Test Fixtures:
+      - backend/tests/fixtures/video_evidence_high.json
+      - backend/tests/fixtures/video_evidence_medium_partial.json
+      - backend/tests/fixtures/video_evidence_suspicious_chain.json
+      - backend/tests/fixtures/video_evidence_suspicious_depth.json
+      - backend/tests/fixtures/video_evidence_low.json
+    </locations>
+
+    <ideas>
+      UNIT TEST IDEAS:
+      - Test evidence package with all verification components present
+      - Test confidence calculation with hash chain broken (should be SUSPICIOUS)
+      - Test confidence calculation with depth analysis failed (should be SUSPICIOUS)
+      - Test confidence calculation with all checks passing (should be HIGH)
+      - Test confidence calculation with depth unavailable (should be MEDIUM)
+      - Test confidence calculation with partial video + checkpoint verified (should be MEDIUM)
+      - Test confidence calculation with all checks unavailable (should be LOW)
+      - Test partial attestation info construction with checkpoint_index
+      - Test partial attestation info construction without checkpoint
+      - Test processing info includes correct checks_performed list
+      - Test backend_version recorded from CARGO_PKG_VERSION
+      - Test processing_time_ms calculated from Instant elapsed
+      - Test VideoEvidence serialization to JSON
+      - Test VideoEvidence deserialization from JSON
+      - Test graceful handling of missing depth analysis (None)
+      - Test graceful handling of failed hash chain verification
+
+      INTEGRATION TEST IDEAS:
+      - Test full evidence pipeline from raw verification results to database
+      - Test evidence stored as JSONB in captures.evidence column
+      - Test confidence_level stored as string in captures.confidence_level column
+      - Test captures.status updated to "complete"
+      - Test captures.processed_at updated with timestamp
+      - Test evidence can be retrieved and deserialized from database
+      - Test processing time is realistic (under 5 seconds)
+      - Test partial video evidence package with checkpoint
+      - Test evidence package with unavailable depth analysis
+      - Test evidence package with failed hash chain
+      - Test evidence package with all checks passing
+      - Test confidence level persists correctly for each scenario
+      - Test JSONB query performance for evidence retrieval
+
+      EDGE CASE TESTS:
+      - Test empty checks_performed list (if no checks ran)
+      - Test processing_time_ms is non-zero
+      - Test partial_attestation.reason populated for partial videos
+      - Test partial_attestation.verified_frames less than total_frames
+      - Test hash chain with checkpoint_verified but is_partial=false (invalid)
+      - Test confidence calculation when depth metrics below thresholds
+      - Test confidence calculation when hash chain status is Partial
+      - Test evidence with extremely long processing time (&gt; 10s)
+      - Test evidence with all boolean flags false
+      - Test evidence serialization with Option&lt;VideoDepthAnalysis&gt; = None
+
+      REFERENCE EXISTING TESTS:
+      - backend/tests/video_upload_integration.rs - Pattern for video upload testing
+      - backend/tests/video_depth_analysis_integration.rs - Pattern for depth analysis testing
+      - backend/src/services/video_depth_analysis.rs - Unit test patterns with mock data
+      - backend/src/services/hash_chain_verifier.rs - Unit test patterns for verification service
+      - backend/src/models/evidence.rs - Confidence calculation test patterns
+    </ideas>
+  </tests>
+</story-context>

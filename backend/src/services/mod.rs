@@ -12,6 +12,7 @@ pub mod metadata_validation;
 pub mod privacy;
 pub mod storage;
 pub mod video_depth_analysis;
+pub mod video_evidence;
 
 pub use attestation::{
     decode_attestation_object, extract_public_key, parse_authenticator_data, verify_attestation,
@@ -31,3 +32,4 @@ pub use metadata_validation::validate_metadata;
 pub use privacy::process_location_for_evidence;
 pub use storage::{depth_map_s3_key, photo_s3_key, StorageService};
 pub use video_depth_analysis::VideoDepthAnalysisService;
+pub use video_evidence::{VideoEvidenceConfig, VideoEvidenceService};

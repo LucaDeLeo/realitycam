@@ -6,6 +6,7 @@ pub mod capture;
 pub mod hash_chain_verification;
 pub mod video_capture;
 pub mod video_depth_analysis;
+pub mod video_evidence;
 
 pub use capture::{
     CaptureDetailsResponse, CaptureLocation, CaptureMetadataPayload, CaptureUploadResponse,
@@ -28,6 +29,11 @@ pub use video_depth_analysis::{
 pub use hash_chain_verification::{
     HashChainData, HashChainVerification, HashChainVerificationError, HashChainVerifierConfig,
     VerificationStatus, VideoAttestation,
+};
+
+pub use video_evidence::{
+    DepthAnalysisEvidence, HardwareAttestationEvidence, HashChainEvidence, MetadataEvidence,
+    PartialAttestationInfo, ProcessingInfo, VideoConfidenceLevel, VideoEvidence,
 };
 
 use chrono::{DateTime, Utc};
