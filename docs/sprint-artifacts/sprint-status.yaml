@@ -125,7 +125,7 @@ development_status:
   7-7-video-local-processing-pipeline: done
   7-8-video-upload-endpoint: done
   7-9-video-depth-analysis-service: done
-  7-10-video-hash-chain-verification: drafted
+  7-10-video-hash-chain-verification: done
   7-11-video-evidence-package: backlog
   7-12-c2pa-video-manifest-generation: backlog
   7-13-video-verification-page: backlog
