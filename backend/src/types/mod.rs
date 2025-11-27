@@ -3,6 +3,7 @@
 //! Defines the standard API response format per architecture specification.
 
 pub mod capture;
+pub mod hash_chain_verification;
 pub mod video_capture;
 pub mod video_depth_analysis;
 
@@ -22,6 +23,11 @@ pub use video_capture::{
 pub use video_depth_analysis::{
     DepthKeyframe, FrameDepthAnalysis, VideoDepthAnalysis, VideoDepthAnalysisConfig,
     VideoDepthAnalysisError,
+};
+
+pub use hash_chain_verification::{
+    HashChainData, HashChainVerification, HashChainVerificationError, HashChainVerifierConfig,
+    VerificationStatus, VideoAttestation,
 };
 
 use chrono::{DateTime, Utc};

@@ -1,0 +1,942 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML: 7-10-video-hash-chain-verification
+  Generated: 2025-11-27
+  Epic: 7 - Video Capture with LiDAR Depth
+
+  This file provides comprehensive implementation context for Story 7-10.
+  It serves as the single source of truth for story implementation.
+-->
+<story-context version="1.0">
+  <metadata>
+    <story-id>7-10-video-hash-chain-verification</story-id>
+    <story-title>Video Hash Chain Verification</story-title>
+    <epic-id>7</epic-id>
+    <epic-title>Video Capture with LiDAR Depth</epic-title>
+    <priority>P0</priority>
+    <estimated-effort>M</estimated-effort>
+    <created-at>2025-11-27</created-at>
+  </metadata>
+
+  <!-- ============================================================== -->
+  <!-- STORY REFERENCE                                                -->
+  <!-- ============================================================== -->
+  <story-reference>
+    <file-path>docs/sprint-artifacts/stories/7-10-video-hash-chain-verification.md</file-path>
+    <user-story>
+      As a backend verification system,
+      I want to verify the cryptographic hash chain of video frames,
+      So that I can detect tampering attempts like frame insertion, removal, or reordering.
+    </user-story>
+    <summary>
+      Implements backend verification of the cryptographic hash chain created by iOS (Story 7-4):
+      - Extracts video frames using ffmpeg at 30fps
+      - Recomputes hash chain following iOS algorithm: H(n) = SHA256(frame_n + depth_n + timestamp_n + H(n-1))
+      - Compares computed chain to submitted chain from iOS upload (Story 7-8)
+      - Verifies attestation matches final/checkpoint hash (Story 7-5)
+      - Detects tampering: frame insertion, removal, reordering
+      - Reports broken frame number for forensic analysis
+      - Feeds into evidence package (Story 7-11)
+    </summary>
+    <acceptance-criteria>
+      <criterion id="AC-7.10.1">Hash Chain Data Parsing: Parse frame_hashes, checkpoints, final_hash from JSON</criterion>
+      <criterion id="AC-7.10.2">Video Frame Extraction: Use ffmpeg to extract all RGB frames at 30fps with timestamps</criterion>
+      <criterion id="AC-7.10.3">Hash Chain Recomputation: Compute H(n) = SHA256(frame + depth + timestamp + H(n-1)) matching iOS</criterion>
+      <criterion id="AC-7.10.4">Chain Comparison: Compare frame-by-frame, identify first divergence point</criterion>
+      <criterion id="AC-7.10.5">Attestation Verification: Verify attestation.finalHash matches computed final/checkpoint hash</criterion>
+      <criterion id="AC-7.10.6">Tamper Detection: Detect broken chain, attestation mismatch, report suspicious frames</criterion>
+      <criterion id="AC-7.10.7">HashChainVerification Output: JSON with status, verified_frames, chain_intact, attestation_valid</criterion>
+      <criterion id="AC-7.10.8">Integration: Run as part of video capture processing pipeline, failures don't block processing</criterion>
+    </acceptance-criteria>
+    <dependencies>
+      <dependency story-id="7-8" status="complete">Video upload provides hash_chain JSON and video S3 path</dependency>
+      <dependency story-id="7-9" status="complete">Video depth analysis provides depth keyframes for hash computation</dependency>
+      <dependency story-id="7-4" status="complete" file="ios/Rial/Core/Crypto/HashChainService.swift">iOS hash chain algorithm to replicate</dependency>
+      <dependency story-id="7-5" status="complete">VideoAttestation format with finalHash, isPartial, checkpointIndex</dependency>
+    </dependencies>
+  </story-reference>
+
+  <!-- ============================================================== -->
+  <!-- EPIC CONTEXT                                                   -->
+  <!-- ============================================================== -->
+  <epic-context>
+    <tech-spec-path>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md</tech-spec-path>
+    <architecture-path>docs/architecture.md</architecture-path>
+    <relevant-sections>
+      <section name="ADR-010: Pattern 1 - Hash Chain Integrity" path="docs/architecture.md" line="996-1014">
+        Each video frame is cryptographically chained to the previous frame:
+        H(n) = SHA256(frame_n + depth_n + timestamp_n + H(n-1))
+
+        This ensures:
+        - No frames can be inserted (chain would break)
+        - No frames can be removed (chain would break)
+        - No frames can be reordered (previous hash wouldn't match)
+
+        Rationale: Established cryptographic pattern used in blockchain, Chronicle, and similar
+        tamper-evident systems. Backend must recompute this chain identically to iOS.
+      </section>
+      <section name="Data Models - HashChainVerification" path="docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md" line="225-233">
+        Rust struct with:
+        - status: VerificationStatus (Pass/Partial/Fail)
+        - verified_frames, total_frames: u32
+        - chain_intact: bool
+        - attestation_valid: bool
+        - partial_reason: Option&lt;String&gt;
+        - verified_duration_ms: u32
+        - broken_at_frame: Option&lt;u32&gt; (for forensics)
+        - checkpoint_verified: bool
+      </section>
+      <section name="Services - hash_chain_verifier.rs" path="docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md" line="116">
+        Backend service to recompute and verify video frame hash chains
+      </section>
+      <section name="Hash Chain Computation Algorithm" path="docs/sprint-artifacts/stories/7-10-video-hash-chain-verification.md" line="362-435">
+        Backend must exactly match iOS algorithm from Story 7-4:
+        1. Add RGB pixel data
+        2. Add depth data (if available for this frame - 10fps)
+        3. Add timestamp (8 bytes, TimeInterval)
+        4. Chain with previous hash (if not first frame)
+      </section>
+    </relevant-sections>
+  </epic-context>
+
+  <!-- ============================================================== -->
+  <!-- EXISTING CODE INTERFACES                                       -->
+  <!-- ============================================================== -->
+  <existing-code-interfaces>
+
+    <!-- CRITICAL: iOS Hash Chain Algorithm (MUST REPLICATE EXACTLY) -->
+    <interface type="swift-service">
+      <path>ios/Rial/Core/Crypto/HashChainService.swift</path>
+      <description>iOS hash chain implementation - MUST MATCH EXACTLY on backend</description>
+      <critical-algorithm name="processFrame">
+        <![CDATA[
+// From HashChainService.swift lines 194-239
+public func processFrame(
+    rgbBuffer: CVPixelBuffer,
+    depthBuffer: CVPixelBuffer?,
+    timestamp: TimeInterval,
+    frameNumber: Int
+) -> Data {
+    let rgbData = extractPixelData(rgbBuffer)
+    let depthData = depthBuffer.flatMap { extractPixelData($0) }
+
+    let hash = computeFrameHash(
+        rgbData: rgbData,
+        depthData: depthData,
+        timestamp: timestamp,
+        previousHash: previousHash
+    )
+
+    frameHashes.append(hash)
+    previousHash = hash
+
+    // Checkpoint every 150 frames (5 seconds at 30fps)
+    if frameNumber > 0 && frameNumber % 150 == 0 {
+        createCheckpoint(frameNumber: frameNumber, hash: hash, timestamp: timestamp)
+    }
+
+    return hash
+}
+
+// From lines 327-355
+private func computeFrameHash(
+    rgbData: Data,
+    depthData: Data?,
+    timestamp: TimeInterval,
+    previousHash: Data?
+) -> Data {
+    var hasher = SHA256()
+
+    // 1. Add RGB data
+    hasher.update(data: rgbData)
+
+    // 2. Add depth data if available
+    if let depth = depthData {
+        hasher.update(data: depth)
+    }
+
+    // 3. Add timestamp (8 bytes for TimeInterval/Double)
+    var ts = timestamp
+    withUnsafeBytes(of: &ts) { bytes in
+        hasher.update(bufferPointer: bytes)
+    }
+
+    // 4. Chain with previous hash (if not first frame)
+    if let prev = previousHash {
+        hasher.update(data: prev)
+    }
+
+    return Data(hasher.finalize())
+}
+
+// From lines 294-311
+private func extractPixelData(_ buffer: CVPixelBuffer) -> Data {
+    CVPixelBufferLockBaseAddress(buffer, .readOnly)
+    defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+
+    guard let baseAddress = CVPixelBufferGetBaseAddress(buffer) else {
+        return Data()
+    }
+
+    let height = CVPixelBufferGetHeight(buffer)
+    let bytesPerRow = CVPixelBufferGetBytesPerRow(buffer)
+    let dataSize = height * bytesPerRow
+
+    return Data(bytes: baseAddress, count: dataSize)
+}
+        ]]>
+      </critical-algorithm>
+      <key-structures>
+        <structure name="HashChainData">
+          // Lines 73-100
+          public struct HashChainData: Codable, Sendable {
+              public let frameHashes: [Data]        // All frame hashes at 30fps
+              public let checkpoints: [HashCheckpoint]  // Every 5s (150 frames)
+              public let finalHash: Data            // Last frame hash
+          }
+        </structure>
+        <structure name="HashCheckpoint">
+          // Lines 27-53
+          public struct HashCheckpoint: Codable, Sendable, Equatable {
+              public let index: Int            // 0=5s, 1=10s, 2=15s
+              public let frameNumber: Int      // 150, 300, 450
+              public let hash: Data            // 32 bytes SHA256
+              public let timestamp: TimeInterval
+          }
+        </structure>
+      </key-structures>
+      <constants>
+        // Lines 145-148
+        public static let checkpointInterval: Int = 150  // 5 seconds at 30fps
+        public static let maxCheckpoints: Int = 3
+      </constants>
+      <critical-notes>
+        1. Pixel data extraction includes FULL bytesPerRow (not just width * channels)
+        2. Timestamp is 8 bytes (TimeInterval = Double) in little-endian
+        3. Depth is only available every 3rd frame (10fps capture from 30fps video)
+        4. First frame has no previousHash in chain
+        5. CryptoKit SHA256 is standard SHA256 (backend must use sha2 crate)
+      </critical-notes>
+    </interface>
+
+    <!-- Video Upload Types (Hash Chain Input) -->
+    <interface type="rust-types">
+      <path>backend/src/types/video_capture.rs</path>
+      <description>Hash chain data structures from iOS upload (Story 7-8)</description>
+      <key-structures>
+        <structure name="HashCheckpoint">
+          // Lines 47-60
+          #[derive(Debug, Clone, Deserialize, Serialize)]
+          pub struct HashCheckpoint {
+              pub index: u32,           // Checkpoint index (0-based)
+              pub frame_number: u32,    // Frame at checkpoint
+              pub hash: String,         // Base64 encoded SHA256
+              pub timestamp: f64,       // Seconds
+          }
+        </structure>
+        <structure name="VideoUploadMetadata">
+          // Lines 63-99
+          #[derive(Debug, Clone, Deserialize, Serialize)]
+          pub struct VideoUploadMetadata {
+              pub hash_chain_final: String,  // Base64 final hash
+              pub assertion: Option&lt;String&gt;,    // Base64 DCAppAttest
+              pub checkpoints: Vec&lt;HashCheckpoint&gt;,
+              pub is_partial: bool,
+              // ... other metadata
+          }
+        </structure>
+      </key-structures>
+      <note>
+        hash_chain JSON is separate multipart field with ALL frame hashes.
+        VideoUploadMetadata only contains FINAL hash and checkpoints.
+        Full frame_hashes array comes from hash_chain multipart field.
+      </note>
+    </interface>
+
+    <!-- Video Depth Types (For Hash Computation) -->
+    <interface type="rust-types">
+      <path>backend/src/types/video_depth_analysis.rs</path>
+      <description>Depth keyframe structures needed for hash computation</description>
+      <key-structures>
+        <structure name="DepthKeyframe">
+          // Lines 94-105
+          #[derive(Debug, Clone)]
+          pub struct DepthKeyframe {
+              pub index: u32,
+              pub timestamp: f64,        // Match to video frame by timestamp
+              pub depth_data: Vec&lt;f32&gt;,   // Float32 array
+              pub width: u32,
+              pub height: u32,
+          }
+        </structure>
+      </key-structures>
+      <note>
+        Depth keyframes are at 10fps (every 3rd video frame at 30fps).
+        Match to video frames by timestamp with ~10ms tolerance.
+        If no depth match, compute hash without depth component.
+      </note>
+    </interface>
+
+    <!-- Video Upload Route (Integration Point) -->
+    <interface type="rust-route">
+      <path>backend/src/routes/captures_video.rs</path>
+      <description>Video upload endpoint stores hash_chain and calls processing</description>
+      <key-patterns>
+        <pattern name="hash_chain_storage">
+          // Lines 104-113
+          // hash_chain field from multipart form
+          // Validated with validate_hash_chain_size() (max 1MB)
+          // Contains: { "frame_hashes": ["base64..."], "checkpoints": [...], "final_hash": "base64" }
+          // Stored to S3: captures/{device_id}/{capture_id}/hash_chain.json
+        </pattern>
+        <pattern name="video_storage">
+          // Video file stored to S3: captures/{device_id}/{capture_id}/video.mp4
+          // This is the file that needs frame extraction for verification
+        </pattern>
+      </key-patterns>
+    </interface>
+
+    <!-- Video Depth Analysis Service (Depth Keyframe Source) -->
+    <interface type="rust-service">
+      <path>backend/src/services/video_depth_analysis.rs</path>
+      <description>Provides depth keyframes for hash computation (Story 7-9)</description>
+      <key-patterns>
+        <pattern name="depth-decompression">
+          // Lines 99-109
+          // Decompresses gzipped depth blob
+          // Parses header and frame indices
+          // Extracts Vec&lt;DepthKeyframe&gt; with timestamp, depth_data, width, height
+        </pattern>
+        <pattern name="depth-parsing">
+          // parse_depth_keyframes() returns Vec&lt;DepthKeyframe&gt;
+          // Each keyframe has timestamp for matching to video frames
+        </pattern>
+      </key-patterns>
+      <reusable-code>
+        <![CDATA[
+// From video_depth_analysis.rs - REUSE these patterns
+
+// Decompression (lines 90-100 of service)
+fn decompress_depth_data(depth_data: &[u8]) -> Result<Vec<u8>, VideoDepthAnalysisError> {
+    let mut decoder = GzDecoder::new(depth_data);
+    let mut decompressed = Vec::new();
+    decoder.read_to_end(&mut decompressed).map_err(|e| {
+        VideoDepthAnalysisError::DecompressionError(e.to_string())
+    })?;
+    Ok(decompressed)
+}
+
+// Parsing depth keyframes (reuse this pattern for hash chain verifier)
+// Parse header: magic "RLDP", version, frame_count, width, height
+// Parse indices: timestamp (f64), offset (u32) for each frame
+// Extract depth data: Float32 array at each offset
+        ]]>
+      </reusable-code>
+    </interface>
+
+  </existing-code-interfaces>
+
+  <!-- ============================================================== -->
+  <!-- DEVELOPMENT CONSTRAINTS                                        -->
+  <!-- ============================================================== -->
+  <constraints>
+    <architecture>
+      <constraint id="hash-algorithm-match" priority="CRITICAL">
+        Backend hash computation MUST match iOS algorithm EXACTLY:
+        1. Same data order: RGB, depth (optional), timestamp, previous hash
+        2. Same encoding: raw bytes for RGB/depth, 8-byte double for timestamp
+        3. Same SHA256 implementation: sha2 crate matches CryptoKit
+        4. Same pixel extraction: FULL bytesPerRow, not width * channels
+
+        Any deviation breaks chain verification. Test with iOS-generated fixtures.
+      </constraint>
+      <constraint id="depth-matching" priority="HIGH">
+        Depth keyframes are at 10fps, video frames at 30fps.
+        Match by timestamp with tolerance (~10ms).
+        Frames without depth match: compute hash WITHOUT depth component.
+        This matches iOS behavior when depth not available for frame.
+      </constraint>
+      <constraint id="base64-decoding" priority="HIGH">
+        iOS submits hashes as base64 strings.
+        Backend must decode before comparison.
+        Use base64::engine::general_purpose::STANDARD.
+      </constraint>
+      <constraint id="ffmpeg-dependency" priority="HIGH">
+        ffmpeg-next crate requires system ffmpeg libraries.
+        Document in backend/README.md:
+        - Ubuntu: apt-get install libavcodec-dev libavformat-dev libavutil-dev
+        - macOS: brew install ffmpeg
+        - CI: Add installation step to GitHub Actions
+      </constraint>
+      <constraint id="graceful-degradation" priority="MEDIUM">
+        Verification failures should not block capture processing.
+        Return HashChainVerification with status=Fail and details.
+        Evidence package (Story 7-11) will reflect reduced confidence.
+      </constraint>
+    </architecture>
+
+    <performance>
+      <constraint id="frame-extraction-time" priority="MEDIUM">
+        Target: &lt; 5 seconds for 450 frames (15s video).
+        Optimizations:
+        - Direct RGB24 conversion (no intermediate formats)
+        - Streaming hash computation (no frame buffering)
+        - Early exit on first hash mismatch (optional)
+      </constraint>
+      <constraint id="parallel-processing" priority="LOW">
+        Consider rayon for parallel hash computation AFTER extraction.
+        Frame extraction itself must be sequential.
+      </constraint>
+    </performance>
+
+    <testing>
+      <constraint id="ios-fixture-compatibility" priority="CRITICAL">
+        Create test fixtures with REAL iOS hash values.
+        Copy known hash values from iOS unit tests (RialTests/HashChainServiceTests).
+        Verify backend computes identical hashes for same inputs.
+      </constraint>
+      <constraint id="tampering-test-cases" priority="HIGH">
+        Test fixtures must include:
+        - Valid chain (passes)
+        - Frame 75 replaced (fails at frame 75)
+        - Frame 200 removed (fails at frame 201)
+        - Frames 100-110 reordered (fails at frame 101)
+        - Attestation mismatch (chain intact but attestation invalid)
+      </constraint>
+    </testing>
+  </constraints>
+
+  <!-- ============================================================== -->
+  <!-- INTEGRATION INTERFACES                                         -->
+  <!-- ============================================================== -->
+  <interfaces>
+    <input-interfaces>
+      <input name="video_file" type="S3 path">
+        S3 key: captures/{device_id}/{capture_id}/video.mp4
+        Format: H.264 or HEVC MP4/MOV
+        Resolution: Up to 4K
+        Duration: Up to 15 seconds
+        Frame rate: 30fps (target, may vary slightly)
+      </input>
+      <input name="hash_chain_json" type="S3 path">
+        S3 key: captures/{device_id}/{capture_id}/hash_chain.json
+        Format: JSON with frame_hashes (base64), checkpoints, final_hash
+        Size: Up to 1MB (~450 hashes)
+        Structure: { "frame_hashes": ["base64..."], "checkpoints": [...], "final_hash": "base64" }
+      </input>
+      <input name="depth_keyframes" type="Vec&lt;DepthKeyframe&gt;">
+        Source: VideoDepthAnalysisService.analyze() output
+        Contains: timestamp, depth_data (Float32 array), width, height
+        Frame rate: 10fps (every 3rd video frame)
+        Used for: Hash computation when depth available
+      </input>
+      <input name="attestation" type="VideoAttestation">
+        Source: VideoUploadMetadata
+        Contains: finalHash (base64), assertion (base64), isPartial, checkpointIndex
+        Used for: Verifying attestation matches computed hash
+      </input>
+    </input-interfaces>
+
+    <output-interfaces>
+      <output name="HashChainVerification" type="Rust struct">
+        Fields:
+        - status: VerificationStatus (Pass/Partial/Fail)
+        - verified_frames: u32 (frames successfully verified)
+        - total_frames: u32 (frames in video)
+        - chain_intact: bool (no tampering detected)
+        - attestation_valid: bool (attestation matches computed hash)
+        - partial_reason: Option&lt;String&gt; (if Partial: "checkpoint_attestation")
+        - verified_duration_ms: u32 (duration of verified portion)
+        - broken_at_frame: Option&lt;u32&gt; (first frame where chain breaks)
+        - checkpoint_verified: bool (checkpoint attestation valid)
+        - checkpoint_index: Option&lt;u32&gt; (if partial verification)
+
+        Stored in: capture record (video_evidence JSON)
+        Used by: Story 7-11 (Evidence Package) for confidence scoring
+      </output>
+    </output-interfaces>
+
+    <service-integration>
+      <integration name="video-upload-pipeline" type="sequential">
+        1. Video uploaded (Story 7-8) → stored to S3
+        2. Depth analysis runs (Story 7-9) → produces depth keyframes
+        3. Hash chain verification runs (Story 7-10) → produces HashChainVerification
+        4. Evidence package generated (Story 7-11) → includes verification results
+
+        Note: Hash chain verification is INDEPENDENT of depth analysis.
+        Can run in parallel if needed.
+      </integration>
+      <integration name="error-handling" type="graceful">
+        If hash chain verification fails:
+        - Log error with details (broken frame number, reason)
+        - Return HashChainVerification with status=Fail
+        - Continue capture processing (don't throw)
+        - Evidence package reflects reduced confidence
+      </integration>
+    </service-integration>
+  </interfaces>
+
+  <!-- ============================================================== -->
+  <!-- TESTING REQUIREMENTS                                           -->
+  <!-- ============================================================== -->
+  <tests>
+    <standards>
+      <standard name="unit-test-coverage">
+        Target: &gt;= 85% coverage for hash_chain_verifier module.
+        Use cargo tarpaulin or similar for measurement.
+      </standard>
+      <standard name="ios-compatibility">
+        Hash computation must match iOS exactly.
+        Use fixtures with known iOS hash values.
+        Test file: backend/tests/fixtures/ios_hash_fixtures.json
+      </standard>
+      <standard name="integration-tests">
+        Test full verification pipeline with real video files.
+        Test file: backend/tests/hash_chain_verification_integration.rs
+      </standard>
+    </standards>
+
+    <test-locations>
+      <location type="unit-tests">
+        Path: backend/src/services/hash_chain_verifier.rs (inline #[cfg(test)] module)
+        OR: backend/src/services/hash_chain_verifier_tests.rs
+
+        Test coverage:
+        - Hash computation matches iOS algorithm
+        - Hash chain with single frame
+        - Hash chain with multiple frames
+        - Hash chain with depth at some frames (10fps)
+        - Chain comparison with identical chains (Pass)
+        - Chain comparison with broken chain (Fail)
+        - Chain comparison identifies correct break point
+        - Attestation verification with matching hash
+        - Attestation verification with mismatched hash
+        - Partial video verification with checkpoint
+        - Checkpoint shortcut optimization
+        - Frame extraction with valid video
+        - Frame extraction failure handling
+        - max_frames safety limit
+        - Base64 decoding of submitted hashes
+      </location>
+      <location type="integration-tests">
+        Path: backend/tests/hash_chain_verification_integration.rs
+
+        Test coverage:
+        - Full verification pipeline with fixture video
+        - Verification with real hash chain from iOS
+        - Verification results JSON serialization
+        - Service configuration overrides
+        - Error handling with various invalid inputs
+        - Parallel frame processing performance
+        - Verification with interrupted video (checkpoint)
+      </location>
+      <location type="test-fixtures">
+        Path: backend/tests/fixtures/
+
+        Required fixtures:
+        - valid_video.mp4 (5s, 30fps, 150 frames)
+        - valid_hash_chain.json (matching hashes for valid_video.mp4)
+        - tampered_video.mp4 (frame 75 replaced)
+        - tampered_hash_chain.json (original hashes, should fail)
+        - partial_video.mp4 (12s, interrupted)
+        - partial_hash_chain.json (checkpoint at 10s)
+        - ios_hash_fixtures.json (known hash values from iOS tests)
+      </location>
+    </test-locations>
+
+    <test-ideas>
+      <test-case name="hash-computation-matches-ios" priority="CRITICAL">
+        Purpose: Verify backend computes identical hashes to iOS
+        Setup: Use ios_hash_fixtures.json with known RGB, depth, timestamp, previous hash
+        Execute: Compute hash with backend algorithm
+        Assert: Hash matches iOS-computed hash exactly
+        Note: This is the MOST CRITICAL test. If this fails, nothing else works.
+      </test-case>
+      <test-case name="frame-insertion-detection" priority="HIGH">
+        Purpose: Verify detection of inserted frame
+        Setup: Valid video + hash chain, insert foreign frame at position 200
+        Execute: Run verification
+        Assert: status=Fail, chain_intact=false, broken_at_frame=Some(201)
+      </test-case>
+      <test-case name="frame-removal-detection" priority="HIGH">
+        Purpose: Verify detection of removed frame
+        Setup: Valid video + hash chain, remove frame 150
+        Execute: Run verification
+        Assert: status=Fail, chain_intact=false, broken_at_frame=Some(151)
+      </test-case>
+      <test-case name="frame-reordering-detection" priority="HIGH">
+        Purpose: Verify detection of reordered frames
+        Setup: Valid video + hash chain, swap frames 100 and 101
+        Execute: Run verification
+        Assert: status=Fail, chain_intact=false, broken_at_frame=Some(101)
+      </test-case>
+      <test-case name="attestation-mismatch-detection" priority="HIGH">
+        Purpose: Verify attestation verification
+        Setup: Valid video + hash chain, wrong attestation.finalHash
+        Execute: Run verification
+        Assert: status=Fail, chain_intact=true, attestation_valid=false
+      </test-case>
+      <test-case name="partial-video-checkpoint-verification" priority="MEDIUM">
+        Purpose: Verify partial video with checkpoint attestation
+        Setup: 12s video with 10s checkpoint attestation
+        Execute: Run verification
+        Assert: status=Partial, verified_frames=300, checkpoint_verified=true
+      </test-case>
+      <test-case name="depth-matching-tolerance" priority="MEDIUM">
+        Purpose: Verify depth keyframes matched to frames by timestamp
+        Setup: Video frames at 0.0, 0.033, 0.066s; depth at 0.0, 0.1, 0.2s
+        Execute: Match depth to frames
+        Assert: Frame 0 matches depth 0, frames 1-2 have no depth, frame 3 matches depth 1
+      </test-case>
+      <test-case name="performance-450-frames" priority="LOW">
+        Purpose: Verify verification completes within time budget
+        Setup: 15s video (450 frames)
+        Execute: Run verification with timing
+        Assert: Completes in &lt; 5 seconds
+      </test-case>
+    </test-ideas>
+  </tests>
+
+  <!-- ============================================================== -->
+  <!-- IMPLEMENTATION NOTES                                           -->
+  <!-- ============================================================== -->
+  <implementation-notes>
+    <note priority="CRITICAL" topic="Hash Algorithm Matching">
+      The backend MUST replicate the iOS hash computation EXACTLY.
+
+      iOS algorithm (HashChainService.swift lines 327-355):
+      1. var hasher = SHA256()
+      2. hasher.update(data: rgbData)              // Full pixel buffer (height * bytesPerRow)
+      3. if depth: hasher.update(data: depthData)  // Full depth buffer (height * bytesPerRow)
+      4. hasher.update(timestamp as 8-byte double) // withUnsafeBytes little-endian
+      5. if previous: hasher.update(data: prev)    // 32-byte hash from previous frame
+      6. return Data(hasher.finalize())            // 32-byte SHA256
+
+      Backend implementation (Rust):
+      1. let mut hasher = Sha256::new();
+      2. hasher.update(&amp;frame.rgb_data);          // FULL bytesPerRow, not width * channels
+      3. if depth: hasher.update(&amp;depth_bytes);   // Convert Vec&lt;f32&gt; to bytes with to_le_bytes()
+      4. hasher.update(timestamp.to_le_bytes());  // 8 bytes, little-endian double
+      5. if prev: hasher.update(prev);            // 32-byte hash
+      6. let hash = hasher.finalize();            // 32 bytes
+
+      CRITICAL: Test with iOS-generated fixtures to verify exact match.
+    </note>
+
+    <note priority="HIGH" topic="Depth Data Conversion">
+      iOS depth is CVPixelBuffer (Float32 pixels).
+      Backend depth is Vec&lt;f32&gt; from decompressed blob.
+
+      For hash computation:
+      - iOS: extractPixelData() returns raw bytes from CVPixelBuffer (height * bytesPerRow)
+      - Backend: Convert Vec&lt;f32&gt; to bytes: depth.iter().flat_map(|f| f.to_le_bytes()).collect()
+
+      Both produce same byte array for same Float32 values.
+      Verify with test case: [1.0f32, 2.5f32, 3.7f32] → same bytes iOS vs Rust.
+    </note>
+
+    <note priority="HIGH" topic="Frame Extraction with ffmpeg">
+      Use ffmpeg-next crate for video decoding.
+
+      Key decisions:
+      - Extract ALL frames (don't skip any) to match iOS 30fps capture
+      - Convert to RGB24 format for consistent pixel data
+      - Extract timestamps from video metadata (PTS / time_base)
+      - Handle variable frame rate videos (some frames may be dropped)
+
+      Example:
+      - ffmpeg::init()
+      - ffmpeg::format::input(video_path)
+      - Find video stream with best(Type::Video)
+      - Create decoder from parameters
+      - Process packets, decode frames
+      - Convert to RGB24 with scaling context
+      - Extract rgb_frame.data(0) as Vec&lt;u8&gt;
+    </note>
+
+    <note priority="MEDIUM" topic="Checkpoint Shortcut">
+      For performance, support checkpoint-only verification.
+
+      If attestation.isPartial = true:
+      - Verify frames 0 to checkpoint.frameNumber
+      - Compare checkpoint hash to attestation.finalHash
+      - Report status = Partial, not Fail
+      - Include partial_reason = "checkpoint_attestation"
+
+      This allows fast verification of partial videos without processing all frames.
+      Full frame-by-frame verification is still default for complete videos.
+    </note>
+
+    <note priority="MEDIUM" topic="Error Handling Strategy">
+      Hash chain verification should NEVER panic or block capture processing.
+
+      Error scenarios:
+      - Video file not found → status=Fail, log error, continue
+      - ffmpeg extraction fails → status=Fail, log error, continue
+      - Hash chain JSON malformed → status=Fail, log error, continue
+      - Frame count mismatch → status=Fail, log details, continue
+
+      Return HashChainVerification with status=Fail and error details.
+      Evidence package (Story 7-11) will reflect reduced confidence.
+    </note>
+
+    <note priority="LOW" topic="Parallel Processing">
+      Frame extraction must be sequential (ffmpeg limitation).
+      Hash computation CAN be parallelized with rayon AFTER extraction.
+
+      Consider:
+      - Extract all frames first → Vec&lt;VideoFrame&gt;
+      - Parallel: frames.par_iter().map(|f| compute_hash(f)).collect()
+      - But: Hash chain has sequential dependency (previous hash)
+      - Conclusion: Parallelism limited to batch extraction + sequential hashing
+
+      Benchmark before optimizing. Sequential may be fast enough (&lt; 5s target).
+    </note>
+
+    <note priority="LOW" topic="Logging Strategy">
+      Include hash prefixes in logs for debugging (first 8 chars hex).
+
+      Example:
+      - info!("Frame 150 hash: {}", hash.prefix(8).hex())
+      - warn!("Chain broken at frame 200: expected {}, got {}", expected_prefix, computed_prefix)
+
+      Never log full hashes to avoid log bloat.
+      Include performance metrics (frame extraction time, hash computation time).
+    </note>
+  </implementation-notes>
+
+  <!-- ============================================================== -->
+  <!-- DEPENDENCIES                                                   -->
+  <!-- ============================================================== -->
+  <dependencies>
+    <rust-crates>
+      <crate name="sha2" version="0.10">
+        SHA256 hashing (matches iOS CryptoKit).
+        Use: Sha256::new(), hasher.update(), hasher.finalize()
+      </crate>
+      <crate name="ffmpeg-next" version="7">
+        Video decoding and frame extraction.
+        SYSTEM DEPENDENCY: Requires libavcodec, libavformat, libavutil installed.
+        Ubuntu: apt-get install libavcodec-dev libavformat-dev libavutil-dev libavdevice-dev libavfilter-dev libswscale-dev libswresample-dev
+        macOS: brew install ffmpeg
+      </crate>
+      <crate name="base64" version="0.22">
+        Decode base64 hashes from iOS.
+        Use: base64::engine::general_purpose::STANDARD.decode()
+      </crate>
+      <crate name="rayon" version="1.8" optional="true">
+        Parallel processing (optional optimization).
+        Use: rayon::prelude::ParallelIterator
+      </crate>
+      <crate name="thiserror" version="1.0">
+        Error enum derives.
+        Already used in project.
+      </crate>
+      <crate name="tracing" version="0.1">
+        Logging.
+        Already used in project.
+      </crate>
+    </rust-crates>
+
+    <system-dependencies>
+      <dependency name="ffmpeg" platform="all">
+        Required by ffmpeg-next crate.
+        Version: 4.x or 5.x
+        Installation:
+        - Ubuntu/Debian: apt-get install libavcodec-dev libavformat-dev libavutil-dev libavdevice-dev libavfilter-dev libswscale-dev libswresample-dev
+        - macOS: brew install ffmpeg
+        - Alpine: apk add ffmpeg-dev
+
+        CI: Add installation step to .github/workflows/ci.yml
+      </dependency>
+    </system-dependencies>
+  </dependencies>
+
+  <!-- ============================================================== -->
+  <!-- TECHNICAL DECISIONS                                            -->
+  <!-- ============================================================== -->
+  <technical-decisions>
+    <decision id="frame-by-frame-verification" status="approved">
+      <question>Should we verify every frame or only checkpoints?</question>
+      <decision>Verify every frame by default, with checkpoint shortcut as opt-in.</decision>
+      <rationale>
+        Complete verification provides:
+        - Detection of tampering at any point in video
+        - Exact frame number where chain breaks (forensics)
+        - No shortcuts that could be exploited
+
+        Checkpoint shortcuts available for performance but not default.
+      </rationale>
+      <alternatives-considered>
+        - Checkpoint-only verification: Faster but misses tampering between checkpoints
+        - Sampling (e.g., 1fps): Faster but may miss single-frame tampering
+      </alternatives-considered>
+    </decision>
+
+    <decision id="ffmpeg-vs-gstreamer" status="approved">
+      <question>Which video decoding library?</question>
+      <decision>Use ffmpeg-next (Rust bindings for FFmpeg)</decision>
+      <rationale>
+        - FFmpeg is industry standard for video decoding
+        - ffmpeg-next is mature, well-maintained Rust binding
+        - Backend already uses c2pa-rs which may depend on FFmpeg
+        - Wide format support (H.264, HEVC, etc.)
+      </rationale>
+      <alternatives-considered>
+        - GStreamer: More complex, less Rust support
+        - Pure Rust decoders: Limited format support, immature
+      </alternatives-considered>
+    </decision>
+
+    <decision id="hash-chain-storage" status="approved">
+      <question>How to store/retrieve hash chain for verification?</question>
+      <decision>Store as separate JSON file in S3, load on-demand for verification</decision>
+      <rationale>
+        - Separates hash chain from video file
+        - Easy to parse JSON for verification
+        - Can be retrieved independently
+        - ~450 hashes * 44 bytes base64 = ~20KB (small)
+      </rationale>
+      <alternatives-considered>
+        - Embed in video metadata: Requires video modification, complex
+        - Store in database: Adds load to database, not necessary
+      </alternatives-considered>
+    </decision>
+
+    <decision id="graceful-degradation" status="approved">
+      <question>What happens if verification fails?</question>
+      <decision>Continue processing, return Fail status, reduce confidence score</decision>
+      <rationale>
+        - Verification failure doesn't mean video is invalid (could be bug)
+        - Better to process with low confidence than reject entirely
+        - User can still view video and evidence
+        - Evidence package shows verification failed
+      </rationale>
+      <alternatives-considered>
+        - Reject capture: Too strict, may lose valid evidence
+        - Retry: Verification is deterministic, retry won't help
+      </alternatives-considered>
+    </decision>
+  </technical-decisions>
+
+  <!-- ============================================================== -->
+  <!-- COMPLETION CHECKLIST                                           -->
+  <!-- ============================================================== -->
+  <completion-checklist>
+    <phase name="setup">
+      <item>Add ffmpeg-next dependency to Cargo.toml</item>
+      <item>Verify ffmpeg system libraries installed locally</item>
+      <item>Document ffmpeg requirement in backend/README.md</item>
+      <item>Add ffmpeg installation to CI workflow</item>
+    </phase>
+    <phase name="types">
+      <item>Create backend/src/types/hash_chain_verification.rs</item>
+      <item>Define HashChainVerifierConfig struct</item>
+      <item>Define VideoFrame struct</item>
+      <item>Define HashChainData struct (from iOS)</item>
+      <item>Define HashCheckpoint struct</item>
+      <item>Define VideoAttestation struct</item>
+      <item>Define ChainComparisonResult struct</item>
+      <item>Define HashChainVerification struct</item>
+      <item>Define VerificationStatus enum</item>
+      <item>Define VerificationError enum with thiserror</item>
+      <item>Add serde derives for JSON serialization</item>
+      <item>Export from backend/src/types/mod.rs</item>
+    </phase>
+    <phase name="frame-extraction">
+      <item>Implement extract_frames() with ffmpeg-next</item>
+      <item>Initialize ffmpeg library</item>
+      <item>Open video file from S3 path</item>
+      <item>Find video stream</item>
+      <item>Create video decoder</item>
+      <item>Process packets and decode frames</item>
+      <item>Convert frames to RGB24</item>
+      <item>Extract frame timestamps</item>
+      <item>Handle errors gracefully</item>
+      <item>Respect max_frames safety limit</item>
+    </phase>
+    <phase name="hash-computation">
+      <item>Implement compute_frame_hash() matching iOS</item>
+      <item>Add RGB pixel data to hasher</item>
+      <item>Add depth data (if available)</item>
+      <item>Add timestamp (8 bytes, little-endian)</item>
+      <item>Chain with previous hash</item>
+      <item>Implement compute_hash_chain() for full video</item>
+      <item>Match depth keyframes to frames by timestamp</item>
+      <item>Handle frames without depth data</item>
+      <item>Test hash computation matches iOS fixtures</item>
+    </phase>
+    <phase name="chain-comparison">
+      <item>Implement compare_chains()</item>
+      <item>Decode base64 hashes from submitted chain</item>
+      <item>Compare frame-by-frame</item>
+      <item>Identify first divergence point</item>
+      <item>Verify checkpoint hashes</item>
+      <item>Count verified vs total frames</item>
+      <item>Return ChainComparisonResult</item>
+    </phase>
+    <phase name="attestation-verification">
+      <item>Implement verify_attestation()</item>
+      <item>Extract attestation.finalHash</item>
+      <item>Decode from base64</item>
+      <item>Compare to computed final/checkpoint hash</item>
+      <item>Verify isPartial flag matches verification</item>
+      <item>Verify frameCount matches</item>
+      <item>Return boolean result</item>
+    </phase>
+    <phase name="service">
+      <item>Create backend/src/services/hash_chain_verifier.rs</item>
+      <item>Implement HashChainVerifier struct</item>
+      <item>Implement new() with default config</item>
+      <item>Implement with_config() for custom config</item>
+      <item>Implement verify() orchestrating all steps</item>
+      <item>Add tracing spans</item>
+      <item>Handle errors gracefully</item>
+      <item>Add performance timing logs</item>
+      <item>Export from backend/src/services/mod.rs</item>
+    </phase>
+    <phase name="integration">
+      <item>Integrate with video upload route</item>
+      <item>Call verifier after upload completes</item>
+      <item>Pass video S3 path, depth keyframes, hash chain, attestation</item>
+      <item>Store results in capture record</item>
+      <item>Handle failures gracefully</item>
+      <item>Add tracing for pipeline visibility</item>
+      <item>Log broken frame numbers</item>
+    </phase>
+    <phase name="testing">
+      <item>Create test fixtures (valid_video.mp4, etc.)</item>
+      <item>Create ios_hash_fixtures.json with known values</item>
+      <item>Test hash computation matches iOS</item>
+      <item>Test chain with single/multiple frames</item>
+      <item>Test chain with partial depth data</item>
+      <item>Test identical chains (Pass)</item>
+      <item>Test broken chains (Fail)</item>
+      <item>Test attestation verification</item>
+      <item>Test partial video verification</item>
+      <item>Test frame insertion detection</item>
+      <item>Test frame removal detection</item>
+      <item>Test frame reordering detection</item>
+      <item>Integration test with full pipeline</item>
+      <item>Performance test (450 frames &lt; 5s)</item>
+      <item>Verify &gt;= 85% coverage</item>
+    </phase>
+    <phase name="documentation">
+      <item>Add rustdoc comments to all public items</item>
+      <item>Document ffmpeg dependency in README</item>
+      <item>Document hash algorithm matching iOS</item>
+      <item>Document error handling strategy</item>
+      <item>Update CI documentation for ffmpeg</item>
+    </phase>
+    <phase name="validation">
+      <item>All acceptance criteria met (AC-7.10.1 - AC-7.10.8)</item>
+      <item>Unit tests passing (&gt;= 85% coverage)</item>
+      <item>Integration tests passing</item>
+      <item>Performance acceptable (&lt; 5s for 450 frames)</item>
+      <item>No new clippy warnings</item>
+      <item>Tracing/logging for observability</item>
+      <item>Ready for Story 7-11 integration</item>
+    </phase>
+  </completion-checklist>
+
+</story-context>

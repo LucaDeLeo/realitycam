@@ -37,14 +37,14 @@ pub struct VideoDepthAnalysisConfig {
 impl Default for VideoDepthAnalysisConfig {
     fn default() -> Self {
         Self {
-            sample_rate: 10,              // 1fps from 10fps keyframes
+            sample_rate: 10, // 1fps from 10fps keyframes
             consistency_threshold: 0.7,
             coherence_threshold: 0.6,
             stability_threshold: 0.8,
-            max_depth_jump: 2.0,          // 2 meters
+            max_depth_jump: 2.0, // 2 meters
             min_valid_depth: 0.1,
             max_valid_depth: 20.0,
-            histogram_bins: 10,           // 0-10m in 1m bins
+            histogram_bins: 10, // 0-10m in 1m bins
         }
     }
 }
