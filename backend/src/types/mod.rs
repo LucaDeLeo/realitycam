@@ -4,6 +4,7 @@
 
 pub mod capture;
 pub mod video_capture;
+pub mod video_depth_analysis;
 
 pub use capture::{
     CaptureDetailsResponse, CaptureLocation, CaptureMetadataPayload, CaptureUploadResponse,
@@ -16,6 +17,11 @@ pub use video_capture::{
     validate_video_size, HashCheckpoint, Resolution, VideoUploadMetadata, VideoUploadResponse,
     MAX_HASH_CHAIN_SIZE, MAX_VIDEO_DEPTH_SIZE, MAX_VIDEO_METADATA_SIZE, MAX_VIDEO_SIZE,
     VIDEO_RATE_LIMIT_PER_HOUR,
+};
+
+pub use video_depth_analysis::{
+    DepthKeyframe, FrameDepthAnalysis, VideoDepthAnalysis, VideoDepthAnalysisConfig,
+    VideoDepthAnalysisError,
 };
 
 use chrono::{DateTime, Utc};

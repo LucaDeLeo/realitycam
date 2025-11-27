@@ -1,0 +1,386 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML: 7-9-video-depth-analysis-service
+  Generated: 2025-11-27
+  Epic: 7 - Video Capture with LiDAR Depth
+
+  This file provides comprehensive implementation context for Story 7-9.
+  It serves as the single source of truth for story implementation.
+-->
+<story-context version="1.0">
+  <metadata>
+    <story-id>7-9-video-depth-analysis-service</story-id>
+    <story-title>Video Depth Analysis Service</story-title>
+    <epic-id>7</epic-id>
+    <epic-title>Video Capture with LiDAR Depth</epic-title>
+    <priority>P0</priority>
+    <estimated-effort>M</estimated-effort>
+    <created-at>2025-11-27</created-at>
+  </metadata>
+
+  <!-- ============================================================== -->
+  <!-- STORY REFERENCE                                                -->
+  <!-- ============================================================== -->
+  <story-reference>
+    <file-path>docs/sprint-artifacts/stories/7-9-video-depth-analysis-service.md</file-path>
+    <user-story>
+      As a backend verification system,
+      I want to analyze temporal depth consistency across video keyframes,
+      So that I can detect manipulation attempts that single-frame analysis would miss.
+    </user-story>
+    <summary>
+      Implements temporal depth analysis for video captures on the backend:
+      - Decompresses gzipped depth keyframe blob from Story 7-8
+      - Computes depth_consistency (0-1: how stable across frames)
+      - Computes motion_coherence (0-1: depth motion matches scene)
+      - Computes scene_stability (0-1: no impossible jumps)
+      - Flags suspicious frames for review
+      - Outputs VideoDepthAnalysis for evidence package (Story 7-11)
+    </summary>
+    <acceptance-criteria>
+      <criterion id="AC-7.9.1">Depth Data Decompression: Parse gzipped blob with header, index, and Float32 arrays</criterion>
+      <criterion id="AC-7.9.2">Depth Consistency: Sample at 1fps, compare histograms, score 0-1 (threshold >= 0.7)</criterion>
+      <criterion id="AC-7.9.3">Motion Coherence: Optical flow on depth, detect motion direction, score 0-1 (threshold >= 0.6)</criterion>
+      <criterion id="AC-7.9.4">Scene Stability: Detect >2m depth jumps, score 0-1 (threshold >= 0.8)</criterion>
+      <criterion id="AC-7.9.5">Suspicious Frame Detection: Flag anomalous frames, compute is_likely_real_scene</criterion>
+      <criterion id="AC-7.9.6">VideoDepthAnalysis Output: JSON with frame_analyses, three metrics, suspicious_frames</criterion>
+      <criterion id="AC-7.9.7">Integration: Run as part of capture processing, failures don't block processing</criterion>
+    </acceptance-criteria>
+    <dependencies>
+      <dependency story-id="7-8" status="complete">depth_data blob uploaded to S3</dependency>
+      <dependency story-id="4-5" status="complete" file="backend/src/services/depth_analysis.rs">Photo depth analysis patterns (decompression, histogram, edge coherence)</dependency>
+    </dependencies>
+  </story-reference>
+
+  <!-- ============================================================== -->
+  <!-- EPIC CONTEXT                                                   -->
+  <!-- ============================================================== -->
+  <epic-context>
+    <tech-spec-path>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md</tech-spec-path>
+    <architecture-path>docs/architecture.md</architecture-path>
+    <relevant-sections>
+      <section name="Data Models - VideoDepthAnalysis">
+        Rust struct with frame_analyses, depth_consistency, motion_coherence, scene_stability,
+        is_likely_real_scene, suspicious_frames
+      </section>
+      <section name="AC-7.9 Temporal Depth Analysis">
+        Compute depth_consistency, motion_coherence, scene_stability. Flag suspicious frames.
+      </section>
+      <section name="Services - video_depth_analysis.rs">
+        Temporal depth consistency checks, returns VideoDepthAnalysis result
+      </section>
+    </relevant-sections>
+  </epic-context>
+
+  <!-- ============================================================== -->
+  <!-- EXISTING CODE INTERFACES                                       -->
+  <!-- ============================================================== -->
+  <existing-code-interfaces>
+
+    <!-- PATTERN: Photo depth analysis service -->
+    <interface type="rust-service">
+      <path>backend/src/services/depth_analysis.rs</path>
+      <description>Photo depth analysis - REUSE patterns for video</description>
+      <key-patterns>
+        <pattern name="gzip-decompression">
+          decompress_depth_map() using flate2::read::GzDecoder
+        </pattern>
+        <pattern name="float32-parsing">
+          parse_float32_array() with byteorder::LittleEndian
+        </pattern>
+        <pattern name="histogram-computation">
+          detect_depth_layers() builds histogram, finds peaks
+        </pattern>
+        <pattern name="edge-coherence">
+          compute_edge_coherence() Sobel-like gradient analysis
+        </pattern>
+        <pattern name="graceful-failure">
+          analyze_depth_map_from_bytes() returns default on error, never panics
+        </pattern>
+      </key-patterns>
+      <code-snippet name="decompression-pattern">
+<![CDATA[
+pub fn decompress_depth_map(compressed: &[u8]) -> Result<Vec<u8>, DepthAnalysisError> {
+    let mut decoder = GzDecoder::new(compressed);
+    let mut decompressed = Vec::new();
+    decoder
+        .read_to_end(&mut decompressed)
+        .map_err(|e| DepthAnalysisError::Decompression(e.to_string()))?;
+    Ok(decompressed)
+}
+]]>
+      </code-snippet>
+      <code-snippet name="histogram-pattern">
+<![CDATA[
+pub fn detect_depth_layers(depths: &[f32], min_depth: f64, max_depth: f64) -> LayerDetectionResult {
+    let bin_width = (max_depth - min_depth) / HISTOGRAM_BINS as f64;
+    let mut histogram = vec![0usize; HISTOGRAM_BINS];
+    for depth in &valid {
+        let bin = ((depth - min_depth) / bin_width).floor() as usize;
+        histogram[bin.min(HISTOGRAM_BINS - 1)] += 1;
+    }
+    // Find peaks...
+}
+]]>
+      </code-snippet>
+    </interface>
+
+    <!-- Video upload endpoint (stores depth_data) -->
+    <interface type="rust-route">
+      <path>backend/src/routes/captures_video.rs</path>
+      <description>Video upload - depth_data stored to S3</description>
+      <key-patterns>
+        <pattern name="depth-s3-key">
+          depth_data stored at captures/{device_id}/{capture_id}/depth.gz
+        </pattern>
+        <pattern name="multipart-depth">
+          depth_data extracted from multipart form, max 20MB
+        </pattern>
+      </key-patterns>
+    </interface>
+
+    <!-- Storage service for S3 operations -->
+    <interface type="rust-service">
+      <path>backend/src/services/storage.rs</path>
+      <description>S3 storage service - download depth data for analysis</description>
+      <key-patterns>
+        <pattern name="download-method">
+          download_depth_map(capture_id) returns bytes from S3
+        </pattern>
+        <pattern name="video-keys">
+          video_depth_s3_key(), video_s3_key(), hash_chain_s3_key() helpers
+        </pattern>
+      </key-patterns>
+    </interface>
+
+    <!-- Models for evidence -->
+    <interface type="rust-model">
+      <path>backend/src/models/evidence.rs</path>
+      <description>Evidence models including DepthAnalysis</description>
+      <current-structure>
+        CheckStatus enum: Pass, Fail, Unavailable
+        DepthAnalysis struct: status, depth_variance, depth_layers, edge_coherence,
+        min_depth, max_depth, is_likely_real_scene
+      </current-structure>
+    </interface>
+
+    <!-- Service exports -->
+    <interface type="rust-module">
+      <path>backend/src/services/mod.rs</path>
+      <description>Service module exports - add video_depth_analysis</description>
+      <current-exports>
+        attestation, c2pa, capture_attestation, challenge_store, depth_analysis,
+        metadata_validation, privacy, storage
+      </current-exports>
+      <to-add>video_depth_analysis</to-add>
+    </interface>
+
+  </existing-code-interfaces>
+
+  <!-- ============================================================== -->
+  <!-- VIDEO DEPTH DATA FORMAT                                        -->
+  <!-- ============================================================== -->
+  <data-format name="video-depth-blob">
+    <description>
+      iOS uploads depth keyframes as a gzipped blob with custom header format.
+      This is the input to VideoDepthAnalysisService.
+    </description>
+    <structure>
+<![CDATA[
+Header (16 bytes):
+  - magic: "RLDP" (4 bytes) - RealityCam LiDAR Depth Pack
+  - version: u32 (4 bytes) - format version (currently 1)
+  - frame_count: u32 (4 bytes) - number of keyframes
+  - resolution: u16 x u16 (4 bytes) - width, height (typically 256x192)
+
+Frame Index (frame_count * 12 bytes):
+  - timestamp: f64 (8 bytes) - video timestamp in seconds
+  - offset: u32 (4 bytes) - byte offset in data section
+
+Frame Data (variable):
+  - Each frame: width * height * 4 bytes (Float32 little-endian)
+
+All data gzipped as single blob.
+]]>
+    </structure>
+    <parsing-steps>
+      1. Decompress gzip with flate2
+      2. Read 16-byte header, validate magic "RLDP"
+      3. Read frame index (frame_count entries)
+      4. For each frame, seek to offset and read Float32 array
+    </parsing-steps>
+  </data-format>
+
+  <!-- ============================================================== -->
+  <!-- ANALYSIS ALGORITHMS                                            -->
+  <!-- ============================================================== -->
+  <algorithms>
+    <algorithm name="depth-consistency">
+      <description>Measure how stable depth is across frames</description>
+      <steps>
+        1. Sample frames at 1fps (every 10th keyframe from 10fps data)
+        2. For each sampled frame, compute depth histogram (10 bins, 0-10m)
+        3. Compare consecutive histograms using chi-squared distance
+        4. Average distances across all frame pairs
+        5. Map to 0-1 score: low distance = high consistency
+      </steps>
+      <threshold>0.7 (>= considered consistent)</threshold>
+    </algorithm>
+
+    <algorithm name="motion-coherence">
+      <description>Check depth motion matches expected patterns</description>
+      <steps>
+        1. Downsample depth frames to 64x48 for efficiency
+        2. Compute block-wise correlation between consecutive frames
+        3. Find peak correlation offset (motion vector dx, dy)
+        4. Check motion vectors are consistent across sequence
+        5. Score based on motion smoothness and consistency
+      </steps>
+      <threshold>0.6 (>= considered coherent)</threshold>
+      <note>Static scenes (no motion) score 1.0</note>
+    </algorithm>
+
+    <algorithm name="scene-stability">
+      <description>Detect impossible depth discontinuities</description>
+      <steps>
+        1. Compare per-pixel depth between consecutive sampled frames
+        2. Count pixels with >2m depth change
+        3. Flag frames where >5% pixels have impossible jumps
+        4. Score: 1.0 - (frames_with_jumps / total_frames)
+      </steps>
+      <threshold>0.8 (>= considered stable)</threshold>
+    </algorithm>
+
+    <algorithm name="suspicious-frame-detection">
+      <description>Flag individual frames with anomalies</description>
+      <steps>
+        1. For each frame pair, compute local_consistency
+        2. Flag if local_consistency below 0.5
+        3. Flag if depth_jump exceeds 2m for >5% pixels
+        4. Collect frame indices into suspicious_frames array
+      </steps>
+    </algorithm>
+  </algorithms>
+
+  <!-- ============================================================== -->
+  <!-- OUTPUT FORMAT                                                  -->
+  <!-- ============================================================== -->
+  <output-format>
+    <description>VideoDepthAnalysis JSON structure for evidence package</description>
+    <example>
+<![CDATA[
+{
+  "frame_analyses": [
+    {
+      "frame_index": 0,
+      "timestamp": 0.0,
+      "depth_histogram": [1234, 5678, 2345, 890, 456, 234, 123, 89, 45, 23],
+      "motion_vector": null,
+      "local_consistency": 1.0
+    },
+    {
+      "frame_index": 10,
+      "timestamp": 1.0,
+      "depth_histogram": [1200, 5700, 2400, 880, 450, 230, 120, 85, 42, 20],
+      "motion_vector": [0.5, -0.2],
+      "local_consistency": 0.95
+    }
+  ],
+  "depth_consistency": 0.85,
+  "motion_coherence": 0.72,
+  "scene_stability": 0.95,
+  "is_likely_real_scene": true,
+  "suspicious_frames": []
+}
+]]>
+    </example>
+  </output-format>
+
+  <!-- ============================================================== -->
+  <!-- IMPLEMENTATION GUIDANCE                                        -->
+  <!-- ============================================================== -->
+  <implementation-guidance>
+    <step order="1" task="Create types">
+      Create backend/src/types/video_depth_analysis.rs with:
+      - VideoDepthAnalysisConfig (sampling rate, thresholds)
+      - DepthKeyframe (parsed frame data)
+      - FrameDepthAnalysis (per-frame results)
+      - VideoDepthAnalysis (complete output)
+      - AnalysisError enum
+    </step>
+
+    <step order="2" task="Implement decompression">
+      In backend/src/services/video_depth_analysis.rs:
+      - Reuse flate2 pattern from depth_analysis.rs
+      - Parse custom header (magic, version, frame_count, resolution)
+      - Parse frame index
+      - Extract Float32 arrays per frame
+    </step>
+
+    <step order="3" task="Implement depth_consistency">
+      - Sample frames at 1fps (configurable)
+      - Compute histogram per frame (reuse pattern from depth_analysis.rs)
+      - Chi-squared distance between consecutive histograms
+      - Normalize to 0-1 score
+    </step>
+
+    <step order="4" task="Implement motion_coherence">
+      - Downsample frames for efficiency
+      - Simple block correlation for motion detection
+      - Score based on motion smoothness
+      - Handle static scenes (no motion = coherent)
+    </step>
+
+    <step order="5" task="Implement scene_stability">
+      - Per-pixel depth difference between frames
+      - Count impossible jumps (>2m)
+      - Score based on stability percentage
+    </step>
+
+    <step order="6" task="Implement suspicious_frames">
+      - Aggregate per-frame metrics
+      - Flag frames exceeding thresholds
+      - Compute is_likely_real_scene from aggregate
+    </step>
+
+    <step order="7" task="Create service">
+      - VideoDepthAnalysisService struct with config
+      - analyze() method orchestrating all steps
+      - Graceful error handling (failures don't block)
+      - Tracing for observability
+    </step>
+
+    <step order="8" task="Write tests">
+      - Unit tests for each analysis function
+      - Test with fixture data (valid, corrupt, edge cases)
+      - Integration test with realistic sample
+    </step>
+  </implementation-guidance>
+
+  <!-- ============================================================== -->
+  <!-- DEPENDENCIES (Cargo.toml)                                      -->
+  <!-- ============================================================== -->
+  <dependencies>
+    <dependency name="flate2" version="1.0" purpose="gzip decompression" status="already-present"/>
+    <dependency name="byteorder" version="1.5" purpose="Float32 parsing" status="already-present"/>
+    <dependency name="thiserror" version="2.0" purpose="error types" status="already-present"/>
+    <dependency name="tracing" version="0.1" purpose="logging/spans" status="already-present"/>
+    <dependency name="serde" version="1.0" purpose="JSON serialization" status="already-present"/>
+  </dependencies>
+
+  <!-- ============================================================== -->
+  <!-- FILE MANIFEST                                                  -->
+  <!-- ============================================================== -->
+  <file-manifest>
+    <files-to-create>
+      <file path="backend/src/types/video_depth_analysis.rs">Analysis types and config</file>
+      <file path="backend/src/services/video_depth_analysis.rs">Analysis service implementation</file>
+      <file path="backend/tests/video_depth_analysis_integration.rs">Integration tests</file>
+    </files-to-create>
+    <files-to-modify>
+      <file path="backend/src/types/mod.rs">Export video_depth_analysis types</file>
+      <file path="backend/src/services/mod.rs">Export video_depth_analysis service</file>
+    </files-to-modify>
+  </file-manifest>
+
+</story-context>
