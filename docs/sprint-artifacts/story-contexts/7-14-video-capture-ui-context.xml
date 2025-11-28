@@ -1,0 +1,597 @@
+<story-context id="7-14-video-capture-ui" v="1.0">
+  <metadata>
+    <epicId>7</epicId>
+    <storyId>7-14</storyId>
+    <title>Video Capture UI Integration</title>
+    <status>ready-for-dev</status>
+    <generatedAt>2025-11-27</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/7-14-video-capture-ui.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>user</asA>
+    <iWant>a clear interface to switch between photo and video modes and record video with visual feedback</iWant>
+    <soThat>I can choose the right capture type and understand the recording state at all times</soThat>
+    <tasks>
+      - Task 1: Add mode selection UI (AC: #1, #9)
+      - Task 2: Extend CaptureButton for video mode (AC: #2, #5)
+      - Task 3: Recording status indicator (AC: #3, #5)
+      - Task 4: Depth overlay mode switching (AC: #4, #9)
+      - Task 5: Upload progress UI (AC: #6)
+      - Task 6: Video preview sheet (AC: #7)
+      - Task 7: Partial video indicator (AC: #8)
+      - Task 8: Interruption handling (AC: #8, #10)
+      - Task 9: Error handling and user feedback (AC: #10)
+      - Task 10: Integration with existing services (AC: All)
+      - Task 11: Update CaptureControlsBar (AC: #2, #3, #5)
+      - Task 12: Write tests (AC: All)
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    AC 1: Mode Selection Interface
+    - Segmented control or toggle shows "Photo | Video" mode selection
+    - Mode selector positioned prominently at top or bottom of screen
+    - Current mode is clearly highlighted
+    - Mode cannot be changed while recording is in progress
+    - Mode preference persisted between app launches
+
+    AC 2: Video Mode Recording Button
+    - Button shows video camera icon or record symbol
+    - Button visual indicates "press and hold" affordance
+    - Button responds to press gesture immediately with haptic feedback
+    - Button shows recording state visually (pulsing red border or fill)
+    - Button disabled if ARSession tracking quality insufficient
+
+    AC 3: Recording Status Indicator
+    - Visual "Recording..." text with pulsing red dot appears at top
+    - Elapsed timer shows current duration (format: "0:00")
+    - Timer updates every second
+    - Remaining duration or progress bar visible (15s max)
+    - Indicator remains visible throughout recording
+
+    AC 4: Real-Time Depth Overlay During Recording
+    - Edge-only depth overlay displays in real-time (Story 7-3)
+    - Overlay shows cyan (near) to magenta (far) edges
+    - Overlay toggle button available to show/hide during recording
+    - Overlay preference persisted for video mode separately from photo mode
+    - Overlay renders to preview ONLY, not recorded in video file
+
+    AC 5: Recording Duration Control
+    - Recording continues until button release OR 15-second maximum
+    - Timer counts from 0:00 to 0:15
+    - Haptic feedback plays at 5-second warning point
+    - Recording auto-stops at 15 seconds with haptic feedback
+    - User can release button early to stop recording
+
+    AC 6: Upload Progress Indicator
+    - Progress indicator shows upload percentage (0-100%)
+    - Upload status text: "Uploading video..." with current/total MB
+    - Progress bar or circular indicator visible
+    - User can view history while upload continues in background
+    - Error state displayed if upload fails with retry option
+
+    AC 7: Video Preview After Recording
+    - Video player shows recorded video with native controls
+    - Play/pause button for video playback
+    - Depth overlay toggle available in preview
+    - "Use Video" button saves and uploads capture
+    - "Retake" button discards and returns to capture screen
+    - Preview sheet dismissible with swipe down gesture
+
+    AC 8: Recording Interruption Handling
+    - Recording stops gracefully at last checkpoint (Story 7-5)
+    - Partial video saved with checkpoint attestation
+    - Preview shows "Verified: 10s of 12s recorded" indicator (if partial)
+    - User presented with Use/Retake options as normal
+    - Upload includes partial video metadata
+
+    AC 9: Mode Switch Behavior
+    - Depth overlay switches from full colormap (photo) to edge-only (video)
+    - Capture button changes visual from tap (photo) to hold (video)
+    - ARSession continues running without restart
+    - Tracking state preserved across mode switch
+    - Switch disabled during capture/recording
+
+    AC 10: Error States and Feedback
+    - Insufficient storage: Show "Storage full - cannot record video" alert
+    - ARSession interrupted: Stop recording, show "Recording interrupted" message
+    - Tracking limited: Show "Move slower" or "More light needed" warning
+    - Recording failed: Show "Recording failed" error with retry option
+    - Upload failed: Show retry button with error details
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <doc>
+        <path>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md</path>
+        <description>Epic 7 Technical Specification - Video capture architecture, components, data models, constraints (15s max, 10fps depth, 30fps hash chain, edge overlay only)</description>
+        <relevance>Defines video recording architecture, VideoRecordingSession integration, DepthKeyframeBuffer usage, EdgeDepthOverlayView rendering, VideoAttestation checkpoint pattern</relevance>
+      </doc>
+      <doc>
+        <path>docs/architecture.md</path>
+        <description>Overall system architecture - ARKit unified capture pattern, SwiftUI view architecture, native Swift patterns, upload service integration</description>
+        <relevance>Establishes ARSession continuity pattern (no restart on mode switch), Metal shader overlay approach, background upload pattern, SwiftUI state management</relevance>
+      </doc>
+      <doc>
+        <path>docs/prd.md</path>
+        <description>Product Requirements Document - FR47-FR55 video capture features</description>
+        <relevance>FR47: 15-second video recording with 10fps depth; FR48: Real-time edge depth overlay during recording; FR55: Video verification with playback</relevance>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/stories/6-13-swiftui-capture-screen.md</path>
+        <description>Story 6-13: SwiftUI Capture Screen - Photo capture UI patterns, haptic feedback, permission handling, error overlays</description>
+        <relevance>Provides existing CaptureView.swift implementation patterns, CaptureButton tap interaction, tracking state indicators, permission flows, error overlay styling</relevance>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/stories/7-1-arkit-video-recording-session.md</path>
+        <description>Story 7-1: ARKit Video Recording Session - VideoRecordingSession implementation, recording states, frame callbacks, interruption handling</description>
+        <relevance>Defines VideoRecordingSession API (startRecording, stopRecording, callbacks), RecordingState enum, VideoRecordingResult struct, handleInterruption() method</relevance>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/stories/7-3-realtime-edge-depth-overlay.md</path>
+        <description>Story 7-3: Real-Time Edge Depth Overlay - EdgeDepthOverlayView component, Sobel edge detection, 30fps rendering, toggle behavior</description>
+        <relevance>Provides EdgeDepthOverlayView SwiftUI component already integrated in CaptureView, edgeThreshold parameter, isVisible binding, separate UserDefaults persistence</relevance>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/stories/7-5-video-attestation-checkpoints.md</path>
+        <description>Story 7-5: Video Attestation Checkpoints - Partial video support, PartialVideoBadge component, checkpoint attestation, isPartial flag</description>
+        <relevance>Defines PartialVideoBadge component to display in preview, VideoAttestation.isPartial property, checkpoint attestation pattern, verified duration display</relevance>
+      </doc>
+      <doc>
+        <path>docs/sprint-artifacts/stories/7-7-video-local-processing-pipeline.md</path>
+        <description>Story 7-7: Video Local Processing Pipeline - Upload packaging, metadata collection, VideoProcessingPipeline integration</description>
+        <relevance>Defines upload packaging pattern for video files, VideoMetadata structure, integration with UploadService for background uploads</relevance>
+      </doc>
+    </docs>
+
+    <code>
+      <file>
+        <path>ios/Rial/Features/Capture/CaptureView.swift</path>
+        <description>Main capture screen SwiftUI view - Already has video recording support with EdgeDepthOverlayView, recordingIndicatorOverlay, CaptureControlsBar integration</description>
+        <relevance>EXISTING IMPLEMENTATION - Already conditionally renders EdgeDepthOverlayView vs DepthOverlayView based on isRecordingVideo, has recording timer, integrates CaptureControlsBar with video callbacks. MISSING: mode selector UI component</relevance>
+      </file>
+      <file>
+        <path>ios/Rial/Features/Capture/CaptureViewModel.swift</path>
+        <description>Capture screen view model - Manages AR session, photo capture, video recording state, edge overlay preference, recording timer</description>
+        <relevance>EXISTING VIDEO SUPPORT - Has isRecordingVideo, recordingDuration, showEdgeOverlay properties, startVideoRecording/stopVideoRecording methods, VideoRecordingSession integration. MISSING: capture mode enum, mode persistence, upload progress tracking</relevance>
+      </file>
+      <file>
+        <path>ios/Rial/Features/Capture/CaptureButton.swift</path>
+        <description>Capture button component with hold-to-record support - Implements DragGesture for long press detection, visual states for photo/video/recording</description>
+        <relevance>EXISTING VIDEO SUPPORT - Already implements longPressTimer (0.3s threshold), RecordingPulseAnimation, recording state visual (red rounded rectangle). Works as-is for video mode, no changes needed</relevance>
+      </file>
+      <file>
+        <path>ios/Rial/Features/Capture/EdgeDepthOverlayView.swift</path>
+        <description>Edge-only depth overlay for video mode - Metal-based Sobel edge detection, 30fps rendering, cyan-to-magenta gradient</description>
+        <relevance>ALREADY INTEGRATED - CaptureView.swift conditionally renders this component when isRecordingVideo=true. Includes EdgeOverlayToggleButton component. No changes needed</relevance>
+      </file>
+      <file>
+        <path>ios/Rial/Features/Capture/DepthOverlayView.swift</path>
+        <description>Full colormap depth overlay for photo mode - Metal-based depth visualization, 60fps rendering, red-to-blue gradient</description>
+        <relevance>ALREADY INTEGRATED - CaptureView.swift conditionally renders this component when NOT recording video. Photo mode overlay. No changes needed</relevance>
+      </file>
+      <file>
+        <path>ios/Rial/Core/Capture/VideoRecordingSession.swift</path>
+        <description>Video recording coordinator - ARSession + AVAssetWriter integration, frame callbacks, depth keyframe extraction, hash chain, attestation</description>
+        <relevance>INTEGRATION TARGET - CaptureViewModel already creates and manages VideoRecordingSession. Provides onFrameProcessed callback, onRecordingStateChanged callback, onError callback, handleInterruption() method. VideoRecordingResult includes wasInterrupted, attestation properties</relevance>
+      </file>
+      <file>
+        <path>ios/Rial/Core/Capture/ARCaptureSession.swift</path>
+        <description>Unified ARKit capture session - Provides synchronized RGB+depth frames for both photo and video capture</description>
+        <relevance>SHARED RESOURCE - Same ARSession instance used for both photo and video modes. DO NOT restart session on mode switch. Just change which processing pipeline is active</relevance>
+      </file>
+    </code>
+
+    <dependencies>
+      <dep>
+        <name>SwiftUI</name>
+        <version>iOS 15+</version>
+        <purpose>UI framework - Picker with segmentedPickerStyle for mode selector, sheet presentation, state management</purpose>
+      </dep>
+      <dep>
+        <name>AVKit</name>
+        <version>iOS 15+</version>
+        <purpose>Video playback - VideoPlayer or AVPlayerViewController for preview sheet</purpose>
+      </dep>
+      <dep>
+        <name>AVFoundation</name>
+        <version>iOS 15+</version>
+        <purpose>AVPlayer for video playback in preview</purpose>
+      </dep>
+      <dep>
+        <name>Combine</name>
+        <version>iOS 15+</version>
+        <purpose>Timer.publish for recording duration updates</purpose>
+      </dep>
+      <dep>
+        <name>UIKit</name>
+        <version>iOS 15+</version>
+        <purpose>UIImpactFeedbackGenerator for haptic feedback, UILongPressGestureRecognizer patterns</purpose>
+      </dep>
+      <dep>
+        <name>UserDefaults</name>
+        <version>iOS 15+</version>
+        <purpose>Persist capture mode preference, separate overlay preferences for photo vs video</purpose>
+      </dep>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint>
+      <title>Mode Selector Must Use SwiftUI Picker</title>
+      <description>Use SwiftUI Picker with segmentedPickerStyle() for iOS 15 compatibility. CaptureMode enum with photo/video cases. Persisted to UserDefaults with key "app.rial.captureMode"</description>
+      <source>docs/sprint-artifacts/stories/7-14-video-capture-ui.md (Dev Notes - Technical Approach)</source>
+    </constraint>
+    <constraint>
+      <title>ARSession Continuity - No Restart on Mode Switch</title>
+      <description>DO NOT restart ARSession when switching between photo and video modes. Same session runs for both. Just change which processing pipeline is active (photo capture vs video recording)</description>
+      <source>docs/architecture.md (ARKit Unified Capture Pattern), docs/sprint-artifacts/stories/7-14-video-capture-ui.md (AC-9, Dev Notes)</source>
+    </constraint>
+    <constraint>
+      <title>Separate Overlay Preferences for Photo vs Video</title>
+      <description>Use separate UserDefaults keys: "photoOverlayEnabled" for DepthOverlayView (photo mode), "videoOverlayEnabled" or existing "app.rial.edgeOverlayEnabled" for EdgeDepthOverlayView (video mode). Each mode has independent overlay visibility preference</description>
+      <source>docs/sprint-artifacts/stories/7-14-video-capture-ui.md (AC-4, Dev Notes - Depth Overlay Mode)</source>
+    </constraint>
+    <constraint>
+      <title>Recording Timer Update Interval</title>
+      <description>Use Timer.publish(every: 0.1, on: .main, in: .common) for smooth timer updates. CaptureViewModel already implements this pattern with recordingTimer property. Display formatted as "0:00" to "0:15"</description>
+      <source>ios/Rial/Features/Capture/CaptureViewModel.swift (lines 506-522), docs/sprint-artifacts/stories/7-14-video-capture-ui.md (Dev Notes - Recording Timer)</source>
+    </constraint>
+    <constraint>
+      <title>15-Second Maximum Recording Duration</title>
+      <description>VideoRecordingSession.maxDuration = 15.0 seconds. Auto-stop enforced in VideoRecordingSession.handleFrame(). UI timer must match backend state. Show haptic feedback at 5-second warning and 15-second completion</description>
+      <source>ios/Rial/Core/Capture/VideoRecordingSession.swift (line 170, lines 715-730), docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md (Constraints - 15-second maximum)</source>
+    </constraint>
+    <constraint>
+      <title>Haptic Feedback Timing</title>
+      <description>Use UIImpactFeedbackGenerator. Prepare before use for lowest latency. .medium style for recording start, .heavy style for recording stop. 5-second warning uses .medium. CaptureView already has impactFeedback and heavyImpactFeedback generators</description>
+      <source>ios/Rial/Features/Capture/CaptureView.swift (lines 51-52, 161-168), docs/sprint-artifacts/stories/7-14-video-capture-ui.md (AC-2, AC-5, Learnings #8)</source>
+    </constraint>
+    <constraint>
+      <title>Preview Sheet Presentation</title>
+      <description>Use SwiftUI .sheet(isPresented:) modifier with @Published boolean. Support .presentationDetents([.medium, .large]) on iOS 16+, gracefully degrade on iOS 15. SheetPresentationModifier already exists in CaptureView.swift</description>
+      <source>ios/Rial/Features/Capture/CaptureView.swift (lines 322-333), docs/sprint-artifacts/stories/7-14-video-capture-ui.md (AC-7, Learnings #10)</source>
+    </constraint>
+    <constraint>
+      <title>Video Preview Must Use Native VideoPlayer</title>
+      <description>Use AVKit's VideoPlayer SwiftUI view (iOS 14+) or AVPlayerViewController. Do NOT implement custom player. Pre-load video URL in background for instant playback</description>
+      <source>docs/sprint-artifacts/stories/7-14-video-capture-ui.md (Dev Notes - Video Preview, Learnings #15)</source>
+    </constraint>
+    <constraint>
+      <title>Partial Video Indicator Styling</title>
+      <description>Use PartialVideoBadge component from Story 7-5. Display "Verified: Xs of Ys recorded" text. Use info blue styling, NOT error red. Check VideoRecordingResult.attestation?.isPartial flag</description>
+      <source>docs/sprint-artifacts/stories/7-14-video-capture-ui.md (AC-8, Dev Notes - Partial Video Display, Learnings #5)</source>
+    </constraint>
+    <constraint>
+      <title>Error Overlay Pattern</title>
+      <description>Show errors as overlay banners at top of screen, not full-screen alerts. Auto-dismiss after 5 seconds or on tap. Use consistent error message format. CaptureView already has errorOverlay() implementation</description>
+      <source>ios/Rial/Features/Capture/CaptureView.swift (lines 272-287), docs/sprint-artifacts/stories/7-14-video-capture-ui.md (AC-10, Learnings #12)</source>
+    </constraint>
+    <constraint>
+      <title>Storage Check Before Recording</title>
+      <description>Check available storage before starting video recording. Require minimum 50MB free. Show "Storage full - cannot record video" alert if insufficient. Video files ~15-20MB for 15s</description>
+      <source>docs/sprint-artifacts/stories/7-14-video-capture-ui.md (AC-10, Learnings #14)</source>
+    </constraint>
+    <constraint>
+      <title>Upload Progress Background Continuity</title>
+      <description>Video uploads use background URLSession (from UploadService). Upload continues if user navigates away from capture screen. Show progress in history view. Use URLSession delegate callbacks for progress tracking</description>
+      <source>docs/sprint-artifacts/stories/7-14-video-capture-ui.md (AC-6, Learnings #17)</source>
+    </constraint>
+    <constraint>
+      <title>Mode Switch Disabled During Capture/Recording</title>
+      <description>Disable mode selector (reduced opacity, .disabled modifier) when isCapturing=true OR isRecordingVideo=true. Prevents mode change during active operations</description>
+      <source>docs/sprint-artifacts/stories/7-14-video-capture-ui.md (AC-1, AC-9)</source>
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface>
+      <name>CaptureViewModel API</name>
+      <description>
+        Published properties:
+        - isRecordingVideo: Bool - Whether video recording is in progress
+        - recordingDuration: TimeInterval - Current recording duration in seconds
+        - showEdgeOverlay: Bool - Edge overlay visibility (persisted to UserDefaults)
+        - currentDepthFrame: DepthFrame? - Latest depth frame for overlay rendering
+        - trackingState: ARCamera.TrackingState - AR tracking quality
+        - errorMessage: String? - Error to display in overlay
+
+        Methods:
+        - startVideoRecording() - Begin video recording, creates VideoRecordingSession
+        - stopVideoRecording() - Finalize and save video recording
+        - cancelVideoRecording() - Discard recording without saving
+
+        Constants:
+        - maxRecordingDuration: TimeInterval = 15.0
+        - edgeThreshold: Float = 0.1
+      </description>
+      <location>ios/Rial/Features/Capture/CaptureViewModel.swift</location>
+      <usage>UI components bind to published properties, call methods on user interaction</usage>
+    </interface>
+    <interface>
+      <name>VideoRecordingSession Callbacks</name>
+      <description>
+        Callbacks set on VideoRecordingSession instance:
+        - onFrameProcessed: ((ARFrame, Int) -> Void)? - Called for each recorded frame
+        - onRecordingStateChanged: ((RecordingState) -> Void)? - State transitions
+        - onError: ((VideoRecordingError) -> Void)? - Recording errors
+
+        Result struct (VideoRecordingResult):
+        - videoURL: URL - Local file path to recorded video
+        - frameCount: Int - Total frames captured
+        - duration: TimeInterval - Recording duration
+        - wasInterrupted: Bool - Whether recording was interrupted
+        - attestation: VideoAttestation? - Attestation data (may be partial)
+        - depthKeyframeData: DepthKeyframeData? - Depth data blob
+        - hashChainData: HashChainData? - Hash chain for integrity
+      </description>
+      <location>ios/Rial/Core/Capture/VideoRecordingSession.swift</location>
+      <usage>CaptureViewModel sets callbacks to update UI state during recording</usage>
+    </interface>
+    <interface>
+      <name>CaptureButton Props</name>
+      <description>
+        Parameters:
+        - isCapturing: Bool - Photo capture in progress
+        - isRecordingVideo: Bool - Video recording in progress
+        - action: () -> Void - Tap callback (photo capture)
+        - onRecordingStart: () -> Void - Hold gesture start (video recording start)
+        - onRecordingStop: () -> Void - Hold gesture end (video recording stop)
+
+        Behavior:
+        - Tap (short press) triggers action callback
+        - Hold (>0.3s) triggers onRecordingStart, release triggers onRecordingStop
+        - Visual state changes: white circle (idle), progress spinner (capturing), red pulsing square (recording)
+      </description>
+      <location>ios/Rial/Features/Capture/CaptureButton.swift</location>
+      <usage>CaptureControlsBar includes CaptureButton, wires callbacks to CaptureViewModel methods</usage>
+    </interface>
+    <interface>
+      <name>EdgeDepthOverlayView Props</name>
+      <description>
+        Parameters:
+        - depthFrame: DepthFrame? - Current depth frame to render
+        - edgeThreshold: Float - Minimum edge magnitude (default: 0.1)
+        - isVisible: Binding&lt;Bool&gt; - Visibility binding
+
+        Behavior:
+        - Renders to preview ONLY (not in recorded video)
+        - 30fps to match video recording
+        - Cyan (near) to magenta (far) edge coloring
+        - Transparent when isVisible=false or depthFrame=nil
+      </description>
+      <location>ios/Rial/Features/Capture/EdgeDepthOverlayView.swift</location>
+      <usage>CaptureView conditionally renders when isRecordingVideo=true</usage>
+    </interface>
+    <interface>
+      <name>CaptureControlsBar Props</name>
+      <description>
+        Parameters:
+        - showDepthOverlay: Binding&lt;Bool&gt; - Overlay visibility toggle (photo or video overlay depending on mode)
+        - isCapturing: Bool - Photo capture state
+        - isRecordingVideo: Bool - Video recording state
+        - recordingDuration: TimeInterval - Current recording duration
+        - onCapture: () -> Void - Photo capture callback
+        - onRecordingStart: () -> Void - Video recording start
+        - onRecordingStop: () -> Void - Video recording stop
+        - onShowHistory: () -> Void - History view callback
+
+        Behavior:
+        - Toggle button enables/disables overlay (switches binding between photo and video overlay)
+        - CaptureButton wired to photo/video callbacks
+        - History button disabled during recording (opacity: 0.3)
+      </description>
+      <location>ios/Rial/Features/Capture/CaptureButton.swift (lines 216-287)</location>
+      <usage>CaptureView includes CaptureControlsBar at bottom, switches showDepthOverlay binding based on mode</usage>
+    </interface>
+    <interface>
+      <name>VideoAttestation Data Model</name>
+      <description>
+        Properties:
+        - finalHash: Data - Hash that was attested
+        - assertion: Data - DCAppAttest signature
+        - durationMs: Int64 - Attested duration in milliseconds
+        - frameCount: Int - Attested frame count
+        - isPartial: Bool - True if recording was interrupted
+        - checkpointIndex: Int? - Which checkpoint (if partial)
+
+        Usage:
+        Check isPartial flag to determine if PartialVideoBadge should be shown.
+        Use durationMs to display verified duration vs total duration.
+      </description>
+      <location>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-7.md (lines 164-171)</location>
+      <usage>VideoRecordingResult.attestation property, checked in preview sheet to show partial indicator</usage>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      Unit Tests (XCTest):
+      - Test mode switching logic in CaptureViewModel
+      - Test recording timer accuracy (starts at 0, increments, stops at max duration)
+      - Test upload progress calculation and state updates
+      - Test partial video detection (isPartial flag check)
+      - Test error handling paths (storage check, ARSession errors, recording failures)
+
+      UI Tests (XCUITest):
+      - Test mode selector tap interaction (switches between Photo and Video)
+      - Test hold-to-record gesture (minimum 500ms hold triggers recording)
+      - Test recording timer updates every second in UI
+      - Test auto-stop at 15 seconds (timer reaches 0:15, recording stops)
+      - Test preview sheet appearance and dismissal (swipe down gesture)
+      - Test Use/Retake button actions in preview sheet
+
+      Integration Tests (Device Only):
+      - Full video capture flow: mode switch -> hold -> record -> preview -> save
+      - Mode switch mid-session (verify ARSession doesn't restart)
+      - Video upload with progress tracking (background URLSession)
+      - Phone call interruption (manual test, partial video saved)
+      - Background app interruption (partial video saved)
+      - Partial video preview and upload (checkpoint attestation)
+
+      Performance Tests:
+      - Mode switch latency &lt; 100ms
+      - Recording start latency &lt; 200ms (from button press to first frame)
+      - Timer update does not drop frames (UI remains responsive at 60fps)
+      - Upload progress updates smoothly (no UI jank)
+    </standards>
+
+    <locations>
+      ios/RialTests/Capture/ - Unit tests for CaptureViewModel
+      ios/RialTests/Networking/ - Unit tests for upload progress tracking
+      ios/RialUITests/ - UI automation tests for capture flow
+    </locations>
+
+    <ideas>
+      Test Idea 1: Mode Persistence Across App Restarts
+      - Set mode to Video, kill app, relaunch -> should default to Video mode
+      - Verify UserDefaults key "app.rial.captureMode" persisted correctly
+
+      Test Idea 2: Overlay Toggle Independence
+      - Disable photo overlay, switch to video mode -> video overlay should have independent state
+      - Toggle video overlay off, switch to photo mode -> photo overlay should retain previous state
+      - Verify separate UserDefaults keys used
+
+      Test Idea 3: Recording State Transitions
+      - Mock VideoRecordingSession state changes
+      - Verify UI updates correctly for each RecordingState (.idle, .recording, .processing, .error)
+
+      Test Idea 4: Haptic Feedback Timing
+      - Instrument haptic feedback calls during recording
+      - Verify .medium haptic at recording start
+      - Verify .medium haptic at 5-second warning
+      - Verify .heavy haptic at 15-second completion or user stop
+
+      Test Idea 5: Partial Video Badge Display
+      - Mock VideoRecordingResult with attestation.isPartial=true
+      - Verify PartialVideoBadge appears in preview
+      - Verify "Verified: Xs of Ys recorded" text calculated correctly
+
+      Test Idea 6: Storage Check Before Recording
+      - Mock low storage condition (&lt;50MB available)
+      - Attempt to start recording
+      - Verify "Storage full" alert appears, recording does not start
+
+      Test Idea 7: Upload Progress Continuity
+      - Start video recording, complete, begin upload
+      - Navigate away from capture screen to history
+      - Verify upload continues in background (URLSession background configuration)
+      - Verify progress updates appear in history view
+
+      Test Idea 8: Mode Switch During Recording Blocked
+      - Start video recording
+      - Attempt to tap mode selector
+      - Verify mode selector disabled (.disabled modifier, reduced opacity)
+      - Recording continues uninterrupted
+
+      Test Idea 9: Error Overlay Auto-Dismiss
+      - Trigger recording error (mock VideoRecordingError)
+      - Verify error overlay appears at top
+      - Wait 5 seconds -> overlay auto-dismisses
+      - Or tap overlay -> dismisses immediately
+
+      Test Idea 10: Video Preview Playback
+      - Complete video recording
+      - Preview sheet appears with VideoPlayer
+      - Tap play button -> video playback starts
+      - Verify native controls appear (AVKit VideoPlayer)
+    </ideas>
+  </tests>
+
+  <implementation-notes>
+    ## Key Implementation Guidance
+
+    ### New Files to Create
+    1. **ModeSelector.swift** - SwiftUI Picker with segmentedPickerStyle
+       - CaptureMode enum: .photo, .video
+       - Persist to UserDefaults on selection change
+       - Disable when isCapturing || isRecordingVideo
+
+    2. **VideoPreviewSheet.swift** - Video playback preview
+       - Embed AVKit VideoPlayer or AVPlayerViewController
+       - Play/pause controls
+       - Depth overlay toggle (read-only visualization)
+       - Use/Retake button actions
+       - Support swipe-to-dismiss gesture
+
+    3. **UploadProgressView.swift** - Upload progress indicator
+       - ProgressView(value: uploadProgress) for visual bar
+       - Text showing "Uploading video... X.X MB / Y.Y MB"
+       - Error state with retry button
+       - Display in result detail view or as overlay
+
+    ### Files to Modify
+    1. **CaptureView.swift** - Add mode selector component
+       - Insert ModeSelector at top or bottom of screen
+       - Wire to CaptureViewModel.currentMode property
+       - Conditional overlay rendering already implemented (lines 109-128)
+       - Recording indicator overlay already implemented (lines 131-133, 178-204)
+
+    2. **CaptureViewModel.swift** - Add mode property and upload progress
+       - Add @Published var currentMode: CaptureMode = .photo
+       - Persist mode to UserDefaults with didSet observer
+       - Add @Published var uploadProgress: Double = 0.0
+       - Track upload progress via URLSession delegate callbacks
+       - Add 5-second warning haptic feedback logic (check recordingDuration)
+
+    3. **CaptureButton.swift** - Already supports video mode
+       - NO CHANGES NEEDED - Long press gesture already implemented
+       - RecordingPulseAnimation already defined
+       - Visual states already handle photo/video/recording
+
+    4. **CaptureControlsBar.swift** - Update for mode-aware overlay toggle
+       - Toggle button already switches binding (line 156: showDepthOverlay binding)
+       - CaptureView already passes correct binding based on mode (line 155)
+       - NO CHANGES NEEDED unless mode selector added to controls bar
+
+    ### Integration Points
+
+    **VideoRecordingSession** (Story 7-1):
+    - CaptureViewModel already creates VideoRecordingSession in startVideoRecording()
+    - Already sets onFrameProcessed, onRecordingStateChanged, onError callbacks
+    - Already handles VideoRecordingResult in stopVideoRecording()
+    - Check wasInterrupted flag to display partial video indicator
+
+    **EdgeDepthOverlayView** (Story 7-3):
+    - Already conditionally rendered in CaptureView when isRecordingVideo=true
+    - Binding already wired to viewModel.showEdgeOverlay
+    - edgeThreshold already set to viewModel.edgeThreshold (0.1)
+    - NO CHANGES NEEDED
+
+    **PartialVideoBadge** (Story 7-5):
+    - Import and use in VideoPreviewSheet
+    - Check VideoRecordingResult.attestation?.isPartial
+    - Display "Verified: [verifiedDuration]s of [totalDuration]s recorded"
+    - Use info blue styling (not error red)
+
+    **UploadService** (Story 6-11):
+    - Extend with video-specific upload endpoint
+    - Use background URLSession for reliability
+    - Track progress via URLSessionTaskDelegate callbacks
+    - Update viewModel.uploadProgress property from delegate
+
+    ### Critical Reminders
+
+    1. **DO NOT RESTART ARSession on mode switch** - Same session for photo and video
+    2. **Separate UserDefaults keys** - "photoOverlayEnabled" vs "videoOverlayEnabled"
+    3. **Timer update interval** - 0.1s for smooth UI, display formatted as "0:00"
+    4. **Haptic feedback timing** - Prepare generator before use, .medium for start/warning, .heavy for stop
+    5. **Storage check** - Minimum 50MB required before recording starts
+    6. **Error overlay pattern** - Top banner, auto-dismiss after 5s or on tap
+    7. **Preview sheet iOS 15 compatibility** - Use SheetPresentationModifier for graceful degradation
+    8. **Upload background continuity** - Use background URLSession, continue when app backgrounded
+
+    ### State Management Flow
+
+    Mode Selection:
+    User taps Photo/Video -> ModeSelector updates viewModel.currentMode -> UserDefaults persisted -> UI updates (overlay type, button visual)
+
+    Video Recording:
+    User holds button -> CaptureButton detects long press -> calls onRecordingStart -> viewModel.startVideoRecording() -> creates VideoRecordingSession -> sets callbacks -> starts recording -> recordingTimer updates every 0.1s -> UI shows elapsed time -> 5s warning haptic -> 15s auto-stop or user releases -> calls onRecordingStop -> viewModel.stopVideoRecording() -> VideoRecordingResult returned -> preview sheet displayed
+
+    Upload Progress:
+    Recording complete -> VideoProcessingPipeline packages video -> UploadService.upload() called -> URLSessionTaskDelegate callbacks -> viewModel.uploadProgress updated -> UploadProgressView renders progress bar -> Upload complete or error -> UI updates accordingly
+  </implementation-notes>
+</story-context>

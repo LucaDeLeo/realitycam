@@ -12,13 +12,15 @@ import ARKit
 
 /// Main capture screen displaying AR camera with depth overlay and capture controls.
 ///
-/// ## Features
+/// ## Features (Story 7-14 additions)
+/// - Photo/Video mode selector with persistent preference (AC-1)
 /// - Full-screen ARKit camera preview
 /// - Real-time LiDAR depth visualization overlay (photo mode: full colormap)
-/// - Real-time edge depth overlay (video mode: Sobel edge detection, Story 7.3)
+/// - Real-time edge depth overlay (video mode: Sobel edge detection)
 /// - Large capture button with haptic feedback (tap for photo, hold for video)
-/// - Video recording with timer and indicator
-/// - Capture preview with Use/Retake options
+/// - Video recording with timer, progress bar, and 5-second warning haptic (AC-5)
+/// - Video preview sheet with Use/Retake options (AC-7)
+/// - Partial video indicator for interrupted recordings (AC-8)
 /// - Permission handling
 ///
 /// ## Depth Overlay Modes
@@ -29,6 +31,12 @@ import ARKit
 /// while still providing depth feedback. It renders to preview ONLY - the
 /// recorded video contains raw RGB frames without any overlay.
 ///
+/// ## Mode Switching
+/// - Mode can be switched via ModeSelector at the bottom
+/// - Mode preference persisted to UserDefaults
+/// - ARSession continues running on mode switch (no restart needed)
+/// - Mode selector disabled during capture or recording
+///
 /// ## Usage
 /// ```swift
 /// NavigationStack {
@@ -37,9 +45,6 @@ import ARKit
 /// ```
 struct CaptureView: View {
     @StateObject private var viewModel = CaptureViewModel()
-
-    /// Whether to show depth overlay (photo mode - full colormap)
-    @State private var showDepthOverlay = true
 
     /// Depth overlay opacity (photo mode)
     @State private var depthOpacity: Float = 0.4
@@ -84,6 +89,9 @@ struct CaptureView: View {
         .sheet(isPresented: $viewModel.showCapturePreview) {
             capturePreviewSheet
         }
+        .sheet(isPresented: $viewModel.showVideoPreview) {
+            videoPreviewSheet
+        }
         .sheet(isPresented: $showHistory) {
             // History view will be implemented in Story 6.14
             Text("Capture History")
@@ -103,10 +111,10 @@ struct CaptureView: View {
                     .ignoresSafeArea()
             }
 
-            // Depth Overlay - mode-dependent (Story 7.3)
+            // Depth Overlay - mode-dependent (Story 7.3, 7-14)
             // Video mode: Edge-only overlay (sparse, doesn't obscure preview)
             // Photo mode: Full colormap overlay (red=near, blue=far)
-            if viewModel.isRecordingVideo {
+            if viewModel.currentMode == .video || viewModel.isRecordingVideo {
                 // Edge overlay for video mode (Story 7.3)
                 // Renders to preview ONLY - NOT in recorded video
                 EdgeDepthOverlayView(
@@ -116,12 +124,12 @@ struct CaptureView: View {
                 )
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
-            } else if showDepthOverlay {
+            } else if viewModel.showPhotoOverlay {
                 // Full colormap overlay for photo mode
                 DepthOverlayView(
                     depthFrame: viewModel.currentDepthFrame,
                     opacity: $depthOpacity,
-                    isVisible: $showDepthOverlay
+                    isVisible: $viewModel.showPhotoOverlay
                 )
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
@@ -149,13 +157,24 @@ struct CaptureView: View {
                     trackingStateIndicator
                 }
 
+                // Mode selector (Story 7-14, AC-1)
+                // Positioned above capture button, disabled during capture/recording
+                if !viewModel.isRecordingVideo {
+                    ModeSelector(
+                        currentMode: $viewModel.currentMode,
+                        isDisabled: viewModel.isCapturing || viewModel.isRecordingVideo
+                    )
+                    .padding(.bottom, 8)
+                }
+
                 // Bottom controls
                 // Toggle binding switches between photo (colormap) and video (edge) overlay
                 CaptureControlsBar(
-                    showDepthOverlay: viewModel.isRecordingVideo ? $viewModel.showEdgeOverlay : $showDepthOverlay,
+                    showDepthOverlay: viewModel.currentMode == .video ? $viewModel.showEdgeOverlay : $viewModel.showPhotoOverlay,
                     isCapturing: viewModel.isCapturing,
                     isRecordingVideo: viewModel.isRecordingVideo,
                     recordingDuration: viewModel.recordingDuration,
+                    currentMode: viewModel.currentMode,
                     onCapture: { viewModel.capture() },
                     onRecordingStart: {
                         impactFeedback.prepare()
@@ -177,26 +196,36 @@ struct CaptureView: View {
 
     private var recordingIndicatorOverlay: some View {
         VStack {
-            HStack(spacing: 8) {
-                // Pulsing red recording dot
-                Circle()
-                    .fill(Color.red)
-                    .frame(width: 12, height: 12)
-                    .modifier(PulsingAnimation())
+            VStack(spacing: 8) {
+                // Status badge
+                HStack(spacing: 8) {
+                    // Pulsing red recording dot
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 12, height: 12)
+                        .modifier(PulsingAnimation())
 
-                Text("Recording...")
-                    .font(.subheadline.bold())
-                    .foregroundColor(.white)
+                    Text("Recording...")
+                        .font(.subheadline.bold())
+                        .foregroundColor(.white)
 
-                // Elapsed time timer
-                Text(formatDuration(viewModel.recordingDuration))
-                    .font(.subheadline.monospacedDigit())
-                    .foregroundColor(.white)
+                    // Elapsed time timer
+                    Text(formatDuration(viewModel.recordingDuration))
+                        .font(.subheadline.monospacedDigit())
+                        .foregroundColor(.white)
+                }
+
+                // Progress bar (AC-5)
+                RecordingProgressBar(
+                    currentDuration: viewModel.recordingDuration,
+                    maxDuration: CaptureViewModel.maxRecordingDuration
+                )
+                .frame(width: 180)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 8)
+            .padding(.vertical, 12)
             .background(Color.black.opacity(0.6))
-            .cornerRadius(20)
+            .cornerRadius(12)
             .padding(.top, 50)
 
             Spacer()
@@ -215,8 +244,8 @@ struct CaptureView: View {
 
     private var topBar: some View {
         HStack {
-            // Opacity slider when depth visible
-            if showDepthOverlay {
+            // Opacity slider when depth visible (photo mode only)
+            if viewModel.currentMode == .photo && viewModel.showPhotoOverlay {
                 DepthOverlayOpacitySlider(opacity: $depthOpacity)
                     .frame(maxWidth: 200)
             }
@@ -316,6 +345,23 @@ struct CaptureView: View {
             .padding(.bottom, 40)
         }
         .modifier(SheetPresentationModifier())
+    }
+
+    // MARK: - Video Preview Sheet (Story 7-14, AC-7)
+
+    private var videoPreviewSheet: some View {
+        VideoPreviewSheet(
+            result: viewModel.lastVideoResult,
+            onUseVideo: {
+                viewModel.useVideo()
+            },
+            onRetake: {
+                viewModel.discardVideo()
+            },
+            isUploading: viewModel.isUploading,
+            uploadProgress: viewModel.uploadProgress,
+            uploadError: viewModel.uploadError
+        )
     }
 }
 

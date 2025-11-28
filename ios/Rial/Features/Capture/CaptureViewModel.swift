@@ -44,6 +44,12 @@ final class CaptureViewModel: ObservableObject {
     /// UserDefaults key for edge overlay visibility preference
     private static let edgeOverlayEnabledKey = "app.rial.edgeOverlayEnabled"
 
+    /// UserDefaults key for photo overlay visibility preference
+    private static let photoOverlayEnabledKey = "app.rial.photoOverlayEnabled"
+
+    /// UserDefaults key for capture mode preference
+    private static let captureModeKey = "app.rial.captureMode"
+
     // MARK: - Published Properties
 
     /// Whether AR session is running
@@ -73,6 +79,26 @@ final class CaptureViewModel: ObservableObject {
     /// Whether showing capture preview
     @Published var showCapturePreview = false
 
+    // MARK: - Capture Mode Properties (Story 7-14)
+
+    /// Current capture mode (photo or video).
+    /// Persisted to UserDefaults so preference survives app restarts.
+    @Published var currentMode: CaptureMode {
+        didSet {
+            UserDefaults.standard.set(currentMode.rawValue, forKey: Self.captureModeKey)
+            Self.logger.debug("Capture mode changed: \(self.currentMode.rawValue)")
+        }
+    }
+
+    /// Whether photo depth overlay is visible.
+    /// Persisted separately from video edge overlay.
+    @Published var showPhotoOverlay: Bool {
+        didSet {
+            UserDefaults.standard.set(showPhotoOverlay, forKey: Self.photoOverlayEnabledKey)
+            Self.logger.debug("Photo overlay visibility changed: \(self.showPhotoOverlay)")
+        }
+    }
+
     // MARK: - Video Recording Published Properties
 
     /// Whether video recording is in progress
@@ -86,6 +112,28 @@ final class CaptureViewModel: ObservableObject {
 
     /// Maximum video recording duration (15 seconds)
     public static let maxRecordingDuration: TimeInterval = VideoRecordingSession.maxDuration
+
+    /// Duration at which 5-second warning haptic should fire
+    private static let fiveSecondWarningDuration: TimeInterval = 10.0  // 10s elapsed = 5s remaining
+
+    // MARK: - Video Preview Properties (Story 7-14)
+
+    /// Whether showing video preview sheet
+    @Published var showVideoPreview = false
+
+    /// Last recorded video result for preview
+    @Published private(set) var lastVideoResult: VideoRecordingResult?
+
+    // MARK: - Upload Progress Properties (Story 7-14)
+
+    /// Current upload progress (0.0 - 1.0)
+    @Published private(set) var uploadProgress: Double = 0.0
+
+    /// Whether upload is in progress
+    @Published private(set) var isUploading = false
+
+    /// Upload error message (if any)
+    @Published var uploadError: String?
 
     // MARK: - Edge Overlay Properties (Story 7.3)
 
@@ -137,6 +185,16 @@ final class CaptureViewModel: ObservableObject {
     /// Timer for updating recording duration display
     private var recordingTimer: Timer?
 
+    /// Whether 5-second warning haptic has been triggered
+    private var hasFiredFiveSecondWarning = false
+
+    /// Haptic feedback generators for recording events
+    private let warningHaptic = UIImpactFeedbackGenerator(style: .medium)
+    private let stopHaptic = UIImpactFeedbackGenerator(style: .heavy)
+
+    /// Video processing pipeline for preparing uploads
+    private let videoProcessingPipeline = VideoProcessingPipeline()
+
     // MARK: - Initialization
 
     init(
@@ -152,8 +210,24 @@ final class CaptureViewModel: ObservableObject {
         let attestation = DeviceAttestationService(keychain: keychain)
         self.assertionService = assertionService ?? CaptureAssertionService(attestation: attestation, keychain: keychain)
 
-        // Load edge overlay preference from UserDefaults
-        // Default to true if key doesn't exist (first launch)
+        // Load capture mode preference from UserDefaults (default: photo)
+        if let modeString = UserDefaults.standard.string(forKey: Self.captureModeKey),
+           let mode = CaptureMode(rawValue: modeString) {
+            self.currentMode = mode
+        } else {
+            self.currentMode = .photo
+            UserDefaults.standard.set(CaptureMode.photo.rawValue, forKey: Self.captureModeKey)
+        }
+
+        // Load photo overlay preference from UserDefaults (default: true)
+        if UserDefaults.standard.object(forKey: Self.photoOverlayEnabledKey) == nil {
+            self.showPhotoOverlay = true
+            UserDefaults.standard.set(true, forKey: Self.photoOverlayEnabledKey)
+        } else {
+            self.showPhotoOverlay = UserDefaults.standard.bool(forKey: Self.photoOverlayEnabledKey)
+        }
+
+        // Load edge overlay preference from UserDefaults (default: true)
         if UserDefaults.standard.object(forKey: Self.edgeOverlayEnabledKey) == nil {
             self.showEdgeOverlay = true
             UserDefaults.standard.set(true, forKey: Self.edgeOverlayEnabledKey)
@@ -163,6 +237,10 @@ final class CaptureViewModel: ObservableObject {
 
         setupCallbacks()
         checkCameraPermission()
+
+        // Prepare haptic generators for lowest latency
+        warningHaptic.prepare()
+        stopHaptic.prepare()
     }
 
     // MARK: - Public Methods
@@ -387,6 +465,13 @@ final class CaptureViewModel: ObservableObject {
             return
         }
 
+        // Check storage before starting (AC-10.1)
+        guard hasStorageForRecording() else {
+            Self.logger.error("Cannot start video recording - insufficient storage")
+            errorMessage = "Storage full - cannot record video"
+            return
+        }
+
         Self.logger.info("Starting video recording")
 
         // Create video recording session
@@ -475,12 +560,20 @@ final class CaptureViewModel: ObservableObject {
                     }
                 }
 
-                // TODO: Story 7.3+ will process the video (hash chain, attestation)
-                // For now, just log completion
                 Self.logger.info("Recording complete: \(result.frameCount) frames, \(depthKeyframeCount) depth keyframes, \(String(format: "%.1f", result.duration))s")
 
-                // Reset state
-                resetRecordingState()
+                // Store result for preview (Story 7-14)
+                self.lastVideoResult = result
+
+                // Reset recording state but keep video result for preview
+                self.isRecordingVideo = false
+                self.recordingDuration = 0
+                self.recordingFrameCount = 0
+                self.videoRecordingSession = nil
+                self.hasFiredFiveSecondWarning = false
+
+                // Show video preview sheet (AC-7)
+                self.showVideoPreview = true
 
             } catch {
                 Self.logger.error("Failed to stop video recording: \(error.localizedDescription)")
@@ -506,6 +599,7 @@ final class CaptureViewModel: ObservableObject {
     private func startRecordingTimer() {
         recordingDuration = 0
         recordingFrameCount = 0
+        hasFiredFiveSecondWarning = false
 
         // Update every 0.1 seconds for smooth UI
         recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
@@ -513,8 +607,18 @@ final class CaptureViewModel: ObservableObject {
                 guard let self = self, let session = self.videoRecordingSession else { return }
                 self.recordingDuration = session.duration
 
+                // 5-second warning haptic (AC-5.3)
+                // Fire at 10s elapsed (5s remaining until 15s max)
+                if !self.hasFiredFiveSecondWarning &&
+                   self.recordingDuration >= Self.fiveSecondWarningDuration {
+                    self.hasFiredFiveSecondWarning = true
+                    self.warningHaptic.impactOccurred()
+                    Self.logger.debug("5-second warning haptic fired at \(self.recordingDuration)s")
+                }
+
                 // Auto-stop at max duration (handled by VideoRecordingSession, but update UI)
                 if self.recordingDuration >= CaptureViewModel.maxRecordingDuration {
+                    self.stopHaptic.impactOccurred()
                     self.stopVideoRecording()
                 }
             }
@@ -533,6 +637,103 @@ final class CaptureViewModel: ObservableObject {
         recordingDuration = 0
         recordingFrameCount = 0
         videoRecordingSession = nil
+        hasFiredFiveSecondWarning = false
+    }
+
+    // MARK: - Video Use/Retake (Story 7-14)
+
+    /// Use the recorded video (save and upload).
+    ///
+    /// Processes the video through the pipeline and initiates background upload.
+    func useVideo() {
+        guard let result = lastVideoResult else {
+            Self.logger.warning("No video result to use")
+            return
+        }
+
+        showVideoPreview = false
+
+        Task {
+            do {
+                // Process video through pipeline
+                isUploading = true
+                uploadProgress = 0.0
+
+                let processed = try await videoProcessingPipeline.process(result: result) { [weak self] progress in
+                    self?.uploadProgress = progress * 0.5  // Processing is 50% of progress
+                }
+
+                // Save to capture store
+                try await captureStore.saveVideoCapture(processed)
+                Self.logger.info("Video capture saved: \(result.videoURL.lastPathComponent)")
+
+                // Reset state after successful save
+                uploadProgress = 1.0
+                isUploading = false
+                clearVideoPreview()
+
+            } catch {
+                Self.logger.error("Failed to process/save video: \(error.localizedDescription)")
+                uploadError = "Failed to save video: \(error.localizedDescription)"
+                isUploading = false
+            }
+        }
+    }
+
+    /// Discard the recorded video.
+    func discardVideo() {
+        guard let result = lastVideoResult else { return }
+
+        // Delete the temp video file
+        try? FileManager.default.removeItem(at: result.videoURL)
+        Self.logger.info("Video discarded")
+
+        clearVideoPreview()
+    }
+
+    /// Clear video preview state.
+    private func clearVideoPreview() {
+        lastVideoResult = nil
+        showVideoPreview = false
+        uploadProgress = 0.0
+        uploadError = nil
+    }
+
+    // MARK: - Storage Check (Story 7-14, AC-10.1)
+
+    /// Minimum storage required for video recording (50MB)
+    private static let minimumStorageBytes: Int64 = 50 * 1024 * 1024
+
+    /// Check if sufficient storage is available for video recording.
+    ///
+    /// Videos typically require 15-20MB for 15 seconds, so we require
+    /// at least 50MB free to ensure recording completes successfully.
+    ///
+    /// - Returns: True if sufficient storage available
+    func hasStorageForRecording() -> Bool {
+        do {
+            let documentDirectory = try FileManager.default.url(
+                for: .documentDirectory,
+                in: .userDomainMask,
+                appropriateFor: nil,
+                create: false
+            )
+
+            let values = try documentDirectory.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+
+            if let available = values.volumeAvailableCapacityForImportantUsage {
+                let hasSpace = available >= Self.minimumStorageBytes
+                if !hasSpace {
+                    Self.logger.warning("Insufficient storage: \(available) bytes available, need \(Self.minimumStorageBytes)")
+                }
+                return hasSpace
+            }
+        } catch {
+            Self.logger.error("Failed to check storage: \(error.localizedDescription)")
+        }
+
+        // Default to allowing recording if check fails
+        return true
     }
 }
 
