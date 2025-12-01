@@ -195,14 +195,22 @@ final class CaptureViewModel: ObservableObject {
     /// Video processing pipeline for preparing uploads
     private let videoProcessingPipeline = VideoProcessingPipeline()
 
+    /// Privacy settings manager for checking privacy mode (Story 8-3)
+    private var privacySettingsManager: PrivacySettingsManager?
+
+    /// Pending hash-only payload for privacy mode captures (Story 8-3)
+    private var pendingHashOnlyPayload: HashOnlyCapturePayload?
+
     // MARK: - Initialization
 
     init(
         frameProcessor: FrameProcessor = FrameProcessor(),
         captureStore: CaptureStore? = nil,
-        assertionService: CaptureAssertionService? = nil
+        assertionService: CaptureAssertionService? = nil,
+        privacySettingsManager: PrivacySettingsManager? = nil
     ) {
         self.frameProcessor = frameProcessor
+        self.privacySettingsManager = privacySettingsManager
 
         // Create default instances if not provided
         self.captureStore = captureStore ?? CaptureStore()
@@ -329,6 +337,24 @@ final class CaptureViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Privacy Mode Support (Story 8-3)
+
+    /// Sets the privacy settings manager for privacy mode support.
+    ///
+    /// Call this method to inject the privacy settings manager, typically
+    /// from the view that hosts the capture view model.
+    ///
+    /// - Parameter manager: The privacy settings manager to use
+    func setPrivacySettingsManager(_ manager: PrivacySettingsManager) {
+        self.privacySettingsManager = manager
+        Self.logger.debug("Privacy settings manager set, privacyModeEnabled: \(manager.isPrivacyModeEnabled)")
+    }
+
+    /// Whether privacy mode is currently enabled.
+    var isPrivacyModeEnabled: Bool {
+        privacySettingsManager?.isPrivacyModeEnabled ?? false
+    }
+
     // MARK: - Private Methods
 
     private func setupCallbacks() {
@@ -403,36 +429,15 @@ final class CaptureViewModel: ObservableObject {
             // Process frame
             let captureData = try await frameProcessor.process(frame, location: nil)
 
-            // Generate assertion (if available)
-            var finalCapture = captureData
-            if assertionService.isAvailable {
-                do {
-                    let assertion = try await assertionService.createAssertion(for: captureData)
-                    finalCapture = CaptureData(
-                        id: captureData.id,
-                        jpeg: captureData.jpeg,
-                        depth: captureData.depth,
-                        metadata: captureData.metadata,
-                        assertion: assertion,
-                        assertionStatus: .generated,
-                        assertionAttemptCount: 1,
-                        timestamp: captureData.timestamp
-                    )
-                } catch {
-                    Self.logger.warning("Assertion failed, saving without: \(error.localizedDescription)")
-                }
+            // Check privacy mode
+            if let privacyManager = privacySettingsManager,
+               privacyManager.isPrivacyModeEnabled {
+                // Privacy mode: run client-side depth analysis and build hash-only payload
+                await performPrivacyModeCapture(frame: frame, captureData: captureData, privacySettings: privacyManager.settings)
+            } else {
+                // Full mode: existing flow with full upload
+                await performFullModeCapture(captureData: captureData)
             }
-
-            // Generate preview image
-            if let jpegImage = UIImage(data: captureData.jpeg) {
-                DispatchQueue.main.async {
-                    self.lastCapturedPhoto = jpegImage
-                    self.pendingCapture = finalCapture
-                    self.showCapturePreview = true
-                }
-            }
-
-            Self.logger.info("Capture processed successfully")
         } catch {
             Self.logger.error("Capture processing failed: \(error.localizedDescription)")
             DispatchQueue.main.async {
@@ -441,8 +446,123 @@ final class CaptureViewModel: ObservableObject {
         }
     }
 
+    /// Performs privacy mode capture with client-side depth analysis (Story 8-3).
+    ///
+    /// - Parameters:
+    ///   - frame: The AR frame containing depth data
+    ///   - captureData: Processed capture data
+    ///   - privacySettings: Current privacy settings snapshot
+    private func performPrivacyModeCapture(
+        frame: ARFrame,
+        captureData: CaptureData,
+        privacySettings: PrivacySettings
+    ) async {
+        Self.logger.info("Privacy mode capture: running client-side depth analysis")
+        let startTime = CFAbsoluteTimeGetCurrent()
+
+        // Run client-side depth analysis
+        var depthAnalysis: DepthAnalysisResult
+        if let depthMap = frame.sceneDepth?.depthMap {
+            depthAnalysis = await DepthAnalysisService.shared.analyze(depthMap: depthMap)
+            Self.logger.debug("Depth analysis completed: isRealScene=\(depthAnalysis.isLikelyRealScene)")
+        } else {
+            // No depth data available - continue with unavailable status
+            Self.logger.warning("No depth data for privacy mode capture - continuing with unavailable status")
+            depthAnalysis = .unavailable()
+        }
+
+        // Build hash-only payload
+        var payload = await HashOnlyPayloadBuilder.build(
+            from: captureData,
+            privacySettings: privacySettings,
+            depthAnalysis: depthAnalysis
+        )
+
+        // Sign payload (if assertion service available)
+        if assertionService.isAvailable {
+            do {
+                payload = try await HashOnlyPayloadBuilder.sign(
+                    payload: payload,
+                    with: assertionService
+                )
+                Self.logger.info("Hash-only payload signed successfully")
+            } catch {
+                Self.logger.warning("Failed to sign hash-only payload: \(error.localizedDescription)")
+                // Continue without assertion - will be marked as pending retry
+            }
+        }
+
+        // Verify payload size
+        if let size = payload.serializedSize() {
+            Self.logger.info("Hash-only payload size: \(size) bytes")
+            if !payload.isWithinSizeLimit() {
+                Self.logger.warning("Hash-only payload exceeds 10KB limit!")
+            }
+        }
+
+        // Create CaptureData with privacy mode fields
+        var finalCapture = captureData
+        finalCapture.uploadMode = .hashOnly
+        finalCapture.depthAnalysisResult = depthAnalysis
+        finalCapture.privacySettings = privacySettings
+
+        let totalTime = (CFAbsoluteTimeGetCurrent() - startTime) * 1000
+        Self.logger.info("Privacy mode capture processed in \(String(format: "%.1f", totalTime))ms")
+
+        // Generate preview image and store captures
+        if let jpegImage = UIImage(data: captureData.jpeg) {
+            DispatchQueue.main.async {
+                self.lastCapturedPhoto = jpegImage
+                self.pendingCapture = finalCapture
+                self.pendingHashOnlyPayload = payload
+                self.showCapturePreview = true
+            }
+        }
+    }
+
+    /// Performs full mode capture with raw media upload (existing behavior).
+    ///
+    /// - Parameter captureData: Processed capture data
+    private func performFullModeCapture(captureData: CaptureData) async {
+        // Generate assertion (if available)
+        var finalCapture = captureData
+        finalCapture.uploadMode = .full
+
+        if assertionService.isAvailable {
+            do {
+                let assertion = try await assertionService.createAssertion(for: captureData)
+                finalCapture = CaptureData(
+                    id: captureData.id,
+                    jpeg: captureData.jpeg,
+                    depth: captureData.depth,
+                    metadata: captureData.metadata,
+                    assertion: assertion,
+                    assertionStatus: .generated,
+                    assertionAttemptCount: 1,
+                    timestamp: captureData.timestamp,
+                    uploadMode: .full
+                )
+            } catch {
+                Self.logger.warning("Assertion failed, saving without: \(error.localizedDescription)")
+            }
+        }
+
+        // Generate preview image
+        if let jpegImage = UIImage(data: captureData.jpeg) {
+            DispatchQueue.main.async {
+                self.lastCapturedPhoto = jpegImage
+                self.pendingCapture = finalCapture
+                self.pendingHashOnlyPayload = nil
+                self.showCapturePreview = true
+            }
+        }
+
+        Self.logger.info("Full mode capture processed successfully")
+    }
+
     private func clearPendingCapture() {
         pendingCapture = nil
+        pendingHashOnlyPayload = nil
         lastCapturedPhoto = nil
         showCapturePreview = false
     }

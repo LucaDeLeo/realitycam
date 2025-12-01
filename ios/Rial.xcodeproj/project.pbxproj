@@ -94,6 +94,13 @@
 		'3089F9DB0066' = {isa = PBXBuildFile; fileRef = 3089F9DB1094; };
 		'3089F9DB0067' = {isa = PBXBuildFile; fileRef = 3089F9DB1095; };
 		'3089F9DB0068' = {isa = PBXBuildFile; fileRef = 3089F9DB1096; };
+		'3089F9DB0069' = {isa = PBXBuildFile; fileRef = 3089F9DB1097; };
+		'3089F9DB006A' = {isa = PBXBuildFile; fileRef = 3089F9DB1098; };
+		'3089F9DB006B' = {isa = PBXBuildFile; fileRef = 3089F9DB1099; };
+		'3089F9DB006C' = {isa = PBXBuildFile; fileRef = 3089F9DB109A; };
+		'3089F9DB006D' = {isa = PBXBuildFile; fileRef = 3089F9DB109B; };
+		'3089F9DB006E' = {isa = PBXBuildFile; fileRef = 3089F9DB109C; };
+		'3089F9DB006F' = {isa = PBXBuildFile; fileRef = 3089F9DB109D; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -206,6 +213,13 @@
 		'3089F9DB1094' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyModeIndicator.swift; sourceTree = "<group>"; };
 		'3089F9DB1095' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsTests.swift; sourceTree = "<group>"; };
 		'3089F9DB1096' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsManagerTests.swift; sourceTree = "<group>"; };
+		'3089F9DB1097' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashOnlyCapturePayload.swift; sourceTree = "<group>"; };
+		'3089F9DB1098' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataFilterService.swift; sourceTree = "<group>"; };
+		'3089F9DB1099' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashOnlyPayloadBuilder.swift; sourceTree = "<group>"; };
+		'3089F9DB109A' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashOnlyCapturePayloadTests.swift; sourceTree = "<group>"; };
+		'3089F9DB109B' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataFilterServiceTests.swift; sourceTree = "<group>"; };
+		'3089F9DB109C' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashOnlyPayloadBuilderTests.swift; sourceTree = "<group>"; };
+		'3089F9DB109D' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureDataPrivacyModeTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -319,6 +333,7 @@
 				3089F9DB1077,
 				3089F9DB1074,
 				'3089F9DB1090',
+				'3089F9DB1097',
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -367,6 +382,8 @@
 			isa = PBXGroup;
 			children = (
 				'3089F9DB1095',
+				'3089F9DB109A',
+				'3089F9DB109D',
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -413,6 +430,8 @@
 				3089F9DB1075,
 				3089F9DB1078,
 				3089F9DB1061,
+				'3089F9DB1098',
+				'3089F9DB1099',
 			);
 			path = Capture;
 			sourceTree = "<group>";
@@ -542,6 +561,8 @@
 				3089F9DB1076,
 				3089F9DB1079,
 				3089F9DB1086,
+				'3089F9DB109B',
+				'3089F9DB109C',
 			);
 			path = Capture;
 			sourceTree = "<group>";
@@ -744,6 +765,9 @@
 				'3089F9DB0064',
 				'3089F9DB0065',
 				'3089F9DB0066',
+				'3089F9DB0069',
+				'3089F9DB006A',
+				'3089F9DB006B',
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -774,6 +798,10 @@
 				'3089F9DB0061',
 				'3089F9DB0067',
 				'3089F9DB0068',
+				'3089F9DB006C',
+				'3089F9DB006D',
+				'3089F9DB006E',
+				'3089F9DB006F',
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

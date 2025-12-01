@@ -10,6 +10,20 @@
 import Foundation
 import CoreLocation
 
+// MARK: - UploadMode
+
+/// Mode of upload determining what data is sent to server.
+///
+/// Controls whether raw media is uploaded or only a hash.
+/// Named UploadMode to avoid conflict with CaptureMode (photo/video).
+public enum UploadMode: String, Codable, Sendable {
+    /// Full upload mode - raw photo/video bytes uploaded
+    case full = "full"
+
+    /// Hash-only mode - only hash and metadata uploaded (privacy mode)
+    case hashOnly = "hash_only"
+}
+
 // MARK: - CaptureData
 
 /// Complete capture data ready for storage and upload.
@@ -50,6 +64,17 @@ public struct CaptureData: Codable, Identifiable, Sendable {
     /// Capture timestamp
     public let timestamp: Date
 
+    // MARK: - Privacy Mode Fields (Story 8-3)
+
+    /// Upload mode (.full or .hashOnly) - nil for backward compatibility
+    public var uploadMode: UploadMode?
+
+    /// Client-side depth analysis result for privacy mode - nil when not applicable
+    public var depthAnalysisResult: DepthAnalysisResult?
+
+    /// Snapshot of privacy settings at capture time - nil for non-privacy captures
+    public var privacySettings: PrivacySettings?
+
     /// Creates a new CaptureData instance.
     ///
     /// - Parameters:
@@ -61,6 +86,9 @@ public struct CaptureData: Codable, Identifiable, Sendable {
     ///   - assertionStatus: Status of assertion generation (defaults to .none)
     ///   - assertionAttemptCount: Number of assertion attempts (defaults to 0)
     ///   - timestamp: Capture timestamp (defaults to current time)
+    ///   - uploadMode: Upload mode (.full or .hashOnly, defaults to nil for backward compat)
+    ///   - depthAnalysisResult: Client-side depth analysis result (defaults to nil)
+    ///   - privacySettings: Privacy settings snapshot (defaults to nil)
     public init(
         id: UUID = UUID(),
         jpeg: Data,
@@ -69,7 +97,10 @@ public struct CaptureData: Codable, Identifiable, Sendable {
         assertion: Data? = nil,
         assertionStatus: AssertionStatus = .none,
         assertionAttemptCount: Int = 0,
-        timestamp: Date = Date()
+        timestamp: Date = Date(),
+        uploadMode: UploadMode? = nil,
+        depthAnalysisResult: DepthAnalysisResult? = nil,
+        privacySettings: PrivacySettings? = nil
     ) {
         self.id = id
         self.jpeg = jpeg
@@ -79,6 +110,9 @@ public struct CaptureData: Codable, Identifiable, Sendable {
         self.assertionStatus = assertionStatus
         self.assertionAttemptCount = assertionAttemptCount
         self.timestamp = timestamp
+        self.uploadMode = uploadMode
+        self.depthAnalysisResult = depthAnalysisResult
+        self.privacySettings = privacySettings
     }
 
     /// Total size of capture data in bytes (approximate for upload estimation)

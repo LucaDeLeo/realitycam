@@ -1,0 +1,738 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML for Story 8-3: Hash-Only Capture Payload
+  Generated: 2025-12-01
+  This file serves as the single source of truth for story implementation.
+-->
+<story-context version="1.0">
+
+  <!-- ============================================== -->
+  <!-- STORY REFERENCE                                -->
+  <!-- ============================================== -->
+  <story-reference>
+    <story-key>8-3-hash-only-capture-payload</story-key>
+    <story-file>docs/sprint-artifacts/stories/8-3-hash-only-capture-payload.md</story-file>
+    <epic-key>epic-8</epic-key>
+    <epic-name>Privacy-First Capture Mode</epic-name>
+    <tech-spec>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-8.md</tech-spec>
+    <status>drafted</status>
+    <dependencies>
+      <dependency story-key="8-1-client-side-depth-analysis" status="done">
+        Provides DepthAnalysisService for client-side depth analysis
+      </dependency>
+      <dependency story-key="8-2-privacy-mode-settings-ui" status="in-progress">
+        Provides PrivacySettingsManager and PrivacySettings model
+      </dependency>
+    </dependencies>
+  </story-reference>
+
+  <!-- ============================================== -->
+  <!-- ACCEPTANCE CRITERIA SUMMARY                    -->
+  <!-- ============================================== -->
+  <acceptance-criteria>
+    <criterion id="AC-1" title="Privacy Mode Branch in Capture Flow">
+      CaptureViewModel detects privacy mode via PrivacySettingsManager and branches capture flow.
+      Raw photo bytes NOT included in upload payload when privacy mode ON.
+    </criterion>
+    <criterion id="AC-2" title="Client-Side Depth Analysis Execution">
+      DepthAnalysisService.shared.analyze() called with depth buffer when privacy mode enabled.
+      Analysis failure falls back gracefully with unavailable status.
+    </criterion>
+    <criterion id="AC-3" title="Metadata Filtering Based on Privacy Settings">
+      Location, timestamp, and device info filtered per privacy settings levels (none/coarse/precise, none/dayOnly/exact, none/modelOnly/full).
+    </criterion>
+    <criterion id="AC-4" title="Hash-Only Payload Structure">
+      HashOnlyCapturePayload contains: captureMode, mediaHash, mediaType, depthAnalysis, metadata, metadataFlags, capturedAt, assertion.
+    </criterion>
+    <criterion id="AC-5" title="Assertion Covers Entire Payload">
+      DCAppAttest assertion clientDataHash = SHA256(serialized payload).
+      Assertion covers: mediaHash + depthAnalysis + metadata + metadataFlags.
+    </criterion>
+    <criterion id="AC-6" title="Payload Size Target">
+      Total payload size less than 10KB. No raw photo or depth bytes included.
+    </criterion>
+    <criterion id="AC-7" title="Local Media Retention">
+      Full JPEG photo and depth map remain in local encrypted storage.
+      Media NOT deleted after hash-only upload.
+    </criterion>
+    <criterion id="AC-8" title="CaptureData Extension for Privacy Mode">
+      New optional fields: depthAnalysisResult, captureMode (.full or .hashOnly), privacySettings snapshot.
+      Backward compatibility maintained.
+    </criterion>
+  </acceptance-criteria>
+
+  <!-- ============================================== -->
+  <!-- DOCUMENTATION ARTIFACTS                        -->
+  <!-- ============================================== -->
+  <documentation-artifacts>
+
+    <artifact type="tech-spec" priority="critical">
+      <path>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-8.md</path>
+      <description>Complete technical specification for Epic 8 Privacy-First Capture Mode. Contains HashOnlyCapturePayload model definition (lines 161-196), FilteredMetadata and MetadataFlags structures (lines 182-195), privacy mode capture flow diagram (lines 443-509), and acceptance criteria for Story 8.3 (lines 631-640).</description>
+      <relevant-sections>
+        <section>iOS: HashOnlyCapturePayload (New) - lines 161-196</section>
+        <section>Privacy Mode Capture Flow - lines 443-509</section>
+        <section>Story 8.3 Acceptance Criteria - lines 631-640</section>
+        <section>POST /api/v1/captures (Updated) - lines 348-402</section>
+        <section>Performance targets - lines 520-529</section>
+      </relevant-sections>
+    </artifact>
+
+    <artifact type="architecture" priority="critical">
+      <path>docs/architecture.md</path>
+      <description>System architecture document with ADR-009 (Native Swift Architecture) and ADR-011 (Client-Side Depth Analysis for Privacy Mode). Defines trust model for privacy mode: device attestation proves uncompromised hardware computed the analysis.</description>
+      <relevant-sections>
+        <section>ADR-009: Native Swift Architecture - lines 939-987</section>
+        <section>ADR-011: Client-Side Depth Analysis for Privacy Mode - lines 1067-1121</section>
+        <section>Evidence Architecture - lines 349-419</section>
+      </relevant-sections>
+    </artifact>
+
+    <artifact type="prd" priority="high">
+      <path>docs/prd.md</path>
+      <description>Product requirements with privacy-first capture requirements FR56-FR62. Defines privacy mode toggle, client-side depth analysis, hash-only uploads, and per-capture metadata granularity configuration.</description>
+      <relevant-sections>
+        <section>FR57: Client-side depth analysis in privacy mode</section>
+        <section>FR58: Hash-only upload with depth_analysis_result + attestation_signature</section>
+        <section>FR62: Per-capture metadata granularity configuration</section>
+      </relevant-sections>
+    </artifact>
+
+    <artifact type="story-file" priority="critical">
+      <path>docs/sprint-artifacts/stories/8-3-hash-only-capture-payload.md</path>
+      <description>Complete story definition with 8 acceptance criteria, 12 tasks, detailed dev notes including code examples for payload structure, metadata filtering logic, and CaptureViewModel flow modifications.</description>
+    </artifact>
+
+    <artifact type="related-context" priority="high">
+      <path>docs/sprint-artifacts/story-contexts/8-1-client-side-depth-analysis-context.xml</path>
+      <description>Context for Story 8-1 which implemented DepthAnalysisService. Contains algorithm parity notes and integration patterns.</description>
+    </artifact>
+
+    <artifact type="related-context" priority="high">
+      <path>docs/sprint-artifacts/story-contexts/8-2-privacy-mode-settings-ui-context.xml</path>
+      <description>Context for Story 8-2 which implemented PrivacySettingsManager and PrivacySettings model. Contains settings persistence patterns and SwiftUI integration.</description>
+    </artifact>
+
+  </documentation-artifacts>
+
+  <!-- ============================================== -->
+  <!-- EXISTING CODE INTERFACES                       -->
+  <!-- ============================================== -->
+  <existing-code>
+
+    <!-- === MODELS === -->
+
+    <code-file type="model" priority="critical">
+      <path>ios/Rial/Models/CaptureData.swift</path>
+      <description>
+        Existing capture data model to EXTEND with privacy mode fields.
+        Currently has: id, jpeg, depth, metadata, assertion, assertionStatus, timestamp.
+        Story 8-3 adds: depthAnalysisResult (optional), captureMode enum (optional), privacySettings snapshot (optional).
+        Must maintain backward compatibility with existing captures (all new fields optional with nil defaults).
+      </description>
+      <interfaces>
+        <interface name="CaptureData">
+          public struct with fields: id (UUID), jpeg (Data), depth (Data), metadata (CaptureMetadata), assertion (Data?), assertionStatus (AssertionStatus), assertionAttemptCount (Int), timestamp (Date).
+          Conforms to: Codable, Identifiable, Sendable.
+        </interface>
+        <interface name="CaptureMetadata">
+          Struct with: capturedAt, deviceModel, photoHash, location (LocationData?), depthMapDimensions, iosVersion, appVersion.
+          Conforms to: Codable, Sendable, Equatable.
+        </interface>
+        <interface name="LocationData">
+          Struct with: latitude, longitude, altitude (optional), accuracy, timestamp.
+          Has init(from: CLLocation) factory method.
+        </interface>
+        <interface name="AssertionStatus">
+          Enum with cases: none, generated, pending, failed.
+        </interface>
+        <interface name="CaptureStatus">
+          Enum with cases: processing, pending, uploading, paused, uploaded, failed.
+        </interface>
+      </interfaces>
+    </code-file>
+
+    <code-file type="model" priority="critical">
+      <path>ios/Rial/Models/DepthAnalysisResult.swift</path>
+      <description>
+        Depth analysis result model from Story 8-1. Used in HashOnlyCapturePayload.
+        Contains: depthVariance, depthLayers, edgeCoherence, minDepth, maxDepth, isLikelyRealScene, computedAt, algorithmVersion, status.
+        Factory method: .unavailable() for graceful failures.
+      </description>
+      <interfaces>
+        <interface name="DepthAnalysisResult">
+          public struct conforming to Codable, Sendable, Equatable.
+          Key fields: depthVariance (Float), depthLayers (Int), edgeCoherence (Float), isLikelyRealScene (Bool), algorithmVersion (String = "1.0").
+          Static factory: unavailable() for failure cases.
+        </interface>
+        <interface name="DepthAnalysisStatus">
+          Enum with cases: completed, unavailable, failed.
+        </interface>
+      </interfaces>
+    </code-file>
+
+    <code-file type="model" priority="critical">
+      <path>ios/Rial/Models/PrivacySettings.swift</path>
+      <description>
+        Privacy settings model from Story 8-2. Defines metadata granularity levels.
+        Contains: privacyModeEnabled, locationLevel, timestampLevel, deviceInfoLevel.
+        This is used to determine how metadata is filtered in HashOnlyCapturePayload.
+      </description>
+      <interfaces>
+        <interface name="PrivacySettings">
+          public struct conforming to Codable, Sendable, Equatable.
+          Fields: privacyModeEnabled (Bool), locationLevel (MetadataLevel), timestampLevel (TimestampLevel), deviceInfoLevel (DeviceInfoLevel).
+          Static: .default provides default values per tech spec.
+        </interface>
+        <interface name="MetadataLevel">
+          Enum: none, coarse, precise. Raw values use snake_case for API compatibility.
+        </interface>
+        <interface name="TimestampLevel">
+          Enum: none, dayOnly, exact. Raw values: "none", "day_only", "exact".
+        </interface>
+        <interface name="DeviceInfoLevel">
+          Enum: none, modelOnly, full. Raw values: "none", "model_only", "full".
+        </interface>
+      </interfaces>
+    </code-file>
+
+    <!-- === SERVICES === -->
+
+    <code-file type="service" priority="critical">
+      <path>ios/Rial/Core/Capture/DepthAnalysisService.swift</path>
+      <description>
+        Client-side depth analysis service from Story 8-1. Performs depth analysis locally.
+        Singleton pattern via shared instance. Runs analysis on background queue.
+        Returns DepthAnalysisResult with all metrics matching backend algorithm.
+      </description>
+      <interfaces>
+        <interface name="DepthAnalysisService">
+          public final class (Sendable).
+          Singleton: DepthAnalysisService.shared
+          Main API: func analyze(depthMap: CVPixelBuffer, rgbImage: CVPixelBuffer?) async -> DepthAnalysisResult
+          Target: less than 500ms on iPhone 12 Pro.
+        </interface>
+        <interface name="DepthAnalysisConstants">
+          Static thresholds: varianceThreshold (0.5), layerThreshold (3), coherenceThreshold (0.3).
+        </interface>
+      </interfaces>
+    </code-file>
+
+    <code-file type="service" priority="critical">
+      <path>ios/Rial/Core/Configuration/PrivacySettingsManager.swift</path>
+      <description>
+        Privacy settings manager from Story 8-2. ObservableObject with @AppStorage persistence.
+        Provides settings access via published property. Inject via @EnvironmentObject in views.
+      </description>
+      <interfaces>
+        <interface name="PrivacySettingsManager">
+          @MainActor public final class conforming to ObservableObject.
+          Published: settings (PrivacySettings).
+          Computed: isPrivacyModeEnabled (Bool).
+          Methods: resetToDefaults(), togglePrivacyMode().
+        </interface>
+      </interfaces>
+    </code-file>
+
+    <code-file type="service" priority="critical">
+      <path>ios/Rial/Core/Attestation/CaptureAssertionService.swift</path>
+      <description>
+        Per-capture DCAppAttest assertion service. Generates cryptographic assertions binding capture data to device attestation key.
+        MUST EXTEND to support HashOnlyCapturePayload signing in addition to CaptureData.
+      </description>
+      <interfaces>
+        <interface name="CaptureAssertionService">
+          class (not actor) with DeviceAttestationService and KeychainService dependencies.
+          Current API: func createAssertion(for capture: CaptureData) async throws -> Data
+          Also has: func generateAssertion(for hash: Data) async throws -> Data
+          Property: isAvailable (Bool) - checks DCAppAttest support and key availability.
+          Target: less than 100ms total (30ms hash + 50ms assertion).
+        </interface>
+        <interface name="CaptureAssertionError">
+          Enum: attestationKeyNotFound, assertionGenerationFailed(Error), hashComputationFailed.
+        </interface>
+      </interfaces>
+    </code-file>
+
+    <code-file type="service" priority="high">
+      <path>ios/Rial/Core/Crypto/CryptoService.swift</path>
+      <description>
+        Cryptographic service using CryptoKit. Provides SHA-256 hashing (required for mediaHash field).
+        Has both in-memory sha256() and streaming sha256Stream(url:) methods.
+      </description>
+      <interfaces>
+        <interface name="CryptoService">
+          Static struct with methods:
+          - sha256(_ data: Data) -> String (returns 64-char hex string)
+          - sha256Data(_ data: Data) -> Data (returns 32-byte raw hash)
+          - sha256Stream(url: URL) throws -> String (for large files)
+          - encrypt/decrypt using AES-GCM
+          - generateKey() -> SymmetricKey
+        </interface>
+      </interfaces>
+    </code-file>
+
+    <code-file type="storage" priority="high">
+      <path>ios/Rial/Core/Storage/CaptureStore.swift</path>
+      <description>
+        CoreData persistence for captures. Saves captures with encrypted storage support.
+        Local media retention happens here - captures stored locally regardless of upload mode.
+        May need extension for hash-only captures that store HashOnlyCapturePayload for upload while keeping full CaptureData locally.
+      </description>
+      <interfaces>
+        <interface name="CaptureStore">
+          final class with CoreData container.
+          Save: func saveCapture(_ capture: CaptureData, status: CaptureStatus) async throws
+          Fetch: func fetchPendingCaptures() async throws -> [CaptureData]
+          Update: func updateStatus(_ status: CaptureStatus, for captureId: UUID) async throws
+        </interface>
+      </interfaces>
+    </code-file>
+
+    <!-- === VIEW MODELS === -->
+
+    <code-file type="viewmodel" priority="critical">
+      <path>ios/Rial/Features/Capture/CaptureViewModel.swift</path>
+      <description>
+        Main capture view model managing AR session and capture flow. This is the PRIMARY file to MODIFY for privacy mode branching.
+        Currently handles photo capture via performCapture() method. Need to add privacy mode check, depth analysis, and hash-only payload construction.
+        @MainActor annotated. Uses FrameProcessor, CaptureStore, CaptureAssertionService.
+      </description>
+      <interfaces>
+        <interface name="CaptureViewModel">
+          @MainActor final class conforming to ObservableObject.
+          Dependencies: frameProcessor, captureStore, assertionService.
+          Key method to modify: performCapture() - needs privacy mode branch.
+          Add: PrivacySettingsManager injection.
+          Pattern: Check privacySettings.isPrivacyModeEnabled, then branch:
+            - Privacy ON: run depth analysis, build HashOnlyCapturePayload, sign, save locally, upload payload only
+            - Privacy OFF: existing flow (full upload)
+        </interface>
+      </interfaces>
+    </code-file>
+
+    <!-- === FRAME PROCESSING === -->
+
+    <code-file type="processor" priority="medium">
+      <path>ios/Rial/Core/Capture/FrameProcessor.swift</path>
+      <description>
+        Frame processing pipeline for converting ARFrame to CaptureData.
+        Handles JPEG conversion, depth compression, metadata collection.
+        The process() method returns CaptureData with jpeg and depth Data.
+      </description>
+      <interfaces>
+        <interface name="FrameProcessor">
+          class with process(_ frame: ARFrame, location: CLLocation?) async throws -> CaptureData.
+          Returns CaptureData with jpeg (JPEG bytes), depth (compressed), metadata.
+          The jpeg Data is what we hash for mediaHash in privacy mode.
+        </interface>
+      </interfaces>
+    </code-file>
+
+  </existing-code>
+
+  <!-- ============================================== -->
+  <!-- DEVELOPMENT CONSTRAINTS                        -->
+  <!-- ============================================== -->
+  <development-constraints>
+
+    <constraint type="architecture" priority="critical">
+      <title>Privacy Mode Trust Model</title>
+      <description>
+        Hardware attestation (DCAppAttest) proves the depth analysis was computed on an uncompromised device.
+        The assertion MUST cover the entire payload: mediaHash + depthAnalysis + metadata + metadataFlags.
+        Server trusts attested device's results with same confidence as server-side computation.
+      </description>
+      <reference>docs/architecture.md ADR-011</reference>
+    </constraint>
+
+    <constraint type="performance" priority="high">
+      <title>Payload Size Target</title>
+      <description>
+        Hash-only upload size MUST be less than 10KB total.
+        Breakdown: mediaHash (~64 bytes), depthAnalysis (~200 bytes), metadata (~100-500 bytes), metadataFlags (~150 bytes), assertion (~1-2KB).
+        No raw photo bytes (saves 2-4MB), no raw depth bytes (saves 50-100KB).
+      </description>
+      <reference>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-8.md lines 520-529</reference>
+    </constraint>
+
+    <constraint type="performance" priority="high">
+      <title>Depth Analysis Performance</title>
+      <description>
+        Client-side depth analysis MUST complete in less than 500ms.
+        Runs on background queue via async/await.
+        If analysis fails, continue with DepthAnalysisResult.unavailable() - DO NOT block capture.
+      </description>
+      <reference>Story 8-1 implementation</reference>
+    </constraint>
+
+    <constraint type="api" priority="critical">
+      <title>API Field Naming</title>
+      <description>
+        Use snake_case raw values for enums (CaptureMode, metadata levels).
+        JSON field names: capture_mode, media_hash, depth_analysis, metadata_flags.
+        Match backend expectations in POST /api/v1/captures.
+      </description>
+      <reference>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-8.md lines 348-402</reference>
+    </constraint>
+
+    <constraint type="backward-compatibility" priority="critical">
+      <title>CaptureData Backward Compatibility</title>
+      <description>
+        All new fields on CaptureData MUST be optional with nil defaults.
+        Existing captures (without privacy mode fields) must continue to work.
+        Migration not needed if defaults are nil.
+      </description>
+    </constraint>
+
+    <constraint type="local-storage" priority="high">
+      <title>Local Media Retention</title>
+      <description>
+        Full JPEG and depth map MUST remain in local encrypted storage after hash-only upload.
+        User can view local capture in History.
+        Media NOT deleted after upload - user maintains full control.
+      </description>
+      <reference>AC-7 in story file</reference>
+    </constraint>
+
+    <constraint type="coding-pattern" priority="high">
+      <title>Codable JSON Encoding</title>
+      <description>
+        All payload structs must conform to Codable, Sendable, Equatable.
+        Use JSONEncoder with consistent settings for payload serialization before signing.
+        The clientDataHash is SHA256 of the serialized JSON bytes.
+      </description>
+    </constraint>
+
+    <constraint type="error-handling" priority="high">
+      <title>Graceful Depth Analysis Failure</title>
+      <description>
+        If depth analysis fails (no depth buffer, invalid format, etc.), capture should CONTINUE.
+        Use DepthAnalysisResult.unavailable() and proceed with hash-only upload.
+        Log warning but do not block user from capturing.
+      </description>
+    </constraint>
+
+  </development-constraints>
+
+  <!-- ============================================== -->
+  <!-- DEPENDENCIES                                   -->
+  <!-- ============================================== -->
+  <dependencies>
+
+    <dependency type="internal-story" priority="critical">
+      <name>Story 8-1: Client-Side Depth Analysis</name>
+      <status>done</status>
+      <provides>
+        - DepthAnalysisService singleton
+        - DepthAnalysisResult model
+        - Algorithm parity with backend
+      </provides>
+    </dependency>
+
+    <dependency type="internal-story" priority="critical">
+      <name>Story 8-2: Privacy Mode Settings UI</name>
+      <status>in-progress</status>
+      <provides>
+        - PrivacySettingsManager (ObservableObject)
+        - PrivacySettings model
+        - MetadataLevel, TimestampLevel, DeviceInfoLevel enums
+        - @EnvironmentObject injection pattern
+      </provides>
+    </dependency>
+
+    <dependency type="internal-module" priority="high">
+      <name>CaptureAssertionService</name>
+      <path>ios/Rial/Core/Attestation/CaptureAssertionService.swift</path>
+      <provides>
+        - DCAppAttest assertion generation
+        - generateAssertion(for hash: Data) method already exists
+        - May need extension for HashOnlyCapturePayload signing
+      </provides>
+    </dependency>
+
+    <dependency type="internal-module" priority="high">
+      <name>CryptoService</name>
+      <path>ios/Rial/Core/Crypto/CryptoService.swift</path>
+      <provides>
+        - SHA-256 hashing: CryptoService.sha256(data) returns 64-char hex string
+        - Used for mediaHash field
+      </provides>
+    </dependency>
+
+    <dependency type="internal-module" priority="high">
+      <name>CaptureStore</name>
+      <path>ios/Rial/Core/Storage/CaptureStore.swift</path>
+      <provides>
+        - Local encrypted storage for captures
+        - Supports both photo and video captures
+        - Handles offline queue
+      </provides>
+    </dependency>
+
+    <dependency type="apple-framework" priority="high">
+      <name>DeviceCheck</name>
+      <description>DCAppAttest for hardware attestation assertions</description>
+    </dependency>
+
+    <dependency type="apple-framework" priority="high">
+      <name>CryptoKit</name>
+      <description>SHA-256 hashing for mediaHash and clientDataHash</description>
+    </dependency>
+
+    <dependency type="apple-framework" priority="medium">
+      <name>CoreLocation</name>
+      <description>Reverse geocoding for coarse location (city/country)</description>
+    </dependency>
+
+  </dependencies>
+
+  <!-- ============================================== -->
+  <!-- TESTING CONTEXT                                -->
+  <!-- ============================================== -->
+  <testing-context>
+
+    <framework>XCTest</framework>
+    <test-location>ios/RialTests/</test-location>
+
+    <test-files-to-create>
+      <file>ios/RialTests/Models/HashOnlyCapturePayloadTests.swift</file>
+      <file>ios/RialTests/Capture/MetadataFilterServiceTests.swift</file>
+      <file>ios/RialTests/Capture/HashOnlyPayloadBuilderTests.swift</file>
+    </test-files-to-create>
+
+    <test-patterns>
+      <pattern name="Model Encoding">
+        Test JSON encoding/decoding of HashOnlyCapturePayload, FilteredMetadata, MetadataFlags.
+        Verify field names match API contract (snake_case).
+      </pattern>
+      <pattern name="Metadata Filtering">
+        Test filterLocation with all three levels (none, coarse, precise).
+        Test filterTimestamp with all three levels (none, dayOnly, exact).
+        Test filterDeviceInfo with all three levels (none, modelOnly, full).
+      </pattern>
+      <pattern name="Payload Size">
+        Create realistic payload and verify serialized size is less than 10KB.
+        Log actual sizes for verification.
+      </pattern>
+      <pattern name="Backward Compatibility">
+        Create CaptureData with new optional fields nil.
+        Verify encoding/decoding works for old captures.
+      </pattern>
+      <pattern name="Assertion Hash">
+        Test that clientDataHash is computed correctly from serialized payload.
+        Verify deterministic serialization (same input -> same hash).
+      </pattern>
+    </test-patterns>
+
+    <test-data>
+      <item>Mock DepthAnalysisResult with realistic values (variance=2.4, layers=5, coherence=0.87)</item>
+      <item>Mock LocationData for filtering tests</item>
+      <item>Mock CaptureMetadata with all fields populated</item>
+      <item>Sample JPEG data (small, just for hash testing)</item>
+    </test-data>
+
+    <coverage-targets>
+      <target>HashOnlyCapturePayload: 100% of encoding paths</target>
+      <target>MetadataFilterService: all 9 filtering combinations</target>
+      <target>HashOnlyPayloadBuilder: all construction paths</target>
+      <target>CaptureData extensions: backward compatibility</target>
+    </coverage-targets>
+
+  </testing-context>
+
+  <!-- ============================================== -->
+  <!-- IMPLEMENTATION NOTES                           -->
+  <!-- ============================================== -->
+  <implementation-notes>
+
+    <note priority="critical" category="task-order">
+      <title>Recommended Task Order</title>
+      <content>
+        1. Create HashOnlyCapturePayload model and related structs (Task 1, 2)
+        2. Create CaptureMode enum (Task 5)
+        3. Extend CaptureData with privacy mode fields (Task 4)
+        4. Create MetadataFilterService (Task 3)
+        5. Create HashOnlyPayloadBuilder (Task 7)
+        6. Integrate DepthAnalysisService into capture flow (Task 6)
+        7. Modify CaptureViewModel for privacy mode branch (Task 8)
+        8. Update assertion generation (Task 9)
+        9. Create HashOnlyCaptureData wrapper if needed (Task 10)
+        10. Unit and integration tests (Tasks 11, 12)
+      </content>
+    </note>
+
+    <note priority="high" category="payload-structure">
+      <title>HashOnlyCapturePayload Structure</title>
+      <content>
+        ```swift
+        struct HashOnlyCapturePayload: Codable, Sendable, Equatable {
+            let captureMode: String // "hash_only"
+            let mediaHash: String   // SHA-256 hex (64 chars)
+            let mediaType: String   // "photo"
+            let depthAnalysis: DepthAnalysisResult
+            let metadata: FilteredMetadata
+            let metadataFlags: MetadataFlags
+            let capturedAt: Date
+            var assertion: String   // Base64, set after signing
+
+            // Video-specific (optional, nil for photos)
+            let hashChain: HashChainData?
+            let frameCount: Int?
+            let durationMs: Int?
+        }
+        ```
+      </content>
+    </note>
+
+    <note priority="high" category="metadata-filtering">
+      <title>Metadata Filtering Logic</title>
+      <content>
+        Location filtering:
+        - .none -> nil
+        - .coarse -> FilteredLocation(city: "San Francisco", country: "US")
+        - .precise -> FilteredLocation(latitude: lat, longitude: lng)
+
+        Timestamp filtering:
+        - .none -> nil
+        - .dayOnly -> "2025-12-01" (ISO8601 date only)
+        - .exact -> "2025-12-01T10:30:00Z" (full ISO8601)
+
+        Device info filtering:
+        - .none -> nil
+        - .modelOnly -> "iPhone 15 Pro"
+        - .full -> "iPhone 15 Pro / iOS 18.1 / 1.0.0"
+      </content>
+    </note>
+
+    <note priority="high" category="capture-flow">
+      <title>CaptureViewModel Privacy Mode Flow</title>
+      <content>
+        ```swift
+        func performCapture() async {
+            let frame = captureSession.captureCurrentFrame()
+            let captureData = try await frameProcessor.process(frame, location: location)
+
+            if privacySettings.isPrivacyModeEnabled {
+                // Privacy mode: client-side analysis + hash-only payload
+                let depthAnalysis = await DepthAnalysisService.shared.analyze(
+                    depthMap: frame.sceneDepth?.depthMap
+                )
+
+                let payload = HashOnlyPayloadBuilder.build(
+                    from: captureData,
+                    privacySettings: privacySettings.settings,
+                    depthAnalysis: depthAnalysis
+                )
+
+                // Sign payload
+                let hash = CryptoService.sha256Data(payloadJSON)
+                let assertion = try await assertionService.generateAssertion(for: hash)
+                payload.assertion = assertion.base64EncodedString()
+
+                // Save full media locally, upload only payload
+                await saveLocalCapture(captureData)
+                await uploadHashOnlyPayload(payload)
+            } else {
+                // Full mode: existing flow
+                await saveAndUpload(captureData)
+            }
+        }
+        ```
+      </content>
+    </note>
+
+    <note priority="medium" category="reverse-geocoding">
+      <title>Coarse Location Implementation</title>
+      <content>
+        For locationLevel.coarse, need reverse geocoding to get city/country from coordinates.
+        Use CLGeocoder.reverseGeocodeLocation() with result.locality and result.isoCountryCode.
+        Consider caching geocode results to avoid rate limits.
+        May run async - handle gracefully if geocoding fails (fall back to nil).
+      </content>
+    </note>
+
+    <note priority="medium" category="story-8-2-integration">
+      <title>Learnings from Story 8-1 and 8-2</title>
+      <content>
+        1. DepthAnalysisService is ready - use shared.analyze() directly
+        2. PrivacySettingsManager uses @EnvironmentObject - inject into CaptureViewModel
+        3. Enum raw values use snake_case ("hash_only", "day_only", "model_only")
+        4. DepthAnalysisResult.unavailable() for graceful failures
+        5. @MainActor for CaptureViewModel - depth analysis runs async on background queue
+        6. Clear UserDefaults before tests for isolation
+      </content>
+    </note>
+
+  </implementation-notes>
+
+  <!-- ============================================== -->
+  <!-- FILES TO CREATE                                -->
+  <!-- ============================================== -->
+  <files-to-create>
+    <file path="ios/Rial/Models/HashOnlyCapturePayload.swift">
+      HashOnlyCapturePayload struct, FilteredMetadata struct, FilteredLocation struct, MetadataFlags struct.
+      All Codable, Sendable, Equatable.
+    </file>
+    <file path="ios/Rial/Core/Capture/MetadataFilterService.swift">
+      MetadataFilterService with filterLocation, filterTimestamp, filterDeviceInfo methods.
+      Static methods for stateless filtering.
+    </file>
+    <file path="ios/Rial/Core/Capture/HashOnlyPayloadBuilder.swift">
+      HashOnlyPayloadBuilder with build(from:privacySettings:depthAnalysis:) method.
+      Coordinates filtering and payload construction.
+    </file>
+    <file path="ios/RialTests/Models/HashOnlyCapturePayloadTests.swift">
+      Unit tests for payload encoding/decoding, size verification.
+    </file>
+    <file path="ios/RialTests/Capture/MetadataFilterServiceTests.swift">
+      Unit tests for all 9 filtering combinations.
+    </file>
+    <file path="ios/RialTests/Capture/HashOnlyPayloadBuilderTests.swift">
+      Unit tests for payload construction.
+    </file>
+  </files-to-create>
+
+  <!-- ============================================== -->
+  <!-- FILES TO MODIFY                                -->
+  <!-- ============================================== -->
+  <files-to-modify>
+    <file path="ios/Rial/Models/CaptureData.swift">
+      Add optional fields: depthAnalysisResult, captureMode, privacySettings.
+      Add CaptureMode enum (.full, .hashOnly).
+      Maintain backward compatibility.
+    </file>
+    <file path="ios/Rial/Features/Capture/CaptureViewModel.swift">
+      Add PrivacySettingsManager injection.
+      Modify performCapture() with privacy mode branch.
+      Add hash-only payload upload path.
+    </file>
+    <file path="ios/Rial/Core/Attestation/CaptureAssertionService.swift">
+      May need to add createAssertion(for payload: HashOnlyCapturePayload) method,
+      OR use existing generateAssertion(for hash: Data) with serialized payload hash.
+    </file>
+    <file path="ios/Rial.xcodeproj/project.pbxproj">
+      Add new files to Xcode project.
+    </file>
+  </files-to-modify>
+
+  <!-- ============================================== -->
+  <!-- VALIDATION CHECKLIST                           -->
+  <!-- ============================================== -->
+  <validation-checklist>
+    <item>HashOnlyCapturePayload serializes to valid JSON with snake_case field names</item>
+    <item>Payload size is less than 10KB when serialized</item>
+    <item>All three location filtering levels work correctly</item>
+    <item>All three timestamp filtering levels work correctly</item>
+    <item>All three device info filtering levels work correctly</item>
+    <item>CaptureData with new optional fields encodes/decodes correctly</item>
+    <item>Existing CaptureData without new fields still works (backward compat)</item>
+    <item>CaptureViewModel correctly detects privacy mode</item>
+    <item>Depth analysis runs and results stored in payload</item>
+    <item>Depth analysis failure falls back gracefully</item>
+    <item>Assertion is generated over serialized payload hash</item>
+    <item>Full media retained locally after hash-only upload</item>
+    <item>Unit tests pass for all new code</item>
+  </validation-checklist>
+
+</story-context>

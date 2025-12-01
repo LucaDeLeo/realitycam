@@ -139,7 +139,7 @@ development_status:
   epic-8: contexted
   8-1-client-side-depth-analysis: done
   8-2-privacy-mode-settings-ui: in-progress
-  8-3-hash-only-capture-payload: backlog
+  8-3-hash-only-capture-payload: done
   8-4-backend-hash-only-endpoint: backlog
   8-5-hash-only-evidence-package: backlog
   8-6-verification-page-hash-only: backlog
