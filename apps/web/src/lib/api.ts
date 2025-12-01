@@ -275,3 +275,19 @@ export function formatDate(dateString: string): string {
     return dateString;
   }
 }
+
+/**
+ * Format date for day-only display (privacy mode)
+ */
+export function formatDateDayOnly(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  } catch {
+    return dateString;
+  }
+}

@@ -51,6 +51,16 @@ export interface ProcessingInfo {
   backend_version: string;
 }
 
+/** Metadata privacy flags for hash-only captures (Story 8-6) */
+export interface MetadataFlags {
+  location_included: boolean;
+  location_level: 'none' | 'coarse' | 'precise';
+  timestamp_included: boolean;
+  timestamp_level: 'none' | 'day_only' | 'exact';
+  device_info_included: boolean;
+  device_info_level: 'none' | 'model_only' | 'full';
+}
+
 /** Complete evidence package for a capture (Story 4-7) */
 export interface Evidence {
   hardware_attestation: HardwareAttestation;

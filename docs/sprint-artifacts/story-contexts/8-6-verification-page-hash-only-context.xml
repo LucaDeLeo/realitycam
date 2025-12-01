@@ -1,0 +1,478 @@
+<story-context id="8-6-verification-page-hash-only" v="1.0">
+  <metadata>
+    <epicId>8</epicId>
+    <storyId>8-6</storyId>
+    <title>Verification Page Hash-Only Display</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-01</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/8-6-verification-page-hash-only.md</sourceStoryPath>
+  </metadata>
+
+  <story>
+    <asA>verifier</asA>
+    <iWant>to see clear indication when viewing a hash-only capture</iWant>
+    <soThat>I understand the media is not stored but hash is verified via device attestation</soThat>
+    <tasks>
+      <task id="1">Add hash-only types to page interface (AC: #1, #5)</task>
+      <task id="2">Create PrivacyModeBadge component (AC: #1)</task>
+      <task id="3">Create HashOnlyMediaPlaceholder component (AC: #2, #5)</task>
+      <task id="4">Update verification page for hash-only mode (AC: #1, #2, #3, #4, #5)</task>
+      <task id="5">Update EvidencePanel for device analysis source (AC: #3)</task>
+      <task id="6">Add demo route for hash-only captures (AC: #6)</task>
+      <task id="7">Update shared types for hash-only (AC: #4)</task>
+      <task id="8">Add E2E tests for hash-only verification (AC: all)</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1" title="Privacy Mode Badge Display">
+      Given a verification URL for a hash-only capture (capture_mode: "hash_only")
+      When the page loads
+      Then:
+      1. A "Privacy Mode" badge is displayed prominently near the confidence badge
+      2. Badge is visually distinct (e.g., shield icon with "Privacy Mode" text)
+      3. Badge includes tooltip: "Media verified via device attestation - original not stored"
+      4. Badge styling consistent with app design system
+    </criterion>
+    <criterion id="AC2" title="Hash-Only Media Section (No Preview)">
+      Given a hash-only capture (no photo_url or video_url)
+      When the media section renders
+      Then:
+      1. No broken image or video placeholder shown
+      2. Shows "Hash Verified" placeholder with lock/shield icon
+      3. Displays message: "Original media not stored on server"
+      4. Shows message: "Authenticity verified via device attestation"
+      5. No "Download" or "View Full Size" buttons displayed
+    </criterion>
+    <criterion id="AC3" title="Depth Analysis Source Indicator">
+      Given a hash-only capture with analysis_source: "device"
+      When the evidence panel renders
+      Then:
+      1. LiDAR Depth Analysis row shows "(computed on device)" suffix
+      2. Status shows the depth analysis result (pass/fail)
+      3. Value shows "Real 3D scene - Device analysis" for passing analysis
+      4. Clear differentiation from server-analyzed captures
+    </criterion>
+    <criterion id="AC4" title="Metadata Flags Display">
+      Given a hash-only capture with metadata_flags in evidence
+      When the verification summary renders
+      Then:
+      1. Location shows value based on location_level (none/coarse/precise)
+      2. Timestamp shows value based on timestamp_level (none/day_only/exact)
+      3. Device shows value based on device_info_level (none/model_only/full)
+    </criterion>
+    <criterion id="AC5" title="Graceful Handling of Missing Media">
+      Given a hash-only capture response from API
+      When response has media_url: null and media_stored: false
+      Then:
+      1. No 404 errors in console from missing media requests
+      2. No broken image icons displayed
+      3. ImagePlaceholder/VideoPlaceholder components not shown
+      4. Hash-only specific UI displayed instead
+    </criterion>
+    <criterion id="AC6" title="Demo Route for Hash-Only Captures">
+      Given the demo routes exist for testing
+      When user navigates to /verify/demo-hash-only
+      Then:
+      1. Demo data shows hash-only capture with Privacy Mode badge
+      2. All metadata flags visible with various levels
+      3. Device analysis source shown in evidence panel
+      4. No media preview section (hash-only placeholder shown)
+    </criterion>
+  </acceptanceCriteria>
+
+  <artifacts>
+    <docs>
+      <artifact path="docs/sprint-artifacts/stories/8-6-verification-page-hash-only.md">
+        <description>Story definition with all acceptance criteria, tasks, and dev notes including type extensions and component patterns</description>
+        <relevance>Primary source of truth for implementation requirements</relevance>
+      </artifact>
+      <artifact path="docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-8.md">
+        <description>Epic 8 technical specification covering privacy-first capture mode architecture, API contracts, and acceptance criteria</description>
+        <relevance>Defines hash-only API response format (lines 404-438), evidence package schema with analysis_source and metadata_flags (lines 322-344), and Story 8.6 acceptance criteria (lines 658-666)</relevance>
+      </artifact>
+      <artifact path="docs/architecture.md">
+        <description>System architecture document with ADR-011 for client-side depth analysis for privacy mode</description>
+        <relevance>ADR-011 (lines 1067-1121) explains trust model for device-computed analysis and metadata_flags concept</relevance>
+      </artifact>
+      <artifact path="docs/prd.md">
+        <description>Product requirements document</description>
+        <relevance>FR61: Verification page displays "Hash Verified" with note about device attestation</relevance>
+      </artifact>
+    </docs>
+
+    <code>
+      <!-- Primary file to modify -->
+      <artifact path="apps/web/src/app/verify/[id]/page.tsx" action="modify">
+        <description>Main verification page component - handles photo and video display with evidence panel. Already has demo routes pattern (demo, demo-video, demo-video-partial)</description>
+        <relevance>PRIMARY FILE TO MODIFY - Add hash-only detection, PrivacyModeBadge, HashOnlyMediaPlaceholder, update evidence items for device source, handle metadata flags, add demo-hash-only route</relevance>
+        <existingPatterns>
+          - CapturePublicData interface with evidence types inline (lines 174-250)
+          - Demo data constants (DEMO_CAPTURE, DEMO_VIDEO_CAPTURE, DEMO_PARTIAL_VIDEO_CAPTURE)
+          - Evidence items array built based on capture type (isVideo)
+          - Conditional rendering for video vs photo media sections
+        </existingPatterns>
+        <keyInterfaceExtensions>
+          Add to CapturePublicData:
+          - capture_mode?: 'full' | 'hash_only'
+          - media_stored?: boolean
+          - media_hash?: string
+          Add to evidence:
+          - analysis_source?: 'server' | 'device'
+          - metadata_flags?: MetadataFlags
+        </keyInterfaceExtensions>
+      </artifact>
+
+      <!-- Evidence components -->
+      <artifact path="apps/web/src/components/Evidence/ConfidenceBadge.tsx" action="reference">
+        <description>Color-coded confidence level badge component</description>
+        <relevance>Reference for PrivacyModeBadge styling - follow same pattern with purple color scheme</relevance>
+        <stylingPattern>
+          - Uses inline-flex items-center px-3 py-1 rounded-full text-xs/sm font-semibold
+          - Color mappings via Record type
+          - role="status" for accessibility
+          - data-testid for testing
+        </stylingPattern>
+      </artifact>
+
+      <artifact path="apps/web/src/components/Evidence/EvidencePanel.tsx" action="reference">
+        <description>Expandable panel showing verification evidence details</description>
+        <relevance>Accepts items array - build hash-only specific items with device analysis source indicator. May need to support longer value text for device analysis suffix.</relevance>
+        <interface>
+          interface EvidenceItem {
+            label: string;
+            status: ExtendedEvidenceStatus;
+            value?: string;
+          }
+        </interface>
+      </artifact>
+
+      <artifact path="apps/web/src/components/Evidence/EvidenceRow.tsx" action="reference">
+        <description>Individual row in evidence panel with status icon and value</description>
+        <relevance>Understand value display pattern - status text or custom value string</relevance>
+        <behavior>If value prop provided, displays value; otherwise displays getStatusText(status)</behavior>
+      </artifact>
+
+      <artifact path="apps/web/src/components/Evidence/PartialVideoBanner.tsx" action="reference">
+        <description>Banner component for partial video captures</description>
+        <relevance>Pattern reference for creating informational banners - similar approach may be useful for privacy mode explanation</relevance>
+      </artifact>
+
+      <!-- Media components -->
+      <artifact path="apps/web/src/components/Media/ImagePlaceholder.tsx" action="reference">
+        <description>Placeholder for image thumbnails with shimmer animation</description>
+        <relevance>Reference for HashOnlyMediaPlaceholder design - use similar aspect ratio handling but different visual treatment (shield/lock icon, explanatory text)</relevance>
+        <aspectRatioPattern>
+          const aspectRatioClasses: Record&lt;string, string&gt; = {
+            square: 'aspect-square',
+            '4:3': 'aspect-[4/3]',
+            '16:9': 'aspect-video',
+            '3:4': 'aspect-[3/4]',
+          };
+        </aspectRatioPattern>
+      </artifact>
+
+      <artifact path="apps/web/src/components/Media/VideoPlayer.tsx" action="reference">
+        <description>HTML5 video player and VideoPlaceholder components</description>
+        <relevance>Reference for aspect ratio handling in video placeholder, understand what NOT to show for hash-only</relevance>
+      </artifact>
+
+      <!-- New components to create -->
+      <artifact path="apps/web/src/components/Evidence/PrivacyModeBadge.tsx" action="create">
+        <description>NEW COMPONENT - Badge indicating Privacy Mode capture</description>
+        <relevance>Shield icon + "Privacy Mode" text, purple color scheme, tooltip with explanation</relevance>
+        <designSpec>
+          - Similar structure to ConfidenceBadge
+          - Purple color: bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300
+          - Shield icon (heroicons ShieldCheckIcon or inline SVG)
+          - title attribute for tooltip
+          - data-testid="privacy-mode-badge"
+        </designSpec>
+      </artifact>
+
+      <artifact path="apps/web/src/components/Media/HashOnlyMediaPlaceholder.tsx" action="create">
+        <description>NEW COMPONENT - Placeholder for hash-only captures where media is not stored</description>
+        <relevance>Displays lock icon, "Hash Verified" heading, explanatory text about device attestation trust model</relevance>
+        <designSpec>
+          - Support 4:3 and 16:9 aspect ratios
+          - Lock/shield icon centered
+          - "Hash Verified" heading
+          - "Original media not stored on server" message
+          - "Authenticity verified via device attestation" subtext
+          - zinc background matching existing placeholders
+          - data-testid="hash-only-placeholder"
+        </designSpec>
+      </artifact>
+
+      <!-- Shared types -->
+      <artifact path="packages/shared/src/types/evidence.ts" action="extend">
+        <description>Shared TypeScript types for evidence</description>
+        <relevance>Add MetadataFlags interface for type consistency across web app. Note: Story 8-6 allows inline types in page.tsx for now (consistent with video types pattern)</relevance>
+        <proposedAdditions>
+          export interface MetadataFlags {
+            location_included: boolean;
+            location_level: 'none' | 'coarse' | 'precise';
+            timestamp_included: boolean;
+            timestamp_level: 'none' | 'day_only' | 'exact';
+            device_info_included: boolean;
+            device_info_level: 'none' | 'model_only' | 'full';
+          }
+        </proposedAdditions>
+      </artifact>
+
+      <!-- API client -->
+      <artifact path="apps/web/src/lib/api.ts" action="reference">
+        <description>API client for web app - getCapturePublic fetches from /api/v1/verify/{id}</description>
+        <relevance>CapturePublicData interface may need optional hash-only fields, but page.tsx uses its own interface so minimal changes needed here</relevance>
+      </artifact>
+
+      <!-- Status utilities -->
+      <artifact path="apps/web/src/lib/status.ts" action="reference">
+        <description>Status mapping utilities - mapToEvidenceStatus, getStatusText</description>
+        <relevance>Use existing status mapping for evidence items, no changes needed</relevance>
+      </artifact>
+    </code>
+
+    <dependencies>
+      <artifact type="npm" name="@heroicons/react" version="^2.0.0">
+        <description>Heroicons React components for shield/lock icons</description>
+        <relevance>May already be installed - check package.json. If not, use inline SVG instead.</relevance>
+        <alternative>Inline SVG icons following existing pattern in ImagePlaceholder and EvidenceRow</alternative>
+      </artifact>
+      <artifact type="internal" name="@realitycam/shared">
+        <description>Shared types package</description>
+        <relevance>Evidence types - extend or reference for MetadataFlags</relevance>
+      </artifact>
+    </dependencies>
+  </artifacts>
+
+  <constraints>
+    <constraint type="architecture" source="ADR-011">
+      Client-side depth analysis is trusted due to DCAppAttest assertion. Hash-only captures achieve same confidence as full captures - do NOT show any "degraded" or "partial" indicators for privacy mode.
+    </constraint>
+    <constraint type="api-contract" source="tech-spec-epic-8.md">
+      Hash-only API response format (GET /captures/{id}):
+      - capture_mode: "hash_only"
+      - media_stored: false
+      - media_url: null
+      - media_hash: "abc123..." (SHA-256 hex)
+      - evidence.analysis_source: "device"
+      - evidence.metadata_flags: { location_level, timestamp_level, device_info_level }
+    </constraint>
+    <constraint type="detection-logic" source="story-8-6">
+      Use media_stored === false as primary detection (not just checking for null media_url which could be null for other reasons):
+      const isHashOnly = capture?.capture_mode === 'hash_only';
+      const hasMedia = capture?.media_stored !== false;
+    </constraint>
+    <constraint type="design-system" source="existing-components">
+      Follow existing component patterns:
+      - Purple color scheme for Privacy Mode (distinct from green/yellow/orange/red confidence colors)
+      - Use inline SVG icons (not external icon library) per existing pattern
+      - Support dark mode with dark: prefixed classes
+      - Include data-testid attributes for E2E tests
+    </constraint>
+    <constraint type="messaging" source="tech-spec-epic-8.md">
+      Trust model messaging must emphasize: "trust comes from DCAppAttest assertion verification" - hash-only is equally trustworthy, not a degraded experience.
+    </constraint>
+    <constraint type="demo-route-pattern" source="page.tsx">
+      Follow existing demo route pattern:
+      - Add DEMO_HASH_ONLY_CAPTURE constant
+      - Handle 'demo-hash-only' case in page component
+      - Include all hash-only specific fields
+    </constraint>
+  </constraints>
+
+  <interfaces>
+    <interface name="CapturePublicData (Extended)">
+      <source>apps/web/src/app/verify/[id]/page.tsx</source>
+      <description>Main data interface for verification page - extend with hash-only fields</description>
+      <definition>
+interface CapturePublicData {
+  capture_id: string;
+  confidence_level: string;
+  captured_at: string;
+  uploaded_at: string;
+  location_coarse?: string;
+  evidence: {
+    type?: string; // 'photo' | 'video'
+    hardware_attestation: { ... };
+    depth_analysis: { ... };
+    metadata: { ... };
+    processing: { ... };
+    // Video-specific
+    hash_chain?: HashChainEvidence;
+    video_depth_analysis?: DepthAnalysisEvidence;
+    partial_attestation?: PartialAttestationInfo;
+    duration_ms?: number;
+    frame_count?: number;
+    // NEW: Hash-only specific (Story 8-6)
+    analysis_source?: 'server' | 'device';
+    metadata_flags?: MetadataFlags;
+  };
+  photo_url?: string;
+  video_url?: string;
+  depth_map_url?: string;
+  // NEW: Hash-only specific (Story 8-6)
+  capture_mode?: 'full' | 'hash_only';
+  media_stored?: boolean;
+  media_hash?: string;
+}
+      </definition>
+    </interface>
+
+    <interface name="MetadataFlags">
+      <source>tech-spec-epic-8.md, story-8-6</source>
+      <description>Flags indicating what metadata was included with privacy-controlled levels</description>
+      <definition>
+interface MetadataFlags {
+  location_included: boolean;
+  location_level: 'none' | 'coarse' | 'precise';
+  timestamp_included: boolean;
+  timestamp_level: 'none' | 'day_only' | 'exact';
+  device_info_included: boolean;
+  device_info_level: 'none' | 'model_only' | 'full';
+}
+      </definition>
+    </interface>
+
+    <interface name="PrivacyModeBadgeProps">
+      <description>Props for new PrivacyModeBadge component</description>
+      <definition>
+interface PrivacyModeBadgeProps {
+  className?: string;
+}
+      </definition>
+    </interface>
+
+    <interface name="HashOnlyMediaPlaceholderProps">
+      <description>Props for new HashOnlyMediaPlaceholder component</description>
+      <definition>
+interface HashOnlyMediaPlaceholderProps {
+  aspectRatio?: '4:3' | '16:9';
+  className?: string;
+}
+      </definition>
+    </interface>
+  </interfaces>
+
+  <tests>
+    <standards>
+      <standard name="Playwright E2E" location="apps/web/tests/e2e/">
+        <description>E2E tests using Playwright for browser testing</description>
+        <conventions>
+          - Test files named *.spec.ts
+          - Use data-testid attributes for element selection
+          - Tests run against demo routes (no backend required)
+          - Multi-browser support (Chromium, Firefox, WebKit)
+        </conventions>
+      </standard>
+      <standard name="Vitest Unit" location="apps/web/src/**/__tests__/">
+        <description>Unit tests for lib utilities and React components</description>
+        <conventions>
+          - Test files in __tests__ directories
+          - Use React Testing Library for component tests
+          - Mock Next.js router and external dependencies
+        </conventions>
+      </standard>
+    </standards>
+
+    <locations>
+      <location path="apps/web/tests/e2e/">E2E test specs - add hash-only verification tests</location>
+      <location path="apps/web/src/components/Evidence/__tests__/">Unit tests for Evidence components (if exists)</location>
+      <location path="apps/web/src/components/Media/__tests__/">Unit tests for Media components (if exists)</location>
+    </locations>
+
+    <ideas>
+      <idea id="E2E-1" priority="high">Test Privacy Mode badge visibility on /verify/demo-hash-only route</idea>
+      <idea id="E2E-2" priority="high">Test HashOnlyMediaPlaceholder renders instead of image/video</idea>
+      <idea id="E2E-3" priority="high">Test evidence panel shows device analysis source text</idea>
+      <idea id="E2E-4" priority="medium">Test metadata flags display with various levels (coarse location, day_only timestamp)</idea>
+      <idea id="E2E-5" priority="medium">Test no console errors for missing media URLs</idea>
+      <idea id="E2E-6" priority="medium">Test demo-hash-only route accessibility (no 404)</idea>
+      <idea id="UNIT-1" priority="low">Unit test PrivacyModeBadge renders with correct styling</idea>
+      <idea id="UNIT-2" priority="low">Unit test HashOnlyMediaPlaceholder renders with both aspect ratios</idea>
+    </ideas>
+  </tests>
+
+  <implementationNotes>
+    <note category="learnings" source="Story 8-5">
+      Story 8-5 defined the exact API response format. Follow this contract exactly:
+      - capture_mode: "hash_only"
+      - media_stored: false
+      - media_url: null
+      - media_hash: SHA-256 hex string
+      - evidence.analysis_source: "device"
+      - evidence.metadata_flags: JSONB with level fields
+    </note>
+    <note category="learnings" source="Story 8-5">
+      Confidence calculation unchanged for hash-only - they get same HIGH confidence when all checks pass. Do NOT indicate degradation.
+    </note>
+    <note category="pattern" source="existing-code">
+      Video types were added inline in page.tsx (not shared package). Follow same pattern for hash-only types for consistency.
+    </note>
+    <note category="pattern" source="existing-code">
+      Demo routes pattern: Check id === 'demo-hash-only', return DEMO_HASH_ONLY_CAPTURE constant. No backend call needed.
+    </note>
+    <note category="ui" source="story-8-6">
+      PrivacyModeBadge should be placed next to ConfidenceBadge in the summary section, creating a visual pair of badges.
+    </note>
+    <note category="ui" source="story-8-6">
+      HashOnlyMediaPlaceholder should convey trust, not absence. Use lock/shield icon, not broken image. Messaging emphasizes verification via attestation.
+    </note>
+  </implementationNotes>
+
+  <demoDataTemplate>
+    <description>Demo data structure for /verify/demo-hash-only route</description>
+    <data>
+const DEMO_HASH_ONLY_CAPTURE: CapturePublicData = {
+  capture_id: 'demo-hash-only',
+  confidence_level: 'high',
+  capture_mode: 'hash_only',
+  media_stored: false,
+  media_hash: 'a1b2c3d4e5f6789abcdef0123456789abcdef0123456789abcdef0123456789a',
+  captured_at: new Date().toISOString(),
+  uploaded_at: new Date().toISOString(),
+  location_coarse: 'San Francisco, CA',
+  evidence: {
+    type: 'photo',
+    analysis_source: 'device',
+    hardware_attestation: {
+      status: 'pass',
+      level: 'full',
+      verified: true,
+      device_model: 'iPhone 15 Pro',
+    },
+    depth_analysis: {
+      status: 'pass',
+      is_likely_real_scene: true,
+      depth_layers: 38,
+      depth_variance: 0.68,
+    },
+    metadata_flags: {
+      location_included: true,
+      location_level: 'coarse',
+      timestamp_included: true,
+      timestamp_level: 'day_only',
+      device_info_included: true,
+      device_info_level: 'model_only',
+    },
+    metadata: {
+      timestamp_valid: true,
+      timestamp_delta_seconds: 0,
+      model_verified: true,
+      model_name: 'iPhone 15 Pro',
+      location_available: true,
+      location_opted_out: false,
+    },
+    processing: {
+      processed_at: new Date().toISOString(),
+      processing_time_ms: 125,
+      version: '1.0.0',
+    },
+  },
+  // Note: photo_url and video_url intentionally omitted for hash-only
+};
+    </data>
+  </demoDataTemplate>
+</story-context>

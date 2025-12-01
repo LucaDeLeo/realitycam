@@ -4,9 +4,11 @@ import { notFound } from 'next/navigation';
 import { ConfidenceBadge } from '@/components/Evidence/ConfidenceBadge';
 import { EvidencePanel } from '@/components/Evidence/EvidencePanel';
 import { PartialVideoBanner } from '@/components/Evidence/PartialVideoBanner';
+import { PrivacyModeBadge } from '@/components/Evidence/PrivacyModeBadge';
 import { ImagePlaceholder } from '@/components/Media/ImagePlaceholder';
+import { HashOnlyMediaPlaceholder } from '@/components/Media/HashOnlyMediaPlaceholder';
 import { VideoPlayer, VideoPlaceholder } from '@/components/Media/VideoPlayer';
-import { apiClient, formatDate, type ConfidenceLevel, type CheckStatus } from '@/lib/api';
+import { apiClient, formatDate, formatDateDayOnly, type ConfidenceLevel, type CheckStatus } from '@/lib/api';
 import { mapToEvidenceStatus } from '@/lib/status';
 
 interface VerifyPageProps {
@@ -170,6 +172,56 @@ const DEMO_PARTIAL_VIDEO_CAPTURE: CapturePublicData = {
   video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
 };
 
+// Demo data for hash-only capture (Story 8-6)
+const DEMO_HASH_ONLY_CAPTURE: CapturePublicData = {
+  capture_id: 'demo-hash-only',
+  confidence_level: 'high',
+  capture_mode: 'hash_only',
+  media_stored: false,
+  media_hash: 'a1b2c3d4e5f6789abcdef0123456789abcdef0123456789abcdef0123456789a',
+  captured_at: new Date().toISOString(),
+  uploaded_at: new Date().toISOString(),
+  location_coarse: 'San Francisco, CA',
+  evidence: {
+    type: 'photo',
+    analysis_source: 'device',
+    hardware_attestation: {
+      status: 'pass',
+      level: 'full',
+      verified: true,
+      device_model: 'iPhone 15 Pro',
+    },
+    depth_analysis: {
+      status: 'pass',
+      is_likely_real_scene: true,
+      depth_layers: 38,
+      depth_variance: 0.68,
+    },
+    metadata_flags: {
+      location_included: true,
+      location_level: 'coarse',
+      timestamp_included: true,
+      timestamp_level: 'day_only',
+      device_info_included: true,
+      device_info_level: 'model_only',
+    },
+    metadata: {
+      timestamp_valid: true,
+      timestamp_delta_seconds: 0,
+      model_verified: true,
+      model_name: 'iPhone 15 Pro',
+      location_available: true,
+      location_opted_out: false,
+    },
+    processing: {
+      processed_at: new Date().toISOString(),
+      processing_time_ms: 125,
+      version: '1.0.0',
+    },
+  },
+  // Note: photo_url and video_url intentionally omitted for hash-only
+};
+
 // Video-specific evidence types (Story 7-13)
 interface HashChainEvidence {
   status: string; // 'pass' | 'partial' | 'fail'
@@ -197,6 +249,16 @@ interface PartialAttestationInfo {
   verified_frames: number;
   total_frames: number;
   reason?: string;
+}
+
+// Hash-only metadata privacy flags (Story 8-6)
+interface MetadataFlags {
+  location_included: boolean;
+  location_level: 'none' | 'coarse' | 'precise';
+  timestamp_included: boolean;
+  timestamp_level: 'none' | 'day_only' | 'exact';
+  device_info_included: boolean;
+  device_info_level: 'none' | 'model_only' | 'full';
 }
 
 interface CapturePublicData {
@@ -243,10 +305,17 @@ interface CapturePublicData {
     partial_attestation?: PartialAttestationInfo;
     duration_ms?: number;
     frame_count?: number;
+    // Hash-only specific fields (Story 8-6)
+    analysis_source?: 'server' | 'device';
+    metadata_flags?: MetadataFlags;
   };
   photo_url?: string;
   video_url?: string;
   depth_map_url?: string;
+  // Hash-only specific fields (Story 8-6)
+  capture_mode?: 'full' | 'hash_only';
+  media_stored?: boolean;
+  media_hash?: string;
 }
 
 // Helper to format video duration
@@ -272,6 +341,8 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
     capture = DEMO_VIDEO_CAPTURE;
   } else if (id === 'demo-video-partial') {
     capture = DEMO_PARTIAL_VIDEO_CAPTURE;
+  } else if (id === 'demo-hash-only') {
+    capture = DEMO_HASH_ONLY_CAPTURE;
   } else {
     // Fetch capture data from backend
     const response = await apiClient.getCapturePublic(id);
@@ -283,8 +354,10 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
     notFound();
   }
 
-  // Detect if this is a video capture
+  // Detect capture type and modes
   const isVideo = capture?.evidence?.type === 'video';
+  const isHashOnly = capture?.capture_mode === 'hash_only';
+  const hasMedia = capture?.media_stored !== false;
   const mediaType = isVideo ? 'Video' : 'Photo';
 
   // Build evidence items based on capture type
@@ -353,7 +426,9 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
 
       evidenceItems = items;
     } else {
-      // Photo evidence items (existing logic)
+      // Photo evidence items (existing logic + hash-only support)
+      const isDeviceAnalysis = capture.evidence.analysis_source === 'device';
+
       evidenceItems = [
         {
           label: 'Hardware Attestation',
@@ -361,9 +436,11 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
           value: capture.evidence.hardware_attestation?.device_model || undefined,
         },
         {
-          label: 'LiDAR Depth Analysis',
+          label: isDeviceAnalysis ? 'LiDAR Depth Analysis (Device)' : 'LiDAR Depth Analysis',
           status: mapToEvidenceStatus(capture.evidence.depth_analysis?.status),
-          value: capture.evidence.depth_analysis?.is_likely_real_scene ? 'Real 3D scene detected' : 'Analysis complete',
+          value: capture.evidence.depth_analysis?.is_likely_real_scene
+            ? (isDeviceAnalysis ? 'Real 3D scene - Device analysis' : 'Real 3D scene detected')
+            : 'Analysis complete',
         },
         {
           label: 'Timestamp',
@@ -445,7 +522,10 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
                 <h2 className="text-sm font-semibold text-zinc-900 dark:text-white uppercase tracking-wide mb-4">
                   Captured {mediaType}
                 </h2>
-                {isVideo ? (
+                {isHashOnly || !hasMedia ? (
+                  // Hash-only placeholder (Story 8-6)
+                  <HashOnlyMediaPlaceholder aspectRatio={isVideo ? '16:9' : '4:3'} />
+                ) : isVideo ? (
                   // Video Player (Story 7-13)
                   capture?.video_url ? (
                     <VideoPlayer src={capture.video_url} aspectRatio="16:9" />
@@ -476,13 +556,14 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
                   Verification Summary
                 </h2>
 
-                {/* Confidence Badge */}
+                {/* Confidence Badge and Privacy Mode Badge */}
                 <div className="mb-6" data-testid="confidence-score">
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
                     Confidence Level
                   </p>
-                  <div data-testid="verification-status">
+                  <div className="flex flex-wrap gap-2" data-testid="verification-status">
                     <ConfidenceBadge level={capture?.confidence_level as ConfidenceLevel || 'pending'} />
+                    {isHashOnly && <PrivacyModeBadge />}
                   </div>
                 </div>
 
@@ -514,7 +595,14 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
                       Captured At
                     </p>
                     <p className="text-sm text-zinc-700 dark:text-zinc-300">
-                      {capture?.captured_at ? (
+                      {/* Check metadata_flags.timestamp_level for privacy mode (AC4) */}
+                      {capture?.evidence?.metadata_flags?.timestamp_level === 'none' ? (
+                        <span className="text-zinc-400 dark:text-zinc-500 italic">
+                          Not included
+                        </span>
+                      ) : capture?.evidence?.metadata_flags?.timestamp_level === 'day_only' && capture?.captured_at ? (
+                        formatDateDayOnly(capture.captured_at)
+                      ) : capture?.captured_at ? (
                         formatDate(capture.captured_at)
                       ) : (
                         <span className="text-zinc-400 dark:text-zinc-500 italic">
@@ -529,7 +617,14 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
                       Location
                     </p>
                     <p className="text-sm text-zinc-700 dark:text-zinc-300">
-                      {capture?.location_coarse ? (
+                      {/* Check metadata_flags.location_level for privacy mode (AC4) */}
+                      {capture?.evidence?.metadata_flags?.location_level === 'none' ? (
+                        <span className="text-zinc-400 dark:text-zinc-500 italic">
+                          Not included
+                        </span>
+                      ) : capture?.evidence?.metadata_flags?.location_level === 'coarse' && capture?.location_coarse ? (
+                        capture.location_coarse
+                      ) : capture?.location_coarse ? (
                         capture.location_coarse
                       ) : capture?.evidence?.metadata?.location_opted_out ? (
                         <span className="text-zinc-400 dark:text-zinc-500 italic">
@@ -548,7 +643,12 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
                       Device
                     </p>
                     <p className="text-sm text-zinc-700 dark:text-zinc-300">
-                      {capture?.evidence?.metadata?.model_name || capture?.evidence?.hardware_attestation?.device_model || (
+                      {/* Check metadata_flags.device_info_level for privacy mode (AC4) */}
+                      {capture?.evidence?.metadata_flags?.device_info_level === 'none' ? (
+                        <span className="text-zinc-400 dark:text-zinc-500 italic">
+                          Not included
+                        </span>
+                      ) : capture?.evidence?.metadata?.model_name || capture?.evidence?.hardware_attestation?.device_model || (
                         <span className="text-zinc-400 dark:text-zinc-500 italic">
                           Not available
                         </span>
