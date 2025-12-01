@@ -32,8 +32,8 @@ use crate::types::ApiResponse;
 // Configuration
 // ============================================================================
 
-/// Maximum file size for verification (20MB per PRD)
-const MAX_FILE_SIZE: usize = 20 * 1024 * 1024;
+/// Maximum file size for verification (50MB for hash-only per Story 8-7)
+const MAX_FILE_SIZE: usize = 50 * 1024 * 1024;
 
 // ============================================================================
 // Response Types
@@ -79,6 +79,35 @@ pub struct FileVerificationResponse {
 
     /// File hash (SHA-256, base64)
     pub file_hash: String,
+
+    // ========== Epic 8: Hash-Only Fields ==========
+    /// Capture mode: "full" or "hash_only" (Story 8-7)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capture_mode: Option<String>,
+
+    /// Whether media is stored on server (Story 8-7)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub media_stored: Option<bool>,
+
+    /// Media hash (hex format for display) (Story 8-7)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub media_hash: Option<String>,
+
+    /// Full evidence package (Story 8-7)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<serde_json::Value>,
+
+    /// Metadata privacy flags (Story 8-7)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata_flags: Option<serde_json::Value>,
+
+    /// Capture timestamp (Story 8-7)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub captured_at: Option<String>,
+
+    /// Media type: "photo" or "video" (Story 8-7)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub media_type: Option<String>,
 }
 
 /// Public capture details response (for web verification page)
@@ -187,13 +216,18 @@ async fn verify_file(
             request_id = %request_id,
             capture_id = %capture.id,
             confidence_level = %capture.confidence_level,
+            capture_mode = %capture.capture_mode,
+            media_stored = capture.media_stored,
             "File verified - match found in database"
         );
+
+        // Convert hash to hex for display
+        let media_hash_hex = hex::encode(&hash_bytes);
 
         let response = FileVerificationResponse {
             status: VerificationStatus::Verified,
             capture_id: Some(capture.id.to_string()),
-            confidence_level: Some(capture.confidence_level),
+            confidence_level: Some(capture.confidence_level.clone()),
             verification_url: Some(format!(
                 "{}/{}",
                 state.config.verification_base_url, capture.id
@@ -201,6 +235,14 @@ async fn verify_file(
             manifest_info: None,
             note: None,
             file_hash: hash_base64,
+            // Epic 8 fields
+            capture_mode: Some(capture.capture_mode.clone()),
+            media_stored: Some(capture.media_stored),
+            media_hash: Some(media_hash_hex),
+            evidence: capture.evidence,
+            metadata_flags: capture.metadata_flags,
+            captured_at: Some(capture.captured_at.to_rfc3339()),
+            media_type: Some(capture.capture_type),
         };
 
         return Ok(Json(ApiResponse::new(response, request_id)));
@@ -225,6 +267,14 @@ async fn verify_file(
                 .to_string(),
         ),
         file_hash: hash_base64,
+        // Epic 8 fields - all None for no match
+        capture_mode: None,
+        media_stored: None,
+        media_hash: None,
+        evidence: None,
+        metadata_flags: None,
+        captured_at: None,
+        media_type: None,
     };
 
     Ok(Json(ApiResponse::new(response, request_id)))
@@ -266,10 +316,17 @@ async fn parse_file_multipart(mut multipart: Multipart) -> Result<Vec<u8>, ApiEr
     ))
 }
 
-/// Database record for capture lookup
+/// Database record for capture lookup (uses FromRow for runtime query)
+#[derive(sqlx::FromRow)]
 struct CaptureRecord {
     id: Uuid,
     confidence_level: String,
+    capture_mode: String,
+    media_stored: bool,
+    evidence: Option<serde_json::Value>,
+    metadata_flags: Option<serde_json::Value>,
+    captured_at: chrono::DateTime<chrono::Utc>,
+    capture_type: String,
 }
 
 /// Looks up a capture by its target_media_hash
@@ -277,16 +334,17 @@ async fn lookup_capture_by_hash(
     pool: &PgPool,
     hash_bytes: &[u8],
 ) -> Result<Option<CaptureRecord>, ApiError> {
-    let record = sqlx::query_as!(
-        CaptureRecord,
+    // Use runtime query instead of query_as! macro to avoid SQLx cache issues
+    let record = sqlx::query_as::<_, CaptureRecord>(
         r#"
-        SELECT id, confidence_level
+        SELECT id, confidence_level, capture_mode, media_stored,
+               evidence, metadata_flags, captured_at, capture_type
         FROM captures
         WHERE target_media_hash = $1
         AND status = 'complete'
         "#,
-        hash_bytes
     )
+    .bind(hash_bytes)
     .fetch_optional(pool)
     .await
     .map_err(|e| {
@@ -418,7 +476,7 @@ mod tests {
 
     #[test]
     fn test_max_file_size() {
-        assert_eq!(MAX_FILE_SIZE, 20 * 1024 * 1024); // 20MB
+        assert_eq!(MAX_FILE_SIZE, 50 * 1024 * 1024); // 50MB (Story 8-7)
     }
 
     #[test]
@@ -431,12 +489,20 @@ mod tests {
             manifest_info: None,
             note: None,
             file_hash: "abc123".to_string(),
+            capture_mode: Some("hash_only".to_string()),
+            media_stored: Some(false),
+            media_hash: Some("def456".to_string()),
+            evidence: None,
+            metadata_flags: None,
+            captured_at: Some("2024-01-01T00:00:00Z".to_string()),
+            media_type: Some("photo".to_string()),
         };
 
         let json = serde_json::to_string(&response).unwrap();
         assert!(json.contains("\"verified\""));
         assert!(json.contains("\"capture_id\""));
         assert!(json.contains("\"confidence_level\""));
+        assert!(json.contains("\"hash_only\""));
         assert!(!json.contains("\"note\"")); // Should be skipped when None
     }
 
@@ -450,6 +516,13 @@ mod tests {
             manifest_info: None,
             note: Some("No provenance record found".to_string()),
             file_hash: "xyz789".to_string(),
+            capture_mode: None,
+            media_stored: None,
+            media_hash: None,
+            evidence: None,
+            metadata_flags: None,
+            captured_at: None,
+            media_type: None,
         };
 
         let json = serde_json::to_string(&response).unwrap();

@@ -125,6 +125,21 @@ export interface FileVerificationResponse {
     manifest_info?: C2paManifestInfo;
     note?: string;
     file_hash: string;
+    // Epic 8: Hash-Only Fields (Story 8-7)
+    capture_mode?: 'full' | 'hash_only';
+    media_stored?: boolean;
+    media_hash?: string;
+    evidence?: EvidencePackage;
+    metadata_flags?: {
+      location_included: boolean;
+      location_level: 'none' | 'coarse' | 'precise';
+      timestamp_included: boolean;
+      timestamp_level: 'none' | 'day_only' | 'exact';
+      device_info_included: boolean;
+      device_info_level: 'none' | 'model_only' | 'full';
+    };
+    captured_at?: string;
+    media_type?: 'photo' | 'video';
   };
   meta: {
     request_id: string;

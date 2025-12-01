@@ -143,6 +143,6 @@ development_status:
   8-4-backend-hash-only-endpoint: done
   8-5-hash-only-evidence-package: done
   8-6-verification-page-hash-only: done
-  8-7-file-verification-hash-only: backlog
+  8-7-file-verification-hash-only: done
   8-8-video-privacy-mode: backlog
   epic-8-retrospective: optional

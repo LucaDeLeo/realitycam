@@ -8,6 +8,7 @@ import {
   getConfidenceBadgeColor,
   type VerificationDisplayStatus,
 } from '@/lib/status';
+import { HashOnlyVerificationResult } from '@/components/Evidence/HashOnlyVerificationResult';
 
 // ============================================================================
 // Types
@@ -24,8 +25,15 @@ interface FileDropzoneProps {
 // Constants
 // ============================================================================
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
-const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/heic', 'image/heif'];
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB (Story 8-7)
+const ACCEPTED_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/heic',
+  'image/heif',
+  'video/mp4',
+  'video/quicktime',
+]; // Added video support for Story 8-7
 
 // ============================================================================
 // Component
@@ -46,7 +54,7 @@ export function FileDropzone({ onVerificationComplete, className = '' }: FileDro
 
   const validateFile = (file: File): string | null => {
     if (!ACCEPTED_TYPES.includes(file.type)) {
-      return 'Invalid file type. Please upload a JPEG, PNG, or HEIC image.';
+      return 'Invalid file type. Please upload a JPEG, PNG, HEIC image or MP4, MOV video.';
     }
     if (file.size > MAX_FILE_SIZE) {
       return `File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB.`;
@@ -218,7 +226,7 @@ export function FileDropzone({ onVerificationComplete, className = '' }: FileDro
                       {state === 'dragging' ? 'Drop to verify' : 'Drop a file here or click to upload'}
                     </p>
                     <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-                      Supports JPEG, PNG, HEIC (up to 20MB)
+                      Supports JPEG, PNG, HEIC, MP4, MOV (up to 50MB)
                     </p>
                   </>
                 )}
@@ -243,7 +251,40 @@ interface VerificationResultProps {
 }
 
 function VerificationResult({ result, fileName, onReset, className = '' }: VerificationResultProps) {
-  const { status, confidence_level, verification_url, manifest_info, note, file_hash } = result.data;
+  const {
+    status,
+    confidence_level,
+    verification_url,
+    manifest_info,
+    note,
+    file_hash,
+    capture_mode,
+    media_stored,
+    media_hash,
+    evidence,
+    metadata_flags,
+    captured_at,
+    media_type,
+    capture_id,
+  } = result.data;
+
+  // Hash-only detection (Story 8-7)
+  const isHashOnly = capture_mode === 'hash_only' || media_stored === false;
+
+  // If verified and hash-only, render HashOnlyVerificationResult (Story 8-7)
+  if (status === 'verified' && isHashOnly && evidence && captured_at && capture_id) {
+    return (
+      <HashOnlyVerificationResult
+        captureId={capture_id}
+        mediaHash={media_hash || file_hash}
+        confidenceLevel={confidence_level!}
+        mediaType={(media_type as 'photo' | 'video') || 'photo'}
+        evidence={evidence}
+        capturedAt={captured_at}
+        metadataFlags={metadata_flags}
+      />
+    );
+  }
 
   return (
     <div className={`w-full rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden ${className}`}>

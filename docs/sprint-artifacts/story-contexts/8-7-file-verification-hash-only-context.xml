@@ -1,0 +1,1073 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-key>8-7-file-verification-hash-only</story-key>
+    <story-file>docs/sprint-artifacts/stories/8-7-file-verification-hash-only.md</story-file>
+    <epic-key>epic-8</epic-key>
+    <epic-title>Privacy-First Capture Mode (Hash-Only)</epic-title>
+    <tech-spec>docs/sprint-artifacts/tech-spec-epic-8.md</tech-spec>
+    <dependencies>
+      <dependency>
+        <story-key>8-6-verification-page-hash-only</story-key>
+        <reason>Provides PrivacyModeBadge and HashOnlyMediaPlaceholder components for reuse</reason>
+      </dependency>
+      <dependency>
+        <story-key>5-6-file-upload-verification</story-key>
+        <reason>Provides FileDropzone component and verify-file endpoint to extend</reason>
+      </dependency>
+    </dependencies>
+    <context-created>2025-12-01</context-created>
+  </metadata>
+
+  <story-overview>
+    <user-story>
+      As a user with an original file from a hash-only capture,
+      I want to verify my file by uploading it to the verification page,
+      So that I can prove this file matches the registered hash without the media being stored on the server.
+    </user-story>
+
+    <business-value>
+      Completes the Privacy Mode feature set by allowing users to verify hash-only captures
+      through file upload. This maintains privacy guarantees (no media storage) while providing
+      full verification capabilities through device attestation and client-side depth analysis.
+    </business-value>
+
+    <technical-approach>
+      Extend the existing file verification flow (Story 5-6) to handle hash-only captures.
+      Backend computes hash of uploaded file and queries captures table with capture_mode filter.
+      Frontend detects hash-only mode in response and displays appropriate UI with Privacy Mode
+      badge, hash value, and evidence summary (no media preview). Reuses components from Story 8-6.
+    </technical-approach>
+  </story-overview>
+
+  <acceptance-criteria>
+    <criterion id="AC1">
+      <title>File Upload Hash Computation and Lookup</title>
+      <description>
+        System computes SHA-256 hash of uploaded file in memory, searches captures table
+        for matching target_media_hash, and discards file bytes immediately. Hash computation
+        completes in under 2 seconds for files up to 50MB.
+      </description>
+      <verification>
+        Upload a 50MB file from hash-only capture and verify hash computation time.
+        Confirm file bytes are never written to disk (memory-only processing).
+      </verification>
+    </criterion>
+
+    <criterion id="AC2">
+      <title>Hash Match Found - Full Evidence Display</title>
+      <description>
+        When uploaded file hash matches a hash-only capture, display "File Verified - Hash Match"
+        message with confidence badge, Privacy Mode badge, full evidence panel with device
+        analysis source, metadata per metadata_flags settings, hash value, and NO file preview.
+      </description>
+      <verification>
+        Upload file matching hash-only capture and verify all UI elements display correctly
+        with Privacy Mode badge and device analysis source indicator.
+      </verification>
+    </criterion>
+
+    <criterion id="AC3">
+      <title>No Hash Match - Clear Messaging</title>
+      <description>
+        When uploaded file hash does not match any capture, show "No Matching Capture Found"
+        message with computed hash value and explanation that file was not captured with rial
+        or has been modified. This is a valid outcome, not an error state.
+      </description>
+      <verification>
+        Upload file with no matching hash and verify clear messaging and hash display.
+      </verification>
+    </criterion>
+
+    <criterion id="AC4">
+      <title>Hash Match for Full Capture (Non-Hash-Only)</title>
+      <description>
+        When uploaded file hash matches a full capture (not hash-only), redirect to standard
+        verification page for that capture ID, showing full media preview (server has the media).
+        Does NOT show hash-only specific messaging.
+      </description>
+      <verification>
+        Upload file matching full capture and verify redirect to standard verification page
+        with media preview.
+      </verification>
+    </criterion>
+
+    <criterion id="AC5">
+      <title>File Upload Security and Privacy</title>
+      <description>
+        File processed entirely in memory (no disk writes), maximum 50MB enforced, hash computed
+        using streaming (memory efficient), file bytes discarded immediately after hashing, no
+        logging of file content, rate limiting: 20 uploads per hour per IP.
+      </description>
+      <verification>
+        Verify memory-only processing, 50MB limit enforcement, and rate limiting behavior.
+      </verification>
+    </criterion>
+
+    <criterion id="AC6">
+      <title>Video File Support</title>
+      <description>
+        When hash verification succeeds for video file from hash-only video capture, evidence
+        shows video-specific fields (duration, frame count), hash chain verification status,
+        temporal depth analysis results, checkpoint attestation information, and "Video Hash
+        Verified" badge.
+      </description>
+      <verification>
+        Upload video file from hash-only capture and verify video-specific metadata display.
+      </verification>
+    </criterion>
+
+    <criterion id="AC7">
+      <title>Error Handling</title>
+      <description>
+        Appropriate error messages for: file too large (>50MB), invalid file format, network
+        error during upload, hash computation error, backend unavailable.
+      </description>
+      <verification>
+        Test each error condition and verify user-friendly error messages.
+      </verification>
+    </criterion>
+  </acceptance-criteria>
+
+  <documentation-artifacts>
+    <artifact>
+      <path>docs/sprint-artifacts/tech-spec-epic-8.md</path>
+      <type>technical-specification</type>
+      <description>
+        Epic 8 technical specification defining hash-only capture mode architecture,
+        API contracts, and acceptance criteria for Story 8.7 (lines 667-674).
+        Defines VerifyFileResponse schema extensions for capture_mode, media_stored,
+        media_hash fields.
+      </description>
+      <key-sections>
+        - Acceptance Criteria Story 8.7 (lines 667-674)
+        - APIs POST /captures hash-only payload format (lines 348-401)
+        - Evidence Package Schema with analysis_source (lines 322-344)
+        - APIs POST /api/v1/verify-file Updated Response (lines TBD)
+      </key-sections>
+    </artifact>
+
+    <artifact>
+      <path>docs/epics.md</path>
+      <type>epic-definition</type>
+      <description>
+        Epic 8 definition from main epics file (lines 3080-3105). Describes Story 8.7:
+        File Verification for Hash-Only with acceptance criteria for file upload, hash
+        match, evidence display, and privacy guarantees.
+      </description>
+      <key-sections>
+        - Story 8.7: File Verification for Hash-Only (lines 3080-3105)
+        - Acceptance: File upload, hash match, evidence display, no storage
+      </key-sections>
+    </artifact>
+
+    <artifact>
+      <path>docs/prd.md</path>
+      <type>product-requirements</type>
+      <description>
+        Product requirements document with relevant functional requirements:
+        FR61 (Verification page displays "Hash Verified" with device attestation note),
+        FR36-40 (File upload verification).
+      </description>
+      <key-sections>
+        - FR61: Hash Verified display with device attestation
+        - FR36-40: File upload verification flow
+      </key-sections>
+    </artifact>
+
+    <artifact>
+      <path>docs/sprint-artifacts/stories/8-6-verification-page-hash-only.md</path>
+      <type>related-story</type>
+      <description>
+        Story 8-6 implementation that created PrivacyModeBadge and HashOnlyMediaPlaceholder
+        components. Defines Privacy Mode UI patterns, trust model messaging, and hash-only
+        display strategy to reuse in file verification flow.
+      </description>
+      <key-sections>
+        - PrivacyModeBadge component implementation
+        - HashOnlyMediaPlaceholder component implementation
+        - Privacy Mode badge pattern (purple color scheme, shield icon)
+        - Hash-only display strategy (no media preview)
+        - Trust model messaging ("Authenticity verified via device attestation")
+        - MetadataFlags interface for conditional metadata display
+      </key-sections>
+    </artifact>
+
+    <artifact>
+      <path>docs/sprint-artifacts/stories/story-5-6-file-upload-verification.md</path>
+      <type>related-story</type>
+      <description>
+        Story 5-6 implementation that created FileDropzone component and verify-file
+        endpoint. Provides base file upload functionality, hash computation, three-way
+        result logic (verified/c2pa_only/no_record), and rate limiting to extend for
+        hash-only support.
+      </description>
+      <key-sections>
+        - FileDropzone component with drag-drop upload
+        - POST /api/v1/verify-file endpoint
+        - SHA-256 hash computation backend
+        - Three-way result logic (verified/c2pa_only/no_record)
+        - Rate limiting (100/hour/IP, consider 20/hour for hash-only)
+        - Error handling patterns
+        - Multipart upload pattern
+      </key-sections>
+    </artifact>
+  </documentation-artifacts>
+
+  <existing-code-interfaces>
+    <interface>
+      <path>apps/web/src/components/Upload/FileDropzone.tsx</path>
+      <type>react-component</type>
+      <description>
+        File upload component with drag-drop interface (374 lines). Currently handles
+        verified/c2pa_only/no_record responses. Needs extension to detect capture_mode
+        in response and render HashOnlyVerificationResult for hash-only captures.
+      </description>
+      <key-exports>
+        - FileDropzone component (main export)
+        - UploadState type: 'idle' | 'dragging' | 'uploading' | 'success' | 'error'
+        - VerificationResult component (lines 245-333)
+        - MAX_FILE_SIZE constant: 20MB (needs update to 50MB for hash-only per AC5)
+        - ACCEPTED_TYPES: JPEG, PNG, HEIC (needs video format support per AC6)
+      </key-exports>
+      <integration-points>
+        - Uses apiClient.verifyFile() for upload
+        - Renders VerificationResult on success
+        - Needs conditional rendering: if capture_mode === 'hash_only' render HashOnlyVerificationResult
+        - Needs to handle new response fields: capture_mode, media_stored, media_hash, evidence, metadata_flags
+      </integration-points>
+    </interface>
+
+    <interface>
+      <path>backend/src/routes/verify.rs</path>
+      <type>rust-axum-route</type>
+      <description>
+        Verification routes module (461 lines). POST /api/v1/verify-file endpoint computes
+        SHA-256 hash and queries captures table. Needs extension to return capture_mode,
+        media_stored, media_hash, evidence, and metadata_flags fields for hash-only captures.
+      </description>
+      <key-exports>
+        - verify_file() handler (lines 141-231)
+        - FileVerificationResponse struct (lines 55-82)
+        - lookup_capture_by_hash() helper (lines 275-298)
+        - MAX_FILE_SIZE constant: 20MB (needs update to 50MB)
+      </key-exports>
+      <integration-points>
+        - FileVerificationResponse needs new fields: capture_mode, media_stored, media_hash, evidence, metadata_flags
+        - lookup_capture_by_hash() needs to join with captures.capture_mode, captures.media_stored
+        - Hash computation uses SHA-256 (keep same for consistency)
+        - Return full evidence package for hash-only (analysis_source: "device")
+        - Query filter: WHERE target_media_hash = $1 AND status = 'complete'
+      </integration-points>
+    </interface>
+
+    <interface>
+      <path>apps/web/src/components/Evidence/PrivacyModeBadge.tsx</path>
+      <type>react-component</type>
+      <description>
+        Purple badge component from Story 8-6 indicating Privacy Mode capture (39 lines).
+        Shows shield icon with "Privacy Mode" text and tooltip explaining trust model.
+        REUSE THIS COMPONENT in HashOnlyVerificationResult.
+      </description>
+      <key-exports>
+        - PrivacyModeBadge component (default export)
+        - Purple color scheme: bg-purple-100 dark:bg-purple-900/30
+        - Shield check icon (inline SVG)
+        - Tooltip: "Media verified via device attestation - original not stored"
+      </key-exports>
+      <integration-points>
+        - Import and display in HashOnlyVerificationResult component
+        - Place next to ConfidenceBadge in badge row
+        - data-testid="privacy-mode-badge" for E2E tests
+      </integration-points>
+    </interface>
+
+    <interface>
+      <path>apps/web/src/components/Media/HashOnlyMediaPlaceholder.tsx</path>
+      <type>react-component</type>
+      <description>
+        Placeholder component from Story 8-6 for hash-only captures without media preview
+        (66 lines). Shows lock icon, "Hash Verified" heading, and trust model explanation.
+        Supports both 4:3 (photo) and 16:9 (video) aspect ratios.
+      </description>
+      <key-exports>
+        - HashOnlyMediaPlaceholder component (default export)
+        - aspectRatio prop: '4:3' | '16:9'
+        - Lock icon (inline SVG)
+        - "Original media not stored on server" message
+        - "Authenticity verified via device attestation" message
+      </key-exports>
+      <integration-points>
+        - REFERENCE THIS PATTERN in HashOnlyVerificationResult
+        - Use same messaging for consistency
+        - Consider showing hash value alongside placeholder
+        - data-testid="hash-only-placeholder" for tests
+      </integration-points>
+    </interface>
+
+    <interface>
+      <path>packages/shared/src/types/evidence.ts</path>
+      <type>typescript-types</type>
+      <description>
+        Shared TypeScript types for evidence data (71 lines). Includes MetadataFlags
+        interface from Story 8-6 for hash-only privacy flags. Contains Evidence interface
+        with hardware attestation, depth analysis, metadata, and processing info.
+      </description>
+      <key-exports>
+        - MetadataFlags interface (lines 55-62): location_level, timestamp_level, device_info_level
+        - Evidence interface (lines 65-70): hardware_attestation, depth_analysis, metadata, processing
+        - ConfidenceLevel type: 'high' | 'medium' | 'low' | 'suspicious'
+        - EvidenceStatus type: 'pass' | 'fail' | 'unavailable'
+      </key-exports>
+      <integration-points>
+        - Use MetadataFlags for conditional metadata display in HashOnlyVerificationResult
+        - Evidence interface for evidence panel display
+        - May need to extend for VerifyFileResponse type or create in api.ts
+      </integration-points>
+    </interface>
+
+    <interface>
+      <path>packages/shared/src/types/api.ts</path>
+      <type>typescript-types</type>
+      <description>
+        Shared API types (20 lines). Currently defines ApiResponse and ApiError wrapper types.
+        May need extension for FileVerificationResponse with hash-only fields or keep in
+        apps/web/src/lib/api.ts inline.
+      </description>
+      <key-exports>
+        - ApiResponse&lt;T&gt; wrapper type
+        - ApiError wrapper type
+      </key-exports>
+      <integration-points>
+        - Consider adding VerifyFileResponse interface with capture_mode, media_stored, media_hash fields
+        - Or keep FileVerificationResponse inline in api.ts following Story 8-6 pattern
+      </integration-points>
+    </interface>
+
+    <interface>
+      <path>backend/src/models/capture.rs</path>
+      <type>rust-model</type>
+      <description>
+        Capture entity model (187 lines). Contains Capture struct with hash-only fields
+        (capture_mode, media_stored, analysis_source, metadata_flags) from Story 8-4/8-5.
+        Provides database schema reference for what fields are available.
+      </description>
+      <key-exports>
+        - Capture struct with hash-only fields (lines 124-136):
+          - capture_mode: Option&lt;String&gt; ("full" | "hash_only")
+          - media_stored: Option&lt;bool&gt;
+          - analysis_source: Option&lt;String&gt; ("server" | "device")
+          - metadata_flags: Option&lt;serde_json::Value&gt;
+        - CaptureType enum: Photo | Video
+        - Video-specific fields: video_s3_key, hash_chain_s3_key, duration_ms, frame_count
+      </key-exports>
+      <integration-points>
+        - Query these fields in lookup_capture_by_hash()
+        - Return in FileVerificationResponse
+        - Use capture_mode to differentiate hash-only vs full
+        - Use analysis_source to indicate device vs server analysis
+      </integration-points>
+    </interface>
+  </existing-code-interfaces>
+
+  <development-constraints>
+    <constraint>
+      <category>architecture</category>
+      <description>
+        File upload must be memory-only processing. No disk writes for uploaded files.
+        Hash computation must use streaming approach for memory efficiency with large files.
+        File bytes must be discarded immediately after SHA-256 hash computed.
+      </description>
+      <source>docs/sprint-artifacts/tech-spec-epic-8.md - Privacy guarantees</source>
+    </constraint>
+
+    <constraint>
+      <category>security</category>
+      <description>
+        Maximum file size increased from 20MB (Story 5-6) to 50MB for hash-only verification.
+        Rate limiting tightened from 100/hour to 20/hour per IP for hash-only file uploads
+        to prevent abuse. No logging of file content or preview generation.
+      </description>
+      <source>Story 8-7 AC5 - File Upload Security and Privacy</source>
+    </constraint>
+
+    <constraint>
+      <category>performance</category>
+      <description>
+        Hash computation for 50MB files must complete in under 2 seconds. Use streaming
+        hash computation (chunked processing) rather than loading entire file into memory
+        at once. Consider Rust's async streaming for backend efficiency.
+      </description>
+      <source>Story 8-7 AC1 - Hash computation time requirement</source>
+    </constraint>
+
+    <constraint>
+      <category>ui-consistency</category>
+      <description>
+        MUST reuse PrivacyModeBadge and HashOnlyMediaPlaceholder components from Story 8-6.
+        Purple color scheme for Privacy Mode (distinct from confidence badge colors).
+        Same trust model messaging: "Authenticity verified via device attestation".
+        No media preview for hash-only (show hash value instead).
+      </description>
+      <source>Story 8-6 - Component patterns and messaging standards</source>
+    </constraint>
+
+    <constraint>
+      <category>data-flow</category>
+      <description>
+        Backend query must filter by capture_mode to differentiate hash-only from full captures.
+        If match is full capture (media_stored = true), redirect to standard verification page.
+        If match is hash-only (media_stored = false), show hash-only result with Privacy Mode badge.
+        No match (any mode) shows "No Matching Capture Found" with hash value.
+      </description>
+      <source>Story 8-7 AC3, AC4 - Display decision tree</source>
+    </constraint>
+
+    <constraint>
+      <category>testing</category>
+      <description>
+        E2E tests must cover: hash match for hash-only photo, hash match for hash-only video,
+        no match scenario, full capture redirect behavior, Privacy Mode badge visibility,
+        error handling (file too large, invalid format, network error). Tests require Next.js
+        dev server running per project conventions.
+      </description>
+      <source>Story 8-7 Task 7 - E2E test requirements</source>
+    </constraint>
+
+    <constraint>
+      <category>video-support</category>
+      <description>
+        File verification must support video formats (MP4, MOV) in addition to images (JPEG, PNG, HEIC).
+        Hash-only video matches must display video-specific metadata: duration, frame count,
+        hash chain status, temporal depth analysis, checkpoint attestation. Use "Video Hash
+        Verified" badge for video files.
+      </description>
+      <source>Story 8-7 AC6 - Video File Support</source>
+    </constraint>
+
+    <constraint>
+      <category>metadata-privacy</category>
+      <description>
+        Metadata display must respect metadata_flags from hash-only capture. Check
+        location_level (none/coarse/precise), timestamp_level (none/day_only/exact),
+        device_info_level (none/model_only/full) and conditionally show/hide metadata
+        fields accordingly. Follow same pattern as Story 8-6 verification page.
+      </description>
+      <source>Story 8-6 AC4 - Metadata Flags Display (NOTE: AC4 was missing in 8-6, implement here)</source>
+    </constraint>
+  </development-constraints>
+
+  <dependencies>
+    <npm-package>
+      <name>react</name>
+      <version>19.x</version>
+      <usage>Component framework for HashOnlyVerificationResult</usage>
+    </npm-package>
+
+    <npm-package>
+      <name>next</name>
+      <version>16.x</version>
+      <usage>App Router for verification routes, Turbopack dev server</usage>
+    </npm-package>
+
+    <npm-package>
+      <name>tailwindcss</name>
+      <version>4.x</version>
+      <usage>Styling with dark mode support (dark: prefix)</usage>
+    </npm-package>
+
+    <cargo-crate>
+      <name>axum</name>
+      <version>0.8</version>
+      <usage>Web framework for verify-file endpoint</usage>
+    </cargo-crate>
+
+    <cargo-crate>
+      <name>axum-extra</name>
+      <version>latest</version>
+      <usage>Multipart form data parsing</usage>
+    </cargo-crate>
+
+    <cargo-crate>
+      <name>sha2</name>
+      <version>latest</version>
+      <usage>SHA-256 hash computation</usage>
+    </cargo-crate>
+
+    <cargo-crate>
+      <name>sqlx</name>
+      <version>0.8</version>
+      <usage>Database queries for capture lookup</usage>
+    </cargo-crate>
+
+    <cargo-crate>
+      <name>serde_json</name>
+      <version>latest</version>
+      <usage>JSON serialization for evidence and metadata_flags</usage>
+    </cargo-crate>
+  </dependencies>
+
+  <testing-requirements>
+    <test-suite>
+      <type>e2e</type>
+      <framework>playwright</framework>
+      <location>apps/web/tests/e2e/</location>
+      <test-cases>
+        - Hash match for hash-only photo capture
+        - Hash match for hash-only video capture
+        - No match scenario with clear messaging
+        - Full capture redirect behavior (media_stored = true)
+        - Privacy Mode badge visibility on hash-only result
+        - Hash value display with copy button
+        - File too large error (>50MB)
+        - Invalid file format error
+        - Network error handling
+        - Rate limit exceeded error (21st upload in hour)
+        - Video-specific metadata display (duration, frames, hash chain)
+        - Metadata flags conditional display (location/timestamp/device levels)
+      </test-cases>
+    </test-suite>
+
+    <test-suite>
+      <type>unit</type>
+      <framework>rust-test</framework>
+      <location>backend/src/routes/verify.rs::tests</location>
+      <test-cases>
+        - FileVerificationResponse serialization with hash-only fields
+        - Hash computation correctness (SHA-256)
+        - Capture lookup by hash with capture_mode filter
+        - Response schema validation for hash-only vs full
+        - 50MB max file size enforcement
+        - Rate limiting logic (20/hour/IP)
+      </test-cases>
+    </test-suite>
+
+    <test-suite>
+      <type>component</type>
+      <framework>vitest</framework>
+      <location>apps/web/src/components/**/__tests__/</location>
+      <test-cases>
+        - HashOnlyVerificationResult component rendering
+        - Privacy Mode badge integration
+        - Hash value display and copy functionality
+        - Evidence summary display for hash-only
+        - Metadata flags conditional rendering
+        - Video vs photo display variants
+      </test-cases>
+    </test-suite>
+  </testing-requirements>
+
+  <implementation-notes>
+    <note>
+      <category>backend-response-schema</category>
+      <description>
+        Extend FileVerificationResponse in backend/src/routes/verify.rs with new fields:
+
+        ```rust
+        #[derive(Debug, Clone, Serialize, Deserialize)]
+        pub struct FileVerificationResponse {
+            pub status: VerificationStatus,
+            pub capture_id: Option&lt;String&gt;,
+            pub confidence_level: Option&lt;String&gt;,
+            pub verification_url: Option&lt;String&gt;,
+
+            // New fields for Epic 8
+            #[serde(skip_serializing_if = "Option::is_none")]
+            pub capture_mode: Option&lt;String&gt;,  // "full" | "hash_only"
+            #[serde(skip_serializing_if = "Option::is_none")]
+            pub media_stored: Option&lt;bool&gt;,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            pub media_hash: Option&lt;String&gt;,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            pub evidence: Option&lt;serde_json::Value&gt;,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            pub metadata_flags: Option&lt;serde_json::Value&gt;,
+
+            // Existing fields
+            pub manifest_info: Option&lt;C2paManifestInfo&gt;,
+            pub note: Option&lt;String&gt;,
+            pub file_hash: String,
+        }
+        ```
+
+        Query must select capture_mode, media_stored, evidence, metadata_flags from captures table.
+      </description>
+    </note>
+
+    <note>
+      <category>frontend-component-structure</category>
+      <description>
+        Create new HashOnlyVerificationResult component at:
+        apps/web/src/components/Evidence/HashOnlyVerificationResult.tsx
+
+        Component structure:
+        - Header with CheckCircleIcon and "File Verified - Hash Match" heading
+        - Badge row: ConfidenceBadge + PrivacyModeBadge (imported from Story 8-6)
+        - Hash display section: SHA-256 value with copy button
+        - Trust model explanation: Purple info box with ShieldCheckIcon
+        - Evidence summary: EvidencePanel with isHashOnly=true, showPreview=false
+        - Metadata display: Conditional rendering based on metadata_flags
+        - Video info section: If mediaType === 'video', show duration, frames, hash chain
+        - Action buttons: "View Full Verification Page" link, "Print Verification" button
+
+        Props interface:
+        ```typescript
+        interface HashOnlyVerificationResultProps {
+          captureId: string;
+          mediaHash: string;
+          confidenceLevel: 'high' | 'medium' | 'low' | 'suspicious';
+          mediaType: 'photo' | 'video';
+          evidence: Evidence;
+          capturedAt: string;
+          metadataFlags?: MetadataFlags;
+        }
+        ```
+      </description>
+    </note>
+
+    <note>
+      <category>filedropzone-extension</category>
+      <description>
+        Modify VerificationResult component in FileDropzone.tsx to detect hash-only mode:
+
+        ```typescript
+        function VerificationResult({ result, fileName, onReset }: Props) {
+          const { status, capture_mode, media_stored } = result.data;
+
+          // Hash-only detection
+          const isHashOnly = capture_mode === 'hash_only' || media_stored === false;
+
+          if (status === 'verified' && isHashOnly) {
+            // Render HashOnlyVerificationResult instead of standard result
+            return (
+              &lt;HashOnlyVerificationResult
+                captureId={result.data.capture_id!}
+                mediaHash={result.data.media_hash || result.data.file_hash}
+                confidenceLevel={result.data.confidence_level as ConfidenceLevel}
+                mediaType={result.data.evidence?.type || 'photo'}
+                evidence={result.data.evidence!}
+                capturedAt={result.data.captured_at}
+                metadataFlags={result.data.metadata_flags}
+              /&gt;
+            );
+          }
+
+          if (status === 'verified' && !isHashOnly) {
+            // Redirect to standard verification page (existing behavior)
+            window.location.href = result.data.verification_url!;
+            return null;
+          }
+
+          // Existing logic for c2pa_only and no_record
+          // ...
+        }
+        ```
+
+        Update MAX_FILE_SIZE from 20MB to 50MB.
+        Add video formats to ACCEPTED_TYPES: ['image/jpeg', 'image/png', 'image/heic', 'video/mp4', 'video/quicktime'].
+      </description>
+    </note>
+
+    <note>
+      <category>metadata-flags-handling</category>
+      <description>
+        Implement conditional metadata display based on metadata_flags in HashOnlyVerificationResult:
+
+        ```typescript
+        // Location display
+        const renderLocation = () => {
+          if (!metadataFlags?.location_included || metadataFlags.location_level === 'none') {
+            return &lt;span className="text-zinc-500"&gt;Not included&lt;/span&gt;;
+          }
+          if (metadataFlags.location_level === 'coarse') {
+            return &lt;span&gt;{evidence.metadata?.location_coarse || 'City/region'}&lt;/span&gt;;
+          }
+          if (metadataFlags.location_level === 'precise') {
+            return &lt;span&gt;{/* Full GPS coordinates */}&lt;/span&gt;;
+          }
+        };
+
+        // Timestamp display
+        const renderTimestamp = () => {
+          if (!metadataFlags?.timestamp_included || metadataFlags.timestamp_level === 'none') {
+            return &lt;span className="text-zinc-500"&gt;Not included&lt;/span&gt;;
+          }
+          if (metadataFlags.timestamp_level === 'day_only') {
+            return &lt;span&gt;{formatDate(capturedAt, { dateOnly: true })}&lt;/span&gt;;
+          }
+          if (metadataFlags.timestamp_level === 'exact') {
+            return &lt;span&gt;{formatDate(capturedAt)}&lt;/span&gt;;
+          }
+        };
+
+        // Device info display
+        const renderDeviceInfo = () => {
+          if (!metadataFlags?.device_info_included || metadataFlags.device_info_level === 'none') {
+            return &lt;span className="text-zinc-500"&gt;Not included&lt;/span&gt;;
+          }
+          if (metadataFlags.device_info_level === 'model_only') {
+            return &lt;span&gt;{evidence.hardware_attestation?.device_model}&lt;/span&gt;;
+          }
+          if (metadataFlags.device_info_level === 'full') {
+            return &lt;span&gt;{/* Full device info */}&lt;/span&gt;;
+          }
+        };
+        ```
+
+        This addresses the CRITICAL issue from Story 8-6 review where AC4 was not implemented.
+      </description>
+    </note>
+
+    <note>
+      <category>video-hash-verification</category>
+      <description>
+        For video hash-only captures, display additional fields in HashOnlyVerificationResult:
+
+        ```typescript
+        {mediaType === 'video' && (
+          &lt;div className="bg-zinc-50 dark:bg-zinc-900 rounded-lg p-4 mb-6"&gt;
+            &lt;h3 className="font-medium mb-2"&gt;Video Information&lt;/h3&gt;
+            &lt;div className="grid grid-cols-2 gap-3 text-sm"&gt;
+              &lt;div&gt;
+                &lt;span className="text-zinc-500"&gt;Duration:&lt;/span&gt;{' '}
+                {evidence.video_metadata?.duration_ms / 1000}s
+              &lt;/div&gt;
+              &lt;div&gt;
+                &lt;span className="text-zinc-500"&gt;Frames:&lt;/span&gt;{' '}
+                {evidence.video_metadata?.frame_count}
+              &lt;/div&gt;
+              &lt;div&gt;
+                &lt;span className="text-zinc-500"&gt;Hash Chain:&lt;/span&gt;{' '}
+                &lt;span className={evidence.hash_chain?.chain_intact ? 'text-green-600' : 'text-red-600'}&gt;
+                  {evidence.hash_chain?.chain_intact ? 'Verified' : 'Failed'}
+                &lt;/span&gt;
+              &lt;/div&gt;
+              &lt;div&gt;
+                &lt;span className="text-zinc-500"&gt;Temporal Depth:&lt;/span&gt;{' '}
+                &lt;span className="text-green-600"&gt;
+                  {evidence.temporal_depth_analysis?.status === 'pass' ? 'Pass' : 'Fail'}
+                &lt;/span&gt;
+              &lt;/div&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        )}
+        ```
+      </description>
+    </note>
+
+    <note>
+      <category>no-match-display</category>
+      <description>
+        For no-match scenario, display helpful messaging in VerificationResult component:
+
+        ```typescript
+        function NoMatchResult({ computedHash }: { computedHash: string }) {
+          return (
+            &lt;div className="max-w-2xl mx-auto p-6 text-center"&gt;
+              &lt;XCircleIcon className="h-16 w-16 text-zinc-400 mx-auto mb-4" /&gt;
+              &lt;h1 className="text-2xl font-bold mb-2"&gt;No Matching Capture Found&lt;/h1&gt;
+              &lt;p className="text-zinc-600 dark:text-zinc-400 mb-6"&gt;
+                This file does not match any capture registered with rial.
+              &lt;/p&gt;
+
+              {/* Hash Display */}
+              &lt;div className="bg-zinc-50 dark:bg-zinc-900 rounded-lg p-4 mb-6 text-left"&gt;
+                &lt;div className="text-sm text-zinc-500 mb-1"&gt;Computed Hash (SHA-256)&lt;/div&gt;
+                &lt;div className="font-mono text-xs break-all"&gt;{computedHash}&lt;/div&gt;
+              &lt;/div&gt;
+
+              {/* Possible Reasons */}
+              &lt;div className="text-left bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4"&gt;
+                &lt;h3 className="font-medium mb-2"&gt;Possible Reasons&lt;/h3&gt;
+                &lt;ul className="text-sm text-zinc-700 dark:text-zinc-300 space-y-1"&gt;
+                  &lt;li&gt;• File was not captured with rial.&lt;/li&gt;
+                  &lt;li&gt;• File has been edited or modified&lt;/li&gt;
+                  &lt;li&gt;• Capture was not uploaded in Privacy Mode&lt;/li&gt;
+                  &lt;li&gt;• Different version of the file&lt;/li&gt;
+                &lt;/ul&gt;
+              &lt;/div&gt;
+
+              &lt;button onClick={() => window.location.reload()} className="mt-6 btn-secondary"&gt;
+                Try Another File
+              &lt;/button&gt;
+            &lt;/div&gt;
+          );
+        }
+        ```
+      </description>
+    </note>
+
+    <note>
+      <category>rate-limiting-strategy</category>
+      <description>
+        Update rate limiting for verify-file endpoint from 100/hour to 20/hour for hash-only:
+
+        ```rust
+        // backend/src/middleware/rate_limit.rs
+        const VERIFY_FILE_RATE_LIMIT: u32 = 20; // per hour per IP
+
+        pub async fn rate_limit_verify(
+            State(state): State&lt;AppState&gt;,
+            req: Request&lt;Body&gt;,
+            next: Next,
+        ) -&gt; Result&lt;Response, ApiError&gt; {
+            let ip = extract_client_ip(&amp;req);
+            let key = format!("rate_limit:verify_file:{}", ip);
+
+            // Check Redis for current count
+            let count: u32 = state.redis.get(&amp;key).await.unwrap_or(0);
+
+            if count &gt;= VERIFY_FILE_RATE_LIMIT {
+                return Err(ApiError::RateLimitExceeded);
+            }
+
+            // Increment with 1-hour expiry
+            state.redis.incr_exp(&amp;key, 3600).await?;
+
+            Ok(next.run(req).await)
+        }
+        ```
+
+        Note: If Redis not available in current setup, implement in-memory rate limiting
+        with HashMap&lt;IpAddr, (count, expiry)&gt; protected by RwLock.
+      </description>
+    </note>
+
+    <note>
+      <category>memory-safety</category>
+      <description>
+        Ensure file upload is memory-only processing in verify_file handler:
+
+        ```rust
+        async fn verify_file(
+            State(state): State&lt;AppState&gt;,
+            Extension(request_id): Extension&lt;Uuid&gt;,
+            multipart: Multipart,
+        ) -&gt; Result&lt;Json&lt;ApiResponse&lt;FileVerificationResponse&gt;&gt;, ApiErrorWithRequestId&gt; {
+            // Parse multipart to get file bytes
+            let file_bytes = parse_file_multipart(multipart).await?;
+
+            // Compute hash using streaming (memory efficient)
+            let hash = sha2::Sha256::digest(&amp;file_bytes);
+            let hash_hex = hex::encode(hash);
+
+            // Query captures table
+            let capture = lookup_capture_by_hash(&amp;state.db, &amp;hash).await?;
+
+            // CRITICAL: Discard file bytes immediately after hash computed
+            drop(file_bytes);
+
+            // Build and return response (no file content logged)
+            // ...
+        }
+        ```
+
+        File bytes NEVER written to disk. Processed entirely in memory and dropped after hashing.
+      </description>
+    </note>
+  </implementation-notes>
+
+  <learnings-from-previous-stories>
+    <learning>
+      <story>8-6-verification-page-hash-only</story>
+      <lesson>
+        Privacy Mode Badge Pattern: Story 8-6 created PrivacyModeBadge component with purple
+        color scheme and shield icon. Reuse this exact component for consistency in file
+        verification results. Place next to ConfidenceBadge in badge row.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>8-6-verification-page-hash-only</story>
+      <lesson>
+        Hash-Only Display Strategy: Story 8-6 established "Hash Verified" messaging pattern
+        and trust model explanation. Follow same language and structure: "Original media not
+        stored on server" + "Authenticity verified via device attestation".
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>8-6-verification-page-hash-only</story>
+      <lesson>
+        No Media Preview Pattern: Story 8-6 uses HashOnlyMediaPlaceholder for captures without
+        stored media. Apply same pattern when file verification succeeds for hash-only. Show
+        lock icon and trust model messaging instead of media preview.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>8-6-verification-page-hash-only</story>
+      <lesson>
+        Evidence Panel Adaptation: Story 8-6 modified EvidencePanel to show "(Device)" suffix
+        for analysis source. Use same evidence display logic in HashOnlyVerificationResult.
+        Check evidence.analysis_source === 'device' and adjust labels accordingly.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>8-6-verification-page-hash-only</story>
+      <lesson>
+        CRITICAL - Metadata Flags Handling: Story 8-6 defined MetadataFlags interface but
+        did NOT implement conditional display logic (AC4 was missing per review). This story
+        MUST implement metadata flags conditional rendering based on location_level,
+        timestamp_level, device_info_level to properly handle privacy settings.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>8-6-verification-page-hash-only</story>
+      <lesson>
+        Type Extensions Inline: Story 8-6 added hash-only types directly in page.tsx rather
+        than shared types package. Consider same approach for VerifyFileResponse extensions
+        or add to shared types for consistency across frontend/backend.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>8-6-verification-page-hash-only</story>
+      <lesson>
+        Trust Model Messaging: Story 8-6 emphasizes "Authenticity verified via device
+        attestation" messaging. Use consistent language across hash-only features to build
+        user trust in Privacy Mode.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>8-6-verification-page-hash-only</story>
+      <lesson>
+        Video Handling: Story 8-6 supports both photo and video hash-only. Ensure file
+        verification handles video-specific fields (hash_chain, temporal_depth_analysis,
+        duration_ms, frame_count) when displaying hash-only video verification results.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>8-6-verification-page-hash-only</story>
+      <lesson>
+        Confidence Unchanged: Story 8-6 confirmed hash-only captures get same confidence
+        calculation as full captures. File verification should display confidence badge
+        identically without any "degraded" or "partial" indicators.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>5-6-file-upload-verification</story>
+      <lesson>
+        Existing FileDropzone Component: Story 5-6 created FileDropzone with drag-drop
+        interface and state machine. Extend this component rather than creating new one.
+        Add hash-only result variant to existing VerificationResult component.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>5-6-file-upload-verification</story>
+      <lesson>
+        Multipart Upload Pattern: Story 5-6 established multipart/form-data upload with
+        FormData API. Reuse same pattern for hash-only file verification. Backend uses
+        axum_extra::extract::Multipart for parsing.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>5-6-file-upload-verification</story>
+      <lesson>
+        Three-Way Result Logic: Story 5-6 handles verified/c2pa_only/no_record statuses.
+        Extend to add hash-only variant of "verified" state by checking capture_mode field
+        in response. Keep c2pa_only and no_record logic unchanged.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>5-6-file-upload-verification</story>
+      <lesson>
+        Rate Limiting: Story 5-6 implemented 100 verifications/hour/IP. Hash-only needs
+        tighter limit (20/hour per AC5) to prevent abuse since no media preview validation.
+        Consider separate rate limit key for hash-only vs standard verification.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>5-6-file-upload-verification</story>
+      <lesson>
+        Hash Computation Backend: Story 5-6 computes SHA-256 of uploaded file using
+        sha2::Sha256::digest(). Reuse same hashing logic for consistency. Ensure hash
+        format matches what iOS client generates (raw bytes, not base64 before hashing).
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>5-6-file-upload-verification</story>
+      <lesson>
+        C2PA Fallback Handling: Story 5-6 checks for C2PA manifest if hash not found in
+        database. Keep this fallback for non-hash-only captures. Hash-only captures won't
+        have embedded C2PA (manifest stored as JSON on S3).
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>5-6-file-upload-verification</story>
+      <lesson>
+        Error Handling: Story 5-6 handles upload errors, size limits, invalid formats.
+        Extend with hash-only specific errors (rate limit, hash computation failure).
+        Use same error message patterns for consistency.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>5-6-file-upload-verification</story>
+      <lesson>
+        Security Considerations: Story 5-6 enforced max file size (20MB) and file type
+        validation. Hash-only increases to 50MB but maintains same security posture.
+        Add tighter rate limiting to compensate for larger file sizes.
+      </lesson>
+    </learning>
+  </learnings-from-previous-stories>
+
+  <validation-checklist>
+    <item>All acceptance criteria (AC1-AC7) have corresponding implementation notes</item>
+    <item>Backend response schema extended with capture_mode, media_stored, media_hash, evidence, metadata_flags</item>
+    <item>Frontend detects hash-only mode and renders HashOnlyVerificationResult component</item>
+    <item>PrivacyModeBadge and HashOnlyMediaPlaceholder components reused from Story 8-6</item>
+    <item>Metadata flags conditional display implemented (addresses Story 8-6 AC4 gap)</item>
+    <item>Video hash-only support with video-specific metadata display</item>
+    <item>Memory-only file processing with immediate disposal after hashing</item>
+    <item>50MB max file size enforced (increased from 20MB)</item>
+    <item>20/hour rate limiting implemented (tightened from 100/hour)</item>
+    <item>E2E test cases defined for all scenarios (hash match, no match, full capture redirect, errors)</item>
+    <item>Error handling for file too large, invalid format, network errors, rate limit exceeded</item>
+    <item>Trust model messaging consistent with Story 8-6 ("Authenticity verified via device attestation")</item>
+  </validation-checklist>
+
+  <next-steps>
+    <step>
+      Review this context XML file to ensure all artifacts and constraints are captured
+    </step>
+    <step>
+      Begin implementation with backend FileVerificationResponse schema extension
+    </step>
+    <step>
+      Create HashOnlyVerificationResult component with PrivacyModeBadge integration
+    </step>
+    <step>
+      Extend FileDropzone to detect hash-only mode and render appropriate component
+    </step>
+    <step>
+      Implement metadata flags conditional display logic
+    </step>
+    <step>
+      Add video hash-only display variant
+    </step>
+    <step>
+      Update rate limiting and file size constraints
+    </step>
+    <step>
+      Write E2E tests for all scenarios
+    </step>
+    <step>
+      Run full test suite (unit, component, E2E) and validate all ACs
+    </step>
+    <step>
+      Update sprint-status.yaml from "drafted" to "ready-for-dev" upon context approval
+    </step>
+  </next-steps>
+</story-context>

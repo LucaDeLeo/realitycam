@@ -10,6 +10,7 @@ export type {
   MetadataEvidence,
   ProcessingInfo,
   Evidence,
+  MetadataFlags, // Story 8-7
 } from './types/evidence';
 
 // Capture Types
