@@ -178,7 +178,7 @@ public enum HashOnlyPayloadBuilder {
     /// - Parameters:
     ///   - captureData: Original capture data
     ///   - privacySettings: Privacy settings to apply
-    ///   - depthAnalysis: Client-side depth analysis result
+    ///   - temporalDepthAnalysis: Client-side temporal depth analysis result for video
     ///   - hashChain: Video hash chain data
     ///   - frameCount: Number of frames in video
     ///   - durationMs: Video duration in milliseconds
@@ -186,7 +186,7 @@ public enum HashOnlyPayloadBuilder {
     public static func buildVideo(
         from captureData: CaptureData,
         privacySettings: PrivacySettings,
-        depthAnalysis: DepthAnalysisResult,
+        temporalDepthAnalysis: TemporalDepthAnalysisResult,
         hashChain: PrivacyHashChainData,
         frameCount: Int,
         durationMs: Int
@@ -208,7 +208,7 @@ public enum HashOnlyPayloadBuilder {
         // Assemble video payload
         let payload = HashOnlyCapturePayload(
             mediaHash: mediaHash,
-            depthAnalysis: depthAnalysis,
+            temporalDepthAnalysis: temporalDepthAnalysis,
             metadata: filteredMetadata,
             metadataFlags: metadataFlags,
             capturedAt: captureData.timestamp,

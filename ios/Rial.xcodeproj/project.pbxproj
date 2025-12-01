@@ -101,6 +101,7 @@
 		'3089F9DB006D' = {isa = PBXBuildFile; fileRef = 3089F9DB109B; };
 		'3089F9DB006E' = {isa = PBXBuildFile; fileRef = 3089F9DB109C; };
 		'3089F9DB006F' = {isa = PBXBuildFile; fileRef = 3089F9DB109D; };
+		'3089F9DB0070' = {isa = PBXBuildFile; fileRef = 3089F9DB109E; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -220,6 +221,7 @@
 		'3089F9DB109B' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataFilterServiceTests.swift; sourceTree = "<group>"; };
 		'3089F9DB109C' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashOnlyPayloadBuilderTests.swift; sourceTree = "<group>"; };
 		'3089F9DB109D' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureDataPrivacyModeTests.swift; sourceTree = "<group>"; };
+		'3089F9DB109E' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalDepthAnalysisResult.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -334,6 +336,7 @@
 				3089F9DB1074,
 				'3089F9DB1090',
 				'3089F9DB1097',
+				'3089F9DB109E',
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -768,6 +771,7 @@
 				'3089F9DB0069',
 				'3089F9DB006A',
 				'3089F9DB006B',
+				'3089F9DB0070',
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

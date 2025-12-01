@@ -62,9 +62,17 @@ final class HashOnlyCapturePayloadTests: XCTestCase {
     /// Test that video payload is constructed correctly
     func testVideoPayload_HasCorrectMediaType() {
         let hashChain = PrivacyHashChainData(finalHash: "finalHash123", chainLength: 450)
+        let temporalAnalysis = TemporalDepthAnalysisResult(
+            keyframeAnalyses: [sampleDepthAnalysis],
+            meanVariance: 2.4,
+            varianceStability: 0.92,
+            temporalCoherence: 0.85,
+            isLikelyRealScene: true,
+            keyframeCount: 150
+        )
         let payload = HashOnlyCapturePayload(
             mediaHash: "abc123",
-            depthAnalysis: sampleDepthAnalysis,
+            temporalDepthAnalysis: temporalAnalysis,
             metadata: sampleMetadata,
             metadataFlags: sampleFlags,
             capturedAt: Date(),
@@ -79,6 +87,7 @@ final class HashOnlyCapturePayloadTests: XCTestCase {
         XCTAssertEqual(payload.frameCount, 450)
         XCTAssertEqual(payload.durationMs, 15000)
         XCTAssertNotNil(payload.hashChain)
+        XCTAssertNotNil(payload.temporalDepthAnalysis)
     }
 
     /// Test that all required fields are present
@@ -96,7 +105,8 @@ final class HashOnlyCapturePayloadTests: XCTestCase {
         XCTAssertEqual(payload.captureMode, "hash_only")
         XCTAssertEqual(payload.mediaHash, "abcdef123456")
         XCTAssertEqual(payload.mediaType, "photo")
-        XCTAssertEqual(payload.depthAnalysis.depthVariance, 2.4)
+        XCTAssertNotNil(payload.depthAnalysis)
+        XCTAssertEqual(payload.depthAnalysis?.depthVariance, 2.4)
         XCTAssertEqual(payload.metadata.deviceModel, "iPhone 15 Pro")
         XCTAssertTrue(payload.metadataFlags.locationIncluded)
         XCTAssertEqual(payload.capturedAt, capturedAt)
@@ -187,7 +197,8 @@ final class HashOnlyCapturePayloadTests: XCTestCase {
         XCTAssertEqual(decoded.captureMode, original.captureMode)
         XCTAssertEqual(decoded.mediaHash, original.mediaHash)
         XCTAssertEqual(decoded.mediaType, original.mediaType)
-        XCTAssertEqual(decoded.depthAnalysis.depthVariance, original.depthAnalysis.depthVariance)
+        XCTAssertNotNil(decoded.depthAnalysis)
+        XCTAssertEqual(decoded.depthAnalysis?.depthVariance, original.depthAnalysis?.depthVariance)
         XCTAssertEqual(decoded.metadata.deviceModel, original.metadata.deviceModel)
         XCTAssertEqual(decoded.metadataFlags.locationLevel, original.metadataFlags.locationLevel)
         XCTAssertEqual(decoded.assertion, original.assertion)

@@ -51,8 +51,11 @@ public struct HashOnlyCapturePayload: Codable, Sendable, Equatable {
     /// Type of media - "photo" or "video"
     public let mediaType: String
 
-    /// Client-side depth analysis result
-    public let depthAnalysis: DepthAnalysisResult
+    /// Client-side depth analysis result (for photos)
+    public let depthAnalysis: DepthAnalysisResult?
+
+    /// Client-side temporal depth analysis result (for videos)
+    public let temporalDepthAnalysis: TemporalDepthAnalysisResult?
 
     /// Privacy-filtered metadata
     public let metadata: FilteredMetadata
@@ -101,6 +104,7 @@ public struct HashOnlyCapturePayload: Codable, Sendable, Equatable {
         self.mediaHash = mediaHash
         self.mediaType = "photo"
         self.depthAnalysis = depthAnalysis
+        self.temporalDepthAnalysis = nil
         self.metadata = metadata
         self.metadataFlags = metadataFlags
         self.capturedAt = capturedAt
@@ -114,7 +118,7 @@ public struct HashOnlyCapturePayload: Codable, Sendable, Equatable {
     ///
     /// - Parameters:
     ///   - mediaHash: SHA-256 hash of video bytes
-    ///   - depthAnalysis: Client-side depth analysis result
+    ///   - temporalDepthAnalysis: Client-side temporal depth analysis result
     ///   - metadata: Filtered metadata
     ///   - metadataFlags: Metadata inclusion flags
     ///   - capturedAt: Capture timestamp
@@ -124,7 +128,7 @@ public struct HashOnlyCapturePayload: Codable, Sendable, Equatable {
     ///   - durationMs: Duration in milliseconds
     public init(
         mediaHash: String,
-        depthAnalysis: DepthAnalysisResult,
+        temporalDepthAnalysis: TemporalDepthAnalysisResult,
         metadata: FilteredMetadata,
         metadataFlags: MetadataFlags,
         capturedAt: Date,
@@ -136,7 +140,8 @@ public struct HashOnlyCapturePayload: Codable, Sendable, Equatable {
         self.captureMode = "hash_only"
         self.mediaHash = mediaHash
         self.mediaType = "video"
-        self.depthAnalysis = depthAnalysis
+        self.depthAnalysis = nil
+        self.temporalDepthAnalysis = temporalDepthAnalysis
         self.metadata = metadata
         self.metadataFlags = metadataFlags
         self.capturedAt = capturedAt
@@ -153,6 +158,7 @@ public struct HashOnlyCapturePayload: Codable, Sendable, Equatable {
         case mediaHash = "media_hash"
         case mediaType = "media_type"
         case depthAnalysis = "depth_analysis"
+        case temporalDepthAnalysis = "temporal_depth_analysis"
         case metadata
         case metadataFlags = "metadata_flags"
         case capturedAt = "captured_at"
@@ -441,12 +447,20 @@ extension HashOnlyCapturePayload {
 extension HashOnlyCapturePayload: CustomStringConvertible {
     public var description: String {
         let sizeStr = serializedSize().map { "\($0) bytes" } ?? "unknown"
+        let analysisStr: String
+        if let depth = depthAnalysis {
+            analysisStr = depth.status.rawValue
+        } else if let temporal = temporalDepthAnalysis {
+            analysisStr = "temporal(\(temporal.keyframeAnalyses.count) keyframes)"
+        } else {
+            analysisStr = "none"
+        }
         return """
         HashOnlyCapturePayload(
             captureMode: \(captureMode),
             mediaType: \(mediaType),
             mediaHash: \(mediaHash.prefix(16))...,
-            depthAnalysis: \(depthAnalysis.status.rawValue),
+            depthAnalysis: \(analysisStr),
             hasAssertion: \(!assertion.isEmpty),
             size: \(sizeStr)
         )

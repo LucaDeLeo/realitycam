@@ -104,10 +104,11 @@ final class HashOnlyPayloadBuilderTests: XCTestCase {
             depthAnalysis: sampleDepthAnalysis
         )
 
-        XCTAssertEqual(payload.depthAnalysis.depthVariance, 2.4)
-        XCTAssertEqual(payload.depthAnalysis.depthLayers, 5)
-        XCTAssertEqual(payload.depthAnalysis.edgeCoherence, 0.87)
-        XCTAssertTrue(payload.depthAnalysis.isLikelyRealScene)
+        XCTAssertNotNil(payload.depthAnalysis)
+        XCTAssertEqual(payload.depthAnalysis?.depthVariance, 2.4)
+        XCTAssertEqual(payload.depthAnalysis?.depthLayers, 5)
+        XCTAssertEqual(payload.depthAnalysis?.edgeCoherence, 0.87)
+        XCTAssertTrue(payload.depthAnalysis?.isLikelyRealScene ?? false)
     }
 
     /// Test that assertion is initially empty
@@ -240,10 +241,20 @@ final class HashOnlyPayloadBuilderTests: XCTestCase {
     func testBuildVideo_CreatesVideoPayload() async {
         let hashChain = PrivacyHashChainData(finalHash: "finalHash123", chainLength: 450)
 
+        // Create temporal depth analysis for video
+        let temporalAnalysis = TemporalDepthAnalysisResult(
+            keyframeAnalyses: [sampleDepthAnalysis],
+            meanVariance: 2.4,
+            varianceStability: 0.92,
+            temporalCoherence: 0.85,
+            isLikelyRealScene: true,
+            keyframeCount: 150
+        )
+
         let payload = await HashOnlyPayloadBuilder.buildVideo(
             from: sampleCaptureData,
             privacySettings: sampleSettings,
-            depthAnalysis: sampleDepthAnalysis,
+            temporalDepthAnalysis: temporalAnalysis,
             hashChain: hashChain,
             frameCount: 450,
             durationMs: 15000
@@ -256,6 +267,9 @@ final class HashOnlyPayloadBuilderTests: XCTestCase {
         XCTAssertNotNil(payload.hashChain)
         XCTAssertEqual(payload.hashChain?.finalHash, "finalHash123")
         XCTAssertEqual(payload.hashChain?.chainLength, 450)
+        XCTAssertNotNil(payload.temporalDepthAnalysis)
+        XCTAssertEqual(payload.temporalDepthAnalysis?.keyframeCount, 150)
+        XCTAssertTrue(payload.temporalDepthAnalysis?.isLikelyRealScene ?? false)
     }
 
     // MARK: - Unavailable Depth Analysis Tests
@@ -270,8 +284,9 @@ final class HashOnlyPayloadBuilderTests: XCTestCase {
             depthAnalysis: unavailableAnalysis
         )
 
-        XCTAssertEqual(payload.depthAnalysis.status, .unavailable)
-        XCTAssertFalse(payload.depthAnalysis.isLikelyRealScene)
+        XCTAssertNotNil(payload.depthAnalysis)
+        XCTAssertEqual(payload.depthAnalysis?.status, .unavailable)
+        XCTAssertFalse(payload.depthAnalysis?.isLikelyRealScene ?? true)
         XCTAssertEqual(payload.captureMode, "hash_only")
     }
 

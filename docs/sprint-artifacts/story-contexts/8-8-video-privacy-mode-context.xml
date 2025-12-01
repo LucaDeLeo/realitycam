@@ -1,0 +1,1453 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context>
+  <metadata>
+    <story-key>8-8-video-privacy-mode</story-key>
+    <story-file>docs/sprint-artifacts/stories/8-8-video-privacy-mode.md</story-file>
+    <epic-key>epic-8</epic-key>
+    <epic-title>Privacy-First Capture Mode (Hash-Only)</epic-title>
+    <tech-spec>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-8.md</tech-spec>
+    <dependencies>
+      <dependency>
+        <story-key>8-1-client-side-depth-analysis</story-key>
+        <reason>Provides DepthAnalysisService.swift foundation for temporal depth analysis extension</reason>
+      </dependency>
+      <dependency>
+        <story-key>8-3-hash-only-capture-payload</story-key>
+        <reason>Provides HashOnlyPayloadBuilder pattern to extend for video payloads</reason>
+      </dependency>
+      <dependency>
+        <story-key>8-4-backend-hash-only-endpoint</story-key>
+        <reason>Provides backend captures_hash_only.rs endpoint to extend for video support</reason>
+      </dependency>
+      <dependency>
+        <story-key>7-1-arkit-video-recording-session</story-key>
+        <reason>Provides VideoRecordingSession.swift infrastructure for privacy mode detection</reason>
+      </dependency>
+      <dependency>
+        <story-key>7-4-frame-hash-chain</story-key>
+        <reason>Provides hash chain computation (reused for privacy mode video)</reason>
+      </dependency>
+      <dependency>
+        <story-key>7-5-video-attestation-checkpoints</story-key>
+        <reason>Provides checkpoint attestation infrastructure to extend for hash-only</reason>
+      </dependency>
+      <dependency>
+        <story-key>7-9-video-depth-analysis-service</story-key>
+        <reason>Provides backend temporal depth analysis pattern for validation reference</reason>
+      </dependency>
+      <dependency>
+        <story-key>8-6-verification-page-hash-only</story-key>
+        <reason>Provides hash-only verification page components to extend for video variant</reason>
+      </dependency>
+      <dependency>
+        <story-key>8-7-file-verification-hash-only</story-key>
+        <reason>Provides HashOnlyVerificationResult component with video support (AC6)</reason>
+      </dependency>
+    </dependencies>
+    <context-created>2025-12-01</context-created>
+  </metadata>
+
+  <story-overview>
+    <user-story>
+      As a privacy-conscious user,
+      I want to record videos in Privacy Mode with hash-only uploads,
+      So that I can prove video authenticity with temporal depth verification without uploading the video file to the server.
+    </user-story>
+
+    <business-value>
+      Completes Epic 8 by extending Privacy Mode to video captures. Enables journalists, lawyers,
+      and medical professionals to capture sensitive video content with full authenticity guarantees
+      (hardware attestation + temporal depth analysis) while maintaining zero-knowledge privacy.
+      Video files never touch the server - only hash, depth analysis, and attestation metadata uploaded.
+    </business-value>
+
+    <technical-approach>
+      Extend existing video infrastructure (Epic 7) for Privacy Mode by computing hash chain locally
+      (30fps frame hashing), extracting depth keyframes (10fps), performing client-side temporal
+      depth analysis on device, and building VideoHashOnlyCapturePayload with sparse frame hashes
+      and checkpoint attestations. Backend validates hash chain integrity, verifies checkpoint
+      attestations, and stores evidence without S3 upload. Verification page displays video metadata,
+      hash chain status, and temporal depth analysis without video player.
+    </technical-approach>
+  </story-overview>
+
+  <acceptance-criteria>
+    <criterion id="AC1">
+      <title>Video Privacy Mode Capture Flow</title>
+      <description>
+        When Privacy Mode is enabled and user records video, VideoRecordingSession detects privacy
+        mode, computes frame-by-frame hash chain (30fps), extracts depth keyframes (10fps), generates
+        attestation checkpoints every 5 seconds, triggers client-side temporal depth analysis on
+        completion, and prepares hash-only payload with full video retained locally in encrypted storage.
+      </description>
+    </criterion>
+
+    <criterion id="AC2">
+      <title>Client-Side Temporal Depth Analysis</title>
+      <description>
+        DepthAnalysisService.analyzeTemporalDepth() analyzes each depth keyframe individually (~150 frames
+        for 15s video), computes temporal consistency metrics (variance stability, temporal coherence),
+        determines aggregate authenticity result, completes in under 2 seconds, tracks algorithm version
+        "1.0" for determinism.
+      </description>
+    </criterion>
+
+    <criterion id="AC3">
+      <title>Video Hash-Only Payload Builder</title>
+      <description>
+        VideoHashOnlyCapturePayload includes: media_hash (SHA-256 of complete video), media_type: "video",
+        hash_chain with frame hashes and keyframe indices, frame_count, duration_ms, temporal depth_analysis,
+        checkpoint_attestations array, filtered metadata per privacy settings, metadata_flags, assertion
+        covering entire payload. Total payload size under 50KB (vs 30-45MB for full video).
+      </description>
+    </criterion>
+
+    <criterion id="AC4">
+      <title>Video Hash Chain Structure for Privacy Mode</title>
+      <description>
+        Hash chain includes previous_hash + frame_data + frame_index per frame, starts with seed hash
+        (device ID + capture timestamp), includes keyframe markers for depth frames, checkpoint attestations
+        every 5 seconds reference chain state, final hash matches computed media_hash, chain integrity
+        verified locally before upload.
+      </description>
+    </criterion>
+
+    <criterion id="AC5">
+      <title>Backend Hash-Only Video Endpoint Extension</title>
+      <description>
+        POST /api/v1/captures/hash-only accepts media_type: "video", validates assertion signature,
+        verifies hash chain integrity (chain_intact computed), validates temporal depth analysis,
+        verifies checkpoint attestations match hash chain state, stores capture with capture_mode:
+        "hash_only" and media_stored: false, no S3 upload occurs, processing completes in under 5 seconds.
+      </description>
+    </criterion>
+
+    <criterion id="AC6">
+      <title>Video Hash-Only Evidence Package</title>
+      <description>
+        Evidence package includes hardware_attestation (device attestation status), temporal depth_analysis
+        (with keyframe count), hash_chain (integrity status, checkpoint count), video_metadata (duration,
+        frame_count, frame_rate), analysis_source: "device", capture_mode: "hash_only", media_stored: false.
+        Confidence calculation works identically to full video capture.
+      </description>
+    </criterion>
+
+    <criterion id="AC7">
+      <title>Video Hash-Only Verification Display</title>
+      <description>
+        Verification page shows "Video Hash Verified" badge, Privacy Mode badge, video metadata (duration,
+        frame count), hash chain verification status with checkpoint count, temporal depth analysis summary,
+        evidence panel with device analysis source, no video playback (no media stored), hash value displayed
+        prominently, confidence badge shows HIGH when all checks pass.
+      </description>
+    </criterion>
+
+    <criterion id="AC8">
+      <title>Error Handling and Edge Cases</title>
+      <description>
+        Recording interrupted: Partial hash chain + checkpoint attestation preserved. Depth analysis fails:
+        Degrades to hash-only without depth (MEDIUM confidence). Assertion generation fails: Falls back to
+        offline queue. Upload fails: Full retry with exponential backoff. Backend validation fails: Clear
+        error message returned. Hash chain integrity check fails: Capture rejected with explanation.
+      </description>
+    </criterion>
+  </acceptance-criteria>
+
+  <documentation-artifacts>
+    <artifact>
+      <path>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-8.md</path>
+      <type>technical-specification</type>
+      <description>
+        Epic 8 technical specification defining Privacy Mode architecture, video hash-only flow,
+        temporal depth analysis algorithm, and VideoHashOnlyPayload structure. Defines Story 8.8
+        acceptance criteria (lines 676-683) for video privacy mode support.
+      </description>
+      <key-sections>
+        - Story 8.8 Acceptance Criteria (lines 676-683)
+        - Video Privacy Mode Flow (lines 510-518)
+        - Video Hash-Only Payload Structure (lines 165-196)
+        - Backend Hash-Only Mode Handling (lines 197-247)
+        - Privacy Mode Capture Flow diagram (lines 443-508)
+      </key-sections>
+    </artifact>
+
+    <artifact>
+      <path>docs/sprint-artifacts/stories/8-8-video-privacy-mode.md</path>
+      <type>story-definition</type>
+      <description>
+        Complete story definition for video privacy mode with 8 acceptance criteria, 10 tasks,
+        detailed dev notes including TemporalDepthAnalysisResult struct definition, VideoHashOnlyCapturePayload
+        structure, backend validation flow, and verification page display patterns.
+      </description>
+      <key-sections>
+        - Acceptance Criteria (lines 12-115): 8 ACs covering capture flow, temporal analysis, payload, backend, evidence, display
+        - Tasks/Subtasks (lines 117-198): 10 implementation tasks across iOS, backend, web
+        - Dev Notes Technical Approach (lines 200-218): Video privacy mode flow diagram
+        - Temporal Depth Analysis Algorithm (lines 220-263): TemporalDepthAnalysisResult struct and algorithm pseudocode
+        - Video Hash-Only Payload Structure (lines 265-302): Complete payload format with hash chain
+        - Backend Validation Flow (lines 304-386): Rust code pattern for hash-only video handling
+        - Verification Page Display (lines 388-450): TSX code pattern for video hash-only UI
+        - Performance Targets (lines 452-459): Temporal analysis < 2s, payload < 50KB, backend < 5s
+        - Algorithm Parity Requirements (lines 533-547): Critical consistency with server-side thresholds
+        - Security Considerations (lines 549-564): Trust model and threat mitigation
+      </key-sections>
+    </artifact>
+
+    <artifact>
+      <path>docs/epics.md</path>
+      <type>epic-definition</type>
+      <description>
+        Epic 8 definition from main epics file (lines 3106-3130). Describes Story 8.8: Video Privacy
+        Mode Support with acceptance criteria for hash chain, temporal depth analysis, video hash-only
+        payload, and verification display.
+      </description>
+      <key-sections>
+        - Story 8.8: Video Privacy Mode Support (lines 3106-3130)
+        - Acceptance: Hash chain locally, temporal analysis on-device, backend acceptance, verification display
+      </key-sections>
+    </artifact>
+
+    <artifact>
+      <path>docs/prd.md</path>
+      <type>product-requirements</type>
+      <description>
+        Product requirements document with relevant functional requirements:
+        FR47-55 (Video capture requirements), FR56-62 (Privacy Mode functional requirements),
+        FR58 (Hash-only uploads with device depth analysis), FR60 (Backend accepts pre-computed analysis).
+      </description>
+      <key-sections>
+        - FR47-55: Video capture requirements
+        - FR56-62: Privacy Mode functional requirements
+        - FR58: Hash-only uploads with device depth analysis
+        - FR60: Backend accepts pre-computed analysis
+      </key-sections>
+    </artifact>
+
+    <artifact>
+      <path>docs/architecture.md</path>
+      <type>architecture-document</type>
+      <description>
+        Project architecture with ADR-011 (Client-Side Depth Analysis for Privacy Mode) defining
+        trust model and design decisions. Video capture architecture (lines 211-212) describes
+        frame-by-frame hash chain and checkpoint attestation patterns.
+      </description>
+      <key-sections>
+        - ADR-011: Client-Side Depth Analysis (lines 1067-1121)
+        - Video capture architecture (lines 211-212)
+        - Hash chain service pattern
+        - Checkpoint attestation flow
+      </key-sections>
+    </artifact>
+
+    <artifact>
+      <path>docs/sprint-artifacts/stories/8-1-client-side-depth-analysis.md</path>
+      <type>related-story</type>
+      <description>
+        Story 8-1 implementation that created DepthAnalysisService.swift for client-side depth
+        analysis. Provides foundation algorithms (variance, layers, coherence) that must be extended
+        to temporal batch processing for video keyframes.
+      </description>
+      <key-sections>
+        - DepthAnalysisService.swift API (analyze method pattern)
+        - Algorithm parity requirements with backend
+        - Performance target: < 500ms per frame
+        - Metal GPU acceleration for batch processing
+        - Deterministic results with version tracking
+      </key-sections>
+    </artifact>
+
+    <artifact>
+      <path>docs/sprint-artifacts/stories/8-3-hash-only-capture-payload.md</path>
+      <type>related-story</type>
+      <description>
+        Story 8-3 implementation that created HashOnlyPayloadBuilder for photo hash-only captures.
+        Provides pattern for metadata filtering, assertion generation, and payload construction
+        to extend for video with hash chain and temporal analysis.
+      </description>
+      <key-sections>
+        - HashOnlyPayloadBuilder.swift pattern
+        - Metadata filtering with PrivacySettingsManager
+        - Assertion coverage of entire payload
+        - Local media retention after upload
+      </key-sections>
+    </artifact>
+
+    <artifact>
+      <path>docs/sprint-artifacts/stories/7-4-frame-hash-chain.md</path>
+      <type>related-story</type>
+      <description>
+        Story 7-4 implementation that created frame-by-frame hash chain computation for video
+        verification. Hash chain pattern (seed hash, sequential hashing, chain integrity verification)
+        will be reused for video privacy mode with sparse frame storage for payload size optimization.
+      </description>
+      <key-sections>
+        - HashChainService.swift API
+        - Seed hash generation (device ID + timestamp)
+        - Sequential frame hashing pattern
+        - Chain integrity verification
+      </key-sections>
+    </artifact>
+
+    <artifact>
+      <path>docs/sprint-artifacts/stories/7-5-video-attestation-checkpoints.md</path>
+      <type>related-story</type>
+      <description>
+        Story 7-5 implementation that created checkpoint attestation every 5 seconds during video
+        recording. Checkpoint pattern (timestamp, frame index, chain state hash, DCAppAttest assertion)
+        will be extended for video privacy mode to prove recording continuity without full video upload.
+      </description>
+      <key-sections>
+        - VideoAttestationService.swift checkpoint generation
+        - Checkpoint attestation structure (timestamp, frame_index, chain_state_hash, assertion)
+        - 5-second interval pattern
+        - Integration with VideoRecordingSession
+      </key-sections>
+    </artifact>
+
+    <artifact>
+      <path>docs/sprint-artifacts/stories/7-9-video-depth-analysis-service.md</path>
+      <type>related-story</type>
+      <description>
+        Story 7-9 backend implementation of temporal depth analysis service. Provides server-side
+        algorithm reference for validating client-computed temporal depth analysis. iOS implementation
+        must match temporal consistency calculations and thresholds.
+      </description>
+      <key-sections>
+        - Temporal variance stability calculation
+        - Mean variance across keyframes
+        - Temporal coherence computation
+        - Algorithm version tracking for determinism
+      </key-sections>
+    </artifact>
+  </documentation-artifacts>
+
+  <existing-code-interfaces>
+    <interface>
+      <path>ios/Rial/Core/Capture/DepthAnalysisService.swift</path>
+      <type>swift-service</type>
+      <description>
+        Client-side depth analysis service from Story 8-1 (232 lines). Provides analyze() method
+        for single-frame depth analysis. MUST BE EXTENDED with analyzeTemporalDepth() method that
+        batches keyframe analysis and computes temporal consistency metrics.
+      </description>
+      <key-exports>
+        - DepthAnalysisService.shared singleton
+        - analyze(depthMap:rgbImage:) async throws -> DepthAnalysisResult (existing, reuse for each keyframe)
+        - analyzeTemporalDepth(keyframes:rgbFrames:) async throws -> TemporalDepthAnalysisResult (NEW)
+        - DepthAnalysisResult struct (existing)
+        - TemporalDepthAnalysisResult struct (NEW - add to file)
+      </key-exports>
+      <integration-points>
+        - Called by VideoRecordingSession.completeRecording() for privacy mode videos
+        - Receives depth keyframes from DepthKeyframeBuffer
+        - Returns temporal analysis to VideoHashOnlyPayloadBuilder
+        - Performance target: < 2s for 15s video (~150 keyframes)
+      </integration-points>
+    </interface>
+
+    <interface>
+      <path>ios/Rial/Core/Capture/VideoRecordingSession.swift</path>
+      <type>swift-class</type>
+      <description>
+        Video recording session from Epic 7 (323 lines). Manages video capture with hash chain
+        computation and checkpoint attestations. MUST BE MODIFIED to detect Privacy Mode from
+        PrivacySettingsManager and trigger client-side temporal analysis on recording completion.
+      </description>
+      <key-exports>
+        - VideoRecordingSession class
+        - startRecording() method
+        - stopRecording() async method (MODIFY to detect privacy mode)
+        - completeRecording() async method (MODIFY to call temporal analysis)
+        - Current integration: HashChainService, VideoAttestationService, DepthKeyframeBuffer
+      </key-exports>
+      <integration-points>
+        - Check PrivacySettingsManager.shared.settings.privacyModeEnabled on recording start
+        - Show privacy mode indicator in UI if enabled
+        - On recording complete, if privacy mode: call DepthAnalysisService.analyzeTemporalDepth()
+        - Route to VideoHashOnlyPayloadBuilder instead of standard upload
+      </integration-points>
+    </interface>
+
+    <interface>
+      <path>ios/Rial/Core/Capture/HashOnlyPayloadBuilder.swift</path>
+      <type>swift-service</type>
+      <description>
+        Hash-only payload builder from Story 8-3 (97 lines). Constructs HashOnlyCapturePayload
+        for photos. MUST BE EXTENDED or new VideoHashOnlyPayloadBuilder created to handle video-specific
+        fields (hash_chain, frame_count, duration_ms, temporal_depth_analysis, checkpoint_attestations).
+      </description>
+      <key-exports>
+        - HashOnlyPayloadBuilder.build() static method (existing, for photos)
+        - buildVideoHashOnlyPayload() static method (NEW - add to file or create new VideoHashOnlyPayloadBuilder)
+        - HashOnlyCapturePayload struct (existing)
+        - VideoHashOnlyCapturePayload struct (NEW - add to Models/)
+      </key-exports>
+      <integration-points>
+        - Called by UploadService when video + privacy mode detected
+        - Receives VideoRecordingResult with hash chain, temporal analysis, checkpoints
+        - Applies metadata filtering via MetadataFilterService
+        - Generates assertion via CaptureAssertionService
+        - Returns payload < 50KB for upload
+      </integration-points>
+    </interface>
+
+    <interface>
+      <path>ios/Rial/Core/Networking/UploadService.swift</path>
+      <type>swift-service</type>
+      <description>
+        Upload service from Epic 7 (154 lines). Routes captures to appropriate endpoints based
+        on media type and mode. MUST BE MODIFIED to detect video + privacy mode combination and
+        route to hash-only payload builder and endpoint.
+      </description>
+      <key-exports>
+        - UploadService class
+        - uploadCapture() method (MODIFY to detect video privacy mode)
+        - uploadVideo() method (existing, for full video)
+        - uploadHashOnly() method (existing, for photo hash-only)
+        - uploadVideoHashOnly() method (NEW - add for video privacy mode)
+      </key-exports>
+      <integration-points>
+        - Check media_type == "video" AND PrivacySettingsManager privacy mode enabled
+        - Route to VideoHashOnlyPayloadBuilder.build()
+        - POST to /api/v1/captures/hash-only with mode: "hash_only", media_type: "video"
+        - Handle video-specific errors (hash chain validation, temporal analysis)
+        - Retain full video in local encrypted storage
+      </integration-points>
+    </interface>
+
+    <interface>
+      <path>backend/src/routes/captures_hash_only.rs</path>
+      <type>rust-axum-route</type>
+      <description>
+        Hash-only capture routes from Story 8-4 (150+ lines shown). POST /api/v1/captures/hash-only
+        endpoint for photo hash-only. MUST BE EXTENDED to handle media_type: "video" with hash chain
+        validation, temporal depth analysis verification, and checkpoint attestation checks.
+      </description>
+      <key-exports>
+        - upload_hash_only_capture() handler (MODIFY to detect video vs photo)
+        - HashOnlyCapturePayload struct (EXTEND with video fields)
+        - VideoHashOnlyPayload struct (NEW - add video-specific fields)
+        - insert_hash_only_capture() helper (existing, works for both)
+      </key-exports>
+      <integration-points>
+        - Detect payload.media_type == "video"
+        - Validate hash_chain field present for video
+        - Validate temporal_depth_analysis field present for video
+        - Call verify_hash_chain_privacy_mode() to check chain integrity
+        - Verify checkpoint attestations via attestation service
+        - Skip S3 upload for hash-only (same as photo)
+        - Return capture_id and verification_url
+      </integration-points>
+    </interface>
+
+    <interface>
+      <path>backend/src/services/depth_analysis.rs</path>
+      <type>rust-service</type>
+      <description>
+        Server-side depth analysis service (reference for algorithm parity). Includes temporal
+        depth analysis for full video captures. iOS temporal analysis must match thresholds and
+        formulas to ensure deterministic results.
+      </description>
+      <key-exports>
+        - analyze_temporal_depth() function (reference for iOS implementation)
+        - Temporal variance stability calculation formula
+        - Mean variance computation across keyframes
+        - Temporal coherence formula
+        - Algorithm version "1.0" constant
+      </key-exports>
+      <integration-points>
+        - iOS DepthAnalysisService.analyzeTemporalDepth() must match calculations
+        - Variance threshold, layer threshold, coherence threshold must be identical
+        - TemporalDepthAnalysisResult struct fields must match backend TemporalDepthAnalysis
+        - Algorithm version must match for parity testing
+      </integration-points>
+    </interface>
+
+    <interface>
+      <path>backend/src/services/evidence.rs</path>
+      <type>rust-service</type>
+      <description>
+        Evidence package generation service from Story 8-5. Builds evidence package from hash-only
+        payloads. MUST BE EXTENDED to handle video-specific evidence fields (video_metadata, hash_chain,
+        temporal_depth_analysis) for video hash-only captures.
+      </description>
+      <key-exports>
+        - Evidence::from_hash_only() method (MODIFY to detect video type)
+        - Evidence struct with capture_mode, media_stored, analysis_source fields (existing)
+        - VideoMetadata struct (NEW - add video-specific fields)
+        - HashChainEvidence struct (NEW - add hash chain status)
+      </key-exports>
+      <integration-points>
+        - Detect media_type: "video" in payload
+        - Include video_metadata (duration_ms, frame_count, frame_rate)
+        - Include hash_chain evidence (chain_intact, checkpoint_count, frame_count)
+        - Include temporal_depth_analysis (keyframe_count, variance_stability, temporal_coherence)
+        - Set analysis_source: "device" for hash-only
+        - Confidence calculation works identically to full video
+      </integration-points>
+    </interface>
+
+    <interface>
+      <path>apps/web/src/app/verify/[id]/page.tsx</path>
+      <type>react-component</type>
+      <description>
+        Verification page from Story 8-6 (extended in 8-7). Displays capture evidence and media.
+        MUST BE MODIFIED to detect capture_mode: "hash_only" AND media_type: "video" and display
+        video-specific hash-only UI (no video player, hash chain status, temporal depth summary).
+      </description>
+      <key-exports>
+        - VerifyPage component (MODIFY to detect video hash-only)
+        - Existing: PrivacyModeBadge, HashOnlyMediaPlaceholder
+        - Add video hash-only display variant with metadata (duration, frames, hash chain)
+      </key-exports>
+      <integration-points>
+        - Check captureData.capture_mode === 'hash_only' AND captureData.media_type === 'video'
+        - Display "Video Hash Verified" badge (not just "Hash Verified")
+        - Show hash chain verification status with checkpoint count
+        - Display temporal depth analysis summary (keyframe_count, consistency metrics)
+        - Show video metadata (duration, frame_count, frame_rate)
+        - No video player component (media not stored)
+        - Hash value displayed prominently
+      </integration-points>
+    </interface>
+
+    <interface>
+      <path>apps/web/src/components/Evidence/HashOnlyVerificationResult.tsx</path>
+      <type>react-component</type>
+      <description>
+        Hash-only verification result component from Story 8-7. Displays hash-only capture evidence
+        from file verification. Already supports video variant (AC6 of Story 8-7). May need minor
+        adjustments for temporal depth analysis display.
+      </description>
+      <key-exports>
+        - HashOnlyVerificationResult component (existing, supports video)
+        - Video-specific display section (duration, frames, hash chain, temporal depth)
+        - PrivacyModeBadge integration (existing)
+        - EvidencePanel integration with isHashOnly flag (existing)
+      </key-exports>
+      <integration-points>
+        - Reuse for verification page video hash-only display
+        - Ensure temporal depth analysis summary displayed correctly
+        - Hash chain checkpoint count display
+        - Video metadata display (duration, frame count)
+        - "Video Hash Verified" badge (may already exist)
+      </integration-points>
+    </interface>
+
+    <interface>
+      <path>ios/Rial/Core/Capture/DepthKeyframeBuffer.swift</path>
+      <type>swift-class</type>
+      <description>
+        Depth keyframe extraction buffer from Story 7-2 (194 lines). Extracts depth keyframes at 10fps
+        during video recording. Provides depth keyframes to temporal analysis service.
+      </description>
+      <key-exports>
+        - DepthKeyframeBuffer class
+        - append() method to add depth frames
+        - getKeyframes() method to retrieve buffered keyframes
+        - 10fps extraction rate (every 3rd frame at 30fps)
+      </key-exports>
+      <integration-points>
+        - VideoRecordingSession already uses DepthKeyframeBuffer
+        - On recording complete, retrieve keyframes via getKeyframes()
+        - Pass keyframes to DepthAnalysisService.analyzeTemporalDepth()
+        - Keyframe count ~150 for 15s video (10fps * 15s)
+      </integration-points>
+    </interface>
+
+    <interface>
+      <path>ios/Rial/Core/Configuration/PrivacySettingsManager.swift</path>
+      <type>swift-class</type>
+      <description>
+        Privacy settings manager from Story 8-2. Manages Privacy Mode toggle and metadata level
+        settings. VideoRecordingSession checks this to determine if privacy mode is active.
+      </description>
+      <key-exports>
+        - PrivacySettingsManager.shared singleton
+        - settings: PrivacySettings struct
+        - settings.privacyModeEnabled: Bool
+        - settings.locationLevel, timestampLevel, deviceInfoLevel enums
+      </key-exports>
+      <integration-points>
+        - VideoRecordingSession checks privacyModeEnabled at recording start
+        - Show privacy mode indicator in UI if enabled
+        - MetadataFilterService uses settings to filter video metadata
+        - Settings persist across app launches
+      </integration-points>
+    </interface>
+
+    <interface>
+      <path>ios/Rial/Core/Capture/MetadataFilterService.swift</path>
+      <type>swift-service</type>
+      <description>
+        Metadata filtering service from Story 8-3 (89 lines). Applies privacy settings to metadata
+        before payload construction. Works for both photo and video metadata.
+      </description>
+      <key-exports>
+        - MetadataFilterService.filter() static method
+        - Filters location, timestamp, device info per PrivacySettings
+        - Returns FilteredMetadata and MetadataFlags
+      </key-exports>
+      <integration-points>
+        - VideoHashOnlyPayloadBuilder calls filter() with video metadata
+        - Same filtering logic applies to video as photo
+        - MetadataFlags included in video payload for verification display
+      </integration-points>
+    </interface>
+  </existing-code-interfaces>
+
+  <development-constraints>
+    <constraint>
+      <category>algorithm-parity</category>
+      <description>
+        CRITICAL: Temporal depth analysis on iOS must match server-side algorithm from
+        backend/src/services/depth_analysis.rs. Per-keyframe analysis thresholds (variance > 0.5,
+        layers >= 3, coherence > 0.7) must be identical. Temporal consistency calculation
+        (variance stability > 0.8) must use same formula. Algorithm version "1.0" tracked for
+        determinism. Testing strategy: Record test video, run client-side temporal analysis,
+        compare with server-side analysis on same depth keyframes, assert metrics within 0.01.
+      </description>
+      <source>docs/sprint-artifacts/stories/8-8-video-privacy-mode.md - Algorithm Parity Requirements (lines 533-547)</source>
+    </constraint>
+
+    <constraint>
+      <category>performance</category>
+      <description>
+        Temporal depth analysis must complete in under 2 seconds for 15s video (~150 keyframes at 10fps).
+        Use Metal GPU acceleration for batch processing if needed. Hash-only payload size must be under
+        50KB (vs 30-45MB for full video) using sparse frame hashes (every 10th frame). Backend processing
+        must complete in under 5 seconds (skip S3 upload, parallel verification).
+      </description>
+      <source>Story 8-8 AC2 and dev notes Performance Targets (lines 452-459)</source>
+    </constraint>
+
+    <constraint>
+      <category>payload-structure</category>
+      <description>
+        VideoHashOnlyCapturePayload must include: media_hash (SHA-256 of complete video), media_type: "video",
+        hash_chain (seedHash, finalHash, chainIntegrity, sparse frameHashes every 10th frame, keyframeIndices),
+        frameCount, durationMs, depthAnalysis (TemporalDepthAnalysisResult), checkpointAttestations (every 5s),
+        metadata (filtered per privacy settings), metadataFlags, capturedAt, assertion (Base64 DCAppAttest).
+        Assertion must cover entire payload for integrity.
+      </description>
+      <source>Story 8-8 dev notes Video Hash-Only Payload Structure (lines 265-302)</source>
+    </constraint>
+
+    <constraint>
+      <category>hash-chain-integrity</category>
+      <description>
+        Hash chain for privacy mode video: Each frame hash includes previous_hash + frame_data + frame_index.
+        Chain starts with seed hash (device ID + capture timestamp). Chain includes keyframe markers for depth frames.
+        Checkpoint attestations every 5 seconds reference chain state. Final hash must match computed media_hash.
+        Chain integrity verified locally before upload. Backend verifies chain integrity before accepting payload.
+      </description>
+      <source>Story 8-8 AC4 - Video Hash Chain Structure</source>
+    </constraint>
+
+    <constraint>
+      <category>backend-validation</category>
+      <description>
+        Backend hash-only video endpoint must: (1) Verify assertion signature covers payload, (2) Validate hash chain
+        integrity (chain_intact computed), (3) Verify checkpoint attestations match hash chain state, (4) Validate
+        temporal depth analysis results, (5) Store capture with capture_mode: "hash_only" and media_stored: false,
+        (6) No S3 upload occurs (video never touches server), (7) Return capture_id and verification_url within 5s.
+      </description>
+      <source>Story 8-8 AC5 - Backend Hash-Only Video Endpoint Extension</source>
+    </constraint>
+
+    <constraint>
+      <category>local-storage</category>
+      <description>
+        Full video file must be retained in local encrypted storage after hash-only upload. User maintains full
+        control of original media. Video stored using iOS Data Protection (FileProtectionType.completeUntilFirstUserAuthentication).
+        Storage target: < 100MB per video with AES-GCM encryption. Video accessible for local playback and re-verification.
+      </description>
+      <source>Story 8-8 dev notes Performance Targets and AC1</source>
+    </constraint>
+
+    <constraint>
+      <category>error-handling</category>
+      <description>
+        Graceful degradation required: (1) Recording interrupted: Partial hash chain + checkpoint attestation preserved,
+        (2) Depth analysis fails: Degrades to hash-only without depth (MEDIUM confidence), (3) Assertion generation fails:
+        Falls back to offline queue, (4) Upload fails: Full retry with exponential backoff, (5) Backend validation fails:
+        Clear error message returned, (6) Hash chain integrity check fails: Capture rejected with explanation.
+      </description>
+      <source>Story 8-8 AC8 - Error Handling and Edge Cases</source>
+    </constraint>
+
+    <constraint>
+      <category>verification-display</category>
+      <description>
+        Verification page for video hash-only must display: "Video Hash Verified" badge (not just "Hash Verified"),
+        Privacy Mode badge, video metadata (duration, frame count, frame rate), hash chain verification status with
+        checkpoint count, temporal depth analysis summary (keyframe count, variance stability, temporal coherence),
+        evidence panel with analysis_source: "device", NO video player (media not stored), hash value displayed
+        prominently, confidence badge shows HIGH when all checks pass.
+      </description>
+      <source>Story 8-8 AC7 - Video Hash-Only Verification Display</source>
+    </constraint>
+
+    <constraint>
+      <category>testing</category>
+      <description>
+        Integration tests required: (1) Video recording in privacy mode, (2) Temporal depth analysis computation,
+        (3) Hash-only payload construction and size validation, (4) Backend endpoint acceptance and validation,
+        (5) Verification page display with all video-specific elements, (6) Interrupted recording handling with
+        partial evidence preservation, (7) Algorithm parity test comparing iOS vs backend temporal analysis on
+        same keyframes.
+      </description>
+      <source>Story 8-8 Task 10 - Video Privacy Mode Integration Tests</source>
+    </constraint>
+
+    <constraint>
+      <category>security</category>
+      <description>
+        Trust model: DCAppAttest assertion covers entire video hash-only payload. Hash chain proves frame integrity
+        (no insertion/deletion). Checkpoint attestations prove capture continuity. Temporal depth analysis proves
+        3D scene across time. Server trusts attested device's computation. Threat mitigation: Video file substitution
+        (hash mismatch detected), frame insertion/deletion (hash chain breaks), fake depth analysis (Secure Enclave
+        signature required), recording interrupted (checkpoint attestations preserve partial evidence).
+      </description>
+      <source>Story 8-8 dev notes Security Considerations (lines 549-564)</source>
+    </constraint>
+  </development-constraints>
+
+  <dependencies>
+    <ios-framework>
+      <name>CryptoKit</name>
+      <usage>SHA-256 hashing of video file for media_hash computation</usage>
+    </ios-framework>
+
+    <ios-framework>
+      <name>DeviceCheck</name>
+      <usage>DCAppAttest assertions for checkpoint attestations and final payload signature</usage>
+    </ios-framework>
+
+    <ios-framework>
+      <name>Metal</name>
+      <usage>GPU acceleration for batch depth analysis on video keyframes (optional, for performance)</usage>
+    </ios-framework>
+
+    <ios-framework>
+      <name>ARKit</name>
+      <usage>Depth map access from video recording session (existing)</usage>
+    </ios-framework>
+
+    <cargo-crate>
+      <name>axum</name>
+      <version>0.8</version>
+      <usage>Web framework for hash-only video endpoint (existing)</usage>
+    </cargo-crate>
+
+    <cargo-crate>
+      <name>sqlx</name>
+      <version>0.8</version>
+      <usage>Database operations for hash-only capture storage (existing)</usage>
+    </cargo-crate>
+
+    <cargo-crate>
+      <name>sha2</name>
+      <version>latest</version>
+      <usage>Hash chain verification (existing)</usage>
+    </cargo-crate>
+
+    <cargo-crate>
+      <name>serde_json</name>
+      <version>latest</version>
+      <usage>JSON serialization for video hash-only payload (existing)</usage>
+    </cargo-crate>
+
+    <npm-package>
+      <name>react</name>
+      <version>19.x</version>
+      <usage>Verification page components (existing)</usage>
+    </npm-package>
+
+    <npm-package>
+      <name>next</name>
+      <version>16.x</version>
+      <usage>App Router for verification routes (existing)</usage>
+    </npm-package>
+  </dependencies>
+
+  <testing-requirements>
+    <test-suite>
+      <type>unit</type>
+      <framework>xctest</framework>
+      <location>ios/RialTests/PrivacyMode/VideoHashOnlyTests.swift</location>
+      <test-cases>
+        - DepthAnalysisService.analyzeTemporalDepth() correctness
+        - Temporal variance stability calculation
+        - Mean variance computation across keyframes
+        - TemporalDepthAnalysisResult serialization
+        - VideoHashOnlyCapturePayload construction
+        - Hash chain integrity for privacy mode
+        - Checkpoint attestation generation
+        - Payload size validation (< 50KB)
+        - Algorithm version tracking
+      </test-cases>
+    </test-suite>
+
+    <test-suite>
+      <type>integration</type>
+      <framework>xctest</framework>
+      <location>ios/RialTests/PrivacyMode/VideoHashOnlyTests.swift</location>
+      <test-cases>
+        - End-to-end video privacy mode capture flow
+        - Privacy mode detection in VideoRecordingSession
+        - Temporal depth analysis triggered on recording complete
+        - Hash-only payload routing via UploadService
+        - Local video retention in encrypted storage
+        - Offline queue fallback for assertion failure
+        - Interrupted recording partial evidence preservation
+      </test-cases>
+    </test-suite>
+
+    <test-suite>
+      <type>algorithm-parity</type>
+      <framework>xctest</framework>
+      <location>ios/RialTests/PrivacyMode/TemporalDepthParityTests.swift</location>
+      <test-cases>
+        - Record test video with known depth characteristics
+        - Run iOS DepthAnalysisService.analyzeTemporalDepth()
+        - Compare with backend analyze_temporal_depth() on same keyframes
+        - Assert: meanVariance within 0.01 of backend
+        - Assert: varianceStability within 0.01 of backend
+        - Assert: temporalCoherence within 0.01 of backend
+        - Assert: isLikelyRealScene matches backend
+      </test-cases>
+    </test-suite>
+
+    <test-suite>
+      <type>unit</type>
+      <framework>rust-test</framework>
+      <location>backend/src/routes/captures_hash_only.rs::tests</location>
+      <test-cases>
+        - VideoHashOnlyPayload deserialization
+        - Hash chain integrity verification
+        - Checkpoint attestation validation
+        - Temporal depth analysis validation
+        - Payload size under 50KB check
+        - media_stored = false enforcement
+        - No S3 upload call verification
+      </test-cases>
+    </test-suite>
+
+    <test-suite>
+      <type>integration</type>
+      <framework>rust-test</framework>
+      <location>backend/tests/video_hash_only_integration.rs</location>
+      <test-cases>
+        - POST /api/v1/captures/hash-only with media_type: "video"
+        - Assertion signature verification
+        - Hash chain validation pass/fail scenarios
+        - Checkpoint attestation verification
+        - Evidence package generation for video hash-only
+        - Confidence calculation (HIGH when all pass)
+        - Database record creation with capture_mode: "hash_only"
+      </test-cases>
+    </test-suite>
+
+    <test-suite>
+      <type>e2e</type>
+      <framework>playwright</framework>
+      <location>apps/web/tests/e2e/video-hash-only-verification.spec.ts</location>
+      <test-cases>
+        - Navigate to verification page for video hash-only capture
+        - "Video Hash Verified" badge displayed
+        - Privacy Mode badge displayed
+        - Video metadata displayed (duration, frame count)
+        - Hash chain status displayed with checkpoint count
+        - Temporal depth analysis summary displayed
+        - Evidence panel shows analysis_source: "device"
+        - No video player component present
+        - Hash value displayed and copyable
+        - Confidence badge shows HIGH when checks pass
+      </test-cases>
+    </test-suite>
+
+    <test-suite>
+      <type>performance</type>
+      <framework>xctest</framework>
+      <location>ios/RialTests/Performance/TemporalDepthPerformanceTests.swift</location>
+      <test-cases>
+        - Measure analyzeTemporalDepth() time for 15s video (~150 keyframes)
+        - Assert: completion time < 2 seconds
+        - Measure VideoHashOnlyCapturePayload serialization size
+        - Assert: payload size < 50KB
+        - Measure hash chain computation time for 450 frames (15s @ 30fps)
+        - Assert: under 1 second
+      </test-cases>
+    </test-suite>
+  </testing-requirements>
+
+  <implementation-notes>
+    <note>
+      <category>temporal-depth-analysis-algorithm</category>
+      <description>
+        Add analyzeTemporalDepth() method to DepthAnalysisService.swift:
+
+        ```swift
+        struct TemporalDepthAnalysisResult: Codable {
+            let keyframeAnalyses: [DepthAnalysisResult]  // Per-keyframe results
+            let meanVariance: Float                       // Average depth variance
+            let varianceStability: Float                  // Consistency across frames
+            let temporalCoherence: Float                  // Edge coherence stability
+            let isLikelyRealScene: Bool                   // All keyframes pass
+            let keyframeCount: Int
+            let algorithmVersion: String                  // "1.0"
+        }
+
+        func analyzeTemporalDepth(keyframes: [CVPixelBuffer], rgbFrames: [CVPixelBuffer]) async throws -> TemporalDepthAnalysisResult {
+            // 1. Analyze each keyframe individually (reuse existing analyze() method)
+            var analyses: [DepthAnalysisResult] = []
+            for (depth, rgb) in zip(keyframes, rgbFrames) {
+                let analysis = try await analyze(depthMap: depth, rgbImage: rgb)
+                analyses.append(analysis)
+            }
+
+            // 2. Compute temporal metrics
+            let variances = analyses.map { $0.depthVariance }
+            let meanVariance = variances.reduce(0, +) / Float(variances.count)
+
+            // Variance stability: 1.0 - (stddev / mean)
+            let varianceStability = 1.0 - (standardDeviation(variances) / meanVariance)
+
+            // Temporal coherence: average coherence across all keyframes
+            let coherences = analyses.map { $0.edgeCoherence }
+            let temporalCoherence = coherences.reduce(0, +) / Float(coherences.count)
+
+            // 3. Determine scene authenticity
+            let isLikelyRealScene = analyses.allSatisfy { $0.isLikelyRealScene } &&
+                                    varianceStability > 0.8
+
+            return TemporalDepthAnalysisResult(
+                keyframeAnalyses: analyses,
+                meanVariance: meanVariance,
+                varianceStability: varianceStability,
+                temporalCoherence: temporalCoherence,
+                isLikelyRealScene: isLikelyRealScene,
+                keyframeCount: keyframes.count,
+                algorithmVersion: "1.0"
+            )
+        }
+
+        private func standardDeviation(_ values: [Float]) -> Float {
+            let mean = values.reduce(0, +) / Float(values.count)
+            let squaredDiffs = values.map { pow($0 - mean, 2) }
+            let variance = squaredDiffs.reduce(0, +) / Float(values.count)
+            return sqrt(variance)
+        }
+        ```
+
+        Performance optimization: Consider batch processing on GPU if analysis time exceeds 2s target.
+      </description>
+    </note>
+
+    <note>
+      <category>video-hash-only-payload-structure</category>
+      <description>
+        Create VideoHashOnlyCapturePayload.swift in ios/Rial/Models/:
+
+        ```swift
+        struct VideoHashOnlyCapturePayload: Codable {
+            let captureMode: String = "hash_only"
+            let mediaHash: String                      // SHA-256 of video file
+            let mediaType: String = "video"
+            let hashChain: HashChainData
+            let frameCount: Int
+            let durationMs: Int
+            let depthAnalysis: TemporalDepthAnalysisResult
+            let checkpointAttestations: [CheckpointAttestation]
+            let metadata: FilteredMetadata
+            let metadataFlags: MetadataFlags
+            let capturedAt: Date
+            let assertion: String                      // Base64 DCAppAttest
+        }
+
+        struct HashChainData: Codable {
+            let seedHash: String
+            let finalHash: String
+            let chainIntegrity: Bool                   // Pre-verified on device
+            let frameHashes: [FrameHashEntry]          // Sparse: every 10th frame
+            let keyframeIndices: [Int]                 // Depth keyframe positions
+        }
+
+        struct FrameHashEntry: Codable {
+            let frameIndex: Int
+            let hash: String
+        }
+
+        struct CheckpointAttestation: Codable {
+            let timestamp: Date
+            let frameIndex: Int
+            let chainStateHash: String
+            let assertion: String                      // DCAppAttest assertion
+        }
+        ```
+
+        Payload size optimization: Store only every 10th frame hash in frameHashes array (sparse storage).
+        Full hash chain retained locally but not uploaded. Target: < 50KB total payload.
+      </description>
+    </note>
+
+    <note>
+      <category>video-recording-session-privacy-mode-detection</category>
+      <description>
+        Modify VideoRecordingSession.swift to detect Privacy Mode:
+
+        ```swift
+        class VideoRecordingSession {
+            private var privacyModeEnabled: Bool = false
+
+            func startRecording() async throws {
+                // Detect privacy mode from PrivacySettingsManager
+                privacyModeEnabled = PrivacySettingsManager.shared.settings.privacyModeEnabled
+
+                if privacyModeEnabled {
+                    // Show privacy mode indicator in UI
+                    NotificationCenter.default.post(name: .privacyModeActive, object: nil)
+                }
+
+                // Start recording as usual
+                // ...
+            }
+
+            func completeRecording() async throws -> VideoRecordingResult {
+                // ... existing recording completion logic ...
+
+                if privacyModeEnabled {
+                    // Trigger client-side temporal depth analysis
+                    let keyframes = depthKeyframeBuffer.getKeyframes()
+                    let rgbFrames = depthKeyframeBuffer.getRGBFrames()
+
+                    let temporalAnalysis = try await DepthAnalysisService.shared
+                        .analyzeTemporalDepth(keyframes: keyframes, rgbFrames: rgbFrames)
+
+                    // Include in recording result
+                    result.temporalDepthAnalysis = temporalAnalysis
+                }
+
+                return result
+            }
+        }
+        ```
+
+        Privacy mode indicator: Add UI element in CaptureView showing purple shield icon when privacy mode active.
+      </description>
+    </note>
+
+    <note>
+      <category>upload-service-video-privacy-routing</category>
+      <description>
+        Modify UploadService.swift to detect video + privacy mode and route to hash-only:
+
+        ```swift
+        func uploadCapture(_ captureData: CaptureData) async throws {
+            let privacyMode = PrivacySettingsManager.shared.settings.privacyModeEnabled
+
+            if captureData.mediaType == .video && privacyMode {
+                // Route to video hash-only upload
+                try await uploadVideoHashOnly(captureData)
+            } else if captureData.mediaType == .video {
+                // Standard video upload
+                try await uploadVideo(captureData)
+            } else if privacyMode {
+                // Photo hash-only upload (existing)
+                try await uploadHashOnly(captureData)
+            } else {
+                // Standard photo upload
+                try await uploadPhoto(captureData)
+            }
+        }
+
+        private func uploadVideoHashOnly(_ captureData: CaptureData) async throws {
+            // Build video hash-only payload
+            let payload = try await VideoHashOnlyPayloadBuilder.build(from: captureData)
+
+            // POST to /api/v1/captures/hash-only
+            let response = try await apiClient.post(
+                "/captures/hash-only",
+                body: payload
+            )
+
+            // Retain full video in local encrypted storage
+            try await localStorage.saveVideo(captureData.videoURL)
+
+            // Return verification URL
+            return response.verificationURL
+        }
+        ```
+
+        Error handling: If temporal analysis fails, degrade to hash-only without depth (MEDIUM confidence).
+      </description>
+    </note>
+
+    <note>
+      <category>backend-video-hash-only-handler</category>
+      <description>
+        Extend captures_hash_only.rs to handle video payloads:
+
+        ```rust
+        async fn upload_hash_only_capture(
+            State(state): State&lt;AppState&gt;,
+            Extension(request_id): Extension&lt;Uuid&gt;,
+            Extension(device_ctx): Extension&lt;DeviceContext&gt;,
+            Json(payload): Json&lt;HashOnlyCapturePayload&gt;,
+        ) -> Result&lt;(StatusCode, Json&lt;ApiResponse&lt;HashOnlyCaptureResponse&gt;&gt;), ApiErrorWithRequestId&gt; {
+            // Detect video vs photo
+            let is_video = payload.media_type == "video";
+
+            if is_video {
+                // Validate video-specific fields
+                let hash_chain = payload.hash_chain.as_ref()
+                    .ok_or(ApiError::ValidationError("hash_chain required for video".into()))?;
+
+                let temporal_analysis = payload.temporal_depth_analysis.as_ref()
+                    .ok_or(ApiError::ValidationError("temporal_depth_analysis required for video".into()))?;
+
+                // Verify hash chain integrity
+                let chain_status = verify_hash_chain_privacy_mode(
+                    hash_chain,
+                    &payload.media_hash,
+                )?;
+
+                if !chain_status.intact {
+                    return Err(ApiError::ValidationError("Hash chain integrity check failed".into()));
+                }
+
+                // Verify checkpoint attestations
+                for checkpoint in &payload.checkpoint_attestations {
+                    verify_checkpoint_attestation(checkpoint, &device_ctx.device_id).await?;
+                }
+            }
+
+            // Verify assertion signature (same for photo/video)
+            verify_hash_only_assertion(&payload, &device_ctx).await?;
+
+            // Build evidence package
+            let evidence = if is_video {
+                Evidence::from_video_hash_only(&payload, &device_ctx)
+            } else {
+                Evidence::from_hash_only(&payload, &device_ctx)
+            };
+
+            // Calculate confidence
+            let confidence = calculate_confidence(&evidence);
+
+            // Store capture (no S3 upload)
+            let capture_id = insert_hash_only_capture(&state.db, InsertHashOnlyCaptureParams {
+                capture_id: Uuid::new_v4(),
+                device_id: device_ctx.device_id,
+                target_media_hash: payload.media_hash,
+                evidence: serde_json::to_value(&evidence)?,
+                confidence_level: confidence,
+                captured_at: payload.captured_at,
+                metadata_flags: payload.metadata_flags,
+                location_coarse: payload.metadata.location_coarse,
+            }).await?;
+
+            Ok((
+                StatusCode::ACCEPTED,
+                Json(ApiResponse::success(HashOnlyCaptureResponse {
+                    capture_id,
+                    status: "complete".to_string(),
+                    capture_mode: "hash_only".to_string(),
+                    media_stored: false,
+                    verification_url: format!("/verify/{}", capture_id),
+                }))
+            ))
+        }
+        ```
+
+        Processing time target: < 5 seconds (skip S3 upload, parallel verification).
+      </description>
+    </note>
+
+    <note>
+      <category>verification-page-video-hash-only-display</category>
+      <description>
+        Extend apps/web/src/app/verify/[id]/page.tsx for video hash-only:
+
+        ```tsx
+        {captureData.capture_mode === 'hash_only' && captureData.media_type === 'video' && (
+          &lt;div className="space-y-6"&gt;
+            {/* Video Hash Verified Badge */}
+            &lt;div className="flex items-center gap-2 text-green-600"&gt;
+              &lt;CheckCircleIcon className="h-6 w-6" /&gt;
+              &lt;span className="font-semibold"&gt;Video Hash Verified&lt;/span&gt;
+            &lt;/div&gt;
+
+            {/* Privacy Mode Badge */}
+            &lt;PrivacyModeBadge /&gt;
+
+            {/* Hash Display */}
+            &lt;div className="bg-zinc-50 dark:bg-zinc-900 rounded-lg p-4"&gt;
+              &lt;div className="text-sm text-zinc-500"&gt;File Hash (SHA-256)&lt;/div&gt;
+              &lt;div className="font-mono text-xs break-all"&gt;{captureData.media_hash}&lt;/div&gt;
+            &lt;/div&gt;
+
+            {/* Video Metadata */}
+            &lt;div className="grid grid-cols-2 gap-4"&gt;
+              &lt;div&gt;
+                &lt;span className="text-zinc-500"&gt;Duration:&lt;/span&gt;{' '}
+                {captureData.video_metadata.duration_ms / 1000}s
+              &lt;/div&gt;
+              &lt;div&gt;
+                &lt;span className="text-zinc-500"&gt;Frames:&lt;/span&gt;{' '}
+                {captureData.video_metadata.frame_count}
+              &lt;/div&gt;
+              &lt;div&gt;
+                &lt;span className="text-zinc-500"&gt;Hash Chain:&lt;/span&gt;{' '}
+                &lt;span className={captureData.evidence.hash_chain.chain_intact ?
+                  'text-green-600' : 'text-red-600'}&gt;
+                  {captureData.evidence.hash_chain.chain_intact ?
+                    `Verified (${captureData.evidence.hash_chain.checkpoint_count} checkpoints)` :
+                    'Failed'}
+                &lt;/span&gt;
+              &lt;/div&gt;
+              &lt;div&gt;
+                &lt;span className="text-zinc-500"&gt;Temporal Depth:&lt;/span&gt;{' '}
+                &lt;span className={captureData.evidence.depth_analysis.status === 'pass' ?
+                  'text-green-600' : 'text-red-600'}&gt;
+                  {captureData.evidence.depth_analysis.keyframe_count} keyframes
+                &lt;/span&gt;
+              &lt;/div&gt;
+            &lt;/div&gt;
+
+            {/* Evidence Panel */}
+            &lt;EvidencePanel
+              evidence={captureData.evidence}
+              isHashOnly={true}
+              showPreview={false}
+            /&gt;
+          &lt;/div&gt;
+        )}
+        ```
+
+        Note: No video player component since media_stored = false.
+      </description>
+    </note>
+
+    <note>
+      <category>hash-chain-verifier-privacy-mode</category>
+      <description>
+        Add verify_hash_chain_privacy_mode() function to backend/src/services/hash_chain_verifier.rs:
+
+        ```rust
+        pub fn verify_hash_chain_privacy_mode(
+            hash_chain: &HashChainData,
+            media_hash: &str,
+        ) -> Result&lt;HashChainStatus, ApiError&gt; {
+            // 1. Verify final hash matches media hash
+            if hash_chain.final_hash != media_hash {
+                return Ok(HashChainStatus {
+                    intact: false,
+                    error: Some("Final hash does not match media hash".into()),
+                });
+            }
+
+            // 2. Verify seed hash format (device_id + timestamp)
+            if !is_valid_seed_hash(&hash_chain.seed_hash) {
+                return Ok(HashChainStatus {
+                    intact: false,
+                    error: Some("Invalid seed hash format".into()),
+                });
+            }
+
+            // 3. Spot-check sparse frame hashes (every 10th frame)
+            // For privacy mode, we trust the chain integrity bool computed on device
+            // but verify attestation coverage via checkpoints
+            if !hash_chain.chain_integrity {
+                return Ok(HashChainStatus {
+                    intact: false,
+                    error: Some("Device reported chain integrity failure".into()),
+                });
+            }
+
+            Ok(HashChainStatus {
+                intact: true,
+                error: None,
+            })
+        }
+        ```
+
+        Trust model: Device-computed chain_integrity trusted due to DCAppAttest signature coverage.
+      </description>
+    </note>
+  </implementation-notes>
+
+  <learnings-from-previous-stories>
+    <learning>
+      <story>8-1-client-side-depth-analysis</story>
+      <lesson>
+        Algorithm parity is CRITICAL. Story 8-1 established exact threshold matching with backend
+        (variance > 0.5, layers >= 3, coherence > 0.7). For temporal analysis, must match variance
+        stability formula (1.0 - stddev/mean) and temporal coherence calculation (average coherence)
+        from backend video_depth_analysis.rs. Version tracking "1.0" essential for determinism.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>8-1-client-side-depth-analysis</story>
+      <lesson>
+        Performance target achieved through Metal GPU acceleration. Story 8-1 hit < 500ms per frame
+        using GPU batch processing. For video, apply same pattern to keyframe batches (~150 frames).
+        Consider parallel processing of keyframes if sequential analysis exceeds 2s target.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>8-3-hash-only-capture-payload</story>
+      <lesson>
+        Assertion coverage of entire payload is non-negotiable. Story 8-3 established pattern:
+        serialize payload to canonical JSON, compute SHA-256, sign with DCAppAttest. For video
+        hash-only, assertion must cover hash_chain + temporal_analysis + metadata + all fields.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>8-3-hash-only-capture-payload</story>
+      <lesson>
+        Metadata filtering applied BEFORE payload construction. Story 8-3 showed MetadataFilterService
+        filters location/timestamp/device per PrivacySettings, then includes metadata_flags documenting
+        what was included/excluded. Same pattern for video - filter VideoMetadata before payload build.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>8-4-backend-hash-only-endpoint</story>
+      <lesson>
+        Validation order critical: Assertion → Hash verification → Store. Story 8-4 established pattern.
+        For video, add hash chain verification and checkpoint validation steps between assertion and store.
+        Return 401 on assertion failure (BLOCKING, not queued).
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>8-4-backend-hash-only-endpoint</story>
+      <lesson>
+        Skip S3 upload for hash-only mode. Story 8-4 showed significant latency reduction (< 2s processing)
+        by skipping S3 operations. For video hash-only, same benefit - no video upload to S3, only database
+        record with evidence JSON. Target: < 5s for video (more validation steps than photo).
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>7-4-frame-hash-chain</story>
+      <lesson>
+        Hash chain pattern proven for video integrity. Story 7-4 established sequential frame hashing
+        with seed hash (device_id + timestamp). For privacy mode, reuse same HashChainService but store
+        only sparse frame hashes (every 10th) in upload payload to stay under 50KB. Full chain retained locally.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>7-5-video-attestation-checkpoints</story>
+      <lesson>
+        Checkpoint attestations every 5 seconds proved recording continuity. Story 7-5 showed checkpoint
+        pattern (timestamp, frame_index, chain_state_hash, DCAppAttest assertion). For privacy mode,
+        checkpoints become even more important as they prove video wasn't spliced without full upload.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>7-9-video-depth-analysis-service</story>
+      <lesson>
+        Backend temporal depth analysis provides algorithm reference. Story 7-9 implemented server-side
+        temporal analysis with variance stability and temporal coherence calculations. iOS implementation
+        must match these formulas exactly for parity. Use same test fixtures (two-plane scene, varied scene)
+        to validate consistency.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>8-6-verification-page-hash-only</story>
+      <lesson>
+        Privacy Mode badge and trust model messaging established. Story 8-6 created purple PrivacyModeBadge
+        with shield icon and "Authenticity verified via device attestation" messaging. Reuse for video
+        hash-only display. Add "Video Hash Verified" variant of heading.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>8-7-file-verification-hash-only</story>
+      <lesson>
+        HashOnlyVerificationResult component already supports video (AC6). Story 8-7 added video-specific
+        display section (duration, frames, hash chain status, temporal depth). May only need minor
+        adjustments for temporal depth analysis summary display in verification page context.
+      </lesson>
+    </learning>
+
+    <learning>
+      <story>8-7-file-verification-hash-only</story>
+      <lesson>
+        Error handling pattern: graceful degradation. Story 8-7 showed no-match scenario handling with
+        clear messaging. For video hash-only, apply same pattern: interrupted recording preserves partial
+        evidence via checkpoint attestations, depth analysis failure degrades to hash-only without depth
+        (MEDIUM confidence instead of rejecting).
+      </lesson>
+    </learning>
+  </learnings-from-previous-stories>
+
+  <validation-checklist>
+    <item>All 8 acceptance criteria have implementation notes</item>
+    <item>TemporalDepthAnalysisResult struct defined with algorithm pseudocode</item>
+    <item>VideoHashOnlyCapturePayload struct defined with all required fields</item>
+    <item>VideoRecordingSession privacy mode detection pattern documented</item>
+    <item>UploadService routing logic for video + privacy mode documented</item>
+    <item>Backend hash-only endpoint extension for video type documented</item>
+    <item>Hash chain verification function for privacy mode documented</item>
+    <item>Verification page video hash-only display pattern documented</item>
+    <item>Algorithm parity requirements clearly stated with testing strategy</item>
+    <item>Performance targets documented: temporal analysis < 2s, payload < 50KB, backend < 5s</item>
+    <item>Security constraints documented: trust model, threat mitigation, assertion coverage</item>
+    <item>Error handling strategy documented: graceful degradation with checkpoint preservation</item>
+    <item>Testing requirements cover unit, integration, algorithm parity, and E2E scenarios</item>
+    <item>All existing code interfaces identified with integration points</item>
+    <item>Dependencies mapped to existing iOS frameworks and backend crates</item>
+  </validation-checklist>
+
+  <next-steps>
+    <step>
+      Review this context XML file to ensure completeness
+    </step>
+    <step>
+      Begin implementation with TemporalDepthAnalysisResult struct and analyzeTemporalDepth() method in DepthAnalysisService.swift
+    </step>
+    <step>
+      Create VideoHashOnlyCapturePayload.swift model with all required fields
+    </step>
+    <step>
+      Modify VideoRecordingSession.swift to detect Privacy Mode and trigger temporal analysis
+    </step>
+    <step>
+      Create VideoHashOnlyPayloadBuilder (or extend HashOnlyPayloadBuilder) for video payload construction
+    </step>
+    <step>
+      Update UploadService.swift to route video + privacy mode to hash-only endpoint
+    </step>
+    <step>
+      Extend backend captures_hash_only.rs to handle media_type: "video" with validation
+    </step>
+    <step>
+      Add verify_hash_chain_privacy_mode() function to hash_chain_verifier.rs
+    </step>
+    <step>
+      Extend Evidence::from_hash_only() for video-specific evidence fields
+    </step>
+    <step>
+      Update verification page to display video hash-only variant with metadata
+    </step>
+    <step>
+      Write algorithm parity tests comparing iOS vs backend temporal analysis
+    </step>
+    <step>
+      Run full test suite (unit, integration, E2E, performance) and validate all ACs
+    </step>
+    <step>
+      Update sprint-status.yaml from "drafted" to "ready-for-dev"
+    </step>
+  </next-steps>
+</story-context>

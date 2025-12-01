@@ -133,6 +133,95 @@ public final class DepthAnalysisService: @unchecked Sendable {
         }
     }
 
+    /// Analyzes multiple depth keyframes to determine temporal consistency (video privacy mode).
+    ///
+    /// This method performs batch depth analysis for video keyframes:
+    /// - Analyzes each keyframe individually (reusing single-frame algorithm)
+    /// - Computes temporal consistency metrics (variance stability, temporal coherence)
+    /// - Determines aggregate authenticity across time
+    ///
+    /// Algorithm parity with backend temporal depth analysis:
+    /// - Per-keyframe thresholds match single-frame analysis
+    /// - Variance stability: 1.0 - (stddev(variances) / mean(variances))
+    /// - Temporal coherence: mean(edge_coherences)
+    /// - Authenticity: all keyframes pass AND variance_stability > 0.8
+    ///
+    /// - Parameters:
+    ///   - keyframes: Array of depth keyframes (CVPixelBuffer with Float32 depths)
+    ///   - rgbFrames: Optional array of RGB frames for each keyframe (currently unused)
+    /// - Returns: TemporalDepthAnalysisResult with per-frame and aggregate metrics
+    ///
+    /// - Note: Target performance < 2s for 15s video (~150 keyframes at 10fps)
+    public func analyzeTemporalDepth(
+        keyframes: [CVPixelBuffer],
+        rgbFrames: [CVPixelBuffer]? = nil
+    ) async throws -> TemporalDepthAnalysisResult {
+        let startTime = CFAbsoluteTimeGetCurrent()
+
+        guard !keyframes.isEmpty else {
+            throw DepthAnalysisError.noKeyframes
+        }
+
+        Self.logger.info("Starting temporal depth analysis for \(keyframes.count) keyframes")
+
+        // 1. Analyze each keyframe individually
+        var keyframeAnalyses: [DepthAnalysisResult] = []
+
+        for (index, depthFrame) in keyframes.enumerated() {
+            let rgbFrame = (rgbFrames != nil && index < rgbFrames!.count) ? rgbFrames![index] : nil
+            let analysis = await analyze(depthMap: depthFrame, rgbImage: rgbFrame)
+            keyframeAnalyses.append(analysis)
+        }
+
+        // 2. Compute temporal metrics
+        let variances = keyframeAnalyses.map { $0.depthVariance }
+        let meanVariance = variances.reduce(0, +) / Float(variances.count)
+
+        // Variance stability: 1.0 - (stddev / mean)
+        // Higher values indicate consistent depth variation across time
+        let varianceStability: Float
+        if meanVariance > 0 {
+            let stdDev = standardDeviation(variances)
+            varianceStability = 1.0 - (stdDev / meanVariance)
+        } else {
+            varianceStability = 0
+        }
+
+        // Temporal coherence: average edge coherence across all keyframes
+        let coherences = keyframeAnalyses.map { $0.edgeCoherence }
+        let temporalCoherence = coherences.reduce(0, +) / Float(coherences.count)
+
+        // 3. Determine scene authenticity
+        // All keyframes must pass individual checks AND variance must be stable
+        let allKeyframesPass = keyframeAnalyses.allSatisfy { $0.isLikelyRealScene }
+        let isLikelyRealScene = allKeyframesPass && varianceStability > 0.8
+
+        let processingTime = CFAbsoluteTimeGetCurrent() - startTime
+
+        Self.logger.info("""
+            Temporal depth analysis complete in \(String(format: "%.1f", processingTime * 1000))ms:
+            keyframes=\(keyframes.count),
+            meanVariance=\(String(format: "%.3f", meanVariance)),
+            varianceStability=\(String(format: "%.3f", varianceStability)),
+            temporalCoherence=\(String(format: "%.3f", temporalCoherence)),
+            isLikelyRealScene=\(isLikelyRealScene)
+            """)
+
+        if processingTime > 2.0 {
+            Self.logger.warning("Temporal depth analysis exceeded 2s target: \(String(format: "%.1f", processingTime * 1000))ms")
+        }
+
+        return TemporalDepthAnalysisResult(
+            keyframeAnalyses: keyframeAnalyses,
+            meanVariance: meanVariance,
+            varianceStability: varianceStability,
+            temporalCoherence: temporalCoherence,
+            isLikelyRealScene: isLikelyRealScene,
+            keyframeCount: keyframes.count,
+            algorithmVersion: "1.0"
+        )
+    }
+
     // MARK: - Internal Analysis
 
     /// Performs the actual depth analysis synchronously.
@@ -610,5 +699,45 @@ public final class DepthAnalysisService: @unchecked Sendable {
         }
 
         return basicChecks
+    }
+
+    // MARK: - Helper Methods
+
+    /// Computes standard deviation of a set of values.
+    ///
+    /// - Parameter values: Array of Float values
+    /// - Returns: Standard deviation (sqrt of variance)
+    private func standardDeviation(_ values: [Float]) -> Float {
+        guard values.count > 1 else { return 0 }
+
+        let mean = values.reduce(0, +) / Float(values.count)
+        let squaredDiffs = values.map { pow($0 - mean, 2) }
+        let variance = squaredDiffs.reduce(0, +) / Float(values.count)
+        return sqrt(variance)
+    }
+}
+
+// MARK: - DepthAnalysisError
+
+/// Errors that can occur during depth analysis
+public enum DepthAnalysisError: Error, LocalizedError {
+    /// No keyframes provided for temporal analysis
+    case noKeyframes
+
+    /// Invalid depth buffer format
+    case invalidFormat
+
+    /// Analysis failed
+    case analysisFailed(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .noKeyframes:
+            return "No keyframes provided for temporal depth analysis"
+        case .invalidFormat:
+            return "Invalid depth buffer format"
+        case .analysisFailed(let message):
+            return "Depth analysis failed: \(message)"
+        }
     }
 }
