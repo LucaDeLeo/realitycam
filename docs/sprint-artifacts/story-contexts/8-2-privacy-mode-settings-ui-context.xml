@@ -1,0 +1,749 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML: 8-2 Privacy Mode Settings UI
+  Generated: 2025-12-01
+  Status: Ready for Development
+
+  This context file provides all artifacts, interfaces, and constraints
+  needed to implement the Privacy Mode Settings UI story.
+-->
+<story-context story-key="8-2" title="Privacy Mode Settings UI">
+
+  <!-- ============================================== -->
+  <!-- SECTION 1: STORY REFERENCE                    -->
+  <!-- ============================================== -->
+  <story-reference>
+    <file path="docs/sprint-artifacts/stories/8-2-privacy-mode-settings-ui.md"/>
+    <summary>
+      User story to implement Privacy Mode toggle and granular metadata controls
+      in iOS settings, allowing users to choose between full upload and hash-only
+      capture mode with configurable location, timestamp, and device info levels.
+    </summary>
+    <acceptance-criteria-count>6</acceptance-criteria-count>
+    <task-count>9</task-count>
+  </story-reference>
+
+  <!-- ============================================== -->
+  <!-- SECTION 2: EPIC CONTEXT                       -->
+  <!-- ============================================== -->
+  <epic-context>
+    <epic-id>8</epic-id>
+    <epic-title>Privacy-First Capture Mode</epic-title>
+    <tech-spec path="docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-8.md"/>
+    <description>
+      Epic 8 enables zero-knowledge provenance for rial. by allowing users to
+      capture attested photos and videos without uploading raw media. The device
+      performs depth analysis locally, signs the results with DCAppAttest, and
+      uploads only a hash plus evidence metadata.
+    </description>
+    <dependency-note>
+      Story 8-2 depends on Story 8-1 (Client-Side Depth Analysis Service) which
+      provides DepthAnalysisService for privacy mode capture processing.
+    </dependency-note>
+  </epic-context>
+
+  <!-- ============================================== -->
+  <!-- SECTION 3: DOCUMENTATION ARTIFACTS            -->
+  <!-- ============================================== -->
+  <documentation-artifacts>
+
+    <!-- Tech Spec: Core reference for this story -->
+    <artifact type="tech-spec" relevance="high">
+      <path>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-8.md</path>
+      <description>
+        Epic 8 Technical Specification defining PrivacySettingsManager,
+        PrivacySettings struct, metadata level enums, and UI patterns.
+      </description>
+      <key-sections>
+        <section lines="118-158">iOS PrivacySettingsManager specification</section>
+        <section lines="141-147">PrivacySettings struct definition</section>
+        <section lines="123-139">MetadataLevel, TimestampLevel, DeviceInfoLevel enums</section>
+        <section lines="622-630">Acceptance Criteria for Story 8.2</section>
+        <section lines="690">Traceability mapping to PrivacySettingsView.swift</section>
+      </key-sections>
+      <code-extract title="PrivacySettingsManager Specification">
+        <![CDATA[
+enum MetadataLevel: String, Codable, CaseIterable {
+    case none = "none"
+    case coarse = "coarse"
+    case precise = "precise"
+}
+
+enum TimestampLevel: String, Codable, CaseIterable {
+    case none = "none"
+    case dayOnly = "day_only"
+    case exact = "exact"
+}
+
+enum DeviceInfoLevel: String, Codable, CaseIterable {
+    case none = "none"
+    case modelOnly = "model_only"
+    case full = "full"
+}
+
+struct PrivacySettings: Codable {
+    var privacyModeEnabled: Bool
+    var locationLevel: MetadataLevel
+    var timestampLevel: TimestampLevel
+    var deviceInfoLevel: DeviceInfoLevel
+}
+
+final class PrivacySettingsManager: ObservableObject {
+    @AppStorage("privacySettings") private var settingsData: Data?
+    @Published var settings: PrivacySettings
+
+    static let `default` = PrivacySettings(
+        privacyModeEnabled: false,
+        locationLevel: .coarse,
+        timestampLevel: .exact,
+        deviceInfoLevel: .modelOnly
+    )
+}
+        ]]>
+      </code-extract>
+    </artifact>
+
+    <!-- Architecture Document -->
+    <artifact type="architecture" relevance="high">
+      <path>docs/architecture.md</path>
+      <description>
+        System architecture document with ADR-009 (Native Swift) and ADR-011
+        (Client-Side Depth Analysis for Privacy Mode) decisions.
+      </description>
+      <key-sections>
+        <section lines="938-988">ADR-009: Native Swift Architecture</section>
+        <section lines="1067-1121">ADR-011: Client-Side Depth Analysis for Privacy Mode</section>
+        <section lines="279-298">Native iOS Dependencies (no external packages)</section>
+        <section lines="715-747">Local Storage Encryption patterns</section>
+      </key-sections>
+    </artifact>
+
+    <!-- PRD Document -->
+    <artifact type="prd" relevance="medium">
+      <path>docs/prd.md</path>
+      <description>
+        Product Requirements Document defining FR56-FR62 for Privacy Mode features.
+      </description>
+      <key-sections>
+        <section lines="462-475">Privacy-First Capture (FR56-FR62)</section>
+        <section lines="430-440">Metadata granularity options table</section>
+      </key-sections>
+      <requirements>
+        <requirement id="FR56">App provides "Privacy Mode" toggle in capture settings</requirement>
+        <requirement id="FR62">Users can configure per-capture metadata: location (none/coarse/precise), timestamp (none/day/exact), device info (none/model/full)</requirement>
+      </requirements>
+    </artifact>
+
+    <!-- Epics Document -->
+    <artifact type="epics" relevance="medium">
+      <path>docs/epics.md</path>
+      <description>
+        Epic breakdown with Story 8.2 definition and acceptance criteria.
+      </description>
+      <key-sections>
+        <section lines="2925-2953">Story 8.2: Privacy Mode Settings UI full definition</section>
+      </key-sections>
+    </artifact>
+
+  </documentation-artifacts>
+
+  <!-- ============================================== -->
+  <!-- SECTION 4: EXISTING CODE INTERFACES           -->
+  <!-- ============================================== -->
+  <existing-code-interfaces>
+
+    <!-- CaptureView.swift - Will be modified to add privacy indicator -->
+    <code-interface type="modify" relevance="high">
+      <path>ios/Rial/Features/Capture/CaptureView.swift</path>
+      <description>
+        Main capture screen. Story 8-2 adds PrivacyModeIndicator overlay when
+        privacy mode is enabled. Indicator should be positioned in header area
+        and tap to navigate to privacy settings.
+      </description>
+      <key-patterns>
+        <pattern name="StateObject ViewModel">@StateObject private var viewModel = CaptureViewModel()</pattern>
+        <pattern name="Sheet Presentation">Uses .sheet(isPresented:) for previews</pattern>
+        <pattern name="Overlay Layering">ZStack with multiple overlays for depth, recording indicator</pattern>
+        <pattern name="Top Bar Area">Lines 245-257: topBar view with conditional content</pattern>
+      </key-patterns>
+      <integration-points>
+        <point>Add PrivacyModeIndicator to top bar or as overlay when privacy mode enabled</point>
+        <point>Import PrivacySettingsManager as @EnvironmentObject or @StateObject</point>
+        <point>Wire tap gesture to navigate to PrivacySettingsView</point>
+      </integration-points>
+    </code-interface>
+
+    <!-- CaptureViewModel.swift - Reference for UserDefaults patterns -->
+    <code-interface type="reference" relevance="high">
+      <path>ios/Rial/Features/Capture/CaptureViewModel.swift</path>
+      <description>
+        View model showing UserDefaults persistence patterns for settings.
+        Uses direct UserDefaults with didSet observers for persistence.
+      </description>
+      <key-patterns>
+        <pattern name="UserDefaults Keys">
+          private static let edgeOverlayEnabledKey = "app.rial.edgeOverlayEnabled"
+          private static let captureModeKey = "app.rial.captureMode"
+        </pattern>
+        <pattern name="Published with didSet">
+          @Published var showEdgeOverlay: Bool {
+              didSet {
+                  UserDefaults.standard.set(showEdgeOverlay, forKey: Self.edgeOverlayEnabledKey)
+              }
+          }
+        </pattern>
+        <pattern name="Load from UserDefaults in init">
+          if UserDefaults.standard.object(forKey: Self.edgeOverlayEnabledKey) == nil {
+              self.showEdgeOverlay = true
+              UserDefaults.standard.set(true, forKey: Self.edgeOverlayEnabledKey)
+          } else {
+              self.showEdgeOverlay = UserDefaults.standard.bool(forKey: Self.edgeOverlayEnabledKey)
+          }
+        </pattern>
+      </key-patterns>
+      <note>
+        Story specifies using @AppStorage with JSON encoding for complex PrivacySettings
+        struct, which differs from the simple bool/string patterns here. See tech spec
+        for the correct pattern.
+      </note>
+    </code-interface>
+
+    <!-- AppEnvironment.swift - Configuration patterns -->
+    <code-interface type="reference" relevance="medium">
+      <path>ios/Rial/Core/Configuration/AppEnvironment.swift</path>
+      <description>
+        App configuration enum pattern. PrivacySettingsManager will be placed
+        in same directory following similar organization.
+      </description>
+      <key-patterns>
+        <pattern name="Static Configuration">enum AppEnvironment with static properties</pattern>
+        <pattern name="Info.plist fallback">Reads from bundle, falls back to defaults</pattern>
+      </key-patterns>
+      <new-file-location>ios/Rial/Core/Configuration/PrivacySettingsManager.swift</new-file-location>
+    </code-interface>
+
+    <!-- RialApp.swift - Environment object injection point -->
+    <code-interface type="modify" relevance="high">
+      <path>ios/Rial/App/RialApp.swift</path>
+      <description>
+        App entry point where PrivacySettingsManager should be injected as
+        @EnvironmentObject for app-wide access.
+      </description>
+      <current-implementation>
+        <![CDATA[
+@main
+struct RialApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+        ]]>
+      </current-implementation>
+      <integration-points>
+        <point>Add @StateObject private var privacySettings = PrivacySettingsManager()</point>
+        <point>Add .environmentObject(privacySettings) to ContentView</point>
+      </integration-points>
+    </code-interface>
+
+    <!-- ContentView.swift - Tab navigation -->
+    <code-interface type="reference" relevance="medium">
+      <path>ios/Rial/App/ContentView.swift</path>
+      <description>
+        Tab-based navigation with Capture and History tabs. Settings access
+        could be added as third tab or accessed via navigation from capture.
+      </description>
+      <current-implementation>
+        <![CDATA[
+struct ContentView: View {
+    @State private var selectedTab = 0
+
+    var body: some View {
+        TabView(selection: $selectedTab) {
+            CaptureView()
+                .tabItem {
+                    Label("Capture", systemImage: "camera.fill")
+                }
+                .tag(0)
+
+            HistoryView()
+                .tabItem {
+                    Label("History", systemImage: "clock.fill")
+                }
+                .tag(1)
+        }
+    }
+}
+        ]]>
+      </current-implementation>
+      <integration-consideration>
+        Settings could be: (a) new tab, (b) gear icon in navigation bar, or
+        (c) accessed via PrivacyModeIndicator tap on capture screen. Story
+        specifies indicator tap navigates to settings, suggesting option (c).
+      </integration-consideration>
+    </code-interface>
+
+    <!-- ModeSelector.swift - SwiftUI component patterns -->
+    <code-interface type="reference" relevance="high">
+      <path>ios/Rial/Features/Capture/ModeSelector.swift</path>
+      <description>
+        Reference for SwiftUI component patterns including enums with
+        CaseIterable, Picker usage, and haptic feedback integration.
+      </description>
+      <key-patterns>
+        <pattern name="Enum with Display Properties">
+          enum CaptureMode: String, CaseIterable {
+              case photo, video
+              var label: String { ... }
+              var systemImage: String { ... }
+          }
+        </pattern>
+        <pattern name="Picker with Segmented Style">
+          Picker("Capture Mode", selection: $currentMode) {
+              ForEach(CaptureMode.allCases, id: \.self) { mode in ... }
+          }
+          .pickerStyle(.segmented)
+        </pattern>
+        <pattern name="Haptic Feedback">
+          private let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+          .onChange(of: currentMode) { _ in impactFeedback.impactOccurred() }
+        </pattern>
+        <pattern name="Accessibility">
+          .accessibilityLabel("Capture mode: \(currentMode.label)")
+          .accessibilityHint(...)
+        </pattern>
+      </key-patterns>
+      <apply-to>
+        Use similar patterns for MetadataLevel, TimestampLevel, DeviceInfoLevel
+        pickers in PrivacySettingsView.
+      </apply-to>
+    </code-interface>
+
+    <!-- DepthAnalysisResult.swift - Codable struct patterns -->
+    <code-interface type="reference" relevance="medium">
+      <path>ios/Rial/Models/DepthAnalysisResult.swift</path>
+      <description>
+        Reference for Codable struct patterns with documentation.
+        PrivacySettings struct should follow similar patterns.
+      </description>
+      <key-patterns>
+        <pattern name="Codable Struct">public struct DepthAnalysisResult: Codable, Sendable, Equatable</pattern>
+        <pattern name="Enum with rawValue">public enum DepthAnalysisStatus: String, Codable, Sendable</pattern>
+        <pattern name="Factory Methods">public static func unavailable() -> DepthAnalysisResult</pattern>
+        <pattern name="CustomStringConvertible">extension DepthAnalysisResult: CustomStringConvertible</pattern>
+      </key-patterns>
+    </code-interface>
+
+    <!-- EdgeDepthVisualizerTests.swift - UserDefaults test patterns -->
+    <code-interface type="reference" relevance="high">
+      <path>ios/RialTests/Capture/EdgeDepthVisualizerTests.swift</path>
+      <description>
+        Test patterns for UserDefaults persistence verification.
+        Apply similar patterns to PrivacySettingsManager tests.
+      </description>
+      <key-patterns>
+        <pattern name="Clear before test">
+          UserDefaults.standard.removeObject(forKey: "app.rial.edgeOverlayEnabled")
+        </pattern>
+        <pattern name="Test default value">
+          func testShowEdgeOverlay_DefaultValue_IsTrue() {
+              UserDefaults.standard.removeObject(forKey: key)
+              let viewModel = CaptureViewModel()
+              XCTAssertTrue(viewModel.showEdgeOverlay)
+          }
+        </pattern>
+        <pattern name="Test persistence">
+          func testShowEdgeOverlay_PersistsToUserDefaults() {
+              viewModel.showEdgeOverlay = false
+              XCTAssertFalse(UserDefaults.standard.bool(forKey: key))
+          }
+        </pattern>
+        <pattern name="Test load on init">
+          func testShowEdgeOverlay_LoadsFromUserDefaults() {
+              UserDefaults.standard.set(false, forKey: key)
+              let viewModel = CaptureViewModel()
+              XCTAssertFalse(viewModel.showEdgeOverlay)
+          }
+        </pattern>
+      </key-patterns>
+    </code-interface>
+
+    <!-- DepthAnalysisService.swift - Singleton pattern reference -->
+    <code-interface type="reference" relevance="low">
+      <path>ios/Rial/Core/Capture/DepthAnalysisService.swift</path>
+      <description>
+        Reference for singleton pattern (PrivacySettingsManager may use
+        shared instance or be injected via @EnvironmentObject).
+      </description>
+      <key-patterns>
+        <pattern name="Singleton">
+          public static let shared = DepthAnalysisService()
+          private init() { ... }
+        </pattern>
+        <pattern name="Logger">
+          private static let logger = Logger(subsystem: "app.rial", category: "depthanalysis")
+        </pattern>
+      </key-patterns>
+      <note>
+        PrivacySettingsManager uses ObservableObject pattern with @EnvironmentObject
+        injection rather than singleton, per tech spec.
+      </note>
+    </code-interface>
+
+  </existing-code-interfaces>
+
+  <!-- ============================================== -->
+  <!-- SECTION 5: DEVELOPMENT CONSTRAINTS            -->
+  <!-- ============================================== -->
+  <development-constraints>
+
+    <!-- ADR-009: Native Swift -->
+    <constraint type="architecture" source="ADR-009">
+      <title>Native Swift Implementation</title>
+      <description>
+        All iOS code must be pure Swift/SwiftUI using only Apple's native
+        frameworks. No third-party dependencies for security-critical code.
+      </description>
+      <implications>
+        <implication>Use SwiftUI @AppStorage for persistence</implication>
+        <implication>Use CryptoKit if encryption needed (not for settings)</implication>
+        <implication>Use os.log Logger for diagnostics</implication>
+      </implications>
+    </constraint>
+
+    <!-- ADR-011: Privacy Mode Trust Model -->
+    <constraint type="architecture" source="ADR-011">
+      <title>Client-Side Depth Analysis for Privacy Mode</title>
+      <description>
+        Privacy Mode relies on DCAppAttest signing client-computed results.
+        Settings must persist reliably to avoid mode confusion.
+      </description>
+      <implications>
+        <implication>Settings must persist across app launches</implication>
+        <implication>Settings must persist across app updates</implication>
+        <implication>Clear visual feedback of current privacy mode state</implication>
+      </implications>
+    </constraint>
+
+    <!-- Default Values Constraint -->
+    <constraint type="specification" source="tech-spec">
+      <title>Default Values Must Match Specification</title>
+      <description>
+        Default values for fresh install must exactly match tech spec:
+        - privacyModeEnabled: false
+        - locationLevel: .coarse
+        - timestampLevel: .exact
+        - deviceInfoLevel: .modelOnly
+      </description>
+    </constraint>
+
+    <!-- Enum Raw Values Constraint -->
+    <constraint type="api-compatibility" source="tech-spec">
+      <title>Enum Raw Values for Backend Compatibility</title>
+      <description>
+        Enum raw values must use snake_case to match backend JSON contracts:
+        - MetadataLevel: "none", "coarse", "precise"
+        - TimestampLevel: "none", "day_only", "exact"
+        - DeviceInfoLevel: "none", "model_only", "full"
+      </description>
+    </constraint>
+
+    <!-- JSON Encoding Constraint -->
+    <constraint type="persistence" source="tech-spec">
+      <title>JSON Encoding for @AppStorage</title>
+      <description>
+        PrivacySettings struct must be stored as JSON-encoded Data in
+        @AppStorage, not as individual keys. This ensures atomic updates
+        and type safety.
+      </description>
+      <implementation-pattern>
+        <![CDATA[
+@AppStorage("privacySettings") private var settingsData: Data?
+
+var settings: PrivacySettings {
+    get {
+        guard let data = settingsData else { return Self.default }
+        return (try? JSONDecoder().decode(PrivacySettings.self, from: data)) ?? Self.default
+    }
+    set {
+        settingsData = try? JSONEncoder().encode(newValue)
+        objectWillChange.send()
+    }
+}
+        ]]>
+      </implementation-pattern>
+    </constraint>
+
+    <!-- SwiftUI State Management -->
+    <constraint type="architecture" source="architecture.md">
+      <title>SwiftUI State Management Patterns</title>
+      <description>
+        Use SwiftUI native state management:
+        - @StateObject for view-owned ObservableObject
+        - @EnvironmentObject for app-wide shared state
+        - @Published for observable properties
+        - Combine/SwiftUI observation for reactive updates
+      </description>
+    </constraint>
+
+    <!-- Accessibility Requirements -->
+    <constraint type="ux" source="best-practices">
+      <title>Accessibility Support</title>
+      <description>
+        All UI elements must have proper accessibility labels and hints.
+        Follow patterns from ModeSelector.swift.
+      </description>
+    </constraint>
+
+  </development-constraints>
+
+  <!-- ============================================== -->
+  <!-- SECTION 6: DEPENDENCIES                       -->
+  <!-- ============================================== -->
+  <dependencies>
+
+    <!-- No external dependencies - native only -->
+    <external-dependencies>
+      <note>No external packages required. Story uses only Apple frameworks.</note>
+    </external-dependencies>
+
+    <!-- Apple Frameworks -->
+    <framework-dependencies>
+      <framework name="SwiftUI" usage="UI components, @AppStorage, state management"/>
+      <framework name="Foundation" usage="Codable, UserDefaults, JSONEncoder/Decoder"/>
+      <framework name="os" usage="Logger for diagnostics"/>
+      <framework name="UIKit" usage="UIImpactFeedbackGenerator for haptics"/>
+    </framework-dependencies>
+
+    <!-- Internal Dependencies -->
+    <internal-dependencies>
+      <dependency>
+        <module>DepthAnalysisService</module>
+        <path>ios/Rial/Core/Capture/DepthAnalysisService.swift</path>
+        <usage>Story 8-3 will use privacy settings to decide capture mode</usage>
+      </dependency>
+      <dependency>
+        <module>CaptureView</module>
+        <path>ios/Rial/Features/Capture/CaptureView.swift</path>
+        <usage>Modified to show PrivacyModeIndicator</usage>
+      </dependency>
+      <dependency>
+        <module>RialApp</module>
+        <path>ios/Rial/App/RialApp.swift</path>
+        <usage>Modified to inject PrivacySettingsManager as environment object</usage>
+      </dependency>
+    </internal-dependencies>
+
+    <!-- Story Dependencies -->
+    <story-dependencies>
+      <depends-on story="6-13">SwiftUI Capture Screen - provides capture UI to add indicator</depends-on>
+      <depends-on story="8-1">Client-Side Depth Analysis Service - privacy mode foundation</depends-on>
+      <enables story="8-3">Hash-Only Capture Payload - provides privacy settings for capture mode decision</enables>
+    </story-dependencies>
+
+  </dependencies>
+
+  <!-- ============================================== -->
+  <!-- SECTION 7: TESTING CONTEXT                    -->
+  <!-- ============================================== -->
+  <testing-context>
+
+    <!-- Testing Framework -->
+    <framework>
+      <name>XCTest</name>
+      <type>Unit Tests</type>
+      <location>ios/RialTests/</location>
+    </framework>
+
+    <framework>
+      <name>XCUITest</name>
+      <type>UI Tests</type>
+      <location>ios/RialUITests/</location>
+    </framework>
+
+    <!-- Test Patterns from Codebase -->
+    <test-patterns>
+      <pattern name="UserDefaults Cleanup">
+        Clear UserDefaults keys in setUp/tearDown to ensure test isolation
+      </pattern>
+      <pattern name="Default Value Testing">
+        Test that fresh instances have correct default values
+      </pattern>
+      <pattern name="Persistence Round-Trip">
+        Test that values survive encode/decode cycle
+      </pattern>
+      <pattern name="MainActor Testing">
+        Use @MainActor annotation for tests involving UI state
+      </pattern>
+    </test-patterns>
+
+    <!-- Required Test Coverage -->
+    <test-coverage>
+      <area name="PrivacySettings Model">
+        <test>Encoding/decoding round-trip for all fields</test>
+        <test>Default values match specification</test>
+        <test>Enum raw values match snake_case API format</test>
+      </area>
+      <area name="PrivacySettingsManager">
+        <test>Fresh install returns default values</test>
+        <test>Settings persist to UserDefaults</test>
+        <test>Settings load correctly on init</test>
+        <test>Reset to defaults works correctly</test>
+        <test>Published property triggers objectWillChange</test>
+      </area>
+      <area name="PrivacySettingsView UI Tests">
+        <test>Toggle visibility and interaction</test>
+        <test>Metadata controls show/hide based on toggle</test>
+        <test>Picker selections update model</test>
+        <test>Learn More sheet presentation</test>
+      </area>
+      <area name="PrivacyModeIndicator UI Tests">
+        <test>Indicator visible when privacy mode enabled</test>
+        <test>Indicator hidden when privacy mode disabled</test>
+        <test>Tap navigates to settings</test>
+      </area>
+    </test-coverage>
+
+    <!-- Test File Locations -->
+    <test-files>
+      <new-file>ios/RialTests/Configuration/PrivacySettingsManagerTests.swift</new-file>
+      <new-file>ios/RialTests/Models/PrivacySettingsTests.swift</new-file>
+      <new-file>ios/RialUITests/PrivacySettingsUITests.swift</new-file>
+    </test-files>
+
+  </testing-context>
+
+  <!-- ============================================== -->
+  <!-- SECTION 8: IMPLEMENTATION NOTES               -->
+  <!-- ============================================== -->
+  <implementation-notes>
+
+    <!-- File Structure -->
+    <file-structure>
+      <new-files>
+        <file path="ios/Rial/Core/Configuration/PrivacySettingsManager.swift">
+          Manager class with @AppStorage persistence, ObservableObject
+        </file>
+        <file path="ios/Rial/Models/PrivacySettings.swift">
+          Settings struct and level enums (MetadataLevel, TimestampLevel, DeviceInfoLevel)
+        </file>
+        <file path="ios/Rial/Features/Settings/PrivacySettingsView.swift">
+          Main settings UI with toggle and pickers
+        </file>
+        <file path="ios/Rial/Features/Settings/LearnMorePrivacyView.swift">
+          Sheet explaining privacy mode trust model and trade-offs
+        </file>
+        <file path="ios/Rial/Features/Capture/PrivacyModeIndicator.swift">
+          Shield icon indicator for capture screen
+        </file>
+        <file path="ios/RialTests/Configuration/PrivacySettingsManagerTests.swift">
+          Unit tests for persistence
+        </file>
+      </new-files>
+      <modified-files>
+        <file path="ios/Rial/Features/Capture/CaptureView.swift">
+          Add PrivacyModeIndicator overlay
+        </file>
+        <file path="ios/Rial/App/RialApp.swift">
+          Inject PrivacySettingsManager as @EnvironmentObject
+        </file>
+        <file path="ios/Rial.xcodeproj/project.pbxproj">
+          Add new files to Xcode project
+        </file>
+      </modified-files>
+    </file-structure>
+
+    <!-- SwiftUI Component Patterns -->
+    <ui-patterns>
+      <pattern name="Settings Section">
+        Use Form with Section for "Privacy and Security" grouping
+      </pattern>
+      <pattern name="Toggle with Description">
+        <![CDATA[
+Toggle(isOn: $manager.settings.privacyModeEnabled) {
+    VStack(alignment: .leading, spacing: 4) {
+        Text("Privacy Mode")
+            .font(.body)
+        Text("When enabled, only a hash of your capture is uploaded...")
+            .font(.caption)
+            .foregroundColor(.secondary)
+    }
+}
+        ]]>
+      </pattern>
+      <pattern name="Conditional Content">
+        <![CDATA[
+if manager.settings.privacyModeEnabled {
+    // Show metadata controls
+}
+        ]]>
+      </pattern>
+      <pattern name="Picker for Levels">
+        <![CDATA[
+Picker("Location", selection: $manager.settings.locationLevel) {
+    ForEach(MetadataLevel.allCases, id: \.self) { level in
+        Text(level.displayName).tag(level)
+    }
+}
+        ]]>
+      </pattern>
+      <pattern name="Shield Indicator">
+        Use SF Symbol "shield.fill" or "lock.shield" for privacy indicator
+      </pattern>
+    </ui-patterns>
+
+    <!-- Warnings and Gotchas -->
+    <warnings>
+      <warning>
+        @AppStorage with Data type requires JSON encoding/decoding wrapper.
+        Direct @AppStorage does not work with Codable structs.
+      </warning>
+      <warning>
+        Enum raw values must match backend exactly (snake_case).
+        Use explicit rawValue assignments, not auto-generated.
+      </warning>
+      <warning>
+        Clear UserDefaults in tests to avoid state leakage between test runs.
+        Use unique suite name if needed for isolation.
+      </warning>
+      <warning>
+        objectWillChange.send() must be called when modifying settings
+        through computed property setter.
+      </warning>
+    </warnings>
+
+    <!-- SF Symbols Recommendations -->
+    <sf-symbols>
+      <symbol name="shield.fill" usage="Privacy mode indicator (enabled)"/>
+      <symbol name="lock.shield" usage="Alternative privacy indicator"/>
+      <symbol name="gearshape.fill" usage="Settings navigation"/>
+      <symbol name="info.circle" usage="Learn More button"/>
+      <symbol name="location" usage="Location level picker"/>
+      <symbol name="clock" usage="Timestamp level picker"/>
+      <symbol name="iphone" usage="Device info level picker"/>
+    </sf-symbols>
+
+  </implementation-notes>
+
+  <!-- ============================================== -->
+  <!-- SECTION 9: VALIDATION CHECKLIST               -->
+  <!-- ============================================== -->
+  <validation-checklist>
+    <check id="1">PrivacySettings struct is Codable and round-trips correctly</check>
+    <check id="2">All enum raw values use snake_case for API compatibility</check>
+    <check id="3">Default values match specification exactly</check>
+    <check id="4">Settings persist across app launches via @AppStorage</check>
+    <check id="5">PrivacySettingsManager is ObservableObject with @Published</check>
+    <check id="6">Toggle shows/hides metadata controls correctly</check>
+    <check id="7">Privacy indicator appears in capture view when enabled</check>
+    <check id="8">Indicator tap navigates to settings</check>
+    <check id="9">Learn More content explains trust model and trade-offs</check>
+    <check id="10">Unit tests cover persistence and default values</check>
+    <check id="11">UI tests cover toggle and picker interactions</check>
+    <check id="12">Accessibility labels present on all interactive elements</check>
+  </validation-checklist>
+
+</story-context>

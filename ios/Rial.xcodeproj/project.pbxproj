@@ -87,6 +87,13 @@
 		'3089F9DB005F' = {isa = PBXBuildFile; fileRef = 3089F9DB1087; };
 		'3089F9DB0060' = {isa = PBXBuildFile; fileRef = 3089F9DB1088; };
 		'3089F9DB0061' = {isa = PBXBuildFile; fileRef = 3089F9DB1089; };
+		'3089F9DB0062' = {isa = PBXBuildFile; fileRef = 3089F9DB1090; };
+		'3089F9DB0063' = {isa = PBXBuildFile; fileRef = 3089F9DB1091; };
+		'3089F9DB0064' = {isa = PBXBuildFile; fileRef = 3089F9DB1092; };
+		'3089F9DB0065' = {isa = PBXBuildFile; fileRef = 3089F9DB1093; };
+		'3089F9DB0066' = {isa = PBXBuildFile; fileRef = 3089F9DB1094; };
+		'3089F9DB0067' = {isa = PBXBuildFile; fileRef = 3089F9DB1095; };
+		'3089F9DB0068' = {isa = PBXBuildFile; fileRef = 3089F9DB1096; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -192,6 +199,13 @@
 		'3089F9DB1087' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthAnalysisService.swift; sourceTree = "<group>"; };
 		'3089F9DB1088' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthAnalysisResult.swift; sourceTree = "<group>"; };
 		'3089F9DB1089' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthAnalysisServiceTests.swift; sourceTree = "<group>"; };
+		'3089F9DB1090' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettings.swift; sourceTree = "<group>"; };
+		'3089F9DB1091' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsManager.swift; sourceTree = "<group>"; };
+		'3089F9DB1092' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsView.swift; sourceTree = "<group>"; };
+		'3089F9DB1093' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnMorePrivacyView.swift; sourceTree = "<group>"; };
+		'3089F9DB1094' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyModeIndicator.swift; sourceTree = "<group>"; };
+		'3089F9DB1095' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsTests.swift; sourceTree = "<group>"; };
+		'3089F9DB1096' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsManagerTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -260,11 +274,20 @@
 			children = (
 				3089F9DB5030,
 				3089F9DB5031,
+				'3089F9DB5035',
 				3089F9DB5032,
 				3089F9DB5033,
 				3089F9DB5034,
 			);
 			path = Core;
+			sourceTree = "<group>";
+		};
+		'3089F9DB5035' = {
+			isa = PBXGroup;
+			children = (
+				'3089F9DB1091',
+			);
+			path = Configuration;
 			sourceTree = "<group>";
 		};
 		'3089F9DB5004' = {
@@ -274,8 +297,18 @@
 				3089F9DB5041,
 				3089F9DB5042,
 				3089F9DB5043,
+				'3089F9DB5044',
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		'3089F9DB5044' = {
+			isa = PBXGroup;
+			children = (
+				'3089F9DB1092',
+				'3089F9DB1093',
+			);
+			path = Settings;
 			sourceTree = "<group>";
 		};
 		'3089F9DB5005' = {
@@ -285,6 +318,7 @@
 				'3089F9DB1088',
 				3089F9DB1077,
 				3089F9DB1074,
+				'3089F9DB1090',
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -311,12 +345,30 @@
 			children = (
 				3089F9DB5052,
 				3089F9DB5053,
+				'3089F9DB5055',
+				'3089F9DB5056',
 				3089F9DB5054,
 				3089F9DB5051,
 				3089F9DB5050,
 				3089F9DB1005,
 			);
 			path = RialTests;
+			sourceTree = "<group>";
+		};
+		'3089F9DB5055' = {
+			isa = PBXGroup;
+			children = (
+				'3089F9DB1096',
+			);
+			path = Configuration;
+			sourceTree = "<group>";
+		};
+		'3089F9DB5056' = {
+			isa = PBXGroup;
+			children = (
+				'3089F9DB1095',
+			);
+			path = Models;
 			sourceTree = "<group>";
 		};
 		'3089F9DB5010' = {
@@ -413,6 +465,7 @@
 				3089F9DB1083,
 				3089F9DB1084,
 				3089F9DB1085,
+				'3089F9DB1094',
 			);
 			path = Capture;
 			sourceTree = "<group>";
@@ -686,6 +739,11 @@
 				3089F9DB005D,
 				'3089F9DB005F',
 				'3089F9DB0060',
+				'3089F9DB0062',
+				'3089F9DB0063',
+				'3089F9DB0064',
+				'3089F9DB0065',
+				'3089F9DB0066',
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -714,6 +772,8 @@
 				3089F9DB0057,
 				3089F9DB005E,
 				'3089F9DB0061',
+				'3089F9DB0067',
+				'3089F9DB0068',
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

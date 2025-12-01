@@ -23,6 +23,10 @@ import ARKit
 /// - Partial video indicator for interrupted recordings (AC-8)
 /// - Permission handling
 ///
+/// ## Features (Story 8-2 additions)
+/// - Privacy mode indicator when privacy mode is enabled (AC-5)
+/// - Tap indicator to navigate to privacy settings
+///
 /// ## Depth Overlay Modes
 /// - **Photo mode**: Full colormap depth visualization (red=near, blue=far)
 /// - **Video mode**: Edge-only depth visualization (cyan=near, magenta=far)
@@ -45,12 +49,16 @@ import ARKit
 /// ```
 struct CaptureView: View {
     @StateObject private var viewModel = CaptureViewModel()
+    @EnvironmentObject private var privacySettings: PrivacySettingsManager
 
     /// Depth overlay opacity (photo mode)
     @State private var depthOpacity: Float = 0.4
 
     /// Whether to show history sheet
     @State private var showHistory = false
+
+    /// Whether to show privacy settings sheet (Story 8-2)
+    @State private var showPrivacySettings = false
 
     /// Haptic feedback generators
     private let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
@@ -97,6 +105,27 @@ struct CaptureView: View {
             Text("Capture History")
                 .font(.title)
                 .padding()
+        }
+        .sheet(isPresented: $showPrivacySettings) {
+            privacySettingsSheet
+        }
+    }
+
+    // MARK: - Privacy Settings Sheet
+
+    @ViewBuilder
+    private var privacySettingsSheet: some View {
+        if #available(iOS 16.0, *) {
+            NavigationStack {
+                PrivacySettingsView()
+                    .environmentObject(privacySettings)
+            }
+        } else {
+            NavigationView {
+                PrivacySettingsView()
+                    .environmentObject(privacySettings)
+            }
+            .navigationViewStyle(.stack)
         }
     }
 
@@ -244,6 +273,14 @@ struct CaptureView: View {
 
     private var topBar: some View {
         HStack {
+            // Privacy Mode Indicator (Story 8-2, AC #5)
+            // Shows when privacy mode is enabled, tap to open settings
+            if privacySettings.isPrivacyModeEnabled {
+                PrivacyModeIndicator {
+                    showPrivacySettings = true
+                }
+            }
+
             // Opacity slider when depth visible (photo mode only)
             if viewModel.currentMode == .photo && viewModel.showPhotoOverlay {
                 DepthOverlayOpacitySlider(opacity: $depthOpacity)
@@ -413,6 +450,7 @@ extension CaptureView {
 struct CaptureView_Previews: PreviewProvider {
     static var previews: some View {
         CaptureView()
+            .environmentObject(PrivacySettingsManager.preview())
             .preferredColorScheme(.dark)
     }
 }
