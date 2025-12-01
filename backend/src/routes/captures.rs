@@ -670,7 +670,8 @@ async fn get_capture(
                thumbnail_s3_key, evidence, confidence_level, status,
                location_precise, location_coarse, captured_at, uploaded_at,
                capture_type, video_s3_key, hash_chain_s3_key, duration_ms,
-               frame_count, is_partial, checkpoint_index
+               frame_count, is_partial, checkpoint_index,
+               capture_mode, media_stored, analysis_source, metadata_flags
         FROM captures
         WHERE id = $1
         "#,
@@ -706,7 +707,19 @@ async fn get_capture(
     // Build verification URL
     let verification_url = format!("{}/{}", state.config.verification_base_url, capture_id);
 
-    // Build response
+    // Determine if this is a hash-only capture
+    let is_hash_only = capture.capture_mode.as_deref() == Some("hash_only");
+
+    // For hash-only captures: media_url is null, media_hash is provided
+    // For full captures: media_url would be generated (left as None for now, handled by verification page)
+    let media_hash: Option<String> = if is_hash_only {
+        // Convert BYTEA target_media_hash to lowercase hex string
+        Some(hex::encode(&capture.target_media_hash))
+    } else {
+        None
+    };
+
+    // Build response with hash-only fields
     let response = crate::types::CaptureDetailsResponse {
         capture_id: capture.id,
         device_id: capture.device_id,
@@ -717,12 +730,20 @@ async fn get_capture(
         uploaded_at: capture.uploaded_at.to_rfc3339(),
         location_coarse: capture.location_coarse,
         verification_url,
+        // Hash-only fields (Story 8-5)
+        capture_mode: capture.capture_mode,
+        media_stored: capture.media_stored,
+        media_url: None, // Full captures get URL from verification page, hash-only is always null
+        media_hash,
+        metadata_flags: capture.metadata_flags,
     };
 
     tracing::info!(
         request_id = %request_id,
         capture_id = %capture_id,
         confidence_level = %response.confidence_level,
+        capture_mode = ?response.capture_mode,
+        media_stored = ?response.media_stored,
         "Capture retrieved successfully"
     );
 

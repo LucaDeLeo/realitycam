@@ -1,0 +1,761 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML: 8-5-hash-only-evidence-package
+  Generated: 2025-12-01
+  Purpose: Single source of truth for implementing hash-only evidence package generation and retrieval
+-->
+<story-context>
+  <meta>
+    <story-key>8-5-hash-only-evidence-package</story-key>
+    <story-title>Hash-Only Evidence Package Generation</story-title>
+    <status>drafted</status>
+    <epic>8 - Privacy-First Capture Mode</epic>
+    <generated-at>2025-12-01</generated-at>
+    <context-version>1.1</context-version>
+    <revision-notes>
+      <revision version="1.1" date="2025-12-01">
+        <fix priority="critical">AnalysisSource enum - clarified IMPORT from types::hash_only, not redefined</fix>
+        <fix priority="critical">SQL SELECT query - documented required column additions at lines 668-674</fix>
+        <fix priority="critical">CaptureDetailsResponse - documented 5 new fields with types and skip_serializing_if</fix>
+        <fix priority="high">Added concrete test code examples for confidence calculation with source=Device</fix>
+        <fix priority="high">Clarified C2PA manifest timing: Story 8-4 generates, Story 8-5 retrieves</fix>
+        <fix priority="high">Specified media_hash encoding: hex::encode() for lowercase hex</fix>
+        <fix priority="high">Documented DepthAnalysis.source and DepthAssertionData.source synchronization</fix>
+        <fix priority="low">Added confidence level serialization mapping</fix>
+        <fix priority="low">Specified manifest S3 key format</fix>
+        <fix priority="low">Clarified manifest retrieval error handling (return null, not 500)</fix>
+      </revision>
+    </revision-notes>
+  </meta>
+
+  <story-reference>
+    <file>docs/sprint-artifacts/stories/8-5-hash-only-evidence-package.md</file>
+    <description>Complete story specification with acceptance criteria, tasks, and dev notes for generating evidence packages for hash-only captures and updating GET /captures/{id} endpoint</description>
+  </story-reference>
+
+  <epic-context>
+    <tech-spec>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-8.md</tech-spec>
+    <description>Epic 8 enables zero-knowledge provenance by allowing hash-only captures with pre-computed depth analysis signed by DCAppAttest. This story ensures hash-only captures return proper evidence packages via the GET endpoint and generate C2PA manifests.</description>
+    <related-stories>
+      <story id="8-4">Backend Hash-Only Endpoint - stores hash-only captures that this story retrieves (COMPLETED)</story>
+      <story id="8-3">Hash-Only Capture Payload (iOS) - defines the payload structure with depth_analysis and metadata_flags</story>
+      <story id="8-6">Verification Page Hash-Only Display - consumes the evidence packages this story generates</story>
+    </related-stories>
+  </epic-context>
+
+  <documentation-artifacts>
+    <artifact>
+      <path>docs/architecture.md</path>
+      <description>Architecture document with ADR-011 (Client-Side Depth Analysis for Privacy Mode) defining trust model</description>
+      <relevant-sections>
+        <section>ADR-011: Client-Side Depth Analysis for Privacy Mode (lines 1067-1121) - trust model for device-computed analysis</section>
+        <section>Evidence Architecture MVP (lines 349-418) - confidence calculation logic</section>
+        <section>API Contracts - GET /captures/{id} (lines 642-674) - response format</section>
+        <section>Data Architecture - S3 Structure (lines 529-539) - manifest storage pattern</section>
+      </relevant-sections>
+    </artifact>
+    <artifact>
+      <path>docs/prd.md</path>
+      <description>Product Requirements Document</description>
+      <relevant-requirements>
+        <requirement id="FR60">Backend stores hash + evidence without raw media</requirement>
+        <requirement id="FR59">Backend accepts pre-computed depth analysis signed by attested device</requirement>
+      </relevant-requirements>
+    </artifact>
+    <artifact>
+      <path>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-8.md</path>
+      <description>Epic 8 Technical Specification</description>
+      <relevant-sections>
+        <section>Evidence Package for Hash-Only (lines 249-298) - from_hash_only() pattern</section>
+        <section>APIs GET /captures/{id} Updated Response (lines 404-438) - hash-only response format</section>
+        <section>Acceptance Criteria Story 8.5 (lines 651-658) - authoritative acceptance criteria</section>
+      </relevant-sections>
+    </artifact>
+    <artifact>
+      <path>docs/epics.md</path>
+      <description>Epic definitions</description>
+      <relevant-sections>
+        <section>Epic 8: Privacy-First Capture Mode - Story 8.5 acceptance criteria</section>
+      </relevant-sections>
+    </artifact>
+  </documentation-artifacts>
+
+  <existing-code-interfaces>
+    <interface>
+      <path>backend/src/routes/captures.rs</path>
+      <description>GET /captures/{id} handler that needs modification for hash-only mode</description>
+      <key-functions>
+        <function name="get_capture">Lines 640-730: Retrieves capture by ID, builds CaptureDetailsResponse. NEEDS UPDATE to handle capture_mode="hash_only", skip S3 URL generation, include analysis_source and metadata_flags.</function>
+      </key-functions>
+      <key-patterns>
+        <pattern>SQL query selects from captures table with all fields including video-specific columns</pattern>
+        <pattern>Access control: only owning device can retrieve capture</pattern>
+        <pattern>Response uses CaptureDetailsResponse type from types/capture.rs</pattern>
+        <pattern>verification_url built from config.verification_base_url</pattern>
+      </key-patterns>
+      <modifications-required>
+        <modification>Add capture_mode, media_stored, analysis_source, metadata_flags to SQL SELECT</modification>
+        <modification>Check capture_mode to determine response format</modification>
+        <modification>Set media_url to null for hash-only captures</modification>
+        <modification>Include media_hash hex string in response using hex::encode() for lowercase hex</modification>
+        <modification>Include metadata_flags in evidence section</modification>
+      </modifications-required>
+      <critical-sql-update>
+        <description>CRITICAL: The SQL SELECT query at lines 668-674 MUST be updated to include the new columns added by Story 8-4 migration.</description>
+        <current-query-location>Lines 668-674 in captures.rs</current-query-location>
+        <columns-to-add>capture_mode, media_stored, analysis_source, metadata_flags</columns-to-add>
+        <updated-query>
+<![CDATA[
+SELECT id, device_id, target_media_hash, photo_s3_key, depth_map_s3_key,
+       thumbnail_s3_key, evidence, confidence_level, status,
+       location_precise, location_coarse, captured_at, uploaded_at,
+       capture_type, video_s3_key, hash_chain_s3_key, duration_ms,
+       frame_count, is_partial, checkpoint_index,
+       capture_mode, media_stored, analysis_source, metadata_flags
+FROM captures
+WHERE id = $1
+]]>
+        </updated-query>
+        <note>The Capture model struct must also have these fields to match the query result</note>
+      </critical-sql-update>
+    </interface>
+    <interface>
+      <path>backend/src/routes/captures_hash_only.rs</path>
+      <description>Hash-only capture upload endpoint from Story 8-4. May need update to generate C2PA manifest after DB insert.</description>
+      <key-functions>
+        <function name="upload_hash_only_capture">Lines 119-372: Accepts JSON payload, verifies assertion, builds evidence package, stores to database without S3 upload.</function>
+        <function name="build_metadata_evidence">Lines 379-398: Builds MetadataEvidence from payload.</function>
+        <function name="extract_coarse_location">Lines 401-414: Extracts coarse location string.</function>
+      </key-functions>
+      <integration-point>
+        <description>After successful database insert, call C2PA manifest generation and store to S3</description>
+        <code-location>After line 339 (insert_hash_only_capture success)</code-location>
+      </integration-point>
+    </interface>
+    <interface>
+      <path>backend/src/types/hash_only.rs</path>
+      <description>Hash-only capture types from Story 8-4</description>
+      <key-structures>
+        <struct name="CaptureMode">Enum: Full, HashOnly</struct>
+        <struct name="AnalysisSource">Enum: Server, Device - already defined!</struct>
+        <struct name="HashOnlyCapturePayload">Request payload with depth_analysis and metadata_flags</struct>
+        <struct name="HashOnlyCaptureResponse">Response with capture_id, status, capture_mode, media_stored</struct>
+        <struct name="ClientDepthAnalysis">Client-provided depth analysis fields</struct>
+        <struct name="MetadataFlags">Privacy metadata flags (location_included, timestamp_level, etc.)</struct>
+        <struct name="FilteredMetadata">Filtered metadata (location, timestamp, device_model)</struct>
+      </key-structures>
+      <note>AnalysisSource enum already exists here - can reuse for DepthAnalysis.source field</note>
+    </interface>
+    <interface>
+      <path>backend/src/models/evidence.rs</path>
+      <description>Evidence types including DepthAnalysis that needs optional source field</description>
+      <key-structures>
+        <struct name="EvidencePackage">Container with hardware_attestation, depth_analysis, metadata, processing</struct>
+        <struct name="DepthAnalysis">Lines 136-152: Has status, depth_variance, depth_layers, edge_coherence, min_depth, max_depth, is_likely_real_scene. NEEDS: optional source field</struct>
+        <struct name="HardwareAttestation">status, level, device_model, assertion_verified, counter_valid</struct>
+        <struct name="MetadataEvidence">timestamp_valid, model_verified, resolution_valid, location_available, location_coarse</struct>
+        <struct name="ProcessingInfo">processed_at, processing_time_ms, backend_version</struct>
+        <struct name="CheckStatus">Pass, Fail, Unavailable enum</struct>
+        <struct name="ConfidenceLevel">High, Medium, Low, Suspicious enum - serializes to lowercase: "high", "medium", "low", "suspicious"</struct>
+      </key-structures>
+      <modifications-required>
+        <modification>Add optional source: Option&lt;AnalysisSource&gt; field to DepthAnalysis struct</modification>
+        <modification>Use #[serde(skip_serializing_if = "Option::is_none")] for backward compatibility</modification>
+        <modification>IMPORT AnalysisSource from types::hash_only - DO NOT redefine the enum</modification>
+        <modification>Add unit tests for serialization with source field</modification>
+      </modifications-required>
+      <critical-import-note>
+        <description>CRITICAL: AnalysisSource enum is ALREADY DEFINED in types/hash_only.rs (lines 62-70). DO NOT create a duplicate enum in evidence.rs. Import it instead to avoid enum conflicts.</description>
+        <correct-approach>
+<![CDATA[
+// At the top of evidence.rs, add this import:
+use crate::types::hash_only::AnalysisSource;
+
+// Then use it in DepthAnalysis struct:
+#[serde(skip_serializing_if = "Option::is_none")]
+pub source: Option<AnalysisSource>,
+]]>
+        </correct-approach>
+        <wrong-approach>DO NOT add a new AnalysisSource enum definition in evidence.rs - this causes type conflicts when comparing sources from different modules</wrong-approach>
+      </critical-import-note>
+      <code-snippet title="DepthAnalysis modification">
+<![CDATA[
+// IMPORTANT: Import AnalysisSource from types::hash_only, do NOT redefine
+use crate::types::hash_only::AnalysisSource;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DepthAnalysis {
+    pub status: CheckStatus,
+    pub depth_variance: f64,
+    pub depth_layers: u32,
+    pub edge_coherence: f64,
+    pub min_depth: f64,
+    pub max_depth: f64,
+    pub is_likely_real_scene: bool,
+
+    // New field for Epic 8 (Story 8-5)
+    // Source is "server" for full captures, "device" for hash-only captures
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<AnalysisSource>,
+}
+]]>
+      </code-snippet>
+    </interface>
+    <interface>
+      <path>backend/src/services/c2pa.rs</path>
+      <description>C2PA manifest generation service. Needs hash-only manifest method.</description>
+      <key-structures>
+        <struct name="C2paManifest">claim_generator, title, created_at, actions, realitycam assertion</struct>
+        <struct name="RealityCamAssertion">confidence_level, hardware_attestation, depth_analysis, device_model, captured_at</struct>
+        <struct name="DepthAssertionData">Lines 113-126: status, is_real_scene, depth_layers, depth_variance. NEEDS: source field added</struct>
+        <struct name="C2paVideoManifest">Video-specific manifest structure (for reference)</struct>
+      </key-structures>
+      <key-functions>
+        <function name="generate_manifest">Lines 181-199: Generates photo manifest. Pattern to follow for hash-only.</function>
+        <function name="generate_manifest_json">Lines 202-210: Returns JSON string.</function>
+        <function name="build_assertion">Lines 213-258: Builds RealityCamAssertion from evidence.</function>
+        <function name="c2pa_manifest_s3_key">Returns S3 key pattern: format!("captures/{}/manifest.json", capture_id)</function>
+      </key-functions>
+      <modifications-required>
+        <modification>Add source: Option&lt;String&gt; field to DepthAssertionData struct with skip_serializing_if</modification>
+        <modification>Add generate_hash_only_manifest() method with "Privacy Mode" title</modification>
+        <modification>Update build_assertion to include source from evidence.depth_analysis.source</modification>
+      </modifications-required>
+      <critical-manifest-timing>
+        <description>CRITICAL: C2PA manifest generation timing differs between Story 8-4 and Story 8-5</description>
+        <story-8-4>Story 8-4 (hash-only upload) GENERATES the manifest at upload time and stores to S3</story-8-4>
+        <story-8-5>Story 8-5 (GET /captures/{id}) RETRIEVES the existing manifest from S3 - does NOT regenerate</story-8-5>
+        <manifest-s3-key>format!("captures/{}/manifest.json", capture_id)</manifest-s3-key>
+        <retrieval-error-handling>If manifest retrieval fails (S3 error, not found), return null in response - do NOT return HTTP 500</retrieval-error-handling>
+      </critical-manifest-timing>
+      <source-field-sync>
+        <description>IMPORTANT: DepthAnalysis.source and DepthAssertionData.source must stay synchronized</description>
+        <depth-analysis-source>evidence.depth_analysis.source (Option&lt;AnalysisSource&gt; from types::hash_only)</depth-analysis-source>
+        <depth-assertion-source>DepthAssertionData.source (Option&lt;String&gt;, serialized as "server" or "device")</depth-assertion-source>
+        <conversion-in-build-assertion>
+<![CDATA[
+// In build_assertion(), add source field to DepthAssertionData:
+depth_analysis: DepthAssertionData {
+    status: depth_status.to_string(),
+    is_real_scene: evidence.depth_analysis.is_likely_real_scene,
+    depth_layers: evidence.depth_analysis.depth_layers,
+    depth_variance: evidence.depth_analysis.depth_variance,
+    source: evidence.depth_analysis.source.map(|s| s.to_string()),  // "server" or "device"
+},
+]]>
+        </conversion-in-build-assertion>
+      </source-field-sync>
+      <code-snippet title="DepthAssertionData with source field">
+<![CDATA[
+/// Depth analysis data for C2PA assertion
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DepthAssertionData {
+    /// Status: "pass", "fail", or "unavailable"
+    pub status: String,
+
+    /// Whether scene is likely real (not a flat image)
+    pub is_real_scene: bool,
+
+    /// Number of depth layers detected
+    pub depth_layers: u32,
+
+    /// Depth variance value
+    pub depth_variance: f64,
+
+    /// Source of analysis: "server" or "device" (hash-only captures)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+}
+]]>
+      </code-snippet>
+      <code-snippet title="Hash-only manifest generation">
+<![CDATA[
+/// Generates a C2PA manifest for hash-only (privacy mode) captures
+pub fn generate_hash_only_manifest(&self, evidence: &EvidencePackage, captured_at: &str) -> C2paManifest {
+    let mut manifest = self.generate_manifest(evidence, captured_at);
+    manifest.title = "RealityCam Verified Photo (Privacy Mode)".to_string();
+    // depth_analysis assertion already includes source from evidence.depth_analysis.source
+    manifest
+}
+]]>
+      </code-snippet>
+    </interface>
+    <interface>
+      <path>backend/src/models/capture.rs</path>
+      <description>Capture database model. Already has video fields, may need privacy mode fields in Capture struct for query result.</description>
+      <key-structures>
+        <struct name="Capture">Database row struct with all columns</struct>
+        <struct name="CaptureType">Photo/Video enum</struct>
+      </key-structures>
+      <note>Capture struct may need capture_mode, media_stored, analysis_source, metadata_flags fields added if not already present from Story 8-4 migration.</note>
+    </interface>
+    <interface>
+      <path>backend/src/types/capture.rs</path>
+      <description>Capture request/response types</description>
+      <key-structures>
+        <struct name="CaptureDetailsResponse">Lines 99-120: Response for GET /captures/{id}. NEEDS: optional media_hash, media_stored, capture_mode, metadata_flags fields for hash-only variant.</struct>
+        <struct name="CaptureUploadResponse">capture_id, status, verification_url</struct>
+      </key-structures>
+      <modifications-required>
+        <modification>Add optional capture_mode: Option&lt;String&gt; field with skip_serializing_if</modification>
+        <modification>Add optional media_stored: Option&lt;bool&gt; field with skip_serializing_if</modification>
+        <modification>CHANGE media_url from String to Option&lt;String&gt; - this is a BREAKING CHANGE to existing field</modification>
+        <modification>Add optional media_hash: Option&lt;String&gt; field (hex string for hash-only)</modification>
+        <modification>Add optional metadata_flags: Option&lt;serde_json::Value&gt; field with skip_serializing_if</modification>
+      </modifications-required>
+      <critical-response-fields>
+        <description>CRITICAL: CaptureDetailsResponse needs 5 NEW fields for hash-only support. The media_url field must CHANGE from required String to optional Option&lt;String&gt;.</description>
+        <new-fields>
+          <field name="capture_mode" type="Option&lt;String&gt;">Capture mode discriminator: "full" or "hash_only"</field>
+          <field name="media_stored" type="Option&lt;bool&gt;">Whether media files are stored on server</field>
+          <field name="media_url" type="Option&lt;String&gt;">CHANGE from String - S3 presigned URL, null for hash-only</field>
+          <field name="media_hash" type="Option&lt;String&gt;">SHA-256 hash as lowercase hex string (64 chars)</field>
+          <field name="metadata_flags" type="Option&lt;serde_json::Value&gt;">Privacy metadata flags from payload</field>
+        </new-fields>
+        <all-fields-require>#[serde(skip_serializing_if = "Option::is_none")] for backward compatibility</all-fields-require>
+      </critical-response-fields>
+      <code-snippet title="Updated CaptureDetailsResponse">
+<![CDATA[
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CaptureDetailsResponse {
+    pub capture_id: Uuid,
+    pub device_id: Uuid,
+    pub confidence_level: String,
+    pub status: String,
+    pub evidence: serde_json::Value,
+    pub captured_at: String,
+    pub uploaded_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub location_coarse: Option<String>,
+    pub verification_url: String,
+
+    // New fields for hash-only (Story 8-5)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capture_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub media_stored: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub media_url: Option<String>,           // CHANGED: was required String, now optional
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub media_hash: Option<String>,          // NEW: lowercase hex string from hex::encode()
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata_flags: Option<serde_json::Value>,  // NEW: privacy flags
+}
+]]>
+      </code-snippet>
+    </interface>
+    <interface>
+      <path>backend/src/services/storage.rs</path>
+      <description>S3 storage service for file uploads. Hash-only captures skip media upload but may store C2PA manifest.</description>
+      <key-functions>
+        <function name="upload_photo">Uploads photo.jpg - SKIP for hash-only</function>
+        <function name="upload_depth_map">Uploads depth.gz - SKIP for hash-only</function>
+      </key-functions>
+      <note>Need upload_manifest_json() method or inline S3 put for manifest.json</note>
+    </interface>
+    <interface>
+      <path>backend/src/middleware/device_auth.rs</path>
+      <description>Device authentication middleware providing DeviceContext</description>
+      <key-structures>
+        <struct name="DeviceContext">device_id, model, has_lidar, is_verified</struct>
+      </key-structures>
+    </interface>
+    <interface>
+      <path>backend/src/error.rs</path>
+      <description>API error types</description>
+      <key-types>
+        <type name="ApiError">Enum with CaptureNotFound, Forbidden, etc.</type>
+      </key-types>
+    </interface>
+  </existing-code-interfaces>
+
+  <database-context>
+    <current-schema>
+      <description>From Story 8-4 migration, the captures table includes:</description>
+      <table name="captures">
+        <column name="id" type="UUID" constraint="PRIMARY KEY"/>
+        <column name="device_id" type="UUID" constraint="NOT NULL REFERENCES devices(id)"/>
+        <column name="target_media_hash" type="BYTEA" constraint="NOT NULL UNIQUE"/>
+        <column name="photo_s3_key" type="VARCHAR(255)" nullable="true"/>
+        <column name="depth_map_s3_key" type="VARCHAR(255)" nullable="true"/>
+        <column name="evidence" type="JSONB" constraint="NOT NULL DEFAULT '{}'"/>
+        <column name="confidence_level" type="TEXT" constraint="NOT NULL"/>
+        <column name="status" type="TEXT" constraint="NOT NULL"/>
+        <column name="captured_at" type="TIMESTAMPTZ" constraint="NOT NULL"/>
+        <column name="uploaded_at" type="TIMESTAMPTZ" constraint="NOT NULL DEFAULT NOW()"/>
+        <column name="capture_type" type="VARCHAR(16)" constraint="DEFAULT 'photo'"/>
+        <column name="capture_mode" type="TEXT" constraint="NOT NULL DEFAULT 'full'" comment="Added by Story 8-4"/>
+        <column name="media_stored" type="BOOLEAN" constraint="NOT NULL DEFAULT TRUE" comment="Added by Story 8-4"/>
+        <column name="analysis_source" type="TEXT" constraint="NOT NULL DEFAULT 'server'" comment="Added by Story 8-4"/>
+        <column name="metadata_flags" type="JSONB" nullable="true" comment="Added by Story 8-4"/>
+        <column name="location_coarse" type="TEXT" nullable="true"/>
+      </table>
+      <indexes>
+        <index name="idx_captures_mode">ON captures(capture_mode)</index>
+        <index name="idx_captures_hash_lookup">USING hash(target_media_hash) WHERE capture_mode = 'hash_only'</index>
+      </indexes>
+    </current-schema>
+    <queries>
+      <query name="get_capture_by_id">
+        <description>Query for GET /captures/{id} - needs capture_mode, media_stored, analysis_source, metadata_flags</description>
+        <sql><![CDATA[
+SELECT id, device_id, target_media_hash, photo_s3_key, depth_map_s3_key,
+       thumbnail_s3_key, evidence, confidence_level, status,
+       location_precise, location_coarse, captured_at, uploaded_at,
+       capture_type, video_s3_key, hash_chain_s3_key, duration_ms,
+       frame_count, is_partial, checkpoint_index,
+       capture_mode, media_stored, analysis_source, metadata_flags  -- NEW
+FROM captures
+WHERE id = $1
+        ]]></sql>
+      </query>
+    </queries>
+  </database-context>
+
+  <development-constraints>
+    <constraint source="tech-spec">
+      <description>Confidence calculation unchanged: hash-only uses same EvidencePackage::calculate_confidence() algorithm. analysis_source does NOT affect confidence.</description>
+    </constraint>
+    <constraint source="tech-spec">
+      <description>Hash-only captures achieve same HIGH confidence when both hardware attestation and depth analysis pass.</description>
+    </constraint>
+    <constraint source="story">
+      <description>C2PA manifest title for hash-only: "RealityCam Verified Photo (Privacy Mode)"</description>
+    </constraint>
+    <constraint source="story">
+      <description>No embedded C2PA for hash-only (no photo to embed into) - store manifest JSON only</description>
+    </constraint>
+    <constraint source="story">
+      <description>Hash-only captures must NOT generate S3 URLs for photo/depth_map - set media_url to null</description>
+    </constraint>
+    <constraint source="story">
+      <description>Response must include media_hash (hex string) for client-side verification</description>
+    </constraint>
+    <constraint source="story">
+      <description>Include metadata_flags in response to show what metadata was included</description>
+    </constraint>
+    <constraint source="architecture">
+      <description>ADR-011: Trust comes from DCAppAttest assertion verification - if uncompromised device computed depth analysis and signed it, results are equally trustworthy as server-side.</description>
+    </constraint>
+  </development-constraints>
+
+  <dependencies>
+    <external-dependencies>
+      <dependency name="serde" version="1">Serialization with skip_serializing_if for optional fields</dependency>
+      <dependency name="serde_json" version="1">JSON processing for evidence and metadata_flags</dependency>
+      <dependency name="hex" version="0.4+">Convert target_media_hash bytes to hex string</dependency>
+      <dependency name="uuid" version="1">Capture ID type</dependency>
+      <dependency name="chrono" version="0.4">Timestamp handling</dependency>
+      <dependency name="sqlx" version="0.8">Database queries with optional columns</dependency>
+    </external-dependencies>
+    <internal-dependencies>
+      <dependency>crate::models::EvidencePackage - Evidence structure with calculate_confidence()</dependency>
+      <dependency>crate::models::DepthAnalysis - Needs source field added</dependency>
+      <dependency>crate::services::C2paService - Manifest generation</dependency>
+      <dependency>crate::services::c2pa_manifest_s3_key - S3 key pattern for manifest</dependency>
+      <dependency>crate::types::CaptureDetailsResponse - Response type to extend</dependency>
+      <dependency>crate::types::hash_only::AnalysisSource - Reuse existing enum</dependency>
+      <dependency>crate::routes::captures::get_capture - Handler to modify</dependency>
+    </internal-dependencies>
+  </dependencies>
+
+  <testing-context>
+    <testing-framework>cargo test</testing-framework>
+    <testing-patterns>
+      <pattern>Unit tests for DepthAnalysis serialization with optional source field</pattern>
+      <pattern>Unit tests for confidence calculation with device source (unchanged behavior)</pattern>
+      <pattern>Unit tests for hash-only manifest generation with privacy mode title</pattern>
+      <pattern>Unit tests for CaptureDetailsResponse serialization with new optional fields</pattern>
+      <pattern>Integration tests for GET /captures/{id} with hash-only capture</pattern>
+    </testing-patterns>
+    <test-data>
+      <item>Hash-only capture with both attestation and depth pass -> HIGH confidence</item>
+      <item>Hash-only capture with attestation pass, depth fail -> SUSPICIOUS</item>
+      <item>Hash-only capture with attestation pass, depth unavailable -> MEDIUM</item>
+      <item>Verify response format matches specification in story</item>
+      <item>Verify media_url is null for hash-only</item>
+      <item>Verify media_hash is present as hex string</item>
+    </test-data>
+    <existing-test-patterns>
+      <pattern location="backend/src/models/evidence.rs">Lines 284-515: Unit tests for confidence calculation - add hash-only variants</pattern>
+      <pattern location="backend/src/services/c2pa.rs">Lines 597-996: Unit tests for manifest generation</pattern>
+      <pattern location="backend/src/types/hash_only.rs">Lines 396-595: Unit tests for hash-only types</pattern>
+    </existing-test-patterns>
+    <concrete-test-examples>
+      <example title="Confidence calculation with source=Device (unchanged behavior)">
+<![CDATA[
+// In backend/src/models/evidence.rs tests section
+// IMPORTANT: analysis_source does NOT affect confidence calculation
+
+#[test]
+fn test_confidence_hash_only_both_pass_is_high() {
+    // Hash-only capture: source=Device, both checks pass -> HIGH
+    // Same as full capture - source doesn't change confidence logic
+    use crate::types::hash_only::AnalysisSource;
+
+    let depth = DepthAnalysis {
+        status: CheckStatus::Pass,
+        is_likely_real_scene: true,
+        source: Some(AnalysisSource::Device),  // Device-computed
+        ..Default::default()
+    };
+
+    let evidence = EvidencePackage {
+        hardware_attestation: HardwareAttestation::pass(
+            "iPhone 15 Pro".to_string(),
+            AttestationLevel::SecureEnclave,
+        ),
+        depth_analysis: depth,
+        metadata: MetadataEvidence::default(),
+        processing: ProcessingInfo::default(),
+    };
+
+    // Confidence is HIGH regardless of source=Device
+    assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::High);
+}
+
+#[test]
+fn test_confidence_hash_only_depth_fail_is_suspicious() {
+    use crate::types::hash_only::AnalysisSource;
+
+    let depth = DepthAnalysis {
+        status: CheckStatus::Fail,
+        is_likely_real_scene: false,
+        source: Some(AnalysisSource::Device),
+        ..Default::default()
+    };
+
+    let evidence = EvidencePackage {
+        hardware_attestation: HardwareAttestation::pass(
+            "iPhone 15 Pro".to_string(),
+            AttestationLevel::SecureEnclave,
+        ),
+        depth_analysis: depth,
+        metadata: MetadataEvidence::default(),
+        processing: ProcessingInfo::default(),
+    };
+
+    assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Suspicious);
+}
+
+#[test]
+fn test_depth_analysis_source_serialization() {
+    use crate::types::hash_only::AnalysisSource;
+
+    let depth_with_source = DepthAnalysis {
+        source: Some(AnalysisSource::Device),
+        ..Default::default()
+    };
+
+    let json = serde_json::to_string(&depth_with_source).unwrap();
+    assert!(json.contains("\"source\":\"device\""));
+
+    let depth_without_source = DepthAnalysis {
+        source: None,
+        ..Default::default()
+    };
+
+    let json = serde_json::to_string(&depth_without_source).unwrap();
+    // source field should be omitted when None (skip_serializing_if)
+    assert!(!json.contains("\"source\""));
+}
+]]>
+      </example>
+      <example title="media_hash hex encoding">
+<![CDATA[
+// In captures.rs handler, convert BYTEA to lowercase hex:
+let media_hash: Option<String> = if capture.capture_mode == Some("hash_only".to_string()) {
+    // target_media_hash is BYTEA (Vec<u8>) in database
+    Some(hex::encode(&capture.target_media_hash))  // lowercase hex
+} else {
+    None
+};
+
+// Test: verify hex encoding produces lowercase
+#[test]
+fn test_media_hash_hex_encoding() {
+    let hash_bytes: [u8; 32] = [0xAB, 0xCD, 0xEF, /* ... */ 0x12];
+    let hex_string = hex::encode(hash_bytes);
+
+    assert_eq!(hex_string.len(), 64);  // SHA-256 = 32 bytes = 64 hex chars
+    assert!(hex_string.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()));
+    assert!(hex_string.starts_with("abcdef"));  // lowercase, not ABCDEF
+}
+]]>
+      </example>
+    </concrete-test-examples>
+  </testing-context>
+
+  <implementation-notes>
+    <note priority="high">
+      <title>Task 1: Extend GET /captures/{id} for hash-only mode</title>
+      <content>
+Modify backend/src/routes/captures.rs get_capture handler:
+1. Add capture_mode, media_stored, analysis_source, metadata_flags to SQL SELECT
+2. Check capture_mode == "hash_only" to determine response format
+3. Skip S3 URL generation when media_stored == false
+4. Convert target_media_hash bytes to hex string for media_hash field
+5. Set media_url to None for hash-only captures
+6. Include metadata_flags from database in response
+      </content>
+    </note>
+    <note priority="high">
+      <title>Task 2: Add source field to DepthAnalysis</title>
+      <content>
+Modify backend/src/models/evidence.rs:
+1. Add AnalysisSource enum (Server, Device) OR import from types/hash_only.rs
+2. Add optional source field to DepthAnalysis struct with skip_serializing_if
+3. Update Default impl to set source = None (backward compatible)
+4. Update existing tests to handle optional source field
+      </content>
+    </note>
+    <note priority="high">
+      <title>Task 3: Verify confidence calculation unchanged</title>
+      <content>
+The existing EvidencePackage::calculate_confidence() in backend/src/models/evidence.rs does NOT check analysis_source.
+Add unit tests to confirm:
+- Hash-only with both pass -> HIGH
+- Hash-only with attestation pass, depth fail -> SUSPICIOUS
+- Hash-only with attestation pass, depth unavailable -> MEDIUM
+Document that analysis_source does NOT affect confidence (intentional per tech spec).
+      </content>
+    </note>
+    <note priority="high">
+      <title>Task 4: Update C2PA manifest for hash-only</title>
+      <content>
+Modify backend/src/services/c2pa.rs:
+1. Add source field to DepthAssertionData struct
+2. Add generate_hash_only_manifest() method
+3. Set title to "RealityCam Verified Photo (Privacy Mode)"
+4. Include analysis_source: "device" in depth assertion
+5. Call manifest generation from captures_hash_only.rs after DB insert
+6. Store manifest JSON to S3 using c2pa_manifest_s3_key() pattern
+      </content>
+    </note>
+    <note priority="medium">
+      <title>Task 5: Update capture response types</title>
+      <content>
+Modify backend/src/types/capture.rs:
+1. Add optional capture_mode: Option&lt;String&gt;
+2. Add optional media_stored: Option&lt;bool&gt;
+3. Add optional media_url: Option&lt;String&gt; (can be null)
+4. Add optional media_hash: Option&lt;String&gt; (hex string)
+5. Add optional metadata_flags: Option&lt;serde_json::Value&gt;
+6. Add optional analysis_source: Option&lt;String&gt; in evidence section
+Use #[serde(skip_serializing_if = "Option::is_none")] for backward compatibility.
+      </content>
+    </note>
+    <note priority="medium">
+      <title>Task 6: Integration with Story 8-4 upload flow</title>
+      <content>
+Modify backend/src/routes/captures_hash_only.rs:
+After successful insert_hash_only_capture (around line 340):
+1. Call C2paService::generate_hash_only_manifest()
+2. Store manifest JSON to S3 using c2pa_manifest_s3_key(capture_id)
+3. Add manifest_generation_time_ms to ProcessingInfo (optional)
+4. Handle manifest generation errors gracefully (log, don't fail upload)
+      </content>
+    </note>
+    <note priority="low">
+      <title>Response Format Reference</title>
+      <content>Expected hash-only response format per story AC 5:</content>
+      <code><![CDATA[
+{
+  "data": {
+    "id": "uuid",
+    "capture_mode": "hash_only",
+    "media_stored": false,
+    "media_url": null,
+    "media_hash": "abc123...",
+    "captured_at": "2025-12-01T10:30:00Z",
+    "confidence_level": "high",
+    "evidence": {
+      "hardware_attestation": {
+        "status": "pass",
+        "level": "secure_enclave",
+        "assertion_verified": true,
+        "counter_valid": true
+      },
+      "depth_analysis": {
+        "status": "pass",
+        "depth_variance": 2.4,
+        "depth_layers": 5,
+        "edge_coherence": 0.87,
+        "is_likely_real_scene": true,
+        "source": "device"
+      },
+      "analysis_source": "device",
+      "metadata_flags": {
+        "location_level": "coarse",
+        "timestamp_level": "day_only"
+      }
+    }
+  }
+}
+      ]]></code>
+    </note>
+    <note priority="low">
+      <title>S3 Storage for Hash-Only</title>
+      <content>
+Hash-only captures store: captures/{id}/manifest.json (C2PA manifest JSON)
+S3 key format: format!("captures/{}/manifest.json", capture_id)
+Hash-only captures do NOT store:
+- captures/{id}/photo.jpg (no media uploaded)
+- captures/{id}/depth.bin (no depth map uploaded)
+- captures/{id}/c2pa.jpg (no embedded C2PA - nothing to embed into)
+      </content>
+    </note>
+    <note priority="low">
+      <title>Confidence Level Serialization</title>
+      <content>
+ConfidenceLevel enum serializes to lowercase strings via #[serde(rename_all = "lowercase")]:
+- ConfidenceLevel::High -> "high"
+- ConfidenceLevel::Medium -> "medium"
+- ConfidenceLevel::Low -> "low"
+- ConfidenceLevel::Suspicious -> "suspicious"
+
+When building API responses, use evidence.calculate_confidence() and convert to string:
+  let confidence_str = match evidence.calculate_confidence() {
+      ConfidenceLevel::High => "high",
+      ConfidenceLevel::Medium => "medium",
+      ConfidenceLevel::Low => "low",
+      ConfidenceLevel::Suspicious => "suspicious",
+  };
+      </content>
+    </note>
+    <note priority="low">
+      <title>Manifest Retrieval Error Handling</title>
+      <content>
+When GET /captures/{id} retrieves manifest from S3 for hash-only captures:
+- On success: include manifest in response
+- On S3 NotFound: return null for manifest field (not HTTP error)
+- On S3 error (network, permissions): log error, return null (not HTTP 500)
+
+Rationale: Manifest is supplementary data. Core evidence is in database.
+Client can still verify capture without manifest.
+      </content>
+    </note>
+  </implementation-notes>
+
+  <acceptance-criteria-summary>
+    <criterion id="AC1">Evidence package includes analysis_source: "device", depth analysis notes "Computed on attested device", hardware attestation shows assertion verification result</criterion>
+    <criterion id="AC2">Confidence calculation uses same algorithm: HIGH when both pass, MEDIUM when one passes, SUSPICIOUS if either fails. analysis_source does NOT affect confidence.</criterion>
+    <criterion id="AC3">Response includes capture_mode: "hash_only", media_stored: false, analysis_source: "device", metadata_flags object</criterion>
+    <criterion id="AC4">C2PA manifest with title "RealityCam Verified Photo (Privacy Mode)", analysis_source: "device" in depth assertion, manifest JSON stored to S3 (no embedded C2PA)</criterion>
+    <criterion id="AC5">GET response matches specified JSON format with media_url null, media_hash present</criterion>
+    <criterion id="AC6">No S3 URL generation for photo/depth_map, no 404 errors from missing S3 objects, media_hash returned for client verification</criterion>
+  </acceptance-criteria-summary>
+
+  <files-summary>
+    <files-to-create>
+      <file>None - all modifications to existing files</file>
+    </files-to-create>
+    <files-to-modify>
+      <file>backend/src/models/evidence.rs - Add AnalysisSource enum and optional source field to DepthAnalysis</file>
+      <file>backend/src/services/c2pa.rs - Add source field to DepthAssertionData, add generate_hash_only_manifest()</file>
+      <file>backend/src/routes/captures.rs - Update GET handler for hash-only mode</file>
+      <file>backend/src/routes/captures_hash_only.rs - Add C2PA manifest generation after upload</file>
+      <file>backend/src/types/capture.rs - Update CaptureDetailsResponse for hash-only fields</file>
+    </files-to-modify>
+  </files-summary>
+</story-context>

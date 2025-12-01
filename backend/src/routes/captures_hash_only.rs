@@ -29,7 +29,8 @@ use crate::models::{
     MetadataEvidence, ProcessingInfo,
 };
 use crate::routes::AppState;
-use crate::services::verify_hash_only_assertion;
+use crate::services::{c2pa_manifest_s3_key, verify_hash_only_assertion, C2paService};
+use crate::types::hash_only::AnalysisSource;
 use crate::types::{
     ApiResponse, HashOnlyCapturePayload, HashOnlyCaptureResponse, InsertHashOnlyCaptureParams,
 };
@@ -232,6 +233,7 @@ async fn upload_hash_only_capture(
         min_depth: payload.depth_analysis.min_depth as f64,
         max_depth: payload.depth_analysis.max_depth as f64,
         is_likely_real_scene: payload.depth_analysis.is_likely_real_scene,
+        source: Some(AnalysisSource::Device), // Hash-only captures use device-side analysis
     };
 
     // Build metadata evidence from filtered metadata
@@ -340,7 +342,49 @@ async fn upload_hash_only_capture(
     );
 
     // ========================================================================
-    // AC 5: Verify No S3 Upload (implicit - we simply don't call StorageService)
+    // Story 8-5: Generate and store C2PA manifest for hash-only captures
+    // ========================================================================
+    // Hash-only captures store manifest JSON to S3 (no embedded C2PA since no media).
+    // Errors are logged but don't fail the upload - manifest is supplementary.
+    let c2pa_service = C2paService::new();
+    match c2pa_service.generate_hash_only_manifest_json(&evidence_package, &payload.captured_at) {
+        Ok(manifest_json) => {
+            let manifest_key = c2pa_manifest_s3_key(db_capture_id);
+            match state
+                .storage
+                .upload_json(&manifest_key, &manifest_json)
+                .await
+            {
+                Ok(_) => {
+                    tracing::info!(
+                        request_id = %request_id,
+                        capture_id = %db_capture_id,
+                        manifest_key = %manifest_key,
+                        "[hash_only] C2PA manifest stored to S3"
+                    );
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        request_id = %request_id,
+                        capture_id = %db_capture_id,
+                        error = %e,
+                        "[hash_only] Failed to store C2PA manifest to S3 (non-fatal)"
+                    );
+                }
+            }
+        }
+        Err(e) => {
+            tracing::warn!(
+                request_id = %request_id,
+                capture_id = %db_capture_id,
+                error = %e,
+                "[hash_only] Failed to generate C2PA manifest (non-fatal)"
+            );
+        }
+    }
+
+    // ========================================================================
+    // AC 5: Verify No S3 Upload (implicit - we simply don't call StorageService for media)
     // ========================================================================
 
     // ========================================================================

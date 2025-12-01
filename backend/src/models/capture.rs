@@ -119,6 +119,21 @@ pub struct Capture {
 
     /// Latest verified checkpoint index (video captures only)
     pub checkpoint_index: Option<i32>,
+
+    // ========================================================================
+    // Hash-only (privacy mode) fields (Story 8-4, 8-5)
+    // ========================================================================
+    /// Capture mode: "full" (default) or "hash_only"
+    pub capture_mode: Option<String>,
+
+    /// Whether media files are stored on server (false for hash-only)
+    pub media_stored: Option<bool>,
+
+    /// Source of depth analysis: "server" (default) or "device"
+    pub analysis_source: Option<String>,
+
+    /// Privacy metadata flags (JSONB)
+    pub metadata_flags: Option<serde_json::Value>,
 }
 
 /// Parameters for creating a new capture record

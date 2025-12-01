@@ -5,6 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::types::hash_only::AnalysisSource;
+
 // ============================================================================
 // Check Status Enum
 // ============================================================================
@@ -149,6 +151,9 @@ pub struct DepthAnalysis {
     pub max_depth: f64,
     /// Whether the depth map likely represents a real scene
     pub is_likely_real_scene: bool,
+    /// Source of depth analysis: "server" for full captures, "device" for hash-only captures (Story 8-5)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<AnalysisSource>,
 }
 
 impl Default for DepthAnalysis {
@@ -162,6 +167,7 @@ impl Default for DepthAnalysis {
             min_depth: 0.0,
             max_depth: 0.0,
             is_likely_real_scene: false,
+            source: None,
         }
     }
 }
@@ -511,5 +517,150 @@ mod tests {
         assert!(json.contains("\"metadata\""));
         assert!(json.contains("\"processing\""));
         assert!(json.contains("\"processing_time_ms\":1000"));
+    }
+
+    // ========================================================================
+    // Story 8-5: Hash-Only Evidence Tests
+    // ========================================================================
+
+    #[test]
+    fn test_depth_analysis_source_serialization_with_device() {
+        let depth = DepthAnalysis {
+            source: Some(AnalysisSource::Device),
+            ..Default::default()
+        };
+
+        let json = serde_json::to_string(&depth).unwrap();
+        assert!(json.contains("\"source\":\"device\""));
+    }
+
+    #[test]
+    fn test_depth_analysis_source_serialization_with_server() {
+        let depth = DepthAnalysis {
+            source: Some(AnalysisSource::Server),
+            ..Default::default()
+        };
+
+        let json = serde_json::to_string(&depth).unwrap();
+        assert!(json.contains("\"source\":\"server\""));
+    }
+
+    #[test]
+    fn test_depth_analysis_source_omitted_when_none() {
+        let depth = DepthAnalysis {
+            source: None,
+            ..Default::default()
+        };
+
+        let json = serde_json::to_string(&depth).unwrap();
+        // Source field should be omitted when None (skip_serializing_if)
+        assert!(!json.contains("\"source\""));
+    }
+
+    #[test]
+    fn test_confidence_hash_only_both_pass_is_high() {
+        // Hash-only capture: source=Device, both checks pass -> HIGH
+        // Same as full capture - source doesn't change confidence logic
+        let depth = DepthAnalysis {
+            status: CheckStatus::Pass,
+            is_likely_real_scene: true,
+            source: Some(AnalysisSource::Device),
+            ..Default::default()
+        };
+
+        let evidence = EvidencePackage {
+            hardware_attestation: HardwareAttestation::pass(
+                "iPhone 15 Pro".to_string(),
+                AttestationLevel::SecureEnclave,
+            ),
+            depth_analysis: depth,
+            metadata: MetadataEvidence::default(),
+            processing: ProcessingInfo::default(),
+        };
+
+        // Confidence is HIGH regardless of source=Device
+        assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::High);
+    }
+
+    #[test]
+    fn test_confidence_hash_only_depth_fail_is_suspicious() {
+        // Hash-only with device depth fail -> SUSPICIOUS (same as server)
+        let depth = DepthAnalysis {
+            status: CheckStatus::Fail,
+            is_likely_real_scene: false,
+            source: Some(AnalysisSource::Device),
+            ..Default::default()
+        };
+
+        let evidence = EvidencePackage {
+            hardware_attestation: HardwareAttestation::pass(
+                "iPhone 15 Pro".to_string(),
+                AttestationLevel::SecureEnclave,
+            ),
+            depth_analysis: depth,
+            metadata: MetadataEvidence::default(),
+            processing: ProcessingInfo::default(),
+        };
+
+        assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Suspicious);
+    }
+
+    #[test]
+    fn test_confidence_hash_only_depth_unavailable_is_medium() {
+        // Hash-only with attestation pass, depth unavailable -> MEDIUM
+        let depth = DepthAnalysis {
+            status: CheckStatus::Unavailable,
+            is_likely_real_scene: false,
+            source: Some(AnalysisSource::Device),
+            ..Default::default()
+        };
+
+        let evidence = EvidencePackage {
+            hardware_attestation: HardwareAttestation::pass(
+                "iPhone 15 Pro".to_string(),
+                AttestationLevel::SecureEnclave,
+            ),
+            depth_analysis: depth,
+            metadata: MetadataEvidence::default(),
+            processing: ProcessingInfo::default(),
+        };
+
+        assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Medium);
+    }
+
+    #[test]
+    fn test_depth_analysis_deserialization_with_source() {
+        let json = r#"{
+            "status": "pass",
+            "depth_variance": 2.4,
+            "depth_layers": 5,
+            "edge_coherence": 0.87,
+            "min_depth": 0.8,
+            "max_depth": 4.2,
+            "is_likely_real_scene": true,
+            "source": "device"
+        }"#;
+
+        let depth: DepthAnalysis = serde_json::from_str(json).unwrap();
+        assert_eq!(depth.source, Some(AnalysisSource::Device));
+        assert_eq!(depth.status, CheckStatus::Pass);
+        assert!(depth.is_likely_real_scene);
+    }
+
+    #[test]
+    fn test_depth_analysis_deserialization_without_source() {
+        // Backward compatibility: old records without source field
+        let json = r#"{
+            "status": "pass",
+            "depth_variance": 2.4,
+            "depth_layers": 5,
+            "edge_coherence": 0.87,
+            "min_depth": 0.8,
+            "max_depth": 4.2,
+            "is_likely_real_scene": true
+        }"#;
+
+        let depth: DepthAnalysis = serde_json::from_str(json).unwrap();
+        assert_eq!(depth.source, None);
     }
 }

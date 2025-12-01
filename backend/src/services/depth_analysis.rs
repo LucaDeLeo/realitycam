@@ -712,6 +712,7 @@ fn analyze_depth_map_from_bytes_inner(
         min_depth: stats.min_depth,
         max_depth: stats.max_depth,
         is_likely_real_scene: is_real,
+        source: None, // Server-side analysis
     })
 }
 
@@ -875,6 +876,7 @@ async fn analyze_depth_map_inner(
         min_depth: stats.min_depth,
         max_depth: stats.max_depth,
         is_likely_real_scene: is_real,
+        source: None, // Server-side analysis
     })
 }
 

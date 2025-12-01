@@ -117,6 +117,29 @@ pub struct CaptureDetailsResponse {
     pub location_coarse: Option<String>,
     /// URL to view verification results
     pub verification_url: String,
+
+    // ========================================================================
+    // Hash-only (privacy mode) fields (Story 8-5)
+    // ========================================================================
+    /// Capture mode: "full" or "hash_only"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capture_mode: Option<String>,
+
+    /// Whether media files are stored on server (false for hash-only)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub media_stored: Option<bool>,
+
+    /// URL to the media file (null for hash-only captures)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub media_url: Option<String>,
+
+    /// SHA-256 hash of the media as lowercase hex string (for hash-only captures)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub media_hash: Option<String>,
+
+    /// Privacy metadata flags showing what metadata was included
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata_flags: Option<serde_json::Value>,
 }
 
 // ============================================================================

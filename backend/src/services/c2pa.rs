@@ -123,6 +123,10 @@ pub struct DepthAssertionData {
 
     /// Depth variance value
     pub depth_variance: f64,
+
+    /// Source of analysis: "server" or "device" (for hash-only captures)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
 }
 
 /// C2PA-style manifest structure
@@ -209,6 +213,39 @@ impl C2paService {
         serde_json::to_string_pretty(&manifest).map_err(|e| C2paError::Serialization(e.to_string()))
     }
 
+    /// Generates a C2PA manifest for hash-only (privacy mode) captures (Story 8-5)
+    ///
+    /// Hash-only captures use device-computed depth analysis and include
+    /// "Privacy Mode" in the title. The manifest is stored as JSON only
+    /// (not embedded in media, since no media is uploaded).
+    ///
+    /// # Arguments
+    /// * `evidence` - Evidence package with source=Device depth analysis
+    /// * `captured_at` - Capture timestamp (ISO 8601)
+    ///
+    /// # Returns
+    /// C2PA manifest with privacy mode title
+    pub fn generate_hash_only_manifest(
+        &self,
+        evidence: &EvidencePackage,
+        captured_at: &str,
+    ) -> C2paManifest {
+        let mut manifest = self.generate_manifest(evidence, captured_at);
+        manifest.title = "RealityCam Verified Photo (Privacy Mode)".to_string();
+        // depth_analysis assertion already includes source from evidence.depth_analysis.source
+        manifest
+    }
+
+    /// Generates a hash-only C2PA manifest as JSON string (Story 8-5)
+    pub fn generate_hash_only_manifest_json(
+        &self,
+        evidence: &EvidencePackage,
+        captured_at: &str,
+    ) -> Result<String, C2paError> {
+        let manifest = self.generate_hash_only_manifest(evidence, captured_at);
+        serde_json::to_string_pretty(&manifest).map_err(|e| C2paError::Serialization(e.to_string()))
+    }
+
     /// Builds the RealityCam assertion from evidence
     fn build_assertion(
         &self,
@@ -251,6 +288,7 @@ impl C2paService {
                 is_real_scene: evidence.depth_analysis.is_likely_real_scene,
                 depth_layers: evidence.depth_analysis.depth_layers,
                 depth_variance: evidence.depth_analysis.depth_variance,
+                source: evidence.depth_analysis.source.map(|s| s.to_string()),
             },
             device_model: evidence.hardware_attestation.device_model.clone(),
             captured_at: captured_at.to_string(),
@@ -614,6 +652,7 @@ mod tests {
                 min_depth: 0.8,
                 max_depth: 4.2,
                 is_likely_real_scene: true,
+                source: None,
             },
             metadata: MetadataEvidence::default(),
             processing: ProcessingInfo::new(1000, "0.1.0"),
@@ -992,5 +1031,119 @@ mod tests {
         assert_eq!(hw.status, "pass");
         assert_eq!(hw.level, "secure_enclave");
         assert!(hw.verified);
+    }
+
+    // ========================================================================
+    // Story 8-5: Hash-Only Manifest Tests
+    // ========================================================================
+
+    use crate::types::hash_only::AnalysisSource;
+
+    fn create_test_hash_only_evidence() -> EvidencePackage {
+        EvidencePackage {
+            hardware_attestation: HardwareAttestation::pass(
+                "iPhone 15 Pro".to_string(),
+                AttestationLevel::SecureEnclave,
+            ),
+            depth_analysis: DepthAnalysis {
+                status: CheckStatus::Pass,
+                depth_variance: 2.4,
+                depth_layers: 5,
+                edge_coherence: 0.87,
+                min_depth: 0.8,
+                max_depth: 4.2,
+                is_likely_real_scene: true,
+                source: Some(AnalysisSource::Device), // Hash-only uses device analysis
+            },
+            metadata: MetadataEvidence::default(),
+            processing: ProcessingInfo::new(100, "0.1.0"), // Faster processing for hash-only
+        }
+    }
+
+    #[test]
+    fn test_hash_only_manifest_title() {
+        let service = C2paService::new();
+        let evidence = create_test_hash_only_evidence();
+
+        let manifest = service.generate_hash_only_manifest(&evidence, "2025-12-01T10:30:00Z");
+
+        assert_eq!(manifest.title, "RealityCam Verified Photo (Privacy Mode)");
+    }
+
+    #[test]
+    fn test_hash_only_manifest_includes_device_source() {
+        let service = C2paService::new();
+        let evidence = create_test_hash_only_evidence();
+
+        let manifest = service.generate_hash_only_manifest(&evidence, "2025-12-01T10:30:00Z");
+
+        assert_eq!(
+            manifest.realitycam.depth_analysis.source,
+            Some("device".to_string())
+        );
+    }
+
+    #[test]
+    fn test_hash_only_manifest_confidence_high() {
+        let service = C2paService::new();
+        let evidence = create_test_hash_only_evidence();
+
+        let manifest = service.generate_hash_only_manifest(&evidence, "2025-12-01T10:30:00Z");
+
+        assert_eq!(manifest.realitycam.confidence_level, "high");
+    }
+
+    #[test]
+    fn test_hash_only_manifest_json() {
+        let service = C2paService::new();
+        let evidence = create_test_hash_only_evidence();
+
+        let json = service
+            .generate_hash_only_manifest_json(&evidence, "2025-12-01T10:30:00Z")
+            .unwrap();
+
+        assert!(json.contains("\"title\": \"RealityCam Verified Photo (Privacy Mode)\""));
+        assert!(json.contains("\"source\": \"device\""));
+        assert!(json.contains("\"confidence_level\": \"high\""));
+        assert!(json.contains("c2pa.created"));
+    }
+
+    #[test]
+    fn test_regular_manifest_no_source_when_none() {
+        let service = C2paService::new();
+        let evidence = create_test_evidence(); // Uses source: None
+
+        let manifest = service.generate_manifest(&evidence, "2025-12-01T10:30:00Z");
+
+        // Regular photo manifest should have no source field
+        assert!(manifest.realitycam.depth_analysis.source.is_none());
+    }
+
+    #[test]
+    fn test_regular_manifest_title() {
+        let service = C2paService::new();
+        let evidence = create_test_evidence();
+
+        let manifest = service.generate_manifest(&evidence, "2025-12-01T10:30:00Z");
+
+        // Regular manifest should NOT have "Privacy Mode" in title
+        assert_eq!(manifest.title, "RealityCam Verified Photo");
+    }
+
+    #[test]
+    fn test_hash_only_manifest_source_serialization() {
+        let service = C2paService::new();
+        let evidence = create_test_hash_only_evidence();
+
+        let json = service
+            .generate_hash_only_manifest_json(&evidence, "2025-12-01T10:30:00Z")
+            .unwrap();
+
+        // Verify source is serialized correctly in depth_analysis
+        assert!(json.contains("\"source\": \"device\""));
+
+        // Verify other standard fields are present
+        assert!(json.contains("\"is_real_scene\": true"));
+        assert!(json.contains("\"depth_layers\": 5"));
     }
 }

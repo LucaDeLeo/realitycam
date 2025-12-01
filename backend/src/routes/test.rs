@@ -209,6 +209,7 @@ async fn create_test_evidence(
             max_depth: 5.0,
             is_likely_real_scene: req.depth_analysis.has_depth
                 && req.depth_analysis.depth_layers > 1,
+            source: None,
         },
         metadata: MetadataEvidence {
             timestamp_valid: true,

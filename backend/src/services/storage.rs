@@ -481,6 +481,50 @@ impl StorageService {
 
         Ok(bytes)
     }
+
+    /// Uploads a JSON string to S3 at a given key (Story 8-5)
+    ///
+    /// Generic method for uploading JSON documents like C2PA manifests.
+    ///
+    /// # Arguments
+    /// * `key` - S3 object key
+    /// * `json_content` - JSON string to upload
+    ///
+    /// # Returns
+    /// The S3 key where the JSON was stored
+    pub async fn upload_json(&self, key: &str, json_content: &str) -> Result<String, ApiError> {
+        let size = json_content.len();
+
+        info!(
+            key = %key,
+            size_bytes = size,
+            "Uploading JSON to S3"
+        );
+
+        self.client
+            .put_object()
+            .bucket(&self.bucket)
+            .key(key)
+            .body(ByteStream::from(json_content.as_bytes().to_vec()))
+            .content_type("application/json")
+            .send()
+            .await
+            .map_err(|e| {
+                warn!(
+                    key = %key,
+                    error = %e,
+                    "Failed to upload JSON to S3"
+                );
+                ApiError::StorageError(format!("Failed to upload JSON to {key}"))
+            })?;
+
+        info!(
+            key = %key,
+            "JSON uploaded successfully"
+        );
+
+        Ok(key.to_string())
+    }
 }
 
 // ============================================================================
