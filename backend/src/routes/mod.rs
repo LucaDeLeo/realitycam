@@ -13,6 +13,7 @@ use crate::middleware::{DeviceAuthConfig, DeviceAuthLayer};
 use crate::services::{ChallengeStore, StorageService};
 
 pub mod captures;
+pub mod captures_hash_only;
 pub mod captures_video;
 pub mod devices;
 pub mod health;
@@ -67,7 +68,17 @@ pub fn api_router(state: AppState) -> Router {
 
     // Video captures router with same device auth middleware (Story 7-8)
     // Rate limiting for video is handled directly in the handler (5 videos/hour/device)
-    let captures_video_router = captures_video::router()
+    let captures_video_router =
+        captures_video::router()
+            .with_state(state.clone())
+            .layer(DeviceAuthLayer::new(
+                state.db.clone(),
+                device_auth_config.clone(),
+            ));
+
+    // Hash-only captures router with device auth middleware (Story 8-4)
+    // Privacy-first mode: no media upload, client-side depth analysis
+    let captures_hash_only_router = captures_hash_only::router()
         .with_state(state.clone())
         .layer(DeviceAuthLayer::new(state.db.clone(), device_auth_config));
 
@@ -79,12 +90,14 @@ pub fn api_router(state: AppState) -> Router {
     // - devices router: public (registration, challenge)
     // - captures router: protected with device auth middleware
     // - captures/video router: protected with device auth + video rate limiting (Story 7-8)
+    // - captures/hash-only router: protected with device auth (Story 8-4)
     // - verify router: public with rate limiting (file verification)
     // - test router: conditionally enabled for E2E test seeding
     let mut v1_router = Router::new()
         .nest("/devices", devices::router())
         .nest("/captures", captures_router)
         .nest("/captures/video", captures_video_router)
+        .nest("/captures/hash-only", captures_hash_only_router)
         .merge(verify_router);
 
     // Conditionally add test routes (SECURITY: only enabled via ENABLE_TEST_ENDPOINTS)

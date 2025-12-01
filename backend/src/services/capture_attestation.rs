@@ -1,11 +1,10 @@
-//! Capture assertion verification service (Story 4-4)
+//! Capture assertion verification service (Story 4-4, Story 8-4)
 //!
 //! Verifies per-capture attestation assertions during upload.
 //! This is different from device_auth (request-level) in that the
-//! clientDataHash binds to the capture content (photo_hash|captured_at)
-//! rather than the request body.
+//! clientDataHash binds to the capture content.
 //!
-//! ## Verification Flow
+//! ## Full Capture Verification Flow (Story 4-4)
 //! 1. Decode base64 assertion into CBOR
 //! 2. Parse CBOR to extract authenticatorData and signature
 //! 3. Extract counter from authenticatorData
@@ -14,6 +13,10 @@
 //! 6. Build message = authenticatorData || clientDataHash
 //! 7. Verify EC P-256 signature using device's public key
 //! 8. Return verification result for evidence package
+//!
+//! ## Hash-Only Capture Verification Flow (Story 8-4)
+//! Same as above, but clientDataHash = SHA256(serialized_payload_json)
+//! where the payload is the HashOnlyCapturePayload with assertion field excluded.
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use ciborium::Value;
@@ -438,6 +441,190 @@ fn parse_signature(sig_bytes: &[u8]) -> Result<Signature, CaptureAssertionError>
 }
 
 // ============================================================================
+// Hash-Only Capture Verification (Story 8-4)
+// ============================================================================
+
+use crate::types::HashOnlyCapturePayload;
+
+/// Verifies a hash-only capture assertion against the device's registered public key.
+///
+/// This function is BLOCKING: verification failures REJECT the upload with 401.
+/// Unlike full captures where failures are recorded in evidence, hash-only captures
+/// cannot verify the media itself - the assertion is the only proof.
+///
+/// ## Arguments
+/// * `device` - The device that produced the capture
+/// * `payload` - The HashOnlyCapturePayload (assertion is extracted from this)
+/// * `config` - Application config (for RP ID verification)
+/// * `request_id` - Request ID for logging
+///
+/// ## Returns
+/// `Ok(CaptureAssertionResult)` on success, or `Err(CaptureAssertionError)` on failure.
+/// The caller should convert errors to 401 Unauthorized responses.
+pub fn verify_hash_only_assertion(
+    device: &Device,
+    payload: &HashOnlyCapturePayload,
+    config: &Config,
+    request_id: Uuid,
+) -> Result<CaptureAssertionResult, CaptureAssertionError> {
+    let device_model = device.model.clone();
+    let level = AttestationLevel::from(device.attestation_level.as_str());
+
+    // Hash-only captures MUST have an assertion (validated earlier, but double-check)
+    if payload.assertion.trim().is_empty() {
+        tracing::warn!(
+            request_id = %request_id,
+            device_id = %device.id,
+            "[capture_attestation] Hash-only capture missing assertion"
+        );
+        return Err(CaptureAssertionError::MissingField("assertion"));
+    }
+
+    // Perform verification
+    let new_counter = verify_hash_only_assertion_internal(device, payload, config, request_id)?;
+
+    tracing::info!(
+        request_id = %request_id,
+        device_id = %device.id,
+        new_counter = new_counter,
+        "[capture_attestation] Hash-only assertion verified successfully"
+    );
+
+    Ok(CaptureAssertionResult {
+        status: CheckStatus::Pass,
+        level,
+        device_model,
+        assertion_verified: true,
+        counter_valid: true,
+        new_counter: Some(new_counter),
+        error_message: None,
+    })
+}
+
+/// Internal verification logic for hash-only captures
+fn verify_hash_only_assertion_internal(
+    device: &Device,
+    payload: &HashOnlyCapturePayload,
+    config: &Config,
+    request_id: Uuid,
+) -> Result<u32, CaptureAssertionError> {
+    // Step 1: Decode base64 assertion
+    tracing::debug!(
+        request_id = %request_id,
+        "[capture_attestation] Decoding base64 assertion (hash-only)"
+    );
+    let assertion_bytes = STANDARD
+        .decode(&payload.assertion)
+        .map_err(|_| CaptureAssertionError::InvalidBase64)?;
+
+    // Step 2: Parse CBOR assertion
+    tracing::debug!(
+        request_id = %request_id,
+        "[capture_attestation] Parsing CBOR assertion (hash-only)"
+    );
+    let assertion = parse_cbor_assertion(&assertion_bytes)?;
+
+    // Step 3: Parse authenticator data
+    tracing::debug!(
+        request_id = %request_id,
+        "[capture_attestation] Parsing authenticator data (hash-only)"
+    );
+    let auth_data = parse_assertion_auth_data(&assertion.authenticator_data)?;
+
+    // Step 4: Verify RP ID hash
+    tracing::debug!(
+        request_id = %request_id,
+        "[capture_attestation] Verifying RP ID hash (hash-only)"
+    );
+    verify_rp_id_hash(&auth_data.rp_id_hash, config)?;
+
+    // Step 5: Verify counter is strictly greater
+    tracing::debug!(
+        request_id = %request_id,
+        received_counter = auth_data.counter,
+        stored_counter = device.assertion_counter,
+        "[capture_attestation] Verifying counter (hash-only)"
+    );
+    if (auth_data.counter as i64) <= device.assertion_counter {
+        return Err(CaptureAssertionError::CounterNotIncreasing {
+            received: auth_data.counter,
+            stored: device.assertion_counter,
+        });
+    }
+
+    // Step 6: Get device public key
+    let public_key_bytes = device
+        .public_key
+        .as_ref()
+        .ok_or(CaptureAssertionError::MissingPublicKey)?;
+
+    // Step 7: Compute clientDataHash for hash-only binding
+    // clientDataHash = SHA256(serialized payload JSON excluding assertion)
+    tracing::debug!(
+        request_id = %request_id,
+        "[capture_attestation] Computing client data hash (hash-only)"
+    );
+    let client_data_hash = compute_hash_only_client_data_hash(payload);
+
+    // Step 8: Build message = authenticatorData || clientDataHash
+    let mut message = assertion.authenticator_data.clone();
+    message.extend_from_slice(&client_data_hash);
+
+    // Step 9: Parse public key
+    tracing::debug!(
+        request_id = %request_id,
+        "[capture_attestation] Parsing public key (hash-only)"
+    );
+    let verifying_key = VerifyingKey::from_sec1_bytes(public_key_bytes)
+        .map_err(|e| CaptureAssertionError::InvalidPublicKey(format!("Failed to parse: {e}")))?;
+
+    // Step 10: Parse signature
+    tracing::debug!(
+        request_id = %request_id,
+        "[capture_attestation] Parsing signature (hash-only)"
+    );
+    let signature = parse_signature(&assertion.signature)?;
+
+    // Step 11: Verify signature
+    tracing::debug!(
+        request_id = %request_id,
+        "[capture_attestation] Verifying signature (hash-only)"
+    );
+    verifying_key.verify(&message, &signature).map_err(|e| {
+        CaptureAssertionError::SignatureInvalid(format!("Verification failed: {e}"))
+    })?;
+
+    Ok(auth_data.counter)
+}
+
+/// Computes the clientDataHash for hash-only capture assertion binding.
+///
+/// CRITICAL: Must match iOS implementation exactly.
+/// Creates a JSON object with all payload fields EXCEPT assertion,
+/// serializes to bytes, and computes SHA-256 hash.
+///
+/// The fields are serialized in alphabetical key order by serde_json.
+pub fn compute_hash_only_client_data_hash(payload: &HashOnlyCapturePayload) -> [u8; 32] {
+    // Create JSON with all fields except assertion
+    // Using serde_json::json! macro for consistent serialization
+    let hashable = serde_json::json!({
+        "capture_mode": payload.capture_mode,
+        "captured_at": payload.captured_at,
+        "depth_analysis": payload.depth_analysis,
+        "media_hash": payload.media_hash,
+        "media_type": payload.media_type,
+        "metadata": payload.metadata,
+        "metadata_flags": payload.metadata_flags,
+    });
+
+    // Serialize to bytes (serde_json::to_vec produces compact JSON)
+    let json_bytes = serde_json::to_vec(&hashable).expect("JSON serialization should not fail");
+
+    // Compute SHA-256 hash
+    Sha256::digest(&json_bytes).into()
+}
+
+// ============================================================================
 // Unit Tests
 // ============================================================================
 
@@ -714,5 +901,125 @@ mod tests {
         let assertion = result.unwrap();
         assert_eq!(assertion.authenticator_data.len(), 37);
         assert_eq!(assertion.signature, vec![1, 2, 3, 4]);
+    }
+
+    // ========================================================================
+    // Hash-Only Capture Tests (Story 8-4)
+    // ========================================================================
+
+    use crate::types::{ClientDepthAnalysis, FilteredMetadata, MetadataFlags};
+
+    fn test_hash_only_payload() -> HashOnlyCapturePayload {
+        HashOnlyCapturePayload {
+            capture_mode: "hash_only".to_string(),
+            media_hash: "a".repeat(64),
+            media_type: "photo".to_string(),
+            depth_analysis: ClientDepthAnalysis {
+                depth_variance: 0.5,
+                depth_layers: 5,
+                edge_coherence: 0.8,
+                min_depth: 0.5,
+                max_depth: 5.0,
+                is_likely_real_scene: true,
+                algorithm_version: "1.0".to_string(),
+            },
+            metadata: FilteredMetadata::default(),
+            metadata_flags: MetadataFlags {
+                location_included: false,
+                location_level: "none".to_string(),
+                timestamp_included: true,
+                timestamp_level: "exact".to_string(),
+                device_info_included: true,
+                device_info_level: "model_only".to_string(),
+            },
+            captured_at: "2025-12-01T10:00:00Z".to_string(),
+            assertion: STANDARD.encode("test-assertion"),
+            hash_chain: None,
+            frame_count: None,
+            duration_ms: None,
+        }
+    }
+
+    #[test]
+    fn test_compute_hash_only_client_data_hash_deterministic() {
+        let payload = test_hash_only_payload();
+
+        // Same payload should produce same hash
+        let hash1 = compute_hash_only_client_data_hash(&payload);
+        let hash2 = compute_hash_only_client_data_hash(&payload);
+        assert_eq!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_compute_hash_only_client_data_hash_different_payloads() {
+        let payload1 = test_hash_only_payload();
+
+        let mut payload2 = test_hash_only_payload();
+        payload2.media_hash = "b".repeat(64);
+
+        let hash1 = compute_hash_only_client_data_hash(&payload1);
+        let hash2 = compute_hash_only_client_data_hash(&payload2);
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_compute_hash_only_client_data_hash_assertion_not_included() {
+        let mut payload1 = test_hash_only_payload();
+        payload1.assertion = "assertion1".to_string();
+
+        let mut payload2 = test_hash_only_payload();
+        payload2.assertion = "different_assertion".to_string();
+
+        // Assertion field should be excluded from hash, so hashes should be equal
+        let hash1 = compute_hash_only_client_data_hash(&payload1);
+        let hash2 = compute_hash_only_client_data_hash(&payload2);
+        assert_eq!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_verify_hash_only_empty_assertion_fails() {
+        let device = test_device();
+        let config = test_config();
+        let request_id = Uuid::new_v4();
+
+        let mut payload = test_hash_only_payload();
+        payload.assertion = "".to_string();
+
+        let result = verify_hash_only_assertion(&device, &payload, &config, request_id);
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            CaptureAssertionError::MissingField("assertion")
+        ));
+    }
+
+    #[test]
+    fn test_verify_hash_only_whitespace_assertion_fails() {
+        let device = test_device();
+        let config = test_config();
+        let request_id = Uuid::new_v4();
+
+        let mut payload = test_hash_only_payload();
+        payload.assertion = "   ".to_string();
+
+        let result = verify_hash_only_assertion(&device, &payload, &config, request_id);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_verify_hash_only_invalid_base64_fails() {
+        let device = test_device();
+        let config = test_config();
+        let request_id = Uuid::new_v4();
+
+        let mut payload = test_hash_only_payload();
+        payload.assertion = "not-valid-base64!!!".to_string();
+
+        let result = verify_hash_only_assertion(&device, &payload, &config, request_id);
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            CaptureAssertionError::InvalidBase64
+        ));
     }
 }

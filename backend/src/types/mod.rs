@@ -4,6 +4,7 @@
 
 pub mod capture;
 pub mod hash_chain_verification;
+pub mod hash_only;
 pub mod video_capture;
 pub mod video_depth_analysis;
 pub mod video_evidence;
@@ -34,6 +35,11 @@ pub use hash_chain_verification::{
 pub use video_evidence::{
     DepthAnalysisEvidence, HardwareAttestationEvidence, HashChainEvidence, MetadataEvidence,
     PartialAttestationInfo, ProcessingInfo, VideoConfidenceLevel, VideoEvidence,
+};
+
+pub use hash_only::{
+    AnalysisSource, CaptureMode, ClientDepthAnalysis, FilteredLocation, FilteredMetadata,
+    HashOnlyCapturePayload, HashOnlyCaptureResponse, InsertHashOnlyCaptureParams, MetadataFlags,
 };
 
 use chrono::{DateTime, Utc};

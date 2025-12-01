@@ -25,7 +25,8 @@ pub use c2pa::{
     RealityCamVideoAssertion, TemporalDepthSummaryData,
 };
 pub use capture_attestation::{
-    verify_capture_assertion, CaptureAssertionError, CaptureAssertionResult,
+    compute_hash_only_client_data_hash, verify_capture_assertion, verify_hash_only_assertion,
+    CaptureAssertionError, CaptureAssertionResult,
 };
 pub use challenge_store::{ChallengeEntry, ChallengeError, ChallengeStore};
 pub use depth_analysis::{analyze_depth_map, analyze_depth_map_from_bytes};

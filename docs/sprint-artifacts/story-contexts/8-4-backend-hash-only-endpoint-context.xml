@@ -1,0 +1,438 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML: 8-4-backend-hash-only-endpoint
+  Generated: 2025-12-01
+  Purpose: Single source of truth for implementing hash-only capture endpoint
+-->
+<story-context>
+  <meta>
+    <story-key>8-4-backend-hash-only-endpoint</story-key>
+    <story-title>Backend Hash-Only Capture Endpoint</story-title>
+    <status>drafted</status>
+    <epic>8 - Privacy-First Capture Mode</epic>
+    <generated-at>2025-12-01</generated-at>
+    <context-version>1.0</context-version>
+  </meta>
+
+  <story-reference>
+    <file>docs/sprint-artifacts/stories/8-4-backend-hash-only-endpoint.md</file>
+    <description>Complete story specification with acceptance criteria, tasks, and dev notes</description>
+  </story-reference>
+
+  <epic-context>
+    <tech-spec>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-8.md</tech-spec>
+    <description>Epic 8 enables zero-knowledge provenance by allowing hash-only captures with pre-computed depth analysis signed by DCAppAttest</description>
+    <related-stories>
+      <story id="8-3">Hash-Only Capture Payload (iOS) - defines the payload structure this endpoint receives</story>
+      <story id="8-5">Hash-Only Evidence Package - builds on this endpoint's database records</story>
+      <story id="8-6">Verification Page Hash-Only Display - displays captures created by this endpoint</story>
+    </related-stories>
+  </epic-context>
+
+  <documentation-artifacts>
+    <artifact>
+      <path>docs/architecture.md</path>
+      <description>Architecture document with ADR-009 (Native Swift), ADR-011 (Client-Side Depth Analysis for Privacy Mode)</description>
+      <relevant-sections>
+        <section>ADR-011: Client-Side Depth Analysis for Privacy Mode (lines 1067-1121)</section>
+        <section>API Contracts - Capture Upload (lines 546-593)</section>
+        <section>Data Architecture - Database Schema (lines 498-525)</section>
+        <section>Security Architecture - Authentication Flow (lines 680-697)</section>
+      </relevant-sections>
+    </artifact>
+    <artifact>
+      <path>docs/prd.md</path>
+      <description>Product Requirements Document</description>
+      <relevant-requirements>
+        <requirement id="FR59">Backend accepts pre-computed depth analysis signed by attested device</requirement>
+        <requirement id="FR60">Backend stores hash + evidence without raw media</requirement>
+      </relevant-requirements>
+    </artifact>
+    <artifact>
+      <path>docs/epics.md</path>
+      <description>Epic definitions</description>
+      <relevant-sections>
+        <section>Epic 8: Privacy-First Capture Mode - Story 8.4 acceptance criteria</section>
+      </relevant-sections>
+    </artifact>
+  </documentation-artifacts>
+
+  <existing-code-interfaces>
+    <interface>
+      <path>backend/src/routes/captures.rs</path>
+      <description>Existing capture upload endpoint (multipart form with photo/depth_map). Use as pattern for new hash-only endpoint - same middleware, similar response format.</description>
+      <key-patterns>
+        <pattern>Multipart parsing with parse_multipart() function</pattern>
+        <pattern>DeviceAuthLayer middleware for authentication</pattern>
+        <pattern>InsertCaptureWithEvidenceParams for database insert</pattern>
+        <pattern>EvidencePackage construction with hardware_attestation, depth_analysis, metadata, processing</pattern>
+        <pattern>Confidence level calculation via evidence_package.calculate_confidence()</pattern>
+        <pattern>Response format: 202 Accepted with CaptureUploadResponse</pattern>
+      </key-patterns>
+    </interface>
+    <interface>
+      <path>backend/src/routes/captures_video.rs</path>
+      <description>Video capture endpoint showing alternate capture type handling pattern</description>
+      <key-patterns>
+        <pattern>Separate route file for different capture mode</pattern>
+        <pattern>capture_type field in database insert</pattern>
+      </key-patterns>
+    </interface>
+    <interface>
+      <path>backend/src/services/capture_attestation.rs</path>
+      <description>Per-capture assertion verification service. MUST extend for hash-only - different clientDataHash computation.</description>
+      <key-functions>
+        <function name="verify_capture_assertion">Verifies assertion using photo_hash|captured_at binding. Hash-only needs payload-based binding.</function>
+        <function name="compute_capture_client_data_hash">Current: SHA256(photo_hash|captured_at). Hash-only: SHA256(serialized_payload)</function>
+        <function name="parse_cbor_assertion">Reusable - parse CBOR to extract authenticatorData and signature</function>
+        <function name="parse_assertion_auth_data">Reusable - extract rp_id_hash, flags, counter from authenticatorData</function>
+        <function name="verify_rp_id_hash">Reusable - verify RP ID matches app identity</function>
+        <function name="parse_signature">Reusable - supports DER and raw r||s format</function>
+      </key-functions>
+      <data-structures>
+        <struct name="CaptureAssertionResult">Return type with status, level, assertion_verified, counter_valid, new_counter</struct>
+        <struct name="CaptureAssertionError">Error enum for verification failures</struct>
+      </data-structures>
+    </interface>
+    <interface>
+      <path>backend/src/services/attestation.rs</path>
+      <description>DCAppAttest device registration verification. Reference for CBOR/X.509 patterns.</description>
+      <key-patterns>
+        <pattern>ciborium for CBOR parsing</pattern>
+        <pattern>x509_parser for certificate handling</pattern>
+        <pattern>sha2 for SHA-256 computation</pattern>
+      </key-patterns>
+    </interface>
+    <interface>
+      <path>backend/src/services/depth_analysis.rs</path>
+      <description>Server-side depth analysis service. Hash-only captures use CLIENT-PROVIDED analysis instead.</description>
+      <key-structures>
+        <struct name="DepthAnalysis">Evidence structure with status, depth_variance, depth_layers, edge_coherence, min_depth, max_depth, is_likely_real_scene</struct>
+      </key-structures>
+      <note>Hash-only captures skip this service - depth analysis comes from client payload</note>
+    </interface>
+    <interface>
+      <path>backend/src/models/capture.rs</path>
+      <description>Capture database model. MUST extend with privacy mode fields.</description>
+      <current-fields>
+        <field name="id">UUID</field>
+        <field name="device_id">UUID</field>
+        <field name="target_media_hash">Vec&lt;u8&gt;</field>
+        <field name="photo_s3_key">Option&lt;String&gt;</field>
+        <field name="depth_map_s3_key">Option&lt;String&gt;</field>
+        <field name="capture_type">Option&lt;String&gt; - "photo" or "video"</field>
+        <field name="evidence">serde_json::Value</field>
+        <field name="confidence_level">String</field>
+        <field name="status">String</field>
+        <field name="captured_at">DateTime&lt;Utc&gt;</field>
+        <field name="uploaded_at">DateTime&lt;Utc&gt;</field>
+      </current-fields>
+      <fields-to-add>
+        <field name="capture_mode">String - "full" or "hash_only" (default "full")</field>
+        <field name="media_stored">bool - true for full, false for hash_only</field>
+        <field name="analysis_source">String - "server" or "device" (default "server")</field>
+        <field name="metadata_flags">Option&lt;serde_json::Value&gt; - privacy metadata flags</field>
+      </fields-to-add>
+    </interface>
+    <interface>
+      <path>backend/src/models/evidence.rs</path>
+      <description>Evidence package structures. May need source field for DepthAnalysis.</description>
+      <key-structures>
+        <struct name="EvidencePackage">Container for hardware_attestation, depth_analysis, metadata, processing</struct>
+        <struct name="HardwareAttestation">status, level, device_model, assertion_verified, counter_valid</struct>
+        <struct name="DepthAnalysis">status, depth_variance, depth_layers, edge_coherence, min_depth, max_depth, is_likely_real_scene</struct>
+        <struct name="MetadataEvidence">timestamp_valid, model_verified, resolution_valid, location_available, location_coarse</struct>
+        <struct name="ProcessingInfo">processed_at, processing_time_ms, backend_version</struct>
+        <struct name="CheckStatus">Pass, Fail, Unavailable enum</struct>
+        <struct name="ConfidenceLevel">High, Medium, Low, Suspicious enum</struct>
+      </key-structures>
+      <potential-changes>
+        <change>Add source: Option&lt;AnalysisSource&gt; field to DepthAnalysis to indicate "server" or "device"</change>
+      </potential-changes>
+    </interface>
+    <interface>
+      <path>backend/src/models/device.rs</path>
+      <description>Device model with assertion_counter and public_key for verification</description>
+      <key-fields>
+        <field name="id">UUID</field>
+        <field name="attestation_level">String</field>
+        <field name="public_key">Option&lt;Vec&lt;u8&gt;&gt; - EC P-256 uncompressed point</field>
+        <field name="assertion_counter">i64 - must be strictly increasing</field>
+      </key-fields>
+    </interface>
+    <interface>
+      <path>backend/src/types/capture.rs</path>
+      <description>Capture request/response types. Use as pattern for hash-only types.</description>
+      <key-structures>
+        <struct name="CaptureMetadataPayload">Current multipart metadata structure</struct>
+        <struct name="CaptureUploadResponse">capture_id, status, verification_url</struct>
+        <struct name="CaptureDetailsResponse">Full capture details response</struct>
+      </key-structures>
+    </interface>
+    <interface>
+      <path>backend/src/types/mod.rs</path>
+      <description>Types module exports. Add hash_only module here.</description>
+    </interface>
+    <interface>
+      <path>backend/src/routes/mod.rs</path>
+      <description>Router setup with device auth middleware. Add hash-only route here.</description>
+      <key-patterns>
+        <pattern>DeviceAuthLayer middleware application</pattern>
+        <pattern>Router::new().route(...).with_state(state.clone())</pattern>
+        <pattern>nest() for grouping routes under path prefix</pattern>
+      </key-patterns>
+    </interface>
+    <interface>
+      <path>backend/src/error.rs</path>
+      <description>API error types and codes. Use existing error patterns.</description>
+      <key-types>
+        <type name="ApiError">Enum with Validation, AttestationFailed, DeviceNotFound, etc.</type>
+        <type name="ApiErrorWithRequestId">Wrapper for response generation</type>
+      </key-types>
+      <existing-codes>
+        <code>ATTESTATION_FAILED - 401</code>
+        <code>VALIDATION_ERROR - 400</code>
+        <code>DEVICE_NOT_FOUND - 404</code>
+      </existing-codes>
+    </interface>
+    <interface>
+      <path>backend/src/middleware/device_auth.rs</path>
+      <description>Device authentication middleware - reuse for hash-only route</description>
+      <provides>
+        <struct name="DeviceContext">device_id, model, has_lidar, is_verified</struct>
+        <struct name="DeviceAuthLayer">Middleware layer for protected routes</struct>
+      </provides>
+    </interface>
+    <interface>
+      <path>backend/src/config.rs</path>
+      <description>Application configuration including Apple credentials for RP ID verification</description>
+      <key-fields>
+        <field name="apple_team_id">For RP ID hash computation</field>
+        <field name="apple_bundle_id">For RP ID hash computation</field>
+        <field name="verification_base_url">For response URL generation</field>
+      </key-fields>
+    </interface>
+  </existing-code-interfaces>
+
+  <database-context>
+    <current-schema>
+      <table name="captures">
+        <column name="id" type="UUID" constraint="PRIMARY KEY"/>
+        <column name="device_id" type="UUID" constraint="NOT NULL REFERENCES devices(id)"/>
+        <column name="target_media_hash" type="BYTEA" constraint="NOT NULL UNIQUE"/>
+        <column name="photo_s3_key" type="VARCHAR(255)"/>
+        <column name="depth_map_s3_key" type="VARCHAR(255)"/>
+        <column name="evidence" type="JSONB" constraint="NOT NULL DEFAULT '{}'"/>
+        <column name="confidence_level" type="TEXT" constraint="NOT NULL DEFAULT 'low'"/>
+        <column name="status" type="TEXT" constraint="NOT NULL DEFAULT 'pending'"/>
+        <column name="captured_at" type="TIMESTAMPTZ" constraint="NOT NULL"/>
+        <column name="uploaded_at" type="TIMESTAMPTZ" constraint="NOT NULL DEFAULT NOW()"/>
+        <column name="capture_type" type="VARCHAR(16)" constraint="DEFAULT 'photo' NOT NULL"/>
+        <column name="video_s3_key" type="VARCHAR(255)"/>
+        <column name="hash_chain_s3_key" type="VARCHAR(255)"/>
+        <column name="duration_ms" type="BIGINT"/>
+        <column name="frame_count" type="INTEGER"/>
+        <column name="is_partial" type="BOOLEAN" constraint="DEFAULT FALSE"/>
+        <column name="checkpoint_index" type="INTEGER"/>
+      </table>
+    </current-schema>
+    <migration-required>
+      <description>Add privacy mode fields to captures table</description>
+      <sql><![CDATA[
+-- Migration: Add privacy mode fields (Story 8-4)
+ALTER TABLE captures
+ADD COLUMN capture_mode TEXT NOT NULL DEFAULT 'full',
+ADD COLUMN media_stored BOOLEAN NOT NULL DEFAULT TRUE,
+ADD COLUMN analysis_source TEXT NOT NULL DEFAULT 'server',
+ADD COLUMN metadata_flags JSONB;
+
+-- Index for hash-only queries
+CREATE INDEX idx_captures_mode ON captures(capture_mode);
+
+-- Hash index for hash-only lookups
+CREATE INDEX idx_captures_hash_lookup ON captures USING hash(target_media_hash)
+WHERE capture_mode = 'hash_only';
+
+COMMENT ON COLUMN captures.capture_mode IS 'Capture mode: full (with media) or hash_only (privacy mode)';
+COMMENT ON COLUMN captures.media_stored IS 'Whether raw media is stored (false for hash_only)';
+COMMENT ON COLUMN captures.analysis_source IS 'Source of depth analysis: server or device';
+COMMENT ON COLUMN captures.metadata_flags IS 'Privacy metadata flags indicating what was included';
+      ]]></sql>
+    </migration-required>
+    <existing-migrations>
+      <migration>backend/migrations/20251122000001_create_devices.sql</migration>
+      <migration>backend/migrations/20251122000002_create_captures.sql</migration>
+      <migration>backend/migrations/20251122000003_create_verification_logs.sql</migration>
+      <migration>backend/migrations/20251123000001_add_device_attestation_fields.sql</migration>
+      <migration>backend/migrations/20251123000002_add_capture_s3_fields.sql</migration>
+      <migration>backend/migrations/20251127000001_add_video_captures.sql</migration>
+    </existing-migrations>
+  </database-context>
+
+  <development-constraints>
+    <constraint source="tech-spec">
+      <description>Hash-only captures use JSON body (not multipart) since no media files</description>
+    </constraint>
+    <constraint source="tech-spec">
+      <description>clientDataHash for hash-only = SHA256(serialized payload excluding assertion field)</description>
+    </constraint>
+    <constraint source="tech-spec">
+      <description>Assertion verification failures return 401 Unauthorized (not evidence failure)</description>
+    </constraint>
+    <constraint source="architecture">
+      <description>Device authentication via DeviceAuthLayer middleware required</description>
+    </constraint>
+    <constraint source="architecture">
+      <description>Counter must be strictly greater than stored counter (replay protection)</description>
+    </constraint>
+    <constraint source="story">
+      <description>Processing time target: &lt; 2 seconds (no S3 upload latency)</description>
+    </constraint>
+    <constraint source="story">
+      <description>media_type must be "photo" for this story (video in Story 8-8)</description>
+    </constraint>
+    <constraint source="story">
+      <description>depth_analysis.is_likely_real_scene=false does NOT reject - just records in evidence</description>
+    </constraint>
+  </development-constraints>
+
+  <dependencies>
+    <external-dependencies>
+      <dependency name="serde" version="1">Serialization/deserialization for JSON payload</dependency>
+      <dependency name="serde_json" version="1">JSON processing for payload and evidence</dependency>
+      <dependency name="sha2" version="0.10">SHA-256 for clientDataHash computation</dependency>
+      <dependency name="base64" version="0.21+">Base64 decode for assertion</dependency>
+      <dependency name="ciborium" version="0.2+">CBOR parsing for assertion</dependency>
+      <dependency name="p256" version="0.13+">EC P-256 signature verification</dependency>
+      <dependency name="chrono" version="0.4">Timestamp parsing and handling</dependency>
+      <dependency name="uuid" version="1">UUID generation for capture_id</dependency>
+      <dependency name="axum" version="0.8">HTTP framework, Json extractor</dependency>
+      <dependency name="sqlx" version="0.8">Database operations</dependency>
+    </external-dependencies>
+    <internal-dependencies>
+      <dependency>crate::middleware::DeviceAuthLayer - Device authentication</dependency>
+      <dependency>crate::middleware::DeviceContext - Authenticated device info</dependency>
+      <dependency>crate::models::Device - Device lookup for public key</dependency>
+      <dependency>crate::models::EvidencePackage - Evidence structure</dependency>
+      <dependency>crate::models::HardwareAttestation - Attestation result</dependency>
+      <dependency>crate::models::DepthAnalysis - Depth analysis structure</dependency>
+      <dependency>crate::models::CheckStatus - Pass/Fail/Unavailable</dependency>
+      <dependency>crate::error::ApiError - Error handling</dependency>
+      <dependency>crate::types::ApiResponse - Response wrapper</dependency>
+      <dependency>crate::config::Config - Apple credentials, verification URL</dependency>
+    </internal-dependencies>
+  </dependencies>
+
+  <testing-context>
+    <testing-framework>cargo test</testing-framework>
+    <testing-patterns>
+      <pattern>Unit tests for type deserialization and validation</pattern>
+      <pattern>Unit tests for clientDataHash computation</pattern>
+      <pattern>Unit tests for assertion verification (reuse from capture_attestation.rs)</pattern>
+      <pattern>Integration tests with test database</pattern>
+      <pattern>Mock StorageService to verify no S3 calls</pattern>
+    </testing-patterns>
+    <test-data>
+      <item>Valid HashOnlyCapturePayload JSON</item>
+      <item>Invalid payloads (missing fields, invalid hashes, wrong capture_mode)</item>
+      <item>Valid CBOR assertion with test keys</item>
+      <item>Invalid assertions (bad signature, wrong counter, wrong RP ID)</item>
+    </test-data>
+    <existing-test-patterns>
+      <pattern location="backend/src/services/capture_attestation.rs">Unit tests for assertion verification</pattern>
+      <pattern location="backend/src/types/capture.rs">Unit tests for metadata validation</pattern>
+      <pattern location="backend/src/services/depth_analysis.rs">Unit tests for depth analysis</pattern>
+    </existing-test-patterns>
+  </testing-context>
+
+  <implementation-notes>
+    <note priority="high">
+      <title>Endpoint Design</title>
+      <content>New dedicated endpoint POST /api/v1/captures/hash-only (not mode parameter on existing endpoint). Cleaner separation: JSON body vs multipart form. Existing /captures unchanged for backward compatibility.</content>
+    </note>
+    <note priority="high">
+      <title>clientDataHash Computation</title>
+      <content>CRITICAL: Must match iOS implementation exactly. Create JSON object with all fields EXCEPT assertion, serialize to bytes, SHA256 hash. Use serde_json::to_vec() with deterministic key ordering.</content>
+      <code><![CDATA[
+fn compute_hash_only_client_data_hash(payload: &HashOnlyCapturePayload) -> [u8; 32] {
+    let hashable = serde_json::json!({
+        "capture_mode": payload.capture_mode,
+        "media_hash": payload.media_hash,
+        "media_type": payload.media_type,
+        "depth_analysis": payload.depth_analysis,
+        "metadata": payload.metadata,
+        "metadata_flags": payload.metadata_flags,
+        "captured_at": payload.captured_at,
+    });
+    let json_bytes = serde_json::to_vec(&hashable).unwrap();
+    Sha256::digest(&json_bytes).into()
+}
+      ]]></code>
+    </note>
+    <note priority="high">
+      <title>Assertion Verification Difference</title>
+      <content>Full capture uses SHA256(photo_hash|captured_at) for clientDataHash. Hash-only uses SHA256(serialized_payload_json). Must implement separate verification function that reuses CBOR parsing and signature verification but computes different clientDataHash.</content>
+    </note>
+    <note priority="medium">
+      <title>New Files to Create</title>
+      <content>
+- backend/src/types/hash_only.rs - Request/response types
+- backend/src/routes/captures_hash_only.rs - Route handler
+- backend/migrations/YYYYMMDDHHMMSS_add_privacy_mode_fields.sql - DB migration
+      </content>
+    </note>
+    <note priority="medium">
+      <title>Files to Modify</title>
+      <content>
+- backend/src/types/mod.rs - Export new types
+- backend/src/routes/mod.rs - Register new route
+- backend/src/models/capture.rs - Add optional fields
+- backend/src/models/evidence.rs - Add source field to DepthAnalysis (optional)
+- backend/src/services/capture_attestation.rs - Add hash-only verification function
+      </content>
+    </note>
+    <note priority="medium">
+      <title>Payload Structure from iOS (Story 8-3)</title>
+      <content>Backend must match iOS field names exactly using snake_case for JSON serialization.</content>
+      <code><![CDATA[
+#[derive(Debug, Clone, Deserialize)]
+pub struct HashOnlyCapturePayload {
+    pub capture_mode: String,        // "hash_only"
+    pub media_hash: String,          // SHA-256 hex (64 chars)
+    pub media_type: String,          // "photo"
+    pub depth_analysis: ClientDepthAnalysis,
+    pub metadata: FilteredMetadata,
+    pub metadata_flags: MetadataFlags,
+    pub captured_at: String,         // ISO8601
+    pub assertion: String,           // Base64
+
+    // Video-specific (optional, Story 8-8)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hash_chain: Option<HashChainData>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub frame_count: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration_ms: Option<i32>,
+}
+      ]]></code>
+    </note>
+    <note priority="low">
+      <title>Error Handling</title>
+      <content>Assertion verification failures return 401 Unauthorized (blocking), unlike full capture mode where failures are recorded in evidence. This is because hash-only mode cannot verify the media itself - assertion is the only proof.</content>
+    </note>
+    <note priority="low">
+      <title>SQLx Offline Cache</title>
+      <content>After migration, run `cargo sqlx prepare` to update .sqlx/ offline cache for compile-time query checking.</content>
+    </note>
+  </implementation-notes>
+
+  <acceptance-criteria-summary>
+    <criterion id="AC1">POST /api/v1/captures/hash-only accepts JSON body with HashOnlyCapturePayload, returns 202 with capture_id and verification_url</criterion>
+    <criterion id="AC2">Payload validation: capture_mode="hash_only", media_hash=64-char hex, media_type="photo", all depth_analysis fields present, valid ISO8601 timestamp, non-empty Base64 assertion</criterion>
+    <criterion id="AC3">Assertion verification: decode Base64 CBOR, compute clientDataHash from serialized payload (excluding assertion), verify signature and counter, return 401 on failure</criterion>
+    <criterion id="AC4">Database storage: capture_mode='hash_only', media_stored=false, analysis_source='device', metadata_flags JSONB, photo_s3_key=NULL, depth_map_s3_key=NULL</criterion>
+    <criterion id="AC5">No S3 upload: no calls to StorageService, processing time &lt; 2 seconds</criterion>
+    <criterion id="AC6">Evidence package: hardware_attestation from assertion result, depth_analysis from client payload with source="device", metadata from filtered metadata</criterion>
+    <criterion id="AC7">Response format: { data: { capture_id, status: "complete", capture_mode: "hash_only", media_stored: false, verification_url } }</criterion>
+  </acceptance-criteria-summary>
+</story-context>
