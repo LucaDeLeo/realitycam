@@ -125,7 +125,11 @@ pub struct HashOnlyCapturePayload {
     // ========================================================================
     /// Hash chain data for video captures
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub hash_chain: Option<serde_json::Value>,
+    pub hash_chain: Option<VideoHashChainData>,
+
+    /// Temporal depth analysis for video captures (replaces depth_analysis for videos)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temporal_depth_analysis: Option<ClientTemporalDepthAnalysis>,
 
     /// Frame count for video captures
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -163,12 +167,47 @@ impl HashOnlyCapturePayload {
             ));
         }
 
-        // AC 2.3: media_type must be "photo" (video support in Story 8-8)
-        if self.media_type != "photo" {
+        // AC 2.3: media_type must be "photo" or "video" (Story 8-8 added video support)
+        if self.media_type != "photo" && self.media_type != "video" {
             return Err(ApiError::Validation(format!(
-                "media_type must be 'photo', got '{}'",
+                "media_type must be 'photo' or 'video', got '{}'",
                 self.media_type
             )));
+        }
+
+        // Video-specific validation (Story 8-8)
+        if self.media_type == "video" {
+            // Video must have hash_chain, frame_count, and duration_ms
+            if self.hash_chain.is_none() {
+                return Err(ApiError::Validation(
+                    "video captures require hash_chain data".to_string(),
+                ));
+            }
+            if self.frame_count.is_none() {
+                return Err(ApiError::Validation(
+                    "video captures require frame_count".to_string(),
+                ));
+            }
+            if self.duration_ms.is_none() {
+                return Err(ApiError::Validation(
+                    "video captures require duration_ms".to_string(),
+                ));
+            }
+            // Validate frame count and duration are positive
+            if let Some(fc) = self.frame_count {
+                if fc <= 0 {
+                    return Err(ApiError::Validation(
+                        "frame_count must be positive".to_string(),
+                    ));
+                }
+            }
+            if let Some(dur) = self.duration_ms {
+                if dur <= 0 {
+                    return Err(ApiError::Validation(
+                        "duration_ms must be positive".to_string(),
+                    ));
+                }
+            }
         }
 
         // AC 2.4: depth_analysis must have all required fields (validated by struct)
@@ -332,6 +371,100 @@ pub struct MetadataFlags {
 }
 
 // ============================================================================
+// Video-specific Types (Story 8-8)
+// ============================================================================
+
+/// Hash chain data for video integrity verification in privacy mode.
+///
+/// Contains a summary of the frame hash chain for video verification.
+/// Sent with video hash-only captures to prove temporal integrity.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct VideoHashChainData {
+    /// Final hash of the hash chain (SHA-256 hex)
+    pub final_hash: String,
+
+    /// Number of frame hashes in the chain
+    pub chain_length: i32,
+
+    /// Hash chain algorithm version
+    #[serde(default = "default_version")]
+    pub version: String,
+
+    /// Number of checkpoint attestations included
+    #[serde(default)]
+    pub checkpoint_count: i32,
+}
+
+fn default_version() -> String {
+    "1.0".to_string()
+}
+
+/// Client-computed temporal depth analysis for video privacy mode.
+///
+/// Contains per-keyframe analyses and aggregate temporal metrics.
+/// Matches the iOS TemporalDepthAnalysisResult structure.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ClientTemporalDepthAnalysis {
+    /// Per-keyframe depth analysis results (typically 10fps = ~150 keyframes for 15s video)
+    #[serde(default)]
+    pub keyframe_analyses: Vec<ClientDepthAnalysis>,
+
+    /// Mean depth variance across all keyframes (meters)
+    pub mean_variance: f32,
+
+    /// Variance stability score (0.0 - 1.0+)
+    /// Formula: 1.0 - (stddev(variances) / mean(variances))
+    pub variance_stability: f32,
+
+    /// Temporal edge coherence score (0.0 - 1.0)
+    /// Average edge coherence across all keyframes
+    pub temporal_coherence: f32,
+
+    /// Final temporal authenticity determination
+    /// Requires: all keyframes pass AND variance_stability > 0.8
+    pub is_likely_real_scene: bool,
+
+    /// Number of keyframes analyzed
+    pub keyframe_count: i32,
+
+    /// Algorithm version for server compatibility
+    pub algorithm_version: String,
+}
+
+impl ClientTemporalDepthAnalysis {
+    /// Validates the temporal depth analysis fields
+    pub fn validate(&self) -> Result<(), ApiError> {
+        if self.algorithm_version.is_empty() {
+            return Err(ApiError::Validation(
+                "temporal_depth_analysis.algorithm_version must not be empty".to_string(),
+            ));
+        }
+
+        if self.keyframe_count < 0 {
+            return Err(ApiError::Validation(
+                "temporal_depth_analysis.keyframe_count must be non-negative".to_string(),
+            ));
+        }
+
+        // Validate variance_stability is reasonable (can exceed 1.0 in edge cases)
+        if self.variance_stability < 0.0 {
+            return Err(ApiError::Validation(
+                "temporal_depth_analysis.variance_stability must be non-negative".to_string(),
+            ));
+        }
+
+        if !(0.0..=1.0).contains(&self.temporal_coherence) {
+            return Err(ApiError::Validation(
+                "temporal_depth_analysis.temporal_coherence must be between 0.0 and 1.0"
+                    .to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+}
+
+// ============================================================================
 // Response Structures
 // ============================================================================
 
@@ -425,8 +558,54 @@ mod tests {
             captured_at: "2025-12-01T10:00:00Z".to_string(),
             assertion: STANDARD.encode("test-assertion"),
             hash_chain: None,
+            temporal_depth_analysis: None,
             frame_count: None,
             duration_ms: None,
+        }
+    }
+
+    fn valid_video_payload() -> HashOnlyCapturePayload {
+        HashOnlyCapturePayload {
+            capture_mode: "hash_only".to_string(),
+            media_hash: "b".repeat(64),
+            media_type: "video".to_string(),
+            depth_analysis: ClientDepthAnalysis {
+                depth_variance: 0.5,
+                depth_layers: 5,
+                edge_coherence: 0.8,
+                min_depth: 0.5,
+                max_depth: 5.0,
+                is_likely_real_scene: true,
+                algorithm_version: "1.0".to_string(),
+            },
+            metadata: FilteredMetadata::default(),
+            metadata_flags: MetadataFlags {
+                location_included: false,
+                location_level: "none".to_string(),
+                timestamp_included: true,
+                timestamp_level: "exact".to_string(),
+                device_info_included: true,
+                device_info_level: "model_only".to_string(),
+            },
+            captured_at: "2025-12-01T10:00:00Z".to_string(),
+            assertion: STANDARD.encode("test-assertion"),
+            hash_chain: Some(VideoHashChainData {
+                final_hash: "c".repeat(64),
+                chain_length: 450,
+                version: "1.0".to_string(),
+                checkpoint_count: 3,
+            }),
+            temporal_depth_analysis: Some(ClientTemporalDepthAnalysis {
+                keyframe_analyses: vec![],
+                mean_variance: 0.6,
+                variance_stability: 0.9,
+                temporal_coherence: 0.75,
+                is_likely_real_scene: true,
+                keyframe_count: 150,
+                algorithm_version: "1.0".to_string(),
+            }),
+            frame_count: Some(450),
+            duration_ms: Some(15000),
         }
     }
 
@@ -463,9 +642,55 @@ mod tests {
     #[test]
     fn test_wrong_media_type_fails() {
         let mut payload = valid_payload();
-        payload.media_type = "video".to_string();
+        payload.media_type = "audio".to_string(); // Not photo or video
         let err = payload.validate().unwrap_err();
         assert!(err.to_string().contains("media_type"));
+    }
+
+    #[test]
+    fn test_valid_video_payload_passes_validation() {
+        let payload = valid_video_payload();
+        assert!(payload.validate().is_ok());
+    }
+
+    #[test]
+    fn test_video_missing_hash_chain_fails() {
+        let mut payload = valid_video_payload();
+        payload.hash_chain = None;
+        let err = payload.validate().unwrap_err();
+        assert!(err.to_string().contains("hash_chain"));
+    }
+
+    #[test]
+    fn test_video_missing_frame_count_fails() {
+        let mut payload = valid_video_payload();
+        payload.frame_count = None;
+        let err = payload.validate().unwrap_err();
+        assert!(err.to_string().contains("frame_count"));
+    }
+
+    #[test]
+    fn test_video_missing_duration_fails() {
+        let mut payload = valid_video_payload();
+        payload.duration_ms = None;
+        let err = payload.validate().unwrap_err();
+        assert!(err.to_string().contains("duration_ms"));
+    }
+
+    #[test]
+    fn test_video_negative_frame_count_fails() {
+        let mut payload = valid_video_payload();
+        payload.frame_count = Some(-1);
+        let err = payload.validate().unwrap_err();
+        assert!(err.to_string().contains("frame_count must be positive"));
+    }
+
+    #[test]
+    fn test_video_negative_duration_fails() {
+        let mut payload = valid_video_payload();
+        payload.duration_ms = Some(-100);
+        let err = payload.validate().unwrap_err();
+        assert!(err.to_string().contains("duration_ms must be positive"));
     }
 
     #[test]

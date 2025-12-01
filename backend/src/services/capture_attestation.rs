@@ -935,6 +935,7 @@ mod tests {
             captured_at: "2025-12-01T10:00:00Z".to_string(),
             assertion: STANDARD.encode("test-assertion"),
             hash_chain: None,
+            temporal_depth_analysis: None,
             frame_count: None,
             duration_ms: None,
         }

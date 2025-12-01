@@ -218,6 +218,60 @@ export function HashOnlyVerificationResult({
               </span>
             </div>
           </div>
+
+          {/* Video-specific: Temporal Depth Analysis (Story 8-8) */}
+          {mediaType === 'video' && evidence.temporal_depth_analysis && (
+            <div>
+              <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                Temporal Depth Analysis (Device)
+              </div>
+              <div className="flex items-center gap-2">
+                {evidence.temporal_depth_analysis.is_likely_real_scene ? (
+                  <span className="text-green-600 dark:text-green-400 text-sm">✓ Pass</span>
+                ) : (
+                  <span className="text-red-600 dark:text-red-400 text-sm">✗ Fail</span>
+                )}
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {evidence.temporal_depth_analysis.keyframe_count} keyframes,{' '}
+                  {(evidence.temporal_depth_analysis.variance_stability * 100).toFixed(0)}% variance stability
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Video-specific: Hash Chain (Story 8-8) */}
+          {mediaType === 'video' && evidence.hash_chain && (
+            <div>
+              <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                Frame Hash Chain
+              </div>
+              <div className="flex items-center gap-2">
+                {evidence.hash_chain.status === 'pass' ? (
+                  <span className="text-green-600 dark:text-green-400 text-sm">✓ Verified</span>
+                ) : evidence.hash_chain.status === 'partial' ? (
+                  <span className="text-yellow-600 dark:text-yellow-400 text-sm">⚠ Partial</span>
+                ) : (
+                  <span className="text-red-600 dark:text-red-400 text-sm">✗ Failed</span>
+                )}
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {evidence.hash_chain.verified_frames}/{evidence.hash_chain.total_frames} frames,{' '}
+                  {evidence.hash_chain.checkpoint_index && `${evidence.hash_chain.checkpoint_index} checkpoints`}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Video-specific: Duration & Frame Count (Story 8-8) */}
+          {mediaType === 'video' && evidence.duration_ms && (
+            <div>
+              <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                Video Duration
+              </div>
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                {(evidence.duration_ms / 1000).toFixed(1)}s ({evidence.frame_count} frames)
+              </span>
+            </div>
+          )}
         </div>
       </div>
 

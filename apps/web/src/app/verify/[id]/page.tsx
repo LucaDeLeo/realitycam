@@ -222,6 +222,77 @@ const DEMO_HASH_ONLY_CAPTURE: CapturePublicData = {
   // Note: photo_url and video_url intentionally omitted for hash-only
 };
 
+// Demo data for video hash-only capture (Story 8-8)
+const DEMO_VIDEO_HASH_ONLY_CAPTURE: CapturePublicData = {
+  capture_id: 'demo-video-hash-only',
+  confidence_level: 'high',
+  capture_mode: 'hash_only',
+  media_stored: false,
+  media_hash: 'b2c3d4e5f6789abcdef0123456789abcdef0123456789abcdef0123456789ab',
+  captured_at: new Date().toISOString(),
+  uploaded_at: new Date().toISOString(),
+  location_coarse: 'San Francisco, CA',
+  evidence: {
+    type: 'video',
+    analysis_source: 'device',
+    duration_ms: 15000,
+    frame_count: 450,
+    hardware_attestation: {
+      status: 'pass',
+      level: 'full',
+      verified: true,
+      device_model: 'iPhone 15 Pro',
+      assertion_valid: true,
+    },
+    depth_analysis: {
+      status: 'pass',
+      is_likely_real_scene: true,
+    },
+    // Temporal depth analysis (Story 8-8)
+    temporal_depth_analysis: {
+      mean_variance: 0.62,
+      variance_stability: 0.91,
+      temporal_coherence: 0.78,
+      is_likely_real_scene: true,
+      keyframe_count: 150,
+    },
+    // Hash chain for video integrity (privacy mode)
+    hash_chain: {
+      status: 'pass',
+      verified_frames: 450,
+      total_frames: 450,
+      chain_intact: true,
+      attestation_valid: true,
+      verified_duration_ms: 15000,
+      checkpoint_verified: true,
+      checkpoint_index: 3,
+    },
+    metadata_flags: {
+      location_included: true,
+      location_level: 'coarse',
+      timestamp_included: true,
+      timestamp_level: 'day_only',
+      device_info_included: true,
+      device_info_level: 'model_only',
+    },
+    metadata: {
+      timestamp_valid: true,
+      timestamp_delta_seconds: 0,
+      model_verified: true,
+      model_name: 'iPhone 15 Pro',
+      device_model: 'iPhone 15 Pro',
+      location_available: true,
+      location_opted_out: false,
+    },
+    processing: {
+      processed_at: new Date().toISOString(),
+      processing_time_ms: 320,
+      version: '1.0.0',
+    },
+  },
+  // Note: video_url intentionally omitted for hash-only
+};
+
 // Video-specific evidence types (Story 7-13)
 interface HashChainEvidence {
   status: string; // 'pass' | 'partial' | 'fail'
@@ -241,6 +312,15 @@ interface DepthAnalysisEvidence {
   scene_stability: number;
   is_likely_real_scene: boolean;
   suspicious_frames: number[];
+}
+
+// Temporal depth analysis for video privacy mode (Story 8-8)
+interface TemporalDepthAnalysisEvidence {
+  mean_variance: number;
+  variance_stability: number;
+  temporal_coherence: number;
+  is_likely_real_scene: boolean;
+  keyframe_count: number;
 }
 
 interface PartialAttestationInfo {
@@ -308,6 +388,8 @@ interface CapturePublicData {
     // Hash-only specific fields (Story 8-6)
     analysis_source?: 'server' | 'device';
     metadata_flags?: MetadataFlags;
+    // Video hash-only specific fields (Story 8-8)
+    temporal_depth_analysis?: TemporalDepthAnalysisEvidence;
   };
   photo_url?: string;
   video_url?: string;
@@ -343,6 +425,8 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
     capture = DEMO_PARTIAL_VIDEO_CAPTURE;
   } else if (id === 'demo-hash-only') {
     capture = DEMO_HASH_ONLY_CAPTURE;
+  } else if (id === 'demo-video-hash-only') {
+    capture = DEMO_VIDEO_HASH_ONLY_CAPTURE;
   } else {
     // Fetch capture data from backend
     const response = await apiClient.getCapturePublic(id);

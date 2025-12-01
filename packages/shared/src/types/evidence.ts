@@ -61,10 +61,58 @@ export interface MetadataFlags {
   device_info_level: 'none' | 'model_only' | 'full';
 }
 
+/** Temporal depth analysis for video privacy mode (Story 8-8) */
+export interface TemporalDepthAnalysis {
+  /** Mean depth variance across keyframes */
+  mean_variance: number;
+  /** Variance stability score (0-1+) */
+  variance_stability: number;
+  /** Temporal coherence score (0-1) */
+  temporal_coherence: number;
+  /** Overall scene authenticity determination */
+  is_likely_real_scene: boolean;
+  /** Number of keyframes analyzed */
+  keyframe_count: number;
+}
+
+/** Hash chain evidence for video integrity (Story 8-8) */
+export interface HashChainEvidence {
+  /** Verification status */
+  status: 'pass' | 'partial' | 'fail';
+  /** Number of verified frames */
+  verified_frames: number;
+  /** Total frames in video */
+  total_frames: number;
+  /** Whether chain is intact */
+  chain_intact: boolean;
+  /** Whether attestation signature is valid */
+  attestation_valid: boolean;
+  /** Duration of verified portion in ms */
+  verified_duration_ms: number;
+  /** Whether checkpoint attestations were verified */
+  checkpoint_verified?: boolean;
+  /** Number of checkpoints */
+  checkpoint_index?: number;
+}
+
 /** Complete evidence package for a capture (Story 4-7) */
 export interface Evidence {
   hardware_attestation: HardwareAttestation;
   depth_analysis: DepthAnalysis;
   metadata: MetadataEvidence;
   processing: ProcessingInfo;
+
+  // Video-specific fields (optional, Stories 7-13 and 8-8)
+  /** Evidence type - 'photo' or 'video' */
+  type?: 'photo' | 'video';
+  /** Analysis source - 'server' or 'device' (privacy mode) */
+  analysis_source?: 'server' | 'device';
+  /** Video duration in milliseconds */
+  duration_ms?: number;
+  /** Total frame count for video */
+  frame_count?: number;
+  /** Temporal depth analysis for video privacy mode (Story 8-8) */
+  temporal_depth_analysis?: TemporalDepthAnalysis;
+  /** Hash chain evidence for video integrity (Story 8-8) */
+  hash_chain?: HashChainEvidence;
 }

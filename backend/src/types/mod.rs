@@ -38,8 +38,9 @@ pub use video_evidence::{
 };
 
 pub use hash_only::{
-    AnalysisSource, CaptureMode, ClientDepthAnalysis, FilteredLocation, FilteredMetadata,
-    HashOnlyCapturePayload, HashOnlyCaptureResponse, InsertHashOnlyCaptureParams, MetadataFlags,
+    AnalysisSource, CaptureMode, ClientDepthAnalysis, ClientTemporalDepthAnalysis,
+    FilteredLocation, FilteredMetadata, HashOnlyCapturePayload, HashOnlyCaptureResponse,
+    InsertHashOnlyCaptureParams, MetadataFlags, VideoHashChainData,
 };
 
 use chrono::{DateTime, Utc};
