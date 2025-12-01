@@ -24,6 +24,7 @@ This document provides the complete epic and story breakdown for rial., decompos
 | 5 | C2PA & Verification Experience | Users can verify photos via shareable links | FR27-FR40 |
 | 6 | Native Swift Implementation | Maximum security via native iOS with zero JS bridge | FR1-FR19, FR41-FR46 (native) |
 | 7 | Video Capture with LiDAR Depth | Attested video with frame-by-frame depth verification | FR47-FR55 |
+| 8 | Privacy-First Capture Mode | Zero-knowledge provenance with client-side analysis | FR56-FR62 |
 
 ---
 
@@ -105,6 +106,15 @@ This document provides the complete epic and story breakdown for rial., decompos
 - **FR53:** Backend analyzes depth consistency across video frames
 - **FR54:** Backend generates C2PA manifest for video files
 - **FR55:** Verification page displays video with playback and evidence
+
+### Privacy-First Capture (FR56-FR62)
+- **FR56:** App provides "Privacy Mode" toggle in capture settings
+- **FR57:** In Privacy Mode, app performs depth analysis locally (variance, layers, edge coherence)
+- **FR58:** In Privacy Mode, app uploads only: hash(media) + depth_analysis_result + attestation_signature
+- **FR59:** Backend accepts pre-computed depth analysis signed by attested device
+- **FR60:** Backend stores hash + evidence without raw media (media never touches server)
+- **FR61:** Verification page displays "Hash Verified" with note about device attestation
+- **FR62:** Users can configure per-capture metadata: location, timestamp, device info granularity
 
 ---
 
@@ -2868,9 +2878,280 @@ So that **I can choose the right capture type for my needs**.
 
 ---
 
+## Epic 8: Privacy-First Capture Mode
+
+**Goal:** Enable users to capture attested photos/videos without uploading raw media, using client-side depth analysis and granular metadata controls.
+
+**User Value:** Privacy-conscious users (journalists, lawyers, HR, medical) can prove capture authenticity without any server touching their sensitive media.
+
+**FRs Covered:** FR56-FR62
+
+**Technical Approach:**
+- Client-side depth analysis (same algorithm as server)
+- DCAppAttest signs hash + analysis results
+- Backend stores evidence package without raw media
+- Granular metadata toggles per capture
+
+### Story 8.1: Client-Side Depth Analysis Service
+
+As a **privacy-conscious user**,
+I want **my device to analyze depth data locally**,
+So that **I can prove my capture is a real 3D scene without uploading the depth map**.
+
+**Acceptance Criteria:**
+
+**Given** a photo or video capture with depth data
+**When** Privacy Mode is enabled
+**Then** the app:
+- Computes depth variance (std dev of depth values)
+- Counts depth layers (distinct depth planes)
+- Calculates edge coherence (correlation with RGB edges)
+- Determines `is_likely_real_scene` using same thresholds as server
+
+**And** analysis completes in < 500ms
+
+**And** results are identical to server-side computation (deterministic algorithm)
+
+**Prerequisites:** Story 6.6 (Frame Processing Pipeline)
+
+**Technical Notes:**
+- Port depth analysis algorithm from Rust to Swift
+- Use Metal for GPU-accelerated computation if needed
+- Thresholds: variance > 0.5, layers >= 3, coherence > 0.7
+- Store analysis in `DepthAnalysisResult` struct
+
+---
+
+### Story 8.2: Privacy Mode Settings UI
+
+As a **user**,
+I want **to toggle Privacy Mode in capture settings**,
+So that **I can choose between full upload and hash-only capture**.
+
+**Acceptance Criteria:**
+
+**Given** the Settings screen is displayed
+**When** the user views privacy options
+**Then** they see:
+- Privacy Mode toggle (off by default)
+- Explanation: "When enabled, only a hash of your capture is uploaded. The actual photo/video never leaves your device."
+
+**And** when Privacy Mode is enabled:
+- Shows granular metadata controls
+- Location: None / Coarse (city) / Precise
+- Timestamp: None / Day only / Exact
+- Device: None / Model only / Full
+
+**And** settings persist across app launches (stored in UserDefaults)
+
+**Prerequisites:** Story 6.13 (SwiftUI Capture Screen)
+
+**Technical Notes:**
+- Use `@AppStorage` for persistence
+- Group under "Privacy & Security" section
+- Include "Learn More" link explaining trust model
+
+---
+
+### Story 8.3: Hash-Only Capture Payload
+
+As a **privacy-conscious user**,
+I want **my capture to upload only hash and evidence**,
+So that **the server never receives my raw media**.
+
+**Acceptance Criteria:**
+
+**Given** Privacy Mode is enabled
+**When** user captures and uploads
+**Then** the payload contains only:
+- `media_hash`: SHA-256 of photo/video bytes
+- `depth_analysis`: Client-computed analysis results
+- `metadata`: Per user settings (location, timestamp, device)
+- `metadata_flags`: What was included/excluded
+- `assertion`: DCAppAttest signature over entire payload
+
+**And** raw photo/video bytes are NOT included
+
+**And** upload size is < 10KB (vs ~5MB for full capture)
+
+**And** full media remains in local storage (user's device only)
+
+**Prerequisites:** Story 8.1, Story 8.2
+
+**Technical Notes:**
+- Create `HashOnlyCapturePayload` struct
+- Sign payload hash with DCAppAttest assertion
+- Include `capture_mode: "hash_only"` in request
+
+---
+
+### Story 8.4: Backend Hash-Only Capture Endpoint
+
+As a **backend service**,
+I want **to accept hash-only captures with pre-computed analysis**,
+So that **I can generate evidence without raw media**.
+
+**Acceptance Criteria:**
+
+**Given** a POST to `/api/v1/captures` with `mode: "hash_only"`
+**When** the request is processed
+**Then** backend:
+- Validates DCAppAttest assertion covers the payload
+- Extracts `media_hash`, `depth_analysis`, `metadata`
+- Stores capture with `media_stored: false`
+- Generates verification URL
+
+**And** if assertion verification fails:
+- Returns 401 with error: "Attestation signature invalid"
+
+**And** no media files are stored in S3
+
+**Prerequisites:** Story 4.1 (Capture Upload Endpoint)
+
+**Technical Notes:**
+- Add `mode` field to capture request schema
+- Verify assertion signature matches payload hash
+- Store `capture_mode` and `media_stored` in DB
+
+---
+
+### Story 8.5: Hash-Only Evidence Package
+
+As a **backend service**,
+I want **to generate evidence for hash-only captures**,
+So that **verification works without stored media**.
+
+**Acceptance Criteria:**
+
+**Given** a hash-only capture is stored
+**When** evidence package is assembled
+**Then** it includes:
+- Hardware attestation: status from assertion verification
+- Depth analysis: values from client payload (marked "computed on device")
+- Metadata checks: per provided metadata
+- Confidence level: calculated per standard algorithm
+
+**And** evidence notes:
+- "Depth analysis performed on attested device"
+- "Original media not stored on server"
+
+**Prerequisites:** Story 4.8 (Evidence Package Assembly)
+
+**Technical Notes:**
+- Add `analysis_source: "device" | "server"` to evidence
+- Confidence calculation unchanged (trusts attested device)
+- Add `media_stored: false` flag to response
+
+---
+
+### Story 8.6: Verification Page Hash-Only Display
+
+As a **verifier**,
+I want **to see clear indication when viewing hash-only capture**,
+So that **I understand the media is not stored but hash is verified**.
+
+**Acceptance Criteria:**
+
+**Given** a verification URL for a hash-only capture
+**When** the page loads
+**Then** the user sees:
+- "Hash Verified" badge (instead of media preview)
+- Confidence level badge (HIGH/MEDIUM/LOW/SUSPICIOUS)
+- Message: "Original media not stored on server"
+- Message: "Authenticity verified via device attestation"
+- Capture timestamp and location (per metadata flags)
+
+**And** evidence panel shows:
+- All check statuses with source indicator
+- "Depth analysis: Pass (computed on device)"
+- Hardware attestation status
+
+**And** no "Download" or "View Full Size" options (no media to view)
+
+**Prerequisites:** Story 5.4 (Verification Page)
+
+**Technical Notes:**
+- Check `media_stored` field from API
+- Use different layout for hash-only vs full captures
+- Emphasize trust model explanation
+
+---
+
+### Story 8.7: File Verification for Hash-Only
+
+As a **user with the original file**,
+I want **to verify my hash-only capture by uploading the file**,
+So that **I can prove this file matches the registered hash**.
+
+**Acceptance Criteria:**
+
+**Given** a hash-only capture exists
+**When** user uploads the original file to verification page
+**Then** system:
+- Computes SHA-256 of uploaded file
+- Compares to stored `media_hash`
+- If match: displays full evidence with "File matches registered hash"
+- If no match: displays "This file does not match any registered capture"
+
+**And** uploaded file is not stored (hashed in memory, discarded)
+
+**Prerequisites:** Story 5.6 (File Upload Verification)
+
+**Technical Notes:**
+- Reuse existing file verification flow
+- Add messaging specific to hash-only mode
+- Consider: show media preview only during verification session
+
+---
+
+### Story 8.8: Video Privacy Mode Support
+
+As a **privacy-conscious user**,
+I want **Privacy Mode to work for video captures**,
+So that **I can hash-only verify videos too**.
+
+**Acceptance Criteria:**
+
+**Given** Privacy Mode is enabled for video capture
+**When** user records and uploads video
+**Then**:
+- Video hash chain is computed locally
+- Temporal depth analysis is performed on-device
+- Upload contains: `hash_chain` + `depth_analysis` + `assertion`
+- No video bytes uploaded
+
+**And** verification shows:
+- "Video Hash Verified"
+- Frame count and duration
+- Depth analysis summary (temporal)
+- Hash chain integrity status
+
+**Prerequisites:** Story 7.7 (Video Local Processing), Story 8.3
+
+**Technical Notes:**
+- Reuse video hash chain from Epic 7
+- Add temporal depth analysis to client
+- Same verification UX as photo hash-only
+
+---
+
+## Privacy-First Capture - Functional Requirements
+
+| FR | Description | Story |
+|----|-------------|-------|
+| FR56 | App provides "Privacy Mode" toggle in capture settings | 8.2 |
+| FR57 | In Privacy Mode, app performs depth analysis locally | 8.1 |
+| FR58 | In Privacy Mode, app uploads only hash + analysis + attestation | 8.3 |
+| FR59 | Backend accepts pre-computed depth analysis signed by attested device | 8.4 |
+| FR60 | Backend stores hash + evidence without raw media | 8.4, 8.5 |
+| FR61 | Verification page displays "Hash Verified" messaging | 8.6 |
+| FR62 | Users can configure per-capture metadata granularity | 8.2 |
+
+---
+
 ## Summary
 
-**Total: 7 Epics, 71 Stories**
+**Total: 8 Epics, 79 Stories**
 
 | Epic | Stories | FRs Covered |
 |------|---------|-------------|
@@ -2881,18 +3162,22 @@ So that **I can choose the right capture type for my needs**.
 | Epic 5: C2PA & Verification Experience | 10 | FR27-FR40 |
 | Epic 6: Native Swift Implementation | 16 | FR1-FR19, FR41-FR46 (native) |
 | Epic 7: Video Capture with LiDAR Depth | 14 | FR47-FR55 |
+| Epic 8: Privacy-First Capture Mode | 8 | FR56-FR62 |
 
 **Context Incorporated:**
-- ✅ PRD requirements (all 55 FRs mapped)
+- ✅ PRD requirements (all 62 FRs mapped)
 - ✅ Architecture technical decisions (tech stack, API contracts, patterns)
 - ✅ Native Swift re-implementation for maximum security posture
 - ✅ Video capture with frame-by-frame depth and hash chain integrity
+- ✅ Privacy-first capture with client-side depth analysis (ADR-011)
 
 **Epic 6 Note:** Provides native Swift alternatives to Epics 2-4 mobile functionality. Can be developed in parallel. After Story 6.16 validation, Expo/RN code can be deprecated.
 
 **Epic 7 Note:** Video capture extends the native Swift implementation. Builds on Epic 6 ARKit foundations. Adds temporal depth analysis and hash chain verification for video-specific manipulation detection.
 
-**Status:** COMPLETE - Ready for Phase 4 Implementation!
+**Epic 8 Note:** Privacy-first mode enables zero-knowledge provenance. Client-side depth analysis trusted via hardware attestation. Added via Sprint Change Proposal SCP-008 (2025-12-01).
+
+**Status:** Epic 8 added - Ready for implementation!
 
 ---
 

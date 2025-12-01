@@ -1064,6 +1064,63 @@ float alpha = edge > threshold ? 0.8 : 0.0;
 
 ---
 
+### ADR-011: Client-Side Depth Analysis for Privacy Mode
+
+**Context:** Privacy-conscious users need proof of capture authenticity without uploading raw media. Current architecture performs depth analysis server-side, requiring full media upload.
+
+**Decision:** Implement client-side depth analysis in the iOS app, with results signed by DCAppAttest.
+
+**Pattern:**
+
+```swift
+// On-device depth analysis
+let analysis = DepthAnalysisService.analyze(depthMap)
+// Returns: { variance: 2.4, layers: 5, coherence: 0.87, isRealScene: true }
+
+// Sign with attestation
+let payload = CapturePayload(
+    mediaHash: SHA256(photoData),
+    depthAnalysis: analysis,
+    timestamp: Date(),
+    metadataFlags: userSettings.metadataFlags
+)
+let assertion = try DCAppAttestService.generateAssertion(
+    keyId,
+    clientDataHash: SHA256(payload.serialize())
+)
+// Upload: payload + assertion (no raw media)
+```
+
+**Rationale:**
+
+| Aspect | Assessment |
+|--------|------------|
+| Trust model | Device attestation proves uncompromised hardware computed the analysis |
+| Spoofing cost | Would require Secure Enclave compromise (~impossible) |
+| Accuracy | Same algorithm as server, deterministic results |
+| Privacy | Media never leaves device |
+
+**Trade-offs:**
+
+- (+) Zero-knowledge provenance — server never sees media
+- (+) Same evidence quality as server-side (depth analysis identical)
+- (+) Competitive differentiator
+- (-) Slightly larger trust assumption (device software integrity)
+- (-) Cannot re-analyze if algorithm improves (only hash stored)
+
+**Consequences:**
+
+- New `DepthAnalysisService` in `ios/Rial/Core/Capture/`
+- New `PrivacyCapturePayload` model
+- Backend accepts `capture_mode: "hash_only"` with pre-computed analysis
+- Verification page shows "Hash verified via device attestation"
+- Database schema extended with `capture_mode`, `media_stored`, `metadata_flags`
+
+**Decision Date:** 2025-12-01
+**Decision Maker:** Luca
+
+---
+
 ## MVP Scope Summary
 
 ### In Scope
@@ -1072,6 +1129,8 @@ float alpha = edge > threshold ? 0.8 : 0.0;
 - **Video capture (15s max) with 10fps depth keyframes** *(Epic 7)*
 - **Hash chain integrity for video frames** *(Epic 7)*
 - **Checkpoint attestation for interrupted videos** *(Epic 7)*
+- **Privacy Mode: hash-only capture with client-side depth analysis** *(Epic 8)*
+- **Granular metadata controls per capture** *(Epic 8)*
 - Hardware attestation (DCAppAttest + Secure Enclave)
 - LiDAR depth analysis (photo + temporal analysis for video)
 - Basic metadata checks

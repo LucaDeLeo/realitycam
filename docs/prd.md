@@ -426,6 +426,19 @@ These add value but require more implementation effort:
 - FR45: Users can opt-out of location (noted in evidence, not suspicious)
 - FR46: Depth map stored but not publicly downloadable (only visualization)
 
+#### Granular Metadata Controls
+
+Users can configure what metadata accompanies each capture:
+
+| Field | Options | Default |
+|-------|---------|---------|
+| Location | None / Coarse (city) / Precise | Coarse |
+| Timestamp | None / Day only / Exact | Exact |
+| Device Info | None / Model only / Full | Model only |
+| Depth Map | Exclude / Include (Privacy Mode: analysis only) | Include |
+
+**Evidence Impact:** Excluded fields are noted in evidence as "User opted out" (not marked suspicious). Confidence calculation adjusts based on available signals.
+
 ### Video Capture (MVP)
 
 - FR47: App records video up to 15 seconds with LiDAR depth at 10fps
@@ -445,6 +458,23 @@ These add value but require more implementation effort:
 - **Checkpoints:** Attestation checkpoints every 5 seconds for partial recovery
 - **Overlay:** Edge-detection only (performance optimized vs full colormap)
 - **File size:** ~30-45MB per 15s video (video + depth + chain + metadata)
+
+### Privacy-First Capture (FR56-FR62)
+
+- FR56: App provides "Privacy Mode" toggle in capture settings
+- FR57: In Privacy Mode, app performs depth analysis locally (variance, layers, edge coherence)
+- FR58: In Privacy Mode, app uploads only: hash(media) + depth_analysis_result + attestation_signature
+- FR59: Backend accepts pre-computed depth analysis signed by attested device
+- FR60: Backend stores hash + evidence without raw media (media never touches server)
+- FR61: Verification page displays "Hash Verified" with note: "Original media not stored - verified by device attestation"
+- FR62: Users can configure per-capture metadata: location (none/coarse/precise), timestamp (none/day/exact), device info (none/model/full)
+
+**Privacy Mode Technical Details:**
+- **Client-side analysis:** Same depth algorithm as server (variance, layers, coherence)
+- **Trust model:** DCAppAttest signs hash + analysis; server trusts attested device
+- **Upload size:** < 10KB (vs ~5MB for full capture)
+- **Confidence:** HIGH achievable when hardware attestation + depth analysis both pass
+- **Local storage:** Full media retained on device (user's control)
 
 ### Deferred Functional Requirements (Post-MVP)
 

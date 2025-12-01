@@ -84,6 +84,9 @@
 		'3089F9DB005C' = {isa = PBXBuildFile; fileRef = 3089F9DB1084; };
 		'3089F9DB005D' = {isa = PBXBuildFile; fileRef = 3089F9DB1085; };
 		'3089F9DB005E' = {isa = PBXBuildFile; fileRef = 3089F9DB1086; };
+		'3089F9DB005F' = {isa = PBXBuildFile; fileRef = 3089F9DB1087; };
+		'3089F9DB0060' = {isa = PBXBuildFile; fileRef = 3089F9DB1088; };
+		'3089F9DB0061' = {isa = PBXBuildFile; fileRef = 3089F9DB1089; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -186,6 +189,9 @@
 		'3089F9DB1085' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingProgressBar.swift; sourceTree = "<group>"; };
 		'3089F9DB1086' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureModeTests.swift; sourceTree = "<group>"; };
 		D9A44E098094F0E08456FEE9 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppEnvironment.swift; path = Rial/Core/Configuration/AppEnvironment.swift; sourceTree = SOURCE_ROOT; };
+		'3089F9DB1087' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthAnalysisService.swift; sourceTree = "<group>"; };
+		'3089F9DB1088' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthAnalysisResult.swift; sourceTree = "<group>"; };
+		'3089F9DB1089' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthAnalysisServiceTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -276,6 +282,7 @@
 			isa = PBXGroup;
 			children = (
 				3089F9DB1021,
+				'3089F9DB1088',
 				3089F9DB1077,
 				3089F9DB1074,
 			);
@@ -346,6 +353,7 @@
 			isa = PBXGroup;
 			children = (
 				3089F9DB1019,
+				'3089F9DB1087',
 				3089F9DB1063,
 				3089F9DB1066,
 				3089F9DB1022,
@@ -472,6 +480,7 @@
 			isa = PBXGroup;
 			children = (
 				3089F9DB1020,
+				'3089F9DB1089',
 				3089F9DB1064,
 				3089F9DB1068,
 				3089F9DB1023,
@@ -675,6 +684,8 @@
 				3089F9DB005B,
 				3089F9DB005C,
 				3089F9DB005D,
+				'3089F9DB005F',
+				'3089F9DB0060',
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -702,6 +713,7 @@
 				3089F9DB0054,
 				3089F9DB0057,
 				3089F9DB005E,
+				'3089F9DB0061',
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

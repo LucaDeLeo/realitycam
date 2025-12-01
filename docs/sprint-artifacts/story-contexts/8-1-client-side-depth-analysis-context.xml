@@ -1,0 +1,680 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Story Context XML for Story 8-1: Client-Side Depth Analysis Service
+  Generated: 2025-12-01
+  Purpose: Single source of truth for implementing client-side depth analysis
+
+  This context provides all documentation, code references, and constraints
+  needed to port the server-side depth analysis algorithm to Swift.
+-->
+<story-context version="1.0">
+  <story-reference>
+    <key>8-1</key>
+    <title>Client-Side Depth Analysis Service</title>
+    <file>docs/sprint-artifacts/stories/8-1-client-side-depth-analysis.md</file>
+    <status>drafted</status>
+    <epic>Epic 8: Privacy-First Capture Mode</epic>
+    <epic-file>docs/epics.md</epic-file>
+  </story-reference>
+
+  <epic-context>
+    <tech-spec>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-8.md</tech-spec>
+    <description>
+      Epic 8 enables zero-knowledge provenance by allowing users to capture
+      attested photos without uploading raw media. The device performs depth
+      analysis locally, signs results with DCAppAttest, and uploads only a
+      hash plus evidence metadata.
+    </description>
+    <key-insight>
+      Hardware attestation proves an uncompromised device computed the depth
+      analysis, so the server can trust client-side results with the same
+      confidence as server-side computation.
+    </key-insight>
+  </epic-context>
+
+  <documentation-artifacts>
+    <artifact type="tech-spec" relevance="primary">
+      <file>docs/sprint-artifacts/epic-tech-specs/tech-spec-epic-8.md</file>
+      <description>
+        Epic 8 technical specification defining DepthAnalysisService interface,
+        algorithm parity requirements, and acceptance criteria.
+      </description>
+      <key-sections>
+        <section name="iOS DepthAnalysisService" lines="77-109">
+          Defines DepthAnalysisResult struct and DepthAnalysisService class API
+        </section>
+        <section name="Algorithm Parity Requirements" lines="113-117">
+          Thresholds must match backend/src/services/depth_analysis.rs
+        </section>
+        <section name="Performance" lines="525-527">
+          Client-side depth analysis must complete in less than 500ms
+        </section>
+        <section name="Acceptance Criteria 8.1" lines="611-621">
+          Variance, layers, coherence, is_real_scene, performance, determinism
+        </section>
+      </key-sections>
+    </artifact>
+
+    <artifact type="architecture" relevance="primary">
+      <file>docs/architecture.md</file>
+      <description>
+        Project architecture document with ADR-011 specifically covering
+        client-side depth analysis for privacy mode.
+      </description>
+      <key-sections>
+        <section name="ADR-011: Client-Side Depth Analysis" lines="1067-1121">
+          Architectural decision for on-device depth analysis with DCAppAttest signing.
+          Defines trust model, trade-offs, and consequences.
+        </section>
+        <section name="ADR-009: Native Swift Architecture" lines="939-987">
+          Decision to use pure Swift/SwiftUI with only Apple native frameworks.
+          No external dependencies for security-critical functionality.
+        </section>
+        <section name="Evidence Architecture" lines="349-418">
+          Defines depth analysis as primary evidence signal.
+          Shows DepthAnalysis struct and is_likely_real_scene thresholds.
+        </section>
+      </key-sections>
+    </artifact>
+
+    <artifact type="algorithm-reference" relevance="critical">
+      <file>backend/src/services/depth_analysis.rs</file>
+      <description>
+        Server-side depth analysis implementation in Rust. This is the
+        authoritative reference for algorithm parity. All thresholds,
+        formulas, and logic must be ported exactly to Swift.
+      </description>
+      <key-sections>
+        <section name="Configuration Constants" lines="33-68">
+          All threshold values that must be matched in Swift:
+          - VARIANCE_THRESHOLD = 0.5
+          - LAYER_THRESHOLD = 3
+          - COHERENCE_THRESHOLD = 0.3
+          - HISTOGRAM_BINS = 50
+          - PEAK_PROMINENCE_RATIO = 0.05
+          - MIN_VALID_DEPTH = 0.1
+          - MAX_VALID_DEPTH = 20.0
+          - GRADIENT_THRESHOLD = 0.1
+          - SCREEN_DEPTH_RANGE_MAX = 0.15
+          - SCREEN_UNIFORMITY_THRESHOLD = 0.85
+          - SCREEN_DISTANCE_MIN = 0.2
+          - SCREEN_DISTANCE_MAX = 1.5
+          - MIN_QUADRANT_VARIANCE = 0.1
+        </section>
+        <section name="filter_valid_depths" lines="177-189">
+          Filters depth values: NaN, infinity, values outside 0.1-20m range
+        </section>
+        <section name="compute_depth_statistics" lines="198-247">
+          Computes mean, standard deviation, min/max, coverage ratio
+        </section>
+        <section name="detect_depth_layers" lines="265-338">
+          Histogram peak detection with 50 bins and smoothing
+        </section>
+        <section name="compute_edge_coherence" lines="359-435">
+          Sobel gradient computation and sigmoid mapping formula:
+          coherence = 1.0 - exp(-edge_ratio * 30.0)
+        </section>
+        <section name="detect_screen_pattern" lines="445-486">
+          Screen recapture detection using uniformity and distance
+        </section>
+        <section name="check_quadrant_variance" lines="494-544">
+          Spatial uniformity check across four quadrants
+        </section>
+        <section name="is_real_scene" lines="553-576">
+          Final determination combining all checks
+        </section>
+        <section name="Unit Tests" lines="905-1202">
+          Test fixtures for flat plane, two planes, varied scene scenarios
+        </section>
+      </key-sections>
+    </artifact>
+
+    <artifact type="story-definition" relevance="primary">
+      <file>docs/sprint-artifacts/stories/8-1-client-side-depth-analysis.md</file>
+      <description>
+        Complete story definition with acceptance criteria, tasks, and dev notes.
+      </description>
+      <key-sections>
+        <section name="Acceptance Criteria" lines="13-74">
+          Six ACs covering variance, layers, coherence, real-scene, performance, determinism
+        </section>
+        <section name="Tasks" lines="76-168">
+          12 implementation tasks from result struct to integration
+        </section>
+        <section name="Dev Notes" lines="170-264">
+          Technical approach, thresholds, CVPixelBuffer handling, performance considerations
+        </section>
+        <section name="Testing Standards" lines="240-264">
+          Unit tests, parity tests, performance tests with measurement assertions
+        </section>
+      </key-sections>
+    </artifact>
+  </documentation-artifacts>
+
+  <existing-code-interfaces>
+    <interface type="depth-buffer-access" relevance="critical">
+      <file>ios/Rial/Core/Capture/FrameProcessor.swift</file>
+      <description>
+        Demonstrates CVPixelBuffer access pattern for depth data.
+        Shows locking, base address extraction, and zlib compression.
+      </description>
+      <code-pattern name="CVPixelBuffer depth access">
+        <reference lines="192-223">
+          compressDepth() method shows:
+          - CVPixelBufferLockBaseAddress with .readOnly
+          - CVPixelBufferGetWidth/Height/BaseAddress
+          - Data copy from baseAddress
+          - defer unlock pattern
+        </reference>
+      </code-pattern>
+      <integration-point>
+        DepthAnalysisService will be called after depth capture,
+        receiving the same CVPixelBuffer that FrameProcessor receives.
+      </integration-point>
+    </interface>
+
+    <interface type="capture-session" relevance="context">
+      <file>ios/Rial/Core/Capture/ARCaptureSession.swift</file>
+      <description>
+        ARKit capture session that provides synchronized RGB + LiDAR depth frames.
+        DepthAnalysisService will analyze depth from frames captured here.
+      </description>
+      <code-pattern name="Depth data access">
+        <reference lines="225-239">
+          session(_:didUpdate:) callback shows frame.sceneDepth?.depthMap access
+        </reference>
+      </code-pattern>
+      <code-pattern name="ARFrame extensions">
+        <reference lines="338-361">
+          Convenience properties: hasDepthData, depthMapSize (width, height)
+        </reference>
+      </code-pattern>
+    </interface>
+
+    <interface type="depth-keyframe-buffer" relevance="reference">
+      <file>ios/Rial/Core/Capture/DepthKeyframeBuffer.swift</file>
+      <description>
+        Video depth keyframe extraction. Shows CVPixelBuffer Float32 extraction
+        pattern that DepthAnalysisService should follow.
+      </description>
+      <code-pattern name="Float32 depth extraction">
+        <reference lines="379-415">
+          extractDepthData() method demonstrates:
+          - Pixel format validation (kCVPixelFormatType_DepthFloat32)
+          - Lock/unlock pattern
+          - Width/height extraction
+          - Data copy from baseAddress
+          - Error handling
+        </reference>
+      </code-pattern>
+    </interface>
+
+    <interface type="depth-visualizer" relevance="reference">
+      <file>ios/Rial/Core/Capture/DepthVisualizer.swift</file>
+      <description>
+        Metal-based depth visualization. Shows DepthFrame struct which
+        wraps CVPixelBuffer with metadata. Could be useful pattern reference.
+      </description>
+      <code-pattern name="DepthFrame struct">
+        <reference lines="262-320">
+          DepthFrame with depthMap, width, height, timestamp, intrinsics, transform
+        </reference>
+      </code-pattern>
+    </interface>
+
+    <interface type="capture-view-model" relevance="integration">
+      <file>ios/Rial/Features/Capture/CaptureViewModel.swift</file>
+      <description>
+        View model for capture screen. This is where DepthAnalysisService
+        will be integrated per Task 12 in the story.
+      </description>
+      <integration-point>
+        Wire DepthAnalysisService into performCapture() async method.
+        Call analysis after depth map capture, store result in CaptureData.
+      </integration-point>
+    </interface>
+
+    <interface type="capture-data-model" relevance="integration">
+      <file>ios/Rial/Models/CaptureData.swift</file>
+      <description>
+        CaptureData struct that will need a depthAnalysis field added.
+        Story notes this is optional for Epic 8.
+      </description>
+      <key-types>
+        <type name="CaptureData" lines="27-109">
+          Main capture struct with jpeg, depth, metadata, assertion
+        </type>
+        <type name="CaptureMetadata" lines="137-186">
+          Metadata including photoHash and depthMapDimensions
+        </type>
+        <type name="DepthDimensions" lines="254-280">
+          Width/height struct for depth map dimensions
+        </type>
+      </key-types>
+    </interface>
+
+    <interface type="crypto-service" relevance="utility">
+      <file>ios/Rial/Core/Crypto/CryptoService.swift</file>
+      <description>
+        Cryptographic utilities. DepthAnalysisService may need SHA-256
+        for algorithm version hashing or result signing.
+      </description>
+      <code-pattern name="SHA-256">
+        <reference lines="34-37">
+          sha256(_ data:) -> String returns hex-encoded hash
+        </reference>
+        <reference lines="43-45">
+          sha256Data(_ data:) -> Data returns raw 32 bytes
+        </reference>
+      </code-pattern>
+    </interface>
+  </existing-code-interfaces>
+
+  <development-constraints>
+    <constraint type="algorithm-parity" priority="critical">
+      <description>
+        All threshold values and formulas must match the Rust implementation
+        exactly to ensure server can trust device-computed results.
+      </description>
+      <thresholds>
+        <threshold name="VARIANCE_THRESHOLD" value="0.5" unit="meters (std dev)" />
+        <threshold name="LAYER_THRESHOLD" value="3" unit="count" />
+        <threshold name="COHERENCE_THRESHOLD" value="0.3" unit="normalized 0-1" />
+        <threshold name="HISTOGRAM_BINS" value="50" unit="count" />
+        <threshold name="PEAK_PROMINENCE_RATIO" value="0.05" unit="fraction" />
+        <threshold name="MIN_VALID_DEPTH" value="0.1" unit="meters" />
+        <threshold name="MAX_VALID_DEPTH" value="20.0" unit="meters" />
+        <threshold name="GRADIENT_THRESHOLD" value="0.1" unit="meters" />
+        <threshold name="SCREEN_DEPTH_RANGE_MAX" value="0.15" unit="meters" />
+        <threshold name="SCREEN_UNIFORMITY_THRESHOLD" value="0.85" unit="fraction" />
+        <threshold name="SCREEN_DISTANCE_MIN" value="0.2" unit="meters" />
+        <threshold name="SCREEN_DISTANCE_MAX" value="1.5" unit="meters" />
+        <threshold name="MIN_QUADRANT_VARIANCE" value="0.1" unit="meters" />
+      </thresholds>
+      <formulas>
+        <formula name="edge_coherence_sigmoid">
+          coherence = 1.0 - exp(-edge_ratio * 30.0)
+        </formula>
+        <formula name="variance">
+          sqrt(sum((d - mean)^2) / count)
+        </formula>
+        <formula name="histogram_bin_width">
+          bin_width = (MAX_VALID_DEPTH - MIN_VALID_DEPTH) / HISTOGRAM_BINS
+                    = (20.0 - 0.1) / 50 = ~0.398m per bin
+          Binning is linear across the valid depth range.
+        </formula>
+      </formulas>
+    </constraint>
+
+    <constraint type="gpu-acceleration-decision" priority="medium">
+      <description>
+        Metal GPU acceleration is optional and should only be used if CPU baseline
+        fails to meet the 500ms performance target.
+      </description>
+      <decision-framework>
+        <step order="1">Implement CPU baseline first using Foundation and Accelerate</step>
+        <step order="2">Profile on iPhone 12 Pro using Instruments (Time Profiler)</step>
+        <step order="3">If CPU baseline meets 500ms target, ship without Metal</step>
+        <step order="4">Only add Metal GPU acceleration if CPU consistently exceeds 500ms</step>
+      </decision-framework>
+      <rationale>
+        256x192 = 49,152 pixels is a small dataset. Modern A14+ CPUs with Accelerate
+        framework should easily process this in under 500ms. Adding Metal complexity
+        for no measurable gain would violate YAGNI principle.
+      </rationale>
+    </constraint>
+
+    <constraint type="cvpixelbuffer-error-handling" priority="medium">
+      <description>
+        Error handling strategy for CVPixelBuffer operations.
+      </description>
+      <error-categories>
+        <category name="format-errors" action="throw">
+          Invalid pixel format (not kCVPixelFormatType_DepthFloat32)
+          → Throw DepthAnalysisError.invalidFormat
+        </category>
+        <category name="lock-errors" action="throw">
+          Failed to lock base address for reading
+          → Throw DepthAnalysisError.bufferAccessFailed
+        </category>
+        <category name="processing-errors" action="return-default">
+          All valid depths filtered out, calculation errors, etc.
+          → Return default result with status = .unavailable
+        </category>
+      </error-categories>
+    </constraint>
+
+    <constraint type="rgb-image-parameter" priority="low">
+      <description>
+        The rgbImage parameter in analyze() is optional.
+      </description>
+      <semantics>
+        rgbImage is used only for edge coherence calculation (Sobel on RGB edges).
+        Depth-only analysis is acceptable for initial implementation.
+        When rgbImage is nil:
+        - Skip edge coherence calculation
+        - Set edgeCoherence to 0.0
+        - Adjust is_likely_real_scene logic to not require coherence
+      </semantics>
+    </constraint>
+
+    <constraint type="hardware-coverage" priority="medium">
+      <description>
+        Device compatibility and fallback behavior.
+      </description>
+      <supported-devices>
+        Target: iPhone 12 Pro and newer (LiDAR required)
+        - iPhone 12 Pro / Pro Max (A14)
+        - iPhone 13 Pro / Pro Max (A15)
+        - iPhone 14 Pro / Pro Max (A16)
+        - iPhone 15 Pro / Pro Max (A17)
+        - iPad Pro 2020 and newer (LiDAR equipped)
+      </supported-devices>
+      <fallback-behavior>
+        On older/non-LiDAR devices:
+        - Depth map will be nil from ARKit
+        - Timeout analysis at 1000ms maximum
+        - Return result with status = .unavailable
+        - Allow capture to proceed without depth analysis
+      </fallback-behavior>
+    </constraint>
+
+    <constraint type="performance" priority="high">
+      <description>
+        Analysis must complete in less than 500ms on iPhone 12 Pro or newer.
+        Should not block main thread. Memory footprint less than 10MB.
+      </description>
+      <targets>
+        <target metric="analysis-time" value="500" unit="ms" />
+        <target metric="memory-footprint" value="10" unit="MB" />
+        <target metric="cpu-throttling" value="false" note="No thermal issues on repeated calls" />
+      </targets>
+      <approach>
+        Use DispatchQueue.global(qos: .userInitiated) for background processing.
+        256x192 = 49,152 pixels is manageable on CPU without Metal.
+        Use os_signpost for performance logging.
+      </approach>
+    </constraint>
+
+    <constraint type="determinism" priority="high">
+      <description>
+        Same depth map input must produce identical output every time.
+        Results must be reproducible across app restarts.
+      </description>
+      <concerns>
+        <concern>Floating point ordering must be stable (no parallelism reordering)</concern>
+        <concern>Histogram bin assignment uses floor() consistently</concern>
+        <concern>Peak detection iterates in consistent order</concern>
+      </concerns>
+    </constraint>
+
+    <constraint type="no-external-dependencies" priority="high">
+      <description>
+        Per ADR-009, no external Swift packages for security-critical code.
+        Use only Apple native frameworks (Foundation, CoreVideo, Accelerate).
+      </description>
+      <allowed-frameworks>
+        <framework>Foundation</framework>
+        <framework>CoreVideo</framework>
+        <framework>Accelerate (optional for SIMD optimization)</framework>
+        <framework>Metal (optional for GPU acceleration)</framework>
+        <framework>os.log</framework>
+      </allowed-frameworks>
+    </constraint>
+
+    <constraint type="depth-buffer-format" priority="critical">
+      <description>
+        LiDAR depth maps use kCVPixelFormatType_DepthFloat32 format.
+        Values are in meters. Typical resolution 256x192 (49,152 pixels).
+      </description>
+      <format>
+        <pixel-format>kCVPixelFormatType_DepthFloat32</pixel-format>
+        <typical-resolution width="256" height="192" />
+        <value-range min="0.1" max="20.0" unit="meters" />
+        <invalid-values>NaN, Infinity, values outside range</invalid-values>
+      </format>
+    </constraint>
+  </development-constraints>
+
+  <dependencies>
+    <internal-dependency>
+      <module>ios/Rial/Core/Capture/</module>
+      <reason>Provides ARCaptureSession and FrameProcessor patterns</reason>
+    </internal-dependency>
+    <internal-dependency>
+      <module>ios/Rial/Models/CaptureData.swift</module>
+      <reason>Will be extended with depthAnalysis field</reason>
+    </internal-dependency>
+    <internal-dependency>
+      <module>ios/Rial/Features/Capture/CaptureViewModel.swift</module>
+      <reason>Integration point for calling DepthAnalysisService</reason>
+    </internal-dependency>
+  </dependencies>
+
+  <testing-context>
+    <framework>XCTest</framework>
+    <test-location>ios/RialTests/Capture/</test-location>
+    <existing-patterns>
+      <pattern name="FrameProcessorTests" file="ios/RialTests/Capture/FrameProcessorTests.swift">
+        Shows XCTest patterns, async test methods, and device-required skips.
+        Use XCTSkip for tests requiring physical iPhone Pro with LiDAR.
+      </pattern>
+      <pattern name="DepthKeyframeBufferTests" file="ios/RialTests/Capture/DepthKeyframeBufferTests.swift">
+        Tests for depth buffer extraction and compression.
+      </pattern>
+    </existing-patterns>
+
+    <test-requirements>
+      <unit-tests>
+        <test name="test_filter_valid_depths">Filters NaN, infinity, out-of-range values</test>
+        <test name="test_compute_statistics_flat_plane">Low variance for uniform depth</test>
+        <test name="test_compute_statistics_varied_scene">High variance for real scenes</test>
+        <test name="test_detect_layers_flat">1-2 layers for flat surface</test>
+        <test name="test_detect_layers_varied">3+ layers for real scene</test>
+        <test name="test_edge_coherence_flat">Low coherence for flat surface</test>
+        <test name="test_edge_coherence_varied">High coherence for varied scene</test>
+        <test name="test_screen_pattern_detection">Detects screen-like patterns</test>
+        <test name="test_quadrant_variance">Checks spatial uniformity</test>
+        <test name="test_is_real_scene_thresholds">All threshold combinations</test>
+        <test name="test_determinism">Same input produces same output</test>
+      </unit-tests>
+
+      <parity-tests>
+        <test name="test_parity_flat_plane">Compare output with Rust for flat data</test>
+        <test name="test_parity_varied_scene">Compare output with Rust for varied data</test>
+        <test name="test_parity_screen_pattern">Compare output with Rust for screen data</test>
+        <approach>
+          Create identical test fixtures in Swift and Rust.
+          Verify all outputs match exactly within 0.01 tolerance.
+        </approach>
+        <implementation-guidance>
+          <json-export-format>
+            Export test fixtures as JSON for exact cross-platform comparison:
+            {
+              "fixture_name": "flat_plane",
+              "width": 256,
+              "height": 192,
+              "depth_values": [0.4, 0.4, 0.4, ...],  // row-major Float32 array
+              "expected": {
+                "depth_variance": 0.0,
+                "depth_layers": 1,
+                "edge_coherence": 0.0,
+                "min_depth": 0.4,
+                "max_depth": 0.4,
+                "is_likely_real_scene": false
+              }
+            }
+          </json-export-format>
+          <comparison-tolerance>
+            Float comparison tolerance: 0.01 (1% relative error acceptable)
+            Use: abs(swift_value - rust_value) less than 0.01 || abs((swift_value - rust_value) / rust_value) less than 0.01
+          </comparison-tolerance>
+          <fixture-sharing>
+            Store shared fixtures in: tests/fixtures/depth_analysis/
+            - flat_plane.json
+            - two_planes.json
+            - varied_scene.json
+            - screen_pattern.json
+            Both Swift (via Bundle) and Rust (via include_str!) load same files.
+          </fixture-sharing>
+        </implementation-guidance>
+      </parity-tests>
+
+      <performance-tests>
+        <test name="testPerformance">
+          Use measure {} block with XCT performance assertions.
+          Assert average less than 500ms, max less than 1000ms.
+        </test>
+      </performance-tests>
+    </test-requirements>
+
+    <test-fixtures>
+      <fixture name="flat_plane_depth_map">
+        256x192 depth map with all values = 0.4m
+        Expected: variance near 0, 1-2 layers, low coherence, is_real_scene = false
+      </fixture>
+      <fixture name="two_plane_depth_map">
+        256x192 with top half = 0.4m, bottom half = 2.0m
+        Expected: high variance, 2+ layers, is_real_scene depends on other checks
+      </fixture>
+      <fixture name="varied_scene_depth_map">
+        256x192 with gradient + objects at different depths
+        Expected: high variance, 3+ layers, high coherence, is_real_scene = true
+      </fixture>
+      <fixture name="screen_pattern_depth_map">
+        256x192 at 0.5m with less than 0.15m variation
+        Expected: screen_pattern_detected = true, is_real_scene = false
+      </fixture>
+
+      <!-- Edge Case Fixtures (LOW priority) -->
+      <fixture name="empty_depth_map" type="edge-case">
+        0x0 depth map (empty buffer)
+        Expected: Return status = .unavailable, all metrics = 0
+        Tests: Buffer dimension validation
+      </fixture>
+      <fixture name="all_nan_depth_map" type="edge-case">
+        256x192 depth map with all values = Float.nan
+        Expected: Return status = .unavailable (no valid depths after filtering)
+        Tests: NaN filtering exhausts all values gracefully
+      </fixture>
+      <fixture name="single_value_depth_map" type="edge-case">
+        1x1 depth map with single value = 1.5m
+        Expected: variance = 0, layers = 1, coherence = 0, is_real_scene = false
+        Tests: Minimum buffer size handling
+      </fixture>
+      <fixture name="mixed_invalid_depth_map" type="edge-case">
+        256x192 with 50% NaN, 25% out-of-range, 25% valid
+        Expected: Statistics computed only on valid 25%
+        Tests: Partial valid data handling
+      </fixture>
+    </test-fixtures>
+  </testing-context>
+
+  <implementation-notes>
+    <note type="file-structure">
+      New files to create:
+      - ios/Rial/Core/Capture/DepthAnalysisService.swift (main service)
+      - ios/Rial/Models/DepthAnalysisResult.swift (result struct)
+      - ios/RialTests/Capture/DepthAnalysisServiceTests.swift (unit tests)
+
+      Files to modify:
+      - ios/Rial/Features/Capture/CaptureViewModel.swift (wire in analysis)
+      - ios/Rial/Models/CaptureData.swift (add depthAnalysis field, optional)
+      - ios/Rial.xcodeproj/project.pbxproj (add new files)
+    </note>
+
+    <note type="algorithm-porting">
+      Port these functions from Rust to Swift in order:
+      1. filter_valid_depths - Basic value filtering
+      2. compute_depth_statistics - Mean, variance, min/max
+      3. detect_depth_layers - Histogram peak detection
+      4. compute_edge_coherence - Sobel gradients
+      5. detect_screen_pattern - Recapture detection
+      6. check_quadrant_variance - Spatial check
+      7. is_real_scene - Final decision
+    </note>
+
+    <note type="cvpixelbuffer-handling">
+      Pattern from DepthKeyframeBuffer.extractDepthData():
+      ```swift
+      let pixelFormat = CVPixelBufferGetPixelFormatType(depthMap)
+      guard pixelFormat == kCVPixelFormatType_DepthFloat32 else { throw ... }
+
+      CVPixelBufferLockBaseAddress(depthMap, .readOnly)
+      defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
+
+      let width = CVPixelBufferGetWidth(depthMap)
+      let height = CVPixelBufferGetHeight(depthMap)
+      let baseAddress = CVPixelBufferGetBaseAddress(depthMap)!
+      let depths = baseAddress.bindMemory(to: Float.self, capacity: width * height)
+      ```
+    </note>
+
+    <note type="async-pattern">
+      Follow FrameProcessor pattern for async processing:
+      ```swift
+      func analyze(depthMap: CVPixelBuffer, rgbImage: CVPixelBuffer?) async -> DepthAnalysisResult {
+          return await withCheckedContinuation { continuation in
+              DispatchQueue.global(qos: .userInitiated).async {
+                  let result = self.performAnalysis(depthMap: depthMap)
+                  continuation.resume(returning: result)
+              }
+          }
+      }
+      ```
+    </note>
+
+    <note type="error-handling">
+      Per learnings from Story 6-6:
+      Return optional or default values on failure. Don't throw.
+      Let capture continue with unavailable analysis.
+
+      Default result when analysis fails:
+      - status = .unavailable
+      - is_likely_real_scene = false
+      - All metrics = 0
+    </note>
+
+    <note type="version-tracking">
+      Include algorithmVersion field set to "1.0" constant.
+      This allows future algorithm improvements to be tracked.
+      Server can verify device used compatible algorithm version.
+    </note>
+
+    <note type="min-max-depth-purpose">
+      minDepth and maxDepth fields serve two purposes:
+
+      1. **Diagnostic Metadata**: Provides insight into the captured scene's depth range.
+         - minDepth: Nearest object in the scene (meters)
+         - maxDepth: Farthest object in the scene (meters)
+
+      2. **Screen Detection Heuristic**: Used by detect_screen_pattern():
+         - If (maxDepth - minDepth) less than SCREEN_DEPTH_RANGE_MAX (0.15m)
+           AND mean depth is within SCREEN_DISTANCE range (0.2m-1.5m)
+           → Likely a screen recapture attempt
+
+      Note: These are computed from VALID depths only (after filtering NaN/infinity/out-of-range).
+      When all depths are filtered out, both values should be 0.0.
+    </note>
+  </implementation-notes>
+
+  <warnings-and-gaps>
+    <warning type="parity-verification">
+      No automated cross-platform parity tests exist yet.
+      Manual verification against Rust implementation required.
+      Consider exporting test fixtures as JSON for exact comparison.
+    </warning>
+
+    <warning type="device-testing-required">
+      Real LiDAR depth data only available on physical iPhone Pro.
+      Simulator tests can only use synthetic depth maps.
+      Full validation requires device testing.
+    </warning>
+  </warnings-and-gaps>
+
+  <next-steps>
+    Ready for story-ready validation phase.
+    After validation, story can move to IN PROGRESS status.
+    Implementation should follow task order defined in story file.
+  </next-steps>
+</story-context>

@@ -131,3 +131,18 @@ development_status:
   7-13-video-verification-page: done
   7-14-video-capture-ui: done
   epic-7-retrospective: optional
+
+  # Epic 8: Privacy-First Capture Mode (8 stories)
+  # Added via Sprint Change Proposal SCP-008 (2025-12-01)
+  # Enables zero-knowledge provenance with client-side depth analysis
+  # Tech spec created: 2025-12-01
+  epic-8: contexted
+  8-1-client-side-depth-analysis: done
+  8-2-privacy-mode-settings-ui: backlog
+  8-3-hash-only-capture-payload: backlog
+  8-4-backend-hash-only-endpoint: backlog
+  8-5-hash-only-evidence-package: backlog
+  8-6-verification-page-hash-only: backlog
+  8-7-file-verification-hash-only: backlog
+  8-8-video-privacy-mode: backlog
+  epic-8-retrospective: optional

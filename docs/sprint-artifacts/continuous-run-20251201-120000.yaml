@@ -1,0 +1,37 @@
+run_id: continuous-run-20251201-120000
+run_started: 2025-12-01T12:00:00Z
+run_ended: null
+branch: main
+initial_commit: d648be1
+
+configuration:
+  jit_epic_context: true
+  max_epic_validation_attempts: 3
+  max_stories: null
+  max_validation_attempts: 3
+  max_review_cycles: 3
+  auto_commit: true
+  auto_push: true
+
+checkpoint: null
+
+epics_contexted: []
+
+stories_pending:
+  - 8-1-client-side-depth-analysis
+  - 8-2-privacy-mode-settings-ui
+  - 8-3-hash-only-capture-payload
+  - 8-4-backend-hash-only-endpoint
+  - 8-5-hash-only-evidence-package
+  - 8-6-verification-page-hash-only
+  - 8-7-file-verification-hash-only
+  - 8-8-video-privacy-mode
+
+stories_processed: []
+
+statistics:
+  epics_contexted_jit: 0
+  epics_already_contexted: 0
+  total_stories: 0
+  success_count: 0
+  failed_count: 0
