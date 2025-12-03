@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "pnpm install",
-  "buildCommand": "pnpm --filter @realitycam/web build",
+  "installCommand": "bun install",
+  "buildCommand": "bun run --filter @realitycam/web build",
   "outputDirectory": "apps/web/.next"
 }

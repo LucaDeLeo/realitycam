@@ -100,12 +100,12 @@ export default defineConfig({
 
   // Web server configuration for local development
   // Disabled by default - start dev server manually before running tests:
-  //   pnpm dev (in another terminal)
-  //   pnpm test
+  //   bun dev (in another terminal)
+  //   bun test
   // Enable webServer when ready for CI integration
   webServer: undefined,
   // webServer: environment === 'local' ? {
-  //   command: 'pnpm dev',
+  //   command: 'bun dev',
   //   url: 'http://localhost:3000',
   //   reuseExistingServer: !process.env.CI,
   //   timeout: 120 * 1000,

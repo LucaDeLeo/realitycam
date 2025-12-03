@@ -15,7 +15,7 @@ Photo verification platform that captures authenticated photos with hardware att
 
 ## Prerequisites
 
-- **Node.js** 22+ (with pnpm 9+)
+- **Bun** 1.3+
 - **Rust** 1.82+
 - **Docker** 24+ (for local development)
 - **Xcode** 16+ (for iOS development)
@@ -42,18 +42,19 @@ realitycam/
 ### 1. Install Dependencies
 
 ```bash
-# Install pnpm if not already installed
-npm install -g pnpm
+# Install Bun if not already installed
+# See https://bun.sh for installation options
+curl -fsSL https://bun.sh/install | bash
 
 # Install all workspace dependencies
-pnpm install
+bun install
 ```
 
 ### 2. Start Docker Services (Local Dev)
 
 ```bash
 # Start PostgreSQL and LocalStack
-pnpm docker:up
+bun docker:up
 
 # Verify services are healthy
 docker-compose -f infrastructure/docker-compose.yml ps
@@ -102,7 +103,7 @@ Configure the backend URL in `Rial/Core/Configuration/AppEnvironment.swift` for 
 
 ```bash
 cd apps/web
-pnpm dev
+bun dev
 ```
 
 Opens at http://localhost:3000
@@ -111,11 +112,11 @@ Opens at http://localhost:3000
 
 | Command | Description |
 |---------|-------------|
-| `pnpm dev:web` | Start web development server |
-| `pnpm docker:up` | Start Docker services |
-| `pnpm docker:down` | Stop Docker services |
-| `pnpm lint` | Run linters across all packages |
-| `pnpm typecheck` | Run TypeScript type checking |
+| `bun dev:web` | Start web development server |
+| `bun docker:up` | Start Docker services |
+| `bun docker:down` | Stop Docker services |
+| `bun lint` | Run linters across all packages |
+| `bun typecheck` | Run TypeScript type checking |
 
 ## CI/CD
 
@@ -241,7 +242,7 @@ rm -rf ~/Library/Developer/Xcode/DerivedData/Rial-*
 
 ```bash
 # Rebuild shared package
-pnpm --filter @realitycam/shared typecheck
+bun run --filter @realitycam/shared typecheck
 ```
 
 ## Tech Stack

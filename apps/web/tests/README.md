@@ -6,28 +6,28 @@ End-to-end and integration tests for the RealityCam verification web application
 
 ```bash
 # Install dependencies (from repo root)
-pnpm install
+bun install
 
 # Install Playwright browsers
-cd apps/web && npx playwright install
+cd apps/web && bunx playwright install
 
 # Run tests
-pnpm test
+bun test
 
 # Run tests with UI
-pnpm test:ui
+bun test:ui
 ```
 
 ## Test Commands
 
 | Command | Description |
 |---------|-------------|
-| `pnpm test` | Run all tests headless |
-| `pnpm test:ui` | Open interactive UI mode |
-| `pnpm test:headed` | Run tests in headed browser |
-| `pnpm test:debug` | Debug mode with inspector |
-| `pnpm test:ci` | CI mode with JUnit + HTML reports |
-| `pnpm test:report` | View last HTML report |
+| `bun test` | Run all tests headless |
+| `bun test:ui` | Open interactive UI mode |
+| `bun test:headed` | Run tests in headed browser |
+| `bun test:debug` | Debug mode with inspector |
+| `bun test:ci` | CI mode with JUnit + HTML reports |
+| `bun test:report` | View last HTML report |
 
 ## Test Structure
 
@@ -130,13 +130,13 @@ Captured on failure only:
 
 ```bash
 # Local (default)
-pnpm test
+bun test
 
 # Staging
-TEST_ENV=staging pnpm test
+TEST_ENV=staging bun test
 
 # Production (smoke tests)
-TEST_ENV=production pnpm test --grep @smoke
+TEST_ENV=production bun test --grep @smoke
 ```
 
 ## CI Integration
@@ -144,7 +144,7 @@ TEST_ENV=production pnpm test --grep @smoke
 Tests run in CI with:
 
 ```bash
-pnpm test:ci
+bun test:ci
 ```
 
 Artifacts uploaded on failure:
@@ -155,10 +155,10 @@ Artifacts uploaded on failure:
 
 ```yaml
 - name: Install Playwright
-  run: npx playwright install --with-deps
+  run: bunx playwright install --with-deps
 
 - name: Run E2E Tests
-  run: pnpm test:ci
+  run: bun test:ci
   env:
     TEST_ENV: staging
 

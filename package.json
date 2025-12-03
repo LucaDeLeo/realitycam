@@ -2,27 +2,28 @@
   "name": "realitycam",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@9.15.0",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "dev:web": "pnpm --filter @realitycam/web dev",
-    "dev:mobile": "pnpm --filter @realitycam/mobile start",
-    "build:web": "pnpm --filter @realitycam/web build",
-    "build:shared": "pnpm --filter @realitycam/shared build",
-    "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck",
-    "test": "pnpm --filter @realitycam/web test:unit --run",
-    "test:ci": "pnpm typecheck && pnpm lint && pnpm test",
+    "dev:web": "bun run --filter @realitycam/web dev",
+    "dev:mobile": "bun run --filter @realitycam/mobile start",
+    "build:web": "bun run --filter @realitycam/web build",
+    "build:shared": "bun run --filter @realitycam/shared build",
+    "lint": "bun run --filter '*' lint",
+    "typecheck": "bun run --filter '*' typecheck",
+    "test": "bun run --filter @realitycam/web test:unit --run",
+    "test:ci": "bun run typecheck && bun run lint && bun run test",
     "docker:up": "docker-compose -f infrastructure/docker-compose.yml up -d",
     "docker:down": "docker-compose -f infrastructure/docker-compose.yml down"
   },
-  "engines": {
-    "node": ">=22.0.0"
-  },
   "devDependencies": {
-    "next": "16.0.3"
+    "next": "16.0.7"
+  },
+  "dependencies": {
+    "eslint-config-next": "16.0.7",
+    "react": "19.2.1",
+    "react-dom": "19.2.1"
   }
 }

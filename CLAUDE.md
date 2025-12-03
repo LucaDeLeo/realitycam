@@ -8,12 +8,12 @@ RealityCam is a photo verification platform capturing authenticated photos with 
 
 ## Common Commands
 
-### Monorepo (pnpm workspace)
+### Monorepo (Bun workspace)
 ```bash
-pnpm install                     # Install all dependencies
-pnpm dev:web                     # Start Next.js web app (localhost:3000)
-pnpm lint                        # Lint all packages
-pnpm typecheck                   # TypeScript check all packages
+bun install                      # Install all dependencies
+bun dev:web                      # Start Next.js web app (localhost:3000)
+bun lint                         # Lint all packages
+bun typecheck                    # TypeScript check all packages
 ```
 
 ### iOS App (ios/Rial)
@@ -40,10 +40,10 @@ open Rial.xcodeproj
 ### Web App (apps/web)
 ```bash
 cd apps/web
-pnpm dev                         # Next.js dev with Turbopack
-pnpm build                       # Production build
-pnpm typecheck                   # TypeScript check
-pnpm test                        # Run Playwright E2E tests
+bun dev                          # Next.js dev with Turbopack
+bun run build                    # Production build
+bun run typecheck                # TypeScript check
+bun test                         # Run Playwright E2E tests
 ```
 
 ### Backend (Rust/Axum)
@@ -59,8 +59,8 @@ SQLX_OFFLINE=true cargo build    # Build with cached query metadata
 
 ### Docker Services (Local Dev)
 ```bash
-pnpm docker:up                   # Start PostgreSQL + LocalStack S3
-pnpm docker:down                 # Stop services
+bun docker:up                    # Start PostgreSQL + LocalStack S3
+bun docker:down                  # Stop services
 ```
 
 ## Architecture
@@ -185,12 +185,12 @@ cargo test <test_name>           # Run specific test
 ### Web App (Vitest + Playwright)
 ```bash
 cd apps/web
-pnpm test:unit                   # Run Vitest unit tests (lib functions)
-pnpm test:unit:watch             # Watch mode for unit tests
-pnpm test:unit:coverage          # Unit tests with coverage
-pnpm test                        # Run all E2E tests (Chromium, Firefox, WebKit, Mobile)
-pnpm test -- --project=chromium  # Run Chromium only (faster)
-pnpm exec playwright install     # Install browsers (first time)
+bun test:unit                    # Run Vitest unit tests (lib functions)
+bun test:unit:watch              # Watch mode for unit tests
+bun test:unit:coverage           # Unit tests with coverage
+bun test                         # Run all E2E tests (Chromium, Firefox, WebKit, Mobile)
+bun test -- --project=chromium   # Run Chromium only (faster)
+bunx playwright install          # Install browsers (first time)
 ```
 
 **Test Infrastructure:**
@@ -262,7 +262,7 @@ cargo run
 ### 3. Start Web App
 ```bash
 cd apps/web
-pnpm dev
+bun dev
 # Server at http://localhost:3000
 ```
 

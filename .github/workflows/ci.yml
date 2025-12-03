@@ -25,7 +25,7 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
-  NODE_VERSION: '22'
+  BUN_VERSION: 'latest'
   RUST_VERSION: 'stable'
   SQLX_OFFLINE: 'true'
 
@@ -40,14 +40,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
+          bun-version: ${{ env.BUN_VERSION }}
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -68,14 +64,14 @@ jobs:
 
       # Install all dependencies (monorepo)
       - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       # Web & Mobile (workspace-level)
       - name: Lint All
-        run: pnpm lint
+        run: bun lint
 
       - name: Type Check All
-        run: pnpm typecheck
+        run: bun typecheck
 
       # Backend
       - name: Lint Backend (Clippy)
@@ -124,21 +120,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
+          bun-version: ${{ env.BUN_VERSION }}
 
       - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Run Unit Tests
         working-directory: apps/web
-        run: pnpm run test:unit --run
+        run: bun run test:unit --run
 
       - name: Upload Test Results
         uses: actions/upload-artifact@v4
@@ -299,17 +291,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
+          bun-version: ${{ env.BUN_VERSION }}
 
       - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Check if Playwright is configured
         id: check-playwright
@@ -325,11 +313,11 @@ jobs:
       - name: Install Playwright Browsers
         if: steps.check-playwright.outputs.configured == 'true'
         working-directory: apps/web
-        run: pnpm exec playwright install --with-deps chromium
+        run: bunx playwright install --with-deps chromium
 
       - name: Run E2E Tests (Production)
         working-directory: apps/web
-        run: pnpm run test:e2e -- --project=chromium
+        run: bun run test:e2e -- --project=chromium
         env:
           TEST_ENV: production
           PROD_URL: ${{ secrets.PROD_URL }}
