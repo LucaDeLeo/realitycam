@@ -450,7 +450,7 @@ fn parse_depth_keyframes(data: &[u8]) -> Result<Vec<DepthKeyframe>, VideoDepthAn
 
 /// Parse raw bytes as Float32 array (little-endian)
 fn parse_float32_array(bytes: &[u8]) -> Result<Vec<f32>, VideoDepthAnalysisError> {
-    if bytes.len() % 4 != 0 {
+    if !bytes.len().is_multiple_of(4) {
         return Err(VideoDepthAnalysisError::InvalidFormat(format!(
             "Byte count {} is not divisible by 4",
             bytes.len()

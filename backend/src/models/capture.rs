@@ -7,21 +7,21 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// Capture type discriminator
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+///
+/// MED-2: Currently unused - Capture struct uses `Option<String>` for capture_type
+/// to match database varchar column. This enum is prepared for future type-safe
+/// refactoring when we add proper enum column migration.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[sqlx(type_name = "varchar", rename_all = "lowercase")]
+#[allow(dead_code)]
 pub enum CaptureType {
     /// Photo capture (default)
     #[serde(rename = "photo")]
+    #[default]
     Photo,
     /// Video capture with depth keyframes
     #[serde(rename = "video")]
     Video,
-}
-
-impl Default for CaptureType {
-    fn default() -> Self {
-        Self::Photo
-    }
 }
 
 impl std::fmt::Display for CaptureType {

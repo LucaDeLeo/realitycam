@@ -149,7 +149,7 @@ export default function ResultScreen() {
       await Share.share({
         message: `Check out this verified photo: ${result.verificationUrl}`,
         url: result.verificationUrl,
-        title: 'RealityCam Verified Photo',
+        title: 'rial. Verified Photo',
       });
     } catch (err) {
       console.error('[ResultScreen] Failed to share:', err);

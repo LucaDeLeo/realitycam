@@ -23,19 +23,14 @@ use crate::error::ApiError;
 // ============================================================================
 
 /// Capture mode discriminator
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CaptureMode {
     /// Full capture with media upload
+    #[default]
     Full,
     /// Hash-only capture (privacy mode) - no media uploaded
     HashOnly,
-}
-
-impl Default for CaptureMode {
-    fn default() -> Self {
-        Self::Full
-    }
 }
 
 impl std::fmt::Display for CaptureMode {
@@ -60,19 +55,14 @@ impl std::str::FromStr for CaptureMode {
 }
 
 /// Source of depth analysis
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AnalysisSource {
     /// Depth analysis performed on the server
+    #[default]
     Server,
     /// Depth analysis performed on the client device
     Device,
-}
-
-impl Default for AnalysisSource {
-    fn default() -> Self {
-        Self::Server
-    }
 }
 
 impl std::fmt::Display for AnalysisSource {

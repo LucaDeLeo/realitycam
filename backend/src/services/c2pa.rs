@@ -32,11 +32,11 @@ use crate::types::video_evidence::{VideoConfidenceLevel, VideoEvidence};
 // Constants
 // ============================================================================
 
-/// Claim generator identifier for RealityCam manifests
-const CLAIM_GENERATOR: &str = "RealityCam";
+/// Claim generator identifier for rial. manifests
+const CLAIM_GENERATOR: &str = "rial.";
 
 /// Software agent for capture action
-const SOFTWARE_AGENT: &str = "RealityCam iOS";
+const SOFTWARE_AGENT: &str = "rial. iOS";
 
 // ============================================================================
 // Error Types
@@ -191,7 +191,7 @@ impl C2paService {
 
         C2paManifest {
             claim_generator,
-            title: "RealityCam Verified Photo".to_string(),
+            title: "rial. Verified Photo".to_string(),
             created_at: captured_at.to_string(),
             actions: vec![C2paAction {
                 action: "c2pa.created".to_string(),
@@ -231,7 +231,7 @@ impl C2paService {
         captured_at: &str,
     ) -> C2paManifest {
         let mut manifest = self.generate_manifest(evidence, captured_at);
-        manifest.title = "RealityCam Verified Photo (Privacy Mode)".to_string();
+        manifest.title = "rial. Verified Photo (Privacy Mode)".to_string();
         // depth_analysis assertion already includes source from evidence.depth_analysis.source
         manifest
     }
@@ -331,7 +331,7 @@ impl C2paService {
 
         C2paVideoManifest {
             claim_generator,
-            title: "RealityCam Verified Video".to_string(),
+            title: "rial. Verified Video".to_string(),
             created_at: captured_at.to_string(),
             actions: vec![C2paAction {
                 action: "c2pa.recorded".to_string(), // Note: "recorded" for videos
@@ -683,8 +683,8 @@ mod tests {
 
         let manifest = service.generate_manifest(&evidence, "2025-11-23T10:30:00Z");
 
-        assert!(manifest.claim_generator.starts_with("RealityCam/"));
-        assert_eq!(manifest.title, "RealityCam Verified Photo");
+        assert!(manifest.claim_generator.starts_with("rial./"));
+        assert_eq!(manifest.title, "rial. Verified Photo");
         assert_eq!(manifest.actions.len(), 1);
         assert_eq!(manifest.actions[0].action, "c2pa.created");
         assert_eq!(manifest.realitycam.confidence_level, "high");
@@ -700,7 +700,7 @@ mod tests {
             .unwrap();
 
         assert!(json.contains("claim_generator"));
-        assert!(json.contains("RealityCam"));
+        assert!(json.contains("rial."));
         assert!(json.contains("confidence_level"));
         assert!(json.contains("high"));
         assert!(json.contains("hardware_attestation"));
@@ -732,7 +732,7 @@ mod tests {
 
         let info: C2paManifestInfo = manifest.into();
 
-        assert!(info.claim_generator.starts_with("RealityCam/"));
+        assert!(info.claim_generator.starts_with("rial./"));
         assert!(info.created_at.is_some());
         assert!(info.assertions.is_some());
         assert_eq!(info.assertions.unwrap().confidence_level, "high");
@@ -847,8 +847,8 @@ mod tests {
 
         let manifest = service.generate_video_manifest(&evidence, "2025-11-27T12:00:00Z");
 
-        assert!(manifest.claim_generator.starts_with("RealityCam/"));
-        assert_eq!(manifest.title, "RealityCam Verified Video");
+        assert!(manifest.claim_generator.starts_with("rial./"));
+        assert_eq!(manifest.title, "rial. Verified Video");
         assert_eq!(manifest.actions.len(), 1);
         assert_eq!(manifest.actions[0].action, "c2pa.recorded");
         assert_eq!(manifest.realitycam.media_type, "video");
@@ -954,7 +954,7 @@ mod tests {
             .unwrap();
 
         assert!(json.contains("claim_generator"));
-        assert!(json.contains("RealityCam"));
+        assert!(json.contains("rial."));
         assert!(json.contains("\"type\": \"video\""));
         assert!(json.contains("c2pa.recorded"));
         assert!(json.contains("hash_chain_summary"));
@@ -1067,7 +1067,7 @@ mod tests {
 
         let manifest = service.generate_hash_only_manifest(&evidence, "2025-12-01T10:30:00Z");
 
-        assert_eq!(manifest.title, "RealityCam Verified Photo (Privacy Mode)");
+        assert_eq!(manifest.title, "rial. Verified Photo (Privacy Mode)");
     }
 
     #[test]
@@ -1102,7 +1102,7 @@ mod tests {
             .generate_hash_only_manifest_json(&evidence, "2025-12-01T10:30:00Z")
             .unwrap();
 
-        assert!(json.contains("\"title\": \"RealityCam Verified Photo (Privacy Mode)\""));
+        assert!(json.contains("\"title\": \"rial. Verified Photo (Privacy Mode)\""));
         assert!(json.contains("\"source\": \"device\""));
         assert!(json.contains("\"confidence_level\": \"high\""));
         assert!(json.contains("c2pa.created"));
@@ -1127,7 +1127,7 @@ mod tests {
         let manifest = service.generate_manifest(&evidence, "2025-12-01T10:30:00Z");
 
         // Regular manifest should NOT have "Privacy Mode" in title
-        assert_eq!(manifest.title, "RealityCam Verified Photo");
+        assert_eq!(manifest.title, "rial. Verified Photo");
     }
 
     #[test]

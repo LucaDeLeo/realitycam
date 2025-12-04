@@ -263,7 +263,7 @@ async fn verify_file(
         verification_url: None,
         manifest_info: None,
         note: Some(
-            "No provenance record found for this file. This doesn't mean the photo is fake - it just wasn't captured with RealityCam."
+            "No provenance record found for this file. This doesn't mean the photo is fake - it just wasn't captured with rial."
                 .to_string(),
         ),
         file_hash: hash_base64,

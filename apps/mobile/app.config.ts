@@ -7,7 +7,7 @@ interface ExtendedIOS extends NonNullable<ExpoConfig['ios']> {
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: 'RealityCam',
+  name: 'rial.',
   slug: 'realitycam',
   version: '0.1.0',
   orientation: 'portrait',
@@ -28,8 +28,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundleIdentifier: 'com.realitycam.app',
     developmentTeam: process.env.EXPO_DEVELOPMENT_TEAM,
     infoPlist: {
-      NSCameraUsageDescription: 'RealityCam needs camera access to capture authenticated photos.',
-      NSLocationWhenInUseUsageDescription: 'RealityCam needs location access to include GPS data in photo evidence.',
+      NSCameraUsageDescription: 'rial. needs camera access to capture authenticated photos.',
+      NSLocationWhenInUseUsageDescription: 'rial. needs location access to include GPS data in photo evidence.',
     },
   } as ExtendedIOS,
   plugins: [
@@ -39,7 +39,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'react-native-vision-camera',
       {
-        cameraPermissionText: 'RealityCam needs camera access to capture verified photos.',
+        cameraPermissionText: 'rial. needs camera access to capture verified photos.',
         enableMicrophonePermission: false,
         enableLocation: false,
       },
@@ -47,7 +47,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-location',
       {
-        locationWhenInUsePermission: 'RealityCam uses your location to record where photos were captured. Location is optional and you can deny this permission.',
+        locationWhenInUsePermission: 'rial. uses your location to record where photos were captured. Location is optional and you can deny this permission.',
       },
     ],
     [
