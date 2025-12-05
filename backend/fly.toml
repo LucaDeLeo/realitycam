@@ -11,6 +11,7 @@ primary_region = 'gru'
 
 [env]
   RUST_LOG = 'info,realitycam_api=debug'
+  CORS_ORIGINS = 'https://rial-web.vercel.app,http://localhost:3000'
 
 [http_service]
   internal_port = 8080
