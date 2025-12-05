@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-RealityCam is a photo verification platform capturing authenticated photos with hardware attestation (DCAppAttest/Secure Enclave) and LiDAR depth analysis. iPhone Pro only (LiDAR required).
+rial. is a photo and video verification platform capturing authenticated media with hardware attestation (DCAppAttest/Secure Enclave) and LiDAR depth analysis. iPhone Pro only (LiDAR required). Supports privacy mode (hash-only capture with client-side depth analysis).
 
 ## Common Commands
 
@@ -84,12 +84,13 @@ ios/
     Core/
       Attestation/            # DeviceAttestationService, CaptureAssertionService
       Capture/                # ARCaptureSession, FrameProcessor, DepthVisualizer
-      Configuration/          # AppEnvironment
+      Configuration/          # AppEnvironment, EnvironmentStore
       Crypto/                 # CryptoService (Secure Enclave)
-      Networking/             # APIClient, UploadService, DeviceSignature, RetryManager
+      Networking/             # APIClient, UploadService, DeviceSignature, RetryManager, DeviceRegistrationService
       Storage/                # KeychainService, CaptureStore, OfflineQueue, CaptureEncryption
     Features/
       Capture/                # CaptureView, CaptureViewModel, ARViewContainer
+      Debug/                  # DebugEnvironmentView (DEBUG only)
       History/                # HistoryView, HistoryViewModel
       Result/                 # ResultDetailView, EvidenceSummaryView
     Models/                   # CaptureData
@@ -138,6 +139,51 @@ No tokens. Device auth uses Ed25519 signatures from Secure Enclave keys. Each re
 - **First Rust build is slow**: c2pa-rs compiles many dependencies
 - **SQLx offline mode**: Run `cargo sqlx prepare` after schema changes to update `.sqlx/` cache
 - **Environment files**: Copy `.env.example` to `.env` in backend/, apps/web/
+
+## Environment Switching
+
+Switch between local and production APIs without rebuilding.
+
+### iOS App (Debug Builds Only)
+
+**Runtime Environment Picker** - tap the gear icon (⚙️) in the top-right corner of CaptureView:
+
+| Environment | URL | Use Case |
+|-------------|-----|----------|
+| Local (Simulator) | `http://localhost:8080` | Simulator testing |
+| Local (Device) | `http://<your-ip>:8080` | Physical device → local backend |
+| Production | `https://rial-api.fly.dev` | Test against live API |
+
+- Changes take effect immediately (no rebuild)
+- Settings persist across app launches
+- Green dot = local override active, Orange dot = production override active
+- Only visible in DEBUG builds
+
+**Physical Device Setup:**
+1. Find your Mac's IP: System Settings → Network
+2. Tap gear icon → select "Local (Device)"
+3. Enter your Mac's IP (e.g., `192.168.1.100`)
+
+### Web App
+
+Use npm scripts to switch API targets:
+
+```bash
+cd apps/web
+bun dev:local   # → http://localhost:8080 (default)
+bun dev:prod    # → https://rial-api.fly.dev
+```
+
+**CORS Note:** To hit production API from localhost, ensure `http://localhost:3000` is in the backend's `CORS_ORIGINS` env var on Fly.io.
+
+### Common Scenarios
+
+| Scenario | iOS | Web |
+|----------|-----|-----|
+| Full local stack | Local (Simulator) | `bun dev:local` |
+| iOS → prod API | Production | N/A |
+| Web → prod API | N/A | `bun dev:prod` |
+| Physical device → local | Local (Device) + IP | N/A |
 
 ## Database
 
@@ -275,7 +321,7 @@ open Rial.xcodeproj
 ```
 
 ### 5. Configure iOS API URL
-Update `AppEnvironment.swift` or use environment configuration for the backend URL.
+Tap the gear icon (⚙️) in CaptureView to switch environments. See [Environment Switching](#environment-switching) for details.
 
 ## When to Rebuild / Refresh
 

@@ -63,6 +63,9 @@ public final class ARCaptureSession: NSObject {
     /// ARKit session for RGB+depth capture
     private let session = ARSession()
 
+    /// Public access to underlying ARSession for ARView binding.
+    public var arSession: ARSession { session }
+
     /// Serial queue for thread-safe frame access
     private let frameQueue = DispatchQueue(label: "app.rial.arcapturesession.frame")
 

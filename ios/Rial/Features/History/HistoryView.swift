@@ -18,6 +18,7 @@ import os.log
 /// - Pull-to-refresh for retry
 /// - Empty state with capture CTA
 /// - Navigation to detail view
+/// - Auto-navigation from Capture tab after save
 ///
 /// ## Usage
 /// ```swift
@@ -27,14 +28,26 @@ import os.log
 /// ```
 struct HistoryView: View {
     @StateObject private var viewModel = HistoryViewModel()
+    @EnvironmentObject private var navigationState: AppNavigationState
 
     /// Navigation action for capture
     var onNavigateToCapture: (() -> Void)?
+
+    /// Selected capture for programmatic navigation
+    @State private var selectedCapture: CaptureHistoryItem?
+
+    /// Whether navigation is active (for programmatic navigation)
+    @State private var isNavigationActive = false
 
     /// 3-column adaptive grid
     private let columns = [
         GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 8)
     ]
+
+    /// Whether there are any pending or failed uploads
+    private var hasPendingUploads: Bool {
+        viewModel.captures.contains { $0.status == .pending || $0.status == .failed }
+    }
 
     var body: some View {
         navigationWrapper {
@@ -49,6 +62,17 @@ struct HistoryView: View {
             }
             .navigationTitle("History")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if hasPendingUploads {
+                        Button {
+                            Task {
+                                await viewModel.retryFailedUploads()
+                            }
+                        } label: {
+                            Label("Upload All", systemImage: "arrow.up.circle")
+                        }
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { onNavigateToCapture?() }) {
                         Image(systemName: "camera")
@@ -61,6 +85,16 @@ struct HistoryView: View {
             .task {
                 await viewModel.loadCaptures()
             }
+            .onChange(of: navigationState.pendingCaptureId) { newId in
+                // Handle pending navigation from Capture tab
+                handlePendingNavigation(captureId: newId)
+            }
+            .onAppear {
+                // Check for pending navigation on appear
+                if let pendingId = navigationState.pendingCaptureId {
+                    handlePendingNavigation(captureId: pendingId)
+                }
+            }
             .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
                 Button("OK") {
                     viewModel.errorMessage = nil
@@ -71,17 +105,81 @@ struct HistoryView: View {
         }
     }
 
+    /// Handle pending navigation to a specific capture
+    private func handlePendingNavigation(captureId: UUID?) {
+        guard let captureId = captureId else { return }
+
+        Task {
+            // First, reset navigation state to pop back if we're currently in a detail view
+            // This is critical for back-to-back captures where we might still be viewing the previous one
+            if isNavigationActive {
+                await MainActor.run {
+                    isNavigationActive = false
+                    selectedCapture = nil
+                }
+                // Wait for SwiftUI to process the navigation state reset
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            }
+
+            // Retry up to 5 times with 500ms delay to allow save to complete
+            for attempt in 1...5 {
+                // Reload captures
+                await viewModel.loadCaptures()
+
+                // Check if capture is now in list
+                if let capture = viewModel.captures.first(where: { $0.id == captureId }) {
+                    await MainActor.run {
+                        selectedCapture = capture
+                        isNavigationActive = true
+                        navigationState.clearPendingNavigation()
+                    }
+                    return
+                }
+
+                // Wait before retrying
+                if attempt < 5 {
+                    try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
+                }
+            }
+
+            // Give up after retries - clear pending to avoid stuck state
+            await MainActor.run {
+                navigationState.clearPendingNavigation()
+            }
+        }
+    }
+
     // MARK: - Navigation Wrapper
 
     @ViewBuilder
     private func navigationWrapper<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         if #available(iOS 16.0, *) {
             NavigationStack {
-                content()
+                ZStack {
+                    content()
+                    // Hidden NavigationLink for programmatic navigation
+                    NavigationLink(
+                        destination: selectedCapture.map { ResultDetailView(capture: $0) },
+                        isActive: $isNavigationActive
+                    ) {
+                        EmptyView()
+                    }
+                    .hidden()
+                }
             }
         } else {
             NavigationView {
-                content()
+                ZStack {
+                    content()
+                    // Hidden NavigationLink for programmatic navigation (iOS 15)
+                    NavigationLink(
+                        destination: selectedCapture.map { ResultDetailView(capture: $0) },
+                        isActive: $isNavigationActive
+                    ) {
+                        EmptyView()
+                    }
+                    .hidden()
+                }
             }
             .navigationViewStyle(.stack)
         }
@@ -125,13 +223,13 @@ struct HistoryView: View {
 
     @ViewBuilder
     private func contextMenuItems(for capture: CaptureHistoryItem) -> some View {
-        if capture.status == .failed {
+        if capture.status == .failed || capture.status == .pending {
             Button {
                 Task {
                     await viewModel.retryFailedUploads()
                 }
             } label: {
-                Label("Retry Upload", systemImage: "arrow.clockwise")
+                Label("Upload Now", systemImage: "arrow.up.circle")
             }
         }
 

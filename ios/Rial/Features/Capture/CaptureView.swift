@@ -50,15 +50,19 @@ import ARKit
 struct CaptureView: View {
     @StateObject private var viewModel = CaptureViewModel()
     @EnvironmentObject private var privacySettings: PrivacySettingsManager
+    @EnvironmentObject private var navigationState: AppNavigationState
 
     /// Depth overlay opacity (photo mode)
     @State private var depthOpacity: Float = 0.4
 
-    /// Whether to show history sheet
-    @State private var showHistory = false
 
     /// Whether to show privacy settings sheet (Story 8-2)
     @State private var showPrivacySettings = false
+
+    #if DEBUG
+    /// Whether to show debug environment settings
+    @State private var showDebugSettings = false
+    #endif
 
     /// Haptic feedback generators
     private let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
@@ -83,6 +87,11 @@ struct CaptureView: View {
             if let error = viewModel.errorMessage {
                 errorOverlay(message: error)
             }
+
+            // Success overlay (auto-dismisses)
+            if let success = viewModel.successMessage {
+                successOverlay(message: success)
+            }
         }
         .onAppear {
             if viewModel.hasCameraPermission && viewModel.isLiDARAvailable {
@@ -100,15 +109,14 @@ struct CaptureView: View {
         .sheet(isPresented: $viewModel.showVideoPreview) {
             videoPreviewSheet
         }
-        .sheet(isPresented: $showHistory) {
-            // History view will be implemented in Story 6.14
-            Text("Capture History")
-                .font(.title)
-                .padding()
-        }
         .sheet(isPresented: $showPrivacySettings) {
             privacySettingsSheet
         }
+        #if DEBUG
+        .sheet(isPresented: $showDebugSettings) {
+            DebugEnvironmentView()
+        }
+        #endif
     }
 
     // MARK: - Privacy Settings Sheet
@@ -135,8 +143,8 @@ struct CaptureView: View {
     private var cameraContent: some View {
         ZStack {
             // AR Camera Preview
-            if let session = viewModel.isRunning ? captureSession : nil {
-                ARViewContainer(session: session)
+            if viewModel.isRunning {
+                ARViewContainer(session: viewModel.arSession)
                     .ignoresSafeArea()
             }
 
@@ -214,8 +222,7 @@ struct CaptureView: View {
                         heavyImpactFeedback.prepare()
                         heavyImpactFeedback.impactOccurred()
                         viewModel.stopVideoRecording()
-                    },
-                    onShowHistory: { showHistory = true }
+                    }
                 )
             }
         }
@@ -288,10 +295,40 @@ struct CaptureView: View {
             }
 
             Spacer()
+
+            #if DEBUG
+            // Debug Settings Button - opens environment switcher
+            debugSettingsButton
+            #endif
         }
         .padding(.horizontal)
         .padding(.top, 8)
     }
+
+    // MARK: - Debug Settings Button
+
+    #if DEBUG
+    private var debugSettingsButton: some View {
+        Button {
+            showDebugSettings = true
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "gearshape.fill")
+                // Show indicator when using non-default environment
+                if EnvironmentStore.shared.isOverrideActive {
+                    Circle()
+                        .fill(EnvironmentStore.shared.currentEnvironment == .production ? .orange : .green)
+                        .frame(width: 8, height: 8)
+                }
+            }
+            .font(.system(size: 18))
+            .foregroundColor(.white)
+            .padding(8)
+            .background(Color.black.opacity(0.5))
+            .cornerRadius(8)
+        }
+    }
+    #endif
 
     // MARK: - Tracking State Indicator
 
@@ -352,6 +389,30 @@ struct CaptureView: View {
         }
     }
 
+    // MARK: - Success Overlay
+
+    private func successOverlay(message: String) -> some View {
+        VStack {
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.white)
+                Text(message)
+                    .foregroundColor(.white)
+            }
+            .padding()
+            .background(Color.green.opacity(0.9))
+            .cornerRadius(10)
+            .padding()
+
+            Spacer()
+        }
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .animation(.easeInOut(duration: 0.3), value: viewModel.successMessage)
+        .onTapGesture {
+            viewModel.successMessage = nil
+        }
+    }
+
     // MARK: - Capture Preview Sheet
 
     private var capturePreviewSheet: some View {
@@ -373,7 +434,13 @@ struct CaptureView: View {
                 .foregroundColor(.red)
 
                 Button("Use Photo") {
+                    // Get capture ID before saving (will be cleared after save)
+                    let captureId = viewModel.pendingCaptureId
                     viewModel.saveCapture()
+                    // Navigate to history tab and show capture detail
+                    if let captureId = captureId {
+                        navigationState.navigateToCapture(captureId)
+                    }
                 }
                 .foregroundColor(.blue)
                 .font(.title3.bold())
@@ -433,16 +500,6 @@ struct PulsingAnimation: ViewModifier {
     }
 }
 
-// MARK: - CaptureView Extension
-
-extension CaptureView {
-    /// Access to ARSession for ARViewContainer
-    var captureSession: ARSession {
-        // Note: In production, this would properly access the ARSession
-        // For now, create a placeholder that the ARCaptureSession manages
-        ARSession()
-    }
-}
 
 // MARK: - Preview
 

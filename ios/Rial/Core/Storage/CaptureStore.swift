@@ -41,8 +41,11 @@ import os.log
 /// // Update status after upload
 /// try await store.updateStatus(.uploaded, for: captureId)
 /// ```
-final class CaptureStore {
+final class CaptureStore: @unchecked Sendable {
     private static let logger = Logger(subsystem: "app.rial", category: "capture-store")
+
+    /// Shared singleton instance to prevent multiple CoreData containers.
+    static let shared = CaptureStore()
 
     /// CoreData persistent container
     private let container: NSPersistentContainer
@@ -113,6 +116,14 @@ final class CaptureStore {
         // Configure contexts
         container.viewContext.automaticallyMergesChangesFromParent = true
         container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+    }
+
+    /// Force refresh the viewContext to get latest data from persistent store.
+    ///
+    /// Call this before querying when you need to ensure changes from background
+    /// contexts have been merged (e.g., after upload completes).
+    func refreshViewContext() {
+        container.viewContext.refreshAllObjects()
     }
 
     // MARK: - Public API
@@ -199,6 +210,41 @@ final class CaptureStore {
 
             let entities = try context.fetch(request)
             return try entities.map { try self.captureData(from: $0) }
+        }
+    }
+
+    /// Fetch capture summaries for history display.
+    ///
+    /// Returns lightweight summaries with upload status and verification URLs,
+    /// without loading full media data.
+    ///
+    /// - Returns: Array of CaptureHistorySummary, newest first
+    func fetchHistorySummaries() async throws -> [CaptureHistorySummary] {
+        let context = container.viewContext
+
+        return try await context.perform {
+            let request = CaptureEntity.fetchRequest()
+            request.sortDescriptors = [NSSortDescriptor(keyPath: \CaptureEntity.createdAt, ascending: false)]
+
+            let entities = try context.fetch(request)
+            return entities.map { entity in
+                // Decode metadata to get device model and location info
+                let metadata = try? JSONDecoder().decode(CaptureMetadata.self, from: entity.metadata)
+                let hasAssertion = entity.assertion != nil &&
+                    AssertionStatus(rawValue: entity.assertionStatus) == .generated
+
+                return CaptureHistorySummary(
+                    id: entity.id,
+                    jpegData: entity.jpeg,
+                    status: CaptureStatus(rawValue: entity.status) ?? .pending,
+                    createdAt: entity.createdAt,
+                    serverCaptureId: entity.serverCaptureId,
+                    verificationUrl: entity.verificationUrl,
+                    deviceModel: metadata?.deviceModel,
+                    hasLocation: metadata?.location != nil,
+                    hasAssertion: hasAssertion
+                )
+            }
         }
     }
 
@@ -782,6 +828,45 @@ extension CaptureEntity {
     /// Whether this capture can be retried
     var canRetry: Bool {
         status == CaptureStatus.failed.rawValue && attemptCount < 5
+    }
+}
+
+// MARK: - CaptureHistorySummary
+
+/// Lightweight capture summary for history display.
+///
+/// Contains only the fields needed for UI display without the full media data.
+struct CaptureHistorySummary: Identifiable {
+    /// Capture UUID
+    let id: UUID
+
+    /// JPEG data for thumbnail generation
+    let jpegData: Data
+
+    /// Upload status
+    let status: CaptureStatus
+
+    /// When the capture was taken
+    let createdAt: Date
+
+    /// Server-assigned capture ID (after successful upload)
+    let serverCaptureId: UUID?
+
+    /// Verification page URL (after successful upload)
+    let verificationUrl: String?
+
+    /// Device model from capture metadata
+    let deviceModel: String?
+
+    /// Whether location was captured
+    let hasLocation: Bool
+
+    /// Whether assertion was generated
+    let hasAssertion: Bool
+
+    /// Whether this capture has been uploaded successfully
+    var isUploaded: Bool {
+        status == .uploaded && verificationUrl != nil
     }
 }
 

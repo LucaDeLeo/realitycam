@@ -67,6 +67,9 @@ final class CaptureViewModel: ObservableObject {
     /// Error message to display
     @Published var errorMessage: String?
 
+    /// Success message to display (auto-dismisses)
+    @Published var successMessage: String?
+
     /// Whether LiDAR is available on this device
     @Published private(set) var isLiDARAvailable = ARCaptureSession.isLiDARAvailable
 
@@ -78,6 +81,11 @@ final class CaptureViewModel: ObservableObject {
 
     /// Whether showing capture preview
     @Published var showCapturePreview = false
+
+    /// ID of the pending capture (for navigation after save)
+    var pendingCaptureId: UUID? {
+        pendingCapture?.id
+    }
 
     // MARK: - Capture Mode Properties (Story 7-14)
 
@@ -164,6 +172,9 @@ final class CaptureViewModel: ObservableObject {
     /// AR capture session
     private let captureSession = ARCaptureSession()
 
+    /// Public access to ARSession for ARView binding.
+    public var arSession: ARSession { captureSession.arSession }
+
     /// Frame processor for capture
     private let frameProcessor: FrameProcessor
 
@@ -213,7 +224,7 @@ final class CaptureViewModel: ObservableObject {
         self.privacySettingsManager = privacySettingsManager
 
         // Create default instances if not provided
-        self.captureStore = captureStore ?? CaptureStore()
+        self.captureStore = captureStore ?? .shared
         let keychain = KeychainService()
         let attestation = DeviceAttestationService(keychain: keychain)
         self.assertionService = assertionService ?? CaptureAssertionService(attestation: attestation, keychain: keychain)
@@ -298,7 +309,7 @@ final class CaptureViewModel: ObservableObject {
         }
     }
 
-    /// Save the pending capture.
+    /// Save the pending capture and trigger upload.
     func saveCapture() {
         guard let capture = pendingCapture else {
             Self.logger.warning("No pending capture to save")
@@ -309,10 +320,36 @@ final class CaptureViewModel: ObservableObject {
             do {
                 try await captureStore.saveCapture(capture, status: .pending)
                 Self.logger.info("Capture saved: \(capture.id.uuidString)")
+
+                // Trigger upload if device is registered
+                if DeviceRegistrationService.shared.isRegistered {
+                    try await UploadService.shared.upload(capture)
+                    Self.logger.info("Upload started for: \(capture.id.uuidString)")
+                    showSuccessMessage("Photo uploading...")
+                } else {
+                    Self.logger.warning("Device not registered - capture queued for later upload")
+                    showSuccessMessage("Photo saved • Will upload when connected")
+                }
+
                 clearPendingCapture()
             } catch {
-                Self.logger.error("Failed to save capture: \(error.localizedDescription)")
+                Self.logger.error("Failed to save/upload capture: \(error.localizedDescription)")
                 errorMessage = "Failed to save: \(error.localizedDescription)"
+                clearPendingCapture()
+            }
+        }
+    }
+
+    /// Show a success message that auto-dismisses after 3 seconds.
+    private func showSuccessMessage(_ message: String) {
+        successMessage = message
+
+        Task {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            await MainActor.run {
+                if self.successMessage == message {
+                    self.successMessage = nil
+                }
             }
         }
     }

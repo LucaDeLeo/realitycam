@@ -21,12 +21,6 @@ import os.log
 class AppDelegate: NSObject, UIApplicationDelegate {
     private static let logger = Logger(subsystem: "app.rial", category: "app-delegate")
 
-    /// Completion handler for photo upload background session
-    var photoUploadCompletionHandler: (() -> Void)?
-
-    /// Completion handler for video upload background session
-    var videoUploadCompletionHandler: (() -> Void)?
-
     func application(
         _ application: UIApplication,
         handleEventsForBackgroundURLSession identifier: String,
@@ -36,9 +30,9 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
         // Route to appropriate upload service based on session identifier
         switch identifier {
-        case "app.rial.upload":
+        case UploadService.sessionIdentifier:
             // Photo upload service
-            photoUploadCompletionHandler = completionHandler
+            UploadService.shared.backgroundCompletionHandler = completionHandler
             Self.logger.debug("Photo upload background completion handler stored")
 
         case VideoUploadService.sessionIdentifier:
@@ -59,8 +53,35 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     ) -> Bool {
         Self.logger.info("Application did finish launching")
 
-        // Resume any pending video uploads from previous session
+        // Configure upload services
+        let captureStore = CaptureStore.shared
+        let keychain = KeychainService()
+
+        UploadService.shared.configure(
+            baseURL: AppEnvironment.apiBaseURL,
+            captureStore: captureStore,
+            keychain: keychain
+        )
+
+        VideoUploadService.shared.configure(
+            baseURL: AppEnvironment.apiBaseURL,
+            captureStore: captureStore,
+            keychain: keychain
+        )
+
+        // Register device with backend (if not already registered)
         Task {
+            do {
+                try await DeviceRegistrationService.shared.registerIfNeeded()
+            } catch {
+                Self.logger.error("Device registration failed: \(error.localizedDescription)")
+                // Non-fatal - app can still capture, uploads will queue
+            }
+        }
+
+        // Resume any pending uploads from previous session
+        Task {
+            await UploadService.shared.resumePendingUploads()
             await VideoUploadService.shared.resumePendingUploads()
         }
 

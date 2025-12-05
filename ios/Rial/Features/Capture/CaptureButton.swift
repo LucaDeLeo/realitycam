@@ -261,7 +261,6 @@ struct CaptureControlsBar: View {
     let onCapture: () -> Void
     let onRecordingStart: () -> Void
     let onRecordingStop: () -> Void
-    let onShowHistory: () -> Void
 
     /// Convenience initializer with default video recording values
     init(
@@ -272,8 +271,7 @@ struct CaptureControlsBar: View {
         currentMode: CaptureMode = .photo,
         onCapture: @escaping () -> Void,
         onRecordingStart: @escaping () -> Void = {},
-        onRecordingStop: @escaping () -> Void = {},
-        onShowHistory: @escaping () -> Void
+        onRecordingStop: @escaping () -> Void = {}
     ) {
         self._showDepthOverlay = showDepthOverlay
         self.isCapturing = isCapturing
@@ -283,7 +281,6 @@ struct CaptureControlsBar: View {
         self.onCapture = onCapture
         self.onRecordingStart = onRecordingStart
         self.onRecordingStop = onRecordingStop
-        self.onShowHistory = onShowHistory
     }
 
     var body: some View {
@@ -307,18 +304,9 @@ struct CaptureControlsBar: View {
 
             Spacer()
 
-            // History button (disabled during recording)
-            Button(action: onShowHistory) {
-                Image(systemName: "photo.on.rectangle")
-                    .font(.title2)
-                    .foregroundColor(.white)
-                    .padding(12)
-                    .background(Color.black.opacity(0.5))
-                    .clipShape(Circle())
-            }
-            .opacity(isRecordingVideo ? 0.3 : 1.0)
-            .disabled(isRecordingVideo)
-            .accessibilityLabel("View capture history")
+            // Spacer to balance layout (matches depth toggle width)
+            Color.clear
+                .frame(width: 48, height: 48)
         }
         .padding(.horizontal, 32)
         .padding(.bottom, 40)
@@ -359,8 +347,7 @@ struct CaptureButton_Previews: PreviewProvider {
                 CaptureControlsBar(
                     showDepthOverlay: .constant(true),
                     isCapturing: false,
-                    onCapture: {},
-                    onShowHistory: {}
+                    onCapture: {}
                 )
 
                 // Control bar - recording
@@ -371,8 +358,7 @@ struct CaptureButton_Previews: PreviewProvider {
                     recordingDuration: 5.5,
                     onCapture: {},
                     onRecordingStart: {},
-                    onRecordingStop: {},
-                    onShowHistory: {}
+                    onRecordingStop: {}
                 )
             }
         }

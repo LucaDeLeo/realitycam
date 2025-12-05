@@ -172,10 +172,11 @@ public struct VideoMetadata: Codable, Equatable, Sendable {
     // MARK: - Custom Encoding/Decoding
 
     /// Custom encoder to ensure ISO 8601 date format with fractional seconds.
+    /// Note: `type` and `iosVersion` excluded - backend doesn't expect them.
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
 
-        try container.encode(type, forKey: .type)
+        // Note: `type` excluded from encoding - backend VideoUploadMetadata doesn't expect it
 
         // Encode dates as ISO 8601 strings with fractional seconds
         let formatter = ISO8601DateFormatter()
@@ -189,7 +190,7 @@ public struct VideoMetadata: Codable, Equatable, Sendable {
         try container.encode(resolution, forKey: .resolution)
         try container.encode(codec, forKey: .codec)
         try container.encode(deviceModel, forKey: .deviceModel)
-        try container.encode(iosVersion, forKey: .iosVersion)
+        // Note: `iosVersion` excluded from encoding - backend doesn't expect it
         try container.encodeIfPresent(location, forKey: .location)
         try container.encode(attestationLevel, forKey: .attestationLevel)
         try container.encode(hashChainFinal, forKey: .hashChainFinal)
@@ -298,7 +299,7 @@ public struct Resolution: Codable, Equatable, Sendable {
 /// GPS location with latitude and longitude for video capture.
 ///
 /// Simplified location structure matching backend API expectations.
-/// Uses `lat` and `lng` keys for JSON serialization.
+/// Uses `latitude` and `longitude` keys for JSON serialization (matching backend CaptureLocation).
 ///
 /// For more detailed location data (altitude, accuracy), see `LocationData`.
 ///
@@ -338,5 +339,14 @@ public struct CaptureLocation: Codable, Equatable, Sendable {
     /// Whether the coordinates are within valid ranges.
     public var isValid: Bool {
         lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
+    }
+
+    // MARK: - CodingKeys
+
+    /// Maps Swift property names to backend-expected JSON keys.
+    /// Backend expects "latitude"/"longitude", not "lat"/"lng".
+    private enum CodingKeys: String, CodingKey {
+        case lat = "latitude"
+        case lng = "longitude"
     }
 }

@@ -21,7 +21,6 @@ class UploadServiceTests: XCTestCase {
 
     var keychain: TestKeychainService!
     var captureStore: CaptureStore!
-    var sut: UploadService!
     var baseURL: URL!
 
     override func setUp() {
@@ -29,11 +28,11 @@ class UploadServiceTests: XCTestCase {
         keychain = TestKeychainService()
         captureStore = CaptureStore(inMemory: true)
         baseURL = URL(string: "https://api.test.realitycam.app")!
-        sut = UploadService(baseURL: baseURL, captureStore: captureStore, keychain: keychain)
+        // Configure the shared singleton for tests
+        UploadService.shared.configure(baseURL: baseURL, captureStore: captureStore, keychain: keychain)
     }
 
     override func tearDown() {
-        sut = nil
         captureStore = nil
         keychain = nil
         baseURL = nil
@@ -149,7 +148,7 @@ class UploadServiceTests: XCTestCase {
 
         // Upload should throw deviceNotRegistered error
         do {
-            try await sut.upload(capture)
+            try await UploadService.shared.upload(capture)
             XCTFail("Expected deviceNotRegistered error")
         } catch UploadError.deviceNotRegistered {
             // Expected
@@ -158,6 +157,12 @@ class UploadServiceTests: XCTestCase {
         // Status should be updated to failed
         let failedCapture = try await captureStore.fetchCapture(byId: capture.id)
         XCTAssertNotNil(failedCapture)
+    }
+
+    /// Test notConfigured error
+    func testNotConfiguredErrorIsNotRetryable() {
+        let error = UploadError.notConfigured
+        XCTAssertFalse(error.isRetryable)
     }
 
     // MARK: - Error Handling Tests

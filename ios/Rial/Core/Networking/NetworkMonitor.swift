@@ -174,7 +174,7 @@ final class NetworkMonitor: ObservableObject {
             let lock = NSLock()
 
             // Set up timeout
-            let timeoutTask = DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
                 lock.lock()
                 guard !completed else {
                     lock.unlock()

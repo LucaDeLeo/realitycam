@@ -71,6 +71,52 @@ public struct DepthAnalysisResult: Codable, Sendable, Equatable {
     /// Analysis status indicating success or failure mode.
     public let status: DepthAnalysisStatus
 
+    // MARK: - CodingKeys
+
+    /// Maps Swift property names to backend-expected JSON keys (snake_case).
+    private enum CodingKeys: String, CodingKey {
+        case depthVariance = "depth_variance"
+        case depthLayers = "depth_layers"
+        case edgeCoherence = "edge_coherence"
+        case minDepth = "min_depth"
+        case maxDepth = "max_depth"
+        case isLikelyRealScene = "is_likely_real_scene"
+        case algorithmVersion = "algorithm_version"
+        case computedAt = "computed_at"
+        case status
+    }
+
+    // MARK: - Custom Encoding
+
+    /// Custom encoder that sends snake_case keys to backend.
+    /// Note: Backend ignores unknown fields, so including computedAt/status is safe.
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(depthVariance, forKey: .depthVariance)
+        try container.encode(depthLayers, forKey: .depthLayers)
+        try container.encode(edgeCoherence, forKey: .edgeCoherence)
+        try container.encode(minDepth, forKey: .minDepth)
+        try container.encode(maxDepth, forKey: .maxDepth)
+        try container.encode(isLikelyRealScene, forKey: .isLikelyRealScene)
+        try container.encode(algorithmVersion, forKey: .algorithmVersion)
+        // Note: computedAt and status excluded from encoding - backend doesn't expect them
+    }
+
+    /// Custom decoder that handles snake_case keys from storage.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        depthVariance = try container.decode(Float.self, forKey: .depthVariance)
+        depthLayers = try container.decode(Int.self, forKey: .depthLayers)
+        edgeCoherence = try container.decode(Float.self, forKey: .edgeCoherence)
+        minDepth = try container.decode(Float.self, forKey: .minDepth)
+        maxDepth = try container.decode(Float.self, forKey: .maxDepth)
+        isLikelyRealScene = try container.decode(Bool.self, forKey: .isLikelyRealScene)
+        algorithmVersion = try container.decode(String.self, forKey: .algorithmVersion)
+        // Provide defaults for fields not in JSON (e.g., when decoding backend response)
+        computedAt = (try? container.decode(Date.self, forKey: .computedAt)) ?? Date()
+        status = (try? container.decode(DepthAnalysisStatus.self, forKey: .status)) ?? .completed
+    }
+
     // MARK: - Initialization
 
     /// Creates a new DepthAnalysisResult with all metrics.

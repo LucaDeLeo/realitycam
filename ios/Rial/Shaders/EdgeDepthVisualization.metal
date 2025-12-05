@@ -58,6 +58,10 @@ vertex EdgeVertexOut edgeDepthVertex(
     // Flip Y for texture coordinates (Metal texture origin is top-left)
     out.texCoord.y = 1.0 - out.texCoord.y;
 
+    // Rotate 90° CW for portrait orientation
+    // ARKit depth maps are in landscape (sensor native), need rotation for portrait display
+    out.texCoord = float2(out.texCoord.y, 1.0 - out.texCoord.x);
+
     return out;
 }
 

@@ -7,114 +7,118 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		'3089F9DB0001' = {isa = PBXBuildFile; fileRef = 3089F9DB1001; };
-		'3089F9DB0002' = {isa = PBXBuildFile; fileRef = 3089F9DB1002; };
-		'3089F9DB0003' = {isa = PBXBuildFile; fileRef = 3089F9DB1003; };
-		'3089F9DB0004' = {isa = PBXBuildFile; fileRef = 3089F9DB1004; };
-		'3089F9DB0005' = {isa = PBXBuildFile; fileRef = 3089F9DB1005; };
-		'3089F9DB0006' = {isa = PBXBuildFile; fileRef = 3089F9DB1006; };
-		'3089F9DB0007' = {isa = PBXBuildFile; fileRef = 3089F9DB1007; };
-		'3089F9DB0008' = {isa = PBXBuildFile; fileRef = 3089F9DB1013; };
-		'3089F9DB0009' = {isa = PBXBuildFile; fileRef = 3089F9DB1014; };
-		'3089F9DB0010' = {isa = PBXBuildFile; fileRef = 3089F9DB1015; };
-		'3089F9DB0011' = {isa = PBXBuildFile; fileRef = 3089F9DB1016; };
-		'3089F9DB0012' = {isa = PBXBuildFile; fileRef = 3089F9DB1017; };
-		'3089F9DB0013' = {isa = PBXBuildFile; fileRef = 3089F9DB1018; };
-		'3089F9DB0014' = {isa = PBXBuildFile; fileRef = 3089F9DB1019; };
-		'3089F9DB0015' = {isa = PBXBuildFile; fileRef = 3089F9DB1020; };
-		'3089F9DB0016' = {isa = PBXBuildFile; fileRef = 3089F9DB1021; };
-		'3089F9DB0017' = {isa = PBXBuildFile; fileRef = 3089F9DB1022; };
-		'3089F9DB0018' = {isa = PBXBuildFile; fileRef = 3089F9DB1023; };
-		'3089F9DB0019' = {isa = PBXBuildFile; fileRef = 3089F9DB1024; };
-		'3089F9DB0020' = {isa = PBXBuildFile; fileRef = 3089F9DB1025; };
-		'3089F9DB0021' = {isa = PBXBuildFile; fileRef = 3089F9DB1026; };
-		'3089F9DB0022' = {isa = PBXBuildFile; fileRef = 3089F9DB1027; };
-		'3089F9DB0023' = {isa = PBXBuildFile; fileRef = 3089F9DB1028; };
-		'3089F9DB0024' = {isa = PBXBuildFile; fileRef = 3089F9DB1029; };
-		'3089F9DB0025' = {isa = PBXBuildFile; fileRef = 3089F9DB1030; };
-		'3089F9DB0026' = {isa = PBXBuildFile; fileRef = 3089F9DB1031; };
-		'3089F9DB0027' = {isa = PBXBuildFile; fileRef = 3089F9DB1032; };
-		'3089F9DB0028' = {isa = PBXBuildFile; fileRef = 3089F9DB1033; };
-		'3089F9DB0029' = {isa = PBXBuildFile; fileRef = 3089F9DB1034; };
-		'3089F9DB0030' = {isa = PBXBuildFile; fileRef = 3089F9DB1040; };
-		'3089F9DB0031' = {isa = PBXBuildFile; fileRef = 3089F9DB1041; };
-		'3089F9DB0032' = {isa = PBXBuildFile; fileRef = 3089F9DB1042; };
-		'3089F9DB0033' = {isa = PBXBuildFile; fileRef = 3089F9DB1043; };
-		'3089F9DB0034' = {isa = PBXBuildFile; fileRef = 3089F9DB1044; };
-		'3089F9DB0035' = {isa = PBXBuildFile; fileRef = 3089F9DB1045; };
-		'3089F9DB0036' = {isa = PBXBuildFile; fileRef = 3089F9DB1046; };
-		'3089F9DB0037' = {isa = PBXBuildFile; fileRef = 3089F9DB1047; };
-		'3089F9DB0038' = {isa = PBXBuildFile; fileRef = 3089F9DB1048; };
-		'3089F9DB0039' = {isa = PBXBuildFile; fileRef = 3089F9DB1049; };
-		'3089F9DB003A' = {isa = PBXBuildFile; fileRef = 3089F9DB1050; };
-		'3089F9DB003B' = {isa = PBXBuildFile; fileRef = 3089F9DB1051; };
-		'3089F9DB003C' = {isa = PBXBuildFile; fileRef = 3089F9DB1052; };
-		'3089F9DB003D' = {isa = PBXBuildFile; fileRef = 3089F9DB1053; };
-		'3089F9DB003E' = {isa = PBXBuildFile; fileRef = 3089F9DB1054; };
-		'3089F9DB003F' = {isa = PBXBuildFile; fileRef = 3089F9DB1055; };
-		'3089F9DB0040' = {isa = PBXBuildFile; fileRef = 3089F9DB1056; };
-		'3089F9DB0041' = {isa = PBXBuildFile; fileRef = 3089F9DB1057; };
-		'3089F9DB0042' = {isa = PBXBuildFile; fileRef = 3089F9DB1058; };
-		'3089F9DB0043' = {isa = PBXBuildFile; fileRef = 3089F9DB1059; };
-		'3089F9DB0044' = {isa = PBXBuildFile; fileRef = 3089F9DB1060; };
+		3089F9DB0001 /* RialApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1001 /* RialApp.swift */; };
+		3089F9DB0002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1002 /* AppDelegate.swift */; };
+		3089F9DB0003 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1003 /* ContentView.swift */; };
+		3089F9DB00A0 /* AppNavigationState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10A0 /* AppNavigationState.swift */; };
+		3089F9DB0004 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1004 /* Assets.xcassets */; };
+		3089F9DB0005 /* RialTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1005 /* RialTests.swift */; };
+		3089F9DB0006 /* RialUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1006 /* RialUITests.swift */; };
+		3089F9DB0007 /* RialUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1007 /* RialUITestsLaunchTests.swift */; };
+		3089F9DB0008 /* CryptoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1013 /* CryptoService.swift */; };
+		3089F9DB0009 /* CryptoServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1014 /* CryptoServiceTests.swift */; };
+		3089F9DB0010 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1015 /* KeychainService.swift */; };
+		3089F9DB0011 /* KeychainServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1016 /* KeychainServiceTests.swift */; };
+		3089F9DB0012 /* DeviceAttestationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1017 /* DeviceAttestationService.swift */; };
+		3089F9DB0013 /* DeviceAttestationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1018 /* DeviceAttestationServiceTests.swift */; };
+		3089F9DB0014 /* ARCaptureSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1019 /* ARCaptureSession.swift */; };
+		3089F9DB0015 /* ARCaptureSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1020 /* ARCaptureSessionTests.swift */; };
+		3089F9DB0016 /* CaptureData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1021 /* CaptureData.swift */; };
+		3089F9DB0017 /* FrameProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1022 /* FrameProcessor.swift */; };
+		3089F9DB0018 /* FrameProcessorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1023 /* FrameProcessorTests.swift */; };
+		3089F9DB0019 /* DepthVisualization.metal in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1024 /* DepthVisualization.metal */; };
+		3089F9DB0020 /* DepthVisualizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1025 /* DepthVisualizer.swift */; };
+		3089F9DB0021 /* DepthOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1026 /* DepthOverlayView.swift */; };
+		3089F9DB0022 /* DepthVisualizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1027 /* DepthVisualizerTests.swift */; };
+		3089F9DB0023 /* CaptureAssertionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1028 /* CaptureAssertionService.swift */; };
+		3089F9DB0024 /* CaptureAssertionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1029 /* CaptureAssertionServiceTests.swift */; };
+		3089F9DB0025 /* CaptureStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1030 /* CaptureStore.swift */; };
+		3089F9DB0026 /* OfflineQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1031 /* OfflineQueue.swift */; };
+		3089F9DB0027 /* CaptureStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1032 /* CaptureStoreTests.swift */; };
+		3089F9DB0028 /* CaptureEncryption.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1033 /* CaptureEncryption.swift */; };
+		3089F9DB0029 /* CaptureEncryptionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1034 /* CaptureEncryptionTests.swift */; };
+		3089F9DB0030 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1040 /* APIClient.swift */; };
+		3089F9DB0031 /* DeviceSignature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1041 /* DeviceSignature.swift */; };
+		3089F9DB0032 /* UploadService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1042 /* UploadService.swift */; };
+		3089F9DB0033 /* UploadServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1043 /* UploadServiceTests.swift */; };
+		3089F9DB0034 /* CertificatePinning.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1044 /* CertificatePinning.swift */; };
+		3089F9DB0035 /* RetryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1045 /* RetryManager.swift */; };
+		3089F9DB0036 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1046 /* NetworkMonitor.swift */; };
+		3089F9DB0037 /* RetryManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1047 /* RetryManagerTests.swift */; };
+		3089F9DB0038 /* ARViewContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1048 /* ARViewContainer.swift */; };
+		3089F9DB0039 /* CaptureButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1049 /* CaptureButton.swift */; };
+		3089F9DB003A /* CaptureViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1050 /* CaptureViewModel.swift */; };
+		3089F9DB003B /* CaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1051 /* CaptureView.swift */; };
+		3089F9DB003C /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1052 /* HistoryView.swift */; };
+		3089F9DB003D /* HistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1053 /* HistoryViewModel.swift */; };
+		3089F9DB003E /* CaptureThumbnailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1054 /* CaptureThumbnailView.swift */; };
+		3089F9DB003F /* EmptyHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1055 /* EmptyHistoryView.swift */; };
+		3089F9DB0040 /* ResultDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1056 /* ResultDetailView.swift */; };
+		3089F9DB0041 /* ConfidenceBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1057 /* ConfidenceBadge.swift */; };
+		3089F9DB0042 /* EvidenceSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1058 /* EvidenceSummaryView.swift */; };
+		3089F9DB0043 /* ZoomableImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1059 /* ZoomableImageView.swift */; };
+		3089F9DB0044 /* FeatureParityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1060 /* FeatureParityTests.swift */; };
+		3089F9DB0045 /* VideoRecordingSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1061 /* VideoRecordingSession.swift */; };
+		3089F9DB0046 /* VideoRecordingSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1062 /* VideoRecordingSessionTests.swift */; };
+		3089F9DB0047 /* DepthKeyframeBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1063 /* DepthKeyframeBuffer.swift */; };
+		3089F9DB0048 /* DepthKeyframeBufferTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1064 /* DepthKeyframeBufferTests.swift */; };
+		3089F9DB0049 /* EdgeDepthVisualization.metal in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1065 /* EdgeDepthVisualization.metal */; };
+		3089F9DB004A /* EdgeDepthVisualizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1066 /* EdgeDepthVisualizer.swift */; };
+		3089F9DB004B /* EdgeDepthOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1067 /* EdgeDepthOverlayView.swift */; };
+		3089F9DB004C /* EdgeDepthVisualizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1068 /* EdgeDepthVisualizerTests.swift */; };
+		3089F9DB004D /* HashChainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1069 /* HashChainService.swift */; };
+		3089F9DB004E /* HashChainServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1070 /* HashChainServiceTests.swift */; };
+		3089F9DB004F /* VideoAttestationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1071 /* VideoAttestationService.swift */; };
+		3089F9DB0050 /* PartialVideoBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1072 /* PartialVideoBadge.swift */; };
+		3089F9DB0051 /* VideoAttestationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1073 /* VideoAttestationServiceTests.swift */; };
+		3089F9DB0052 /* VideoMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1074 /* VideoMetadata.swift */; };
+		3089F9DB0053 /* VideoMetadataCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1075 /* VideoMetadataCollector.swift */; };
+		3089F9DB0054 /* VideoMetadataCollectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1076 /* VideoMetadataCollectorTests.swift */; };
+		3089F9DB0055 /* ProcessedVideoCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1077 /* ProcessedVideoCapture.swift */; };
+		3089F9DB0056 /* VideoProcessingPipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1078 /* VideoProcessingPipeline.swift */; };
+		3089F9DB0057 /* VideoProcessingPipelineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1079 /* VideoProcessingPipelineTests.swift */; };
+		3089F9DB0058 /* VideoUploadService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1080 /* VideoUploadService.swift */; };
+		3089F9DB0059 /* VideoCaptureEntity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1081 /* VideoCaptureEntity.swift */; };
+		3089F9DB005A /* ModeSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1082 /* ModeSelector.swift */; };
+		3089F9DB005B /* VideoPreviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1083 /* VideoPreviewSheet.swift */; };
+		3089F9DB005C /* UploadProgressView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1084 /* UploadProgressView.swift */; };
+		3089F9DB005D /* RecordingProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1085 /* RecordingProgressBar.swift */; };
+		3089F9DB005E /* CaptureModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1086 /* CaptureModeTests.swift */; };
+		3089F9DB005F /* DepthAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1087 /* DepthAnalysisService.swift */; };
+		3089F9DB0060 /* DepthAnalysisResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1088 /* DepthAnalysisResult.swift */; };
+		3089F9DB0061 /* DepthAnalysisServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1089 /* DepthAnalysisServiceTests.swift */; };
+		3089F9DB0062 /* PrivacySettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1090 /* PrivacySettings.swift */; };
+		3089F9DB0063 /* PrivacySettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1091 /* PrivacySettingsManager.swift */; };
+		3089F9DB0064 /* PrivacySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1092 /* PrivacySettingsView.swift */; };
+		3089F9DB0065 /* LearnMorePrivacyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1093 /* LearnMorePrivacyView.swift */; };
+		3089F9DB0066 /* PrivacyModeIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1094 /* PrivacyModeIndicator.swift */; };
+		3089F9DB0067 /* PrivacySettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1095 /* PrivacySettingsTests.swift */; };
+		3089F9DB0068 /* PrivacySettingsManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1096 /* PrivacySettingsManagerTests.swift */; };
+		3089F9DB0069 /* HashOnlyCapturePayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1097 /* HashOnlyCapturePayload.swift */; };
+		3089F9DB006A /* MetadataFilterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1098 /* MetadataFilterService.swift */; };
+		3089F9DB006B /* HashOnlyPayloadBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB1099 /* HashOnlyPayloadBuilder.swift */; };
+		3089F9DB006C /* HashOnlyCapturePayloadTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB109A /* HashOnlyCapturePayloadTests.swift */; };
+		3089F9DB006D /* MetadataFilterServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB109B /* MetadataFilterServiceTests.swift */; };
+		3089F9DB006E /* HashOnlyPayloadBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB109C /* HashOnlyPayloadBuilderTests.swift */; };
+		3089F9DB006F /* CaptureDataPrivacyModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB109D /* CaptureDataPrivacyModeTests.swift */; };
+		3089F9DB0070 /* TemporalDepthAnalysisResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB109E /* TemporalDepthAnalysisResult.swift */; };
+		3089F9DB00A1 /* DeviceRegistrationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10A1 /* DeviceRegistrationService.swift */; };
+		3089F9DB00B0 /* EnvironmentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10B0 /* EnvironmentStore.swift */; };
+		3089F9DB00B1 /* DebugEnvironmentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10B1 /* DebugEnvironmentView.swift */; };
 		4ACD4DC8A3C7953EECB9CFF5 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9A44E098094F0E08456FEE9 /* AppEnvironment.swift */; };
-		'3089F9DB0045' = {isa = PBXBuildFile; fileRef = 3089F9DB1061; };
-		'3089F9DB0046' = {isa = PBXBuildFile; fileRef = 3089F9DB1062; };
-		'3089F9DB0047' = {isa = PBXBuildFile; fileRef = 3089F9DB1063; };
-		'3089F9DB0048' = {isa = PBXBuildFile; fileRef = 3089F9DB1064; };
-		'3089F9DB0049' = {isa = PBXBuildFile; fileRef = 3089F9DB1065; };
-		'3089F9DB004A' = {isa = PBXBuildFile; fileRef = 3089F9DB1066; };
-		'3089F9DB004B' = {isa = PBXBuildFile; fileRef = 3089F9DB1067; };
-		'3089F9DB004C' = {isa = PBXBuildFile; fileRef = 3089F9DB1068; };
-		'3089F9DB004D' = {isa = PBXBuildFile; fileRef = 3089F9DB1069; };
-		'3089F9DB004E' = {isa = PBXBuildFile; fileRef = 3089F9DB1070; };
-		'3089F9DB004F' = {isa = PBXBuildFile; fileRef = 3089F9DB1071; };
-		'3089F9DB0050' = {isa = PBXBuildFile; fileRef = 3089F9DB1072; };
-		'3089F9DB0051' = {isa = PBXBuildFile; fileRef = 3089F9DB1073; };
-		'3089F9DB0052' = {isa = PBXBuildFile; fileRef = 3089F9DB1074; };
-		'3089F9DB0053' = {isa = PBXBuildFile; fileRef = 3089F9DB1075; };
-		'3089F9DB0054' = {isa = PBXBuildFile; fileRef = 3089F9DB1076; };
-		'3089F9DB0055' = {isa = PBXBuildFile; fileRef = 3089F9DB1077; };
-		'3089F9DB0056' = {isa = PBXBuildFile; fileRef = 3089F9DB1078; };
-		'3089F9DB0057' = {isa = PBXBuildFile; fileRef = 3089F9DB1079; };
-		'3089F9DB0058' = {isa = PBXBuildFile; fileRef = 3089F9DB1080; };
-		'3089F9DB0059' = {isa = PBXBuildFile; fileRef = 3089F9DB1081; };
-		'3089F9DB005A' = {isa = PBXBuildFile; fileRef = 3089F9DB1082; };
-		'3089F9DB005B' = {isa = PBXBuildFile; fileRef = 3089F9DB1083; };
-		'3089F9DB005C' = {isa = PBXBuildFile; fileRef = 3089F9DB1084; };
-		'3089F9DB005D' = {isa = PBXBuildFile; fileRef = 3089F9DB1085; };
-		'3089F9DB005E' = {isa = PBXBuildFile; fileRef = 3089F9DB1086; };
-		'3089F9DB005F' = {isa = PBXBuildFile; fileRef = 3089F9DB1087; };
-		'3089F9DB0060' = {isa = PBXBuildFile; fileRef = 3089F9DB1088; };
-		'3089F9DB0061' = {isa = PBXBuildFile; fileRef = 3089F9DB1089; };
-		'3089F9DB0062' = {isa = PBXBuildFile; fileRef = 3089F9DB1090; };
-		'3089F9DB0063' = {isa = PBXBuildFile; fileRef = 3089F9DB1091; };
-		'3089F9DB0064' = {isa = PBXBuildFile; fileRef = 3089F9DB1092; };
-		'3089F9DB0065' = {isa = PBXBuildFile; fileRef = 3089F9DB1093; };
-		'3089F9DB0066' = {isa = PBXBuildFile; fileRef = 3089F9DB1094; };
-		'3089F9DB0067' = {isa = PBXBuildFile; fileRef = 3089F9DB1095; };
-		'3089F9DB0068' = {isa = PBXBuildFile; fileRef = 3089F9DB1096; };
-		'3089F9DB0069' = {isa = PBXBuildFile; fileRef = 3089F9DB1097; };
-		'3089F9DB006A' = {isa = PBXBuildFile; fileRef = 3089F9DB1098; };
-		'3089F9DB006B' = {isa = PBXBuildFile; fileRef = 3089F9DB1099; };
-		'3089F9DB006C' = {isa = PBXBuildFile; fileRef = 3089F9DB109A; };
-		'3089F9DB006D' = {isa = PBXBuildFile; fileRef = 3089F9DB109B; };
-		'3089F9DB006E' = {isa = PBXBuildFile; fileRef = 3089F9DB109C; };
-		'3089F9DB006F' = {isa = PBXBuildFile; fileRef = 3089F9DB109D; };
-		'3089F9DB0070' = {isa = PBXBuildFile; fileRef = 3089F9DB109E; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		'3089F9DB2001' = {
+		3089F9DB2001 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = 3089F9DB0000;
+			containerPortal = 3089F9DB0000 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 3089F9DB3001;
 			remoteInfo = Rial;
 		};
-		'3089F9DB2002' = {
+		3089F9DB2002 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
-			containerPortal = 3089F9DB0000;
+			containerPortal = 3089F9DB0000 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 3089F9DB3001;
 			remoteInfo = Rial;
@@ -122,124 +126,128 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		'3089F9DB1001' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RialApp.swift; sourceTree = "<group>"; };
-		'3089F9DB1002' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		'3089F9DB1003' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		'3089F9DB1004' = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		'3089F9DB1005' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RialTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1006' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RialUITests.swift; sourceTree = "<group>"; };
-		'3089F9DB1007' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RialUITestsLaunchTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1008' = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Rial.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		'3089F9DB1009' = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RialTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		'3089F9DB1010' = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RialUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		'3089F9DB1011' = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Rial.entitlements; sourceTree = "<group>"; };
-		'3089F9DB1012' = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		'3089F9DB1013' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryptoService.swift; sourceTree = "<group>"; };
-		'3089F9DB1014' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryptoServiceTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1015' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
-		'3089F9DB1016' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainServiceTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1017' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceAttestationService.swift; sourceTree = "<group>"; };
-		'3089F9DB1018' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceAttestationServiceTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1019' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARCaptureSession.swift; sourceTree = "<group>"; };
-		'3089F9DB1020' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARCaptureSessionTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1021' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureData.swift; sourceTree = "<group>"; };
-		'3089F9DB1022' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameProcessor.swift; sourceTree = "<group>"; };
-		'3089F9DB1023' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameProcessorTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1024' = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = DepthVisualization.metal; sourceTree = "<group>"; };
-		'3089F9DB1025' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthVisualizer.swift; sourceTree = "<group>"; };
-		'3089F9DB1026' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthOverlayView.swift; sourceTree = "<group>"; };
-		'3089F9DB1027' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthVisualizerTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1028' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureAssertionService.swift; sourceTree = "<group>"; };
-		'3089F9DB1029' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureAssertionServiceTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1030' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureStore.swift; sourceTree = "<group>"; };
-		'3089F9DB1031' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineQueue.swift; sourceTree = "<group>"; };
-		'3089F9DB1032' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureStoreTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1033' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureEncryption.swift; sourceTree = "<group>"; };
-		'3089F9DB1034' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureEncryptionTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1040' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
-		'3089F9DB1041' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSignature.swift; sourceTree = "<group>"; };
-		'3089F9DB1042' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadService.swift; sourceTree = "<group>"; };
-		'3089F9DB1043' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadServiceTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1044' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificatePinning.swift; sourceTree = "<group>"; };
-		'3089F9DB1045' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetryManager.swift; sourceTree = "<group>"; };
-		'3089F9DB1046' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
-		'3089F9DB1047' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetryManagerTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1048' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARViewContainer.swift; sourceTree = "<group>"; };
-		'3089F9DB1049' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureButton.swift; sourceTree = "<group>"; };
-		'3089F9DB1050' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureViewModel.swift; sourceTree = "<group>"; };
-		'3089F9DB1051' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureView.swift; sourceTree = "<group>"; };
-		'3089F9DB1052' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
-		'3089F9DB1053' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryViewModel.swift; sourceTree = "<group>"; };
-		'3089F9DB1054' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureThumbnailView.swift; sourceTree = "<group>"; };
-		'3089F9DB1055' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyHistoryView.swift; sourceTree = "<group>"; };
-		'3089F9DB1056' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultDetailView.swift; sourceTree = "<group>"; };
-		'3089F9DB1057' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfidenceBadge.swift; sourceTree = "<group>"; };
-		'3089F9DB1058' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvidenceSummaryView.swift; sourceTree = "<group>"; };
-		'3089F9DB1059' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomableImageView.swift; sourceTree = "<group>"; };
-		'3089F9DB1060' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureParityTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1061' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoRecordingSession.swift; sourceTree = "<group>"; };
-		'3089F9DB1062' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoRecordingSessionTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1063' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthKeyframeBuffer.swift; sourceTree = "<group>"; };
-		'3089F9DB1064' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthKeyframeBufferTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1065' = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = EdgeDepthVisualization.metal; sourceTree = "<group>"; };
-		'3089F9DB1066' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeDepthVisualizer.swift; sourceTree = "<group>"; };
-		'3089F9DB1067' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeDepthOverlayView.swift; sourceTree = "<group>"; };
-		'3089F9DB1068' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeDepthVisualizerTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1069' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashChainService.swift; sourceTree = "<group>"; };
-		'3089F9DB1070' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashChainServiceTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1071' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoAttestationService.swift; sourceTree = "<group>"; };
-		'3089F9DB1072' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PartialVideoBadge.swift; sourceTree = "<group>"; };
-		'3089F9DB1073' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoAttestationServiceTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1074' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoMetadata.swift; sourceTree = "<group>"; };
-		'3089F9DB1075' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoMetadataCollector.swift; sourceTree = "<group>"; };
-		'3089F9DB1076' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoMetadataCollectorTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1077' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessedVideoCapture.swift; sourceTree = "<group>"; };
-		'3089F9DB1078' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoProcessingPipeline.swift; sourceTree = "<group>"; };
-		'3089F9DB1079' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoProcessingPipelineTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1080' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoUploadService.swift; sourceTree = "<group>"; };
-		'3089F9DB1081' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoCaptureEntity.swift; sourceTree = "<group>"; };
-		'3089F9DB1082' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModeSelector.swift; sourceTree = "<group>"; };
-		'3089F9DB1083' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoPreviewSheet.swift; sourceTree = "<group>"; };
-		'3089F9DB1084' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadProgressView.swift; sourceTree = "<group>"; };
-		'3089F9DB1085' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingProgressBar.swift; sourceTree = "<group>"; };
-		'3089F9DB1086' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureModeTests.swift; sourceTree = "<group>"; };
+		3089F9DB1001 /* RialApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RialApp.swift; sourceTree = "<group>"; };
+		3089F9DB1002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		3089F9DB1003 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		3089F9DB10A0 /* AppNavigationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppNavigationState.swift; sourceTree = "<group>"; };
+		3089F9DB1004 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		3089F9DB1005 /* RialTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RialTests.swift; sourceTree = "<group>"; };
+		3089F9DB1006 /* RialUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RialUITests.swift; sourceTree = "<group>"; };
+		3089F9DB1007 /* RialUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RialUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		3089F9DB1008 /* Rial.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Rial.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3089F9DB1009 /* RialTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RialTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		3089F9DB1010 /* RialUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RialUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		3089F9DB1011 /* Rial.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Rial.entitlements; sourceTree = "<group>"; };
+		3089F9DB1012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		3089F9DB1013 /* CryptoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryptoService.swift; sourceTree = "<group>"; };
+		3089F9DB1014 /* CryptoServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryptoServiceTests.swift; sourceTree = "<group>"; };
+		3089F9DB1015 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
+		3089F9DB1016 /* KeychainServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainServiceTests.swift; sourceTree = "<group>"; };
+		3089F9DB1017 /* DeviceAttestationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceAttestationService.swift; sourceTree = "<group>"; };
+		3089F9DB1018 /* DeviceAttestationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceAttestationServiceTests.swift; sourceTree = "<group>"; };
+		3089F9DB1019 /* ARCaptureSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARCaptureSession.swift; sourceTree = "<group>"; };
+		3089F9DB1020 /* ARCaptureSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARCaptureSessionTests.swift; sourceTree = "<group>"; };
+		3089F9DB1021 /* CaptureData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureData.swift; sourceTree = "<group>"; };
+		3089F9DB1022 /* FrameProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameProcessor.swift; sourceTree = "<group>"; };
+		3089F9DB1023 /* FrameProcessorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrameProcessorTests.swift; sourceTree = "<group>"; };
+		3089F9DB1024 /* DepthVisualization.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = DepthVisualization.metal; sourceTree = "<group>"; };
+		3089F9DB1025 /* DepthVisualizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthVisualizer.swift; sourceTree = "<group>"; };
+		3089F9DB1026 /* DepthOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthOverlayView.swift; sourceTree = "<group>"; };
+		3089F9DB1027 /* DepthVisualizerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthVisualizerTests.swift; sourceTree = "<group>"; };
+		3089F9DB1028 /* CaptureAssertionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureAssertionService.swift; sourceTree = "<group>"; };
+		3089F9DB1029 /* CaptureAssertionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureAssertionServiceTests.swift; sourceTree = "<group>"; };
+		3089F9DB1030 /* CaptureStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureStore.swift; sourceTree = "<group>"; };
+		3089F9DB1031 /* OfflineQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineQueue.swift; sourceTree = "<group>"; };
+		3089F9DB1032 /* CaptureStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureStoreTests.swift; sourceTree = "<group>"; };
+		3089F9DB1033 /* CaptureEncryption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureEncryption.swift; sourceTree = "<group>"; };
+		3089F9DB1034 /* CaptureEncryptionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureEncryptionTests.swift; sourceTree = "<group>"; };
+		3089F9DB1040 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		3089F9DB1041 /* DeviceSignature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceSignature.swift; sourceTree = "<group>"; };
+		3089F9DB1042 /* UploadService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadService.swift; sourceTree = "<group>"; };
+		3089F9DB1043 /* UploadServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadServiceTests.swift; sourceTree = "<group>"; };
+		3089F9DB1044 /* CertificatePinning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificatePinning.swift; sourceTree = "<group>"; };
+		3089F9DB1045 /* RetryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetryManager.swift; sourceTree = "<group>"; };
+		3089F9DB1046 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
+		3089F9DB1047 /* RetryManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetryManagerTests.swift; sourceTree = "<group>"; };
+		3089F9DB1048 /* ARViewContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARViewContainer.swift; sourceTree = "<group>"; };
+		3089F9DB1049 /* CaptureButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureButton.swift; sourceTree = "<group>"; };
+		3089F9DB1050 /* CaptureViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureViewModel.swift; sourceTree = "<group>"; };
+		3089F9DB1051 /* CaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureView.swift; sourceTree = "<group>"; };
+		3089F9DB1052 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
+		3089F9DB1053 /* HistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryViewModel.swift; sourceTree = "<group>"; };
+		3089F9DB1054 /* CaptureThumbnailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureThumbnailView.swift; sourceTree = "<group>"; };
+		3089F9DB1055 /* EmptyHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyHistoryView.swift; sourceTree = "<group>"; };
+		3089F9DB1056 /* ResultDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultDetailView.swift; sourceTree = "<group>"; };
+		3089F9DB1057 /* ConfidenceBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfidenceBadge.swift; sourceTree = "<group>"; };
+		3089F9DB1058 /* EvidenceSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvidenceSummaryView.swift; sourceTree = "<group>"; };
+		3089F9DB1059 /* ZoomableImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZoomableImageView.swift; sourceTree = "<group>"; };
+		3089F9DB1060 /* FeatureParityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureParityTests.swift; sourceTree = "<group>"; };
+		3089F9DB1061 /* VideoRecordingSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoRecordingSession.swift; sourceTree = "<group>"; };
+		3089F9DB1062 /* VideoRecordingSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoRecordingSessionTests.swift; sourceTree = "<group>"; };
+		3089F9DB1063 /* DepthKeyframeBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthKeyframeBuffer.swift; sourceTree = "<group>"; };
+		3089F9DB1064 /* DepthKeyframeBufferTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthKeyframeBufferTests.swift; sourceTree = "<group>"; };
+		3089F9DB1065 /* EdgeDepthVisualization.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = EdgeDepthVisualization.metal; sourceTree = "<group>"; };
+		3089F9DB1066 /* EdgeDepthVisualizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeDepthVisualizer.swift; sourceTree = "<group>"; };
+		3089F9DB1067 /* EdgeDepthOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeDepthOverlayView.swift; sourceTree = "<group>"; };
+		3089F9DB1068 /* EdgeDepthVisualizerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EdgeDepthVisualizerTests.swift; sourceTree = "<group>"; };
+		3089F9DB1069 /* HashChainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashChainService.swift; sourceTree = "<group>"; };
+		3089F9DB1070 /* HashChainServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashChainServiceTests.swift; sourceTree = "<group>"; };
+		3089F9DB1071 /* VideoAttestationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoAttestationService.swift; sourceTree = "<group>"; };
+		3089F9DB1072 /* PartialVideoBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PartialVideoBadge.swift; sourceTree = "<group>"; };
+		3089F9DB1073 /* VideoAttestationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoAttestationServiceTests.swift; sourceTree = "<group>"; };
+		3089F9DB1074 /* VideoMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoMetadata.swift; sourceTree = "<group>"; };
+		3089F9DB1075 /* VideoMetadataCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoMetadataCollector.swift; sourceTree = "<group>"; };
+		3089F9DB1076 /* VideoMetadataCollectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoMetadataCollectorTests.swift; sourceTree = "<group>"; };
+		3089F9DB1077 /* ProcessedVideoCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessedVideoCapture.swift; sourceTree = "<group>"; };
+		3089F9DB1078 /* VideoProcessingPipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoProcessingPipeline.swift; sourceTree = "<group>"; };
+		3089F9DB1079 /* VideoProcessingPipelineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoProcessingPipelineTests.swift; sourceTree = "<group>"; };
+		3089F9DB1080 /* VideoUploadService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoUploadService.swift; sourceTree = "<group>"; };
+		3089F9DB1081 /* VideoCaptureEntity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoCaptureEntity.swift; sourceTree = "<group>"; };
+		3089F9DB1082 /* ModeSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModeSelector.swift; sourceTree = "<group>"; };
+		3089F9DB1083 /* VideoPreviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoPreviewSheet.swift; sourceTree = "<group>"; };
+		3089F9DB1084 /* UploadProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadProgressView.swift; sourceTree = "<group>"; };
+		3089F9DB1085 /* RecordingProgressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingProgressBar.swift; sourceTree = "<group>"; };
+		3089F9DB1086 /* CaptureModeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureModeTests.swift; sourceTree = "<group>"; };
+		3089F9DB1087 /* DepthAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthAnalysisService.swift; sourceTree = "<group>"; };
+		3089F9DB1088 /* DepthAnalysisResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthAnalysisResult.swift; sourceTree = "<group>"; };
+		3089F9DB1089 /* DepthAnalysisServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthAnalysisServiceTests.swift; sourceTree = "<group>"; };
+		3089F9DB1090 /* PrivacySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettings.swift; sourceTree = "<group>"; };
+		3089F9DB1091 /* PrivacySettingsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsManager.swift; sourceTree = "<group>"; };
+		3089F9DB1092 /* PrivacySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsView.swift; sourceTree = "<group>"; };
+		3089F9DB1093 /* LearnMorePrivacyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnMorePrivacyView.swift; sourceTree = "<group>"; };
+		3089F9DB1094 /* PrivacyModeIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyModeIndicator.swift; sourceTree = "<group>"; };
+		3089F9DB1095 /* PrivacySettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsTests.swift; sourceTree = "<group>"; };
+		3089F9DB1096 /* PrivacySettingsManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsManagerTests.swift; sourceTree = "<group>"; };
+		3089F9DB1097 /* HashOnlyCapturePayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashOnlyCapturePayload.swift; sourceTree = "<group>"; };
+		3089F9DB1098 /* MetadataFilterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataFilterService.swift; sourceTree = "<group>"; };
+		3089F9DB1099 /* HashOnlyPayloadBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashOnlyPayloadBuilder.swift; sourceTree = "<group>"; };
+		3089F9DB109A /* HashOnlyCapturePayloadTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashOnlyCapturePayloadTests.swift; sourceTree = "<group>"; };
+		3089F9DB109B /* MetadataFilterServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataFilterServiceTests.swift; sourceTree = "<group>"; };
+		3089F9DB109C /* HashOnlyPayloadBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashOnlyPayloadBuilderTests.swift; sourceTree = "<group>"; };
+		3089F9DB109D /* CaptureDataPrivacyModeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureDataPrivacyModeTests.swift; sourceTree = "<group>"; };
+		3089F9DB109E /* TemporalDepthAnalysisResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalDepthAnalysisResult.swift; sourceTree = "<group>"; };
+		3089F9DB10A1 /* DeviceRegistrationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceRegistrationService.swift; sourceTree = "<group>"; };
+		3089F9DB10B0 /* EnvironmentStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvironmentStore.swift; sourceTree = "<group>"; };
+		3089F9DB10B1 /* DebugEnvironmentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugEnvironmentView.swift; sourceTree = "<group>"; };
 		D9A44E098094F0E08456FEE9 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppEnvironment.swift; path = Rial/Core/Configuration/AppEnvironment.swift; sourceTree = SOURCE_ROOT; };
-		'3089F9DB1087' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthAnalysisService.swift; sourceTree = "<group>"; };
-		'3089F9DB1088' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthAnalysisResult.swift; sourceTree = "<group>"; };
-		'3089F9DB1089' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DepthAnalysisServiceTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1090' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettings.swift; sourceTree = "<group>"; };
-		'3089F9DB1091' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsManager.swift; sourceTree = "<group>"; };
-		'3089F9DB1092' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsView.swift; sourceTree = "<group>"; };
-		'3089F9DB1093' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnMorePrivacyView.swift; sourceTree = "<group>"; };
-		'3089F9DB1094' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyModeIndicator.swift; sourceTree = "<group>"; };
-		'3089F9DB1095' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1096' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySettingsManagerTests.swift; sourceTree = "<group>"; };
-		'3089F9DB1097' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashOnlyCapturePayload.swift; sourceTree = "<group>"; };
-		'3089F9DB1098' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataFilterService.swift; sourceTree = "<group>"; };
-		'3089F9DB1099' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashOnlyPayloadBuilder.swift; sourceTree = "<group>"; };
-		'3089F9DB109A' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashOnlyCapturePayloadTests.swift; sourceTree = "<group>"; };
-		'3089F9DB109B' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetadataFilterServiceTests.swift; sourceTree = "<group>"; };
-		'3089F9DB109C' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HashOnlyPayloadBuilderTests.swift; sourceTree = "<group>"; };
-		'3089F9DB109D' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureDataPrivacyModeTests.swift; sourceTree = "<group>"; };
-		'3089F9DB109E' = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemporalDepthAnalysisResult.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		'3089F9DB4001' = {
+		3089F9DB4001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		'3089F9DB4002' = {
+		3089F9DB4002 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		'3089F9DB4003' = {
+		3089F9DB4003 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -249,346 +257,358 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		'3089F9DB5000' = {
+		3089F9DB5000 = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB5001,
-				3089F9DB5009,
-				3089F9DB5010,
-				3089F9DB5020,
+				3089F9DB5001 /* Rial */,
+				3089F9DB5009 /* RialTests */,
+				3089F9DB5010 /* RialUITests */,
+				3089F9DB5020 /* Products */,
 				D9A44E098094F0E08456FEE9 /* AppEnvironment.swift */,
 			);
 			sourceTree = "<group>";
 		};
-		'3089F9DB5001' = {
+		3089F9DB5001 /* Rial */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB5002,
-				3089F9DB5003,
-				3089F9DB5004,
-				3089F9DB5005,
-				3089F9DB5006,
-				3089F9DB5007,
-				3089F9DB1011,
-				3089F9DB1012,
+				3089F9DB5002 /* App */,
+				3089F9DB5003 /* Core */,
+				3089F9DB5004 /* Features */,
+				3089F9DB5005 /* Models */,
+				3089F9DB5006 /* Shaders */,
+				3089F9DB5007 /* Resources */,
+				3089F9DB1011 /* Rial.entitlements */,
+				3089F9DB1012 /* Info.plist */,
 			);
 			path = Rial;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5002' = {
+		3089F9DB5002 /* App */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB1001,
-				3089F9DB1002,
-				3089F9DB1003,
+				3089F9DB1001 /* RialApp.swift */,
+				3089F9DB1002 /* AppDelegate.swift */,
+				3089F9DB1003 /* ContentView.swift */,
+				3089F9DB10A0 /* AppNavigationState.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5003' = {
+		3089F9DB5003 /* Core */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB5030,
-				3089F9DB5031,
-				'3089F9DB5035',
-				3089F9DB5032,
-				3089F9DB5033,
-				3089F9DB5034,
+				3089F9DB5030 /* Attestation */,
+				3089F9DB5031 /* Capture */,
+				3089F9DB5035 /* Configuration */,
+				3089F9DB5032 /* Crypto */,
+				3089F9DB5033 /* Networking */,
+				3089F9DB5034 /* Storage */,
 			);
 			path = Core;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5035' = {
+		3089F9DB5004 /* Features */ = {
 			isa = PBXGroup;
 			children = (
-				'3089F9DB1091',
-			);
-			path = Configuration;
-			sourceTree = "<group>";
-		};
-		'3089F9DB5004' = {
-			isa = PBXGroup;
-			children = (
-				3089F9DB5040,
-				3089F9DB5041,
-				3089F9DB5042,
-				3089F9DB5043,
-				'3089F9DB5044',
+				3089F9DB5040 /* Capture */,
+				3089F9DB5045 /* Debug */,
+				3089F9DB5041 /* Preview */,
+				3089F9DB5042 /* History */,
+				3089F9DB5043 /* Result */,
+				3089F9DB5044 /* Settings */,
 			);
 			path = Features;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5044' = {
+		3089F9DB5045 /* Debug */ = {
 			isa = PBXGroup;
 			children = (
-				'3089F9DB1092',
-				'3089F9DB1093',
+				3089F9DB10B1 /* DebugEnvironmentView.swift */,
 			);
-			path = Settings;
+			path = Debug;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5005' = {
+		3089F9DB5005 /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB1021,
-				'3089F9DB1088',
-				3089F9DB1077,
-				3089F9DB1074,
-				'3089F9DB1090',
-				'3089F9DB1097',
-				'3089F9DB109E',
+				3089F9DB1021 /* CaptureData.swift */,
+				3089F9DB1088 /* DepthAnalysisResult.swift */,
+				3089F9DB1077 /* ProcessedVideoCapture.swift */,
+				3089F9DB1074 /* VideoMetadata.swift */,
+				3089F9DB1090 /* PrivacySettings.swift */,
+				3089F9DB1097 /* HashOnlyCapturePayload.swift */,
+				3089F9DB109E /* TemporalDepthAnalysisResult.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5006' = {
+		3089F9DB5006 /* Shaders */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB1024,
-				3089F9DB1065,
+				3089F9DB1024 /* DepthVisualization.metal */,
+				3089F9DB1065 /* EdgeDepthVisualization.metal */,
 			);
 			path = Shaders;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5007' = {
+		3089F9DB5007 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB1004,
+				3089F9DB1004 /* Assets.xcassets */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5009' = {
+		3089F9DB5009 /* RialTests */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB5052,
-				3089F9DB5053,
-				'3089F9DB5055',
-				'3089F9DB5056',
-				3089F9DB5054,
-				3089F9DB5051,
-				3089F9DB5050,
-				3089F9DB1005,
+				3089F9DB5052 /* Attestation */,
+				3089F9DB5053 /* Capture */,
+				3089F9DB5055 /* Configuration */,
+				3089F9DB5056 /* Models */,
+				3089F9DB5054 /* Networking */,
+				3089F9DB5051 /* Storage */,
+				3089F9DB5050 /* Crypto */,
+				3089F9DB1005 /* RialTests.swift */,
 			);
 			path = RialTests;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5055' = {
+		3089F9DB5010 /* RialUITests */ = {
 			isa = PBXGroup;
 			children = (
-				'3089F9DB1096',
-			);
-			path = Configuration;
-			sourceTree = "<group>";
-		};
-		'3089F9DB5056' = {
-			isa = PBXGroup;
-			children = (
-				'3089F9DB1095',
-				'3089F9DB109A',
-				'3089F9DB109D',
-			);
-			path = Models;
-			sourceTree = "<group>";
-		};
-		'3089F9DB5010' = {
-			isa = PBXGroup;
-			children = (
-				3089F9DB1060,
-				3089F9DB1006,
-				3089F9DB1007,
+				3089F9DB1060 /* FeatureParityTests.swift */,
+				3089F9DB1006 /* RialUITests.swift */,
+				3089F9DB1007 /* RialUITestsLaunchTests.swift */,
 			);
 			path = RialUITests;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5020' = {
+		3089F9DB5020 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB1008,
-				3089F9DB1009,
-				3089F9DB1010,
+				3089F9DB1008 /* Rial.app */,
+				3089F9DB1009 /* RialTests.xctest */,
+				3089F9DB1010 /* RialUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5030' = {
+		3089F9DB5030 /* Attestation */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB1028,
-				3089F9DB1017,
-				3089F9DB1071,
+				3089F9DB1028 /* CaptureAssertionService.swift */,
+				3089F9DB1017 /* DeviceAttestationService.swift */,
+				3089F9DB1071 /* VideoAttestationService.swift */,
 			);
 			path = Attestation;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5031' = {
+		3089F9DB5031 /* Capture */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB1019,
-				'3089F9DB1087',
-				3089F9DB1063,
-				3089F9DB1066,
-				3089F9DB1022,
-				3089F9DB1025,
-				3089F9DB1075,
-				3089F9DB1078,
-				3089F9DB1061,
-				'3089F9DB1098',
-				'3089F9DB1099',
+				3089F9DB1019 /* ARCaptureSession.swift */,
+				3089F9DB1087 /* DepthAnalysisService.swift */,
+				3089F9DB1063 /* DepthKeyframeBuffer.swift */,
+				3089F9DB1066 /* EdgeDepthVisualizer.swift */,
+				3089F9DB1022 /* FrameProcessor.swift */,
+				3089F9DB1025 /* DepthVisualizer.swift */,
+				3089F9DB1075 /* VideoMetadataCollector.swift */,
+				3089F9DB1078 /* VideoProcessingPipeline.swift */,
+				3089F9DB1061 /* VideoRecordingSession.swift */,
+				3089F9DB1098 /* MetadataFilterService.swift */,
+				3089F9DB1099 /* HashOnlyPayloadBuilder.swift */,
 			);
 			path = Capture;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5032' = {
+		3089F9DB5032 /* Crypto */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB1013,
-				3089F9DB1069,
+				3089F9DB1013 /* CryptoService.swift */,
+				3089F9DB1069 /* HashChainService.swift */,
 			);
 			path = Crypto;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5033' = {
+		3089F9DB5033 /* Networking */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB1040,
-				3089F9DB1044,
-				3089F9DB1041,
-				3089F9DB1046,
-				3089F9DB1045,
-				3089F9DB1042,
-				3089F9DB1080,
+				3089F9DB1040 /* APIClient.swift */,
+				3089F9DB1044 /* CertificatePinning.swift */,
+				3089F9DB10A1 /* DeviceRegistrationService.swift */,
+				3089F9DB1041 /* DeviceSignature.swift */,
+				3089F9DB1046 /* NetworkMonitor.swift */,
+				3089F9DB1045 /* RetryManager.swift */,
+				3089F9DB1042 /* UploadService.swift */,
+				3089F9DB1080 /* VideoUploadService.swift */,
 			);
 			path = Networking;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5034' = {
+		3089F9DB5034 /* Storage */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB1033,
-				3089F9DB1030,
-				3089F9DB1015,
-				3089F9DB1031,
-				3089F9DB1081,
+				3089F9DB1033 /* CaptureEncryption.swift */,
+				3089F9DB1030 /* CaptureStore.swift */,
+				3089F9DB1015 /* KeychainService.swift */,
+				3089F9DB1031 /* OfflineQueue.swift */,
+				3089F9DB1081 /* VideoCaptureEntity.swift */,
 			);
 			path = Storage;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5040' = {
+		3089F9DB5035 /* Configuration */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB1048,
-				3089F9DB1049,
-				3089F9DB1051,
-				3089F9DB1050,
-				3089F9DB1026,
-				3089F9DB1067,
-				3089F9DB1082,
-				3089F9DB1083,
-				3089F9DB1084,
-				3089F9DB1085,
-				'3089F9DB1094',
+				3089F9DB10B0 /* EnvironmentStore.swift */,
+				3089F9DB1091 /* PrivacySettingsManager.swift */,
+			);
+			path = Configuration;
+			sourceTree = "<group>";
+		};
+		3089F9DB5040 /* Capture */ = {
+			isa = PBXGroup;
+			children = (
+				3089F9DB1048 /* ARViewContainer.swift */,
+				3089F9DB1049 /* CaptureButton.swift */,
+				3089F9DB1051 /* CaptureView.swift */,
+				3089F9DB1050 /* CaptureViewModel.swift */,
+				3089F9DB1026 /* DepthOverlayView.swift */,
+				3089F9DB1067 /* EdgeDepthOverlayView.swift */,
+				3089F9DB1082 /* ModeSelector.swift */,
+				3089F9DB1083 /* VideoPreviewSheet.swift */,
+				3089F9DB1084 /* UploadProgressView.swift */,
+				3089F9DB1085 /* RecordingProgressBar.swift */,
+				3089F9DB1094 /* PrivacyModeIndicator.swift */,
 			);
 			path = Capture;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5041' = {
+		3089F9DB5041 /* Preview */ = {
 			isa = PBXGroup;
 			children = (
 			);
 			path = Preview;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5042' = {
+		3089F9DB5042 /* History */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB1054,
-				3089F9DB1055,
-				3089F9DB1052,
-				3089F9DB1053,
+				3089F9DB1054 /* CaptureThumbnailView.swift */,
+				3089F9DB1055 /* EmptyHistoryView.swift */,
+				3089F9DB1052 /* HistoryView.swift */,
+				3089F9DB1053 /* HistoryViewModel.swift */,
 			);
 			path = History;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5043' = {
+		3089F9DB5043 /* Result */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB1057,
-				3089F9DB1058,
-				3089F9DB1072,
-				3089F9DB1056,
-				3089F9DB1059,
+				3089F9DB1057 /* ConfidenceBadge.swift */,
+				3089F9DB1058 /* EvidenceSummaryView.swift */,
+				3089F9DB1072 /* PartialVideoBadge.swift */,
+				3089F9DB1056 /* ResultDetailView.swift */,
+				3089F9DB1059 /* ZoomableImageView.swift */,
 			);
 			path = Result;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5050' = {
+		3089F9DB5044 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB1014,
-				3089F9DB1070,
+				3089F9DB1092 /* PrivacySettingsView.swift */,
+				3089F9DB1093 /* LearnMorePrivacyView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		3089F9DB5050 /* Crypto */ = {
+			isa = PBXGroup;
+			children = (
+				3089F9DB1014 /* CryptoServiceTests.swift */,
+				3089F9DB1070 /* HashChainServiceTests.swift */,
 			);
 			path = Crypto;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5051' = {
+		3089F9DB5051 /* Storage */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB1034,
-				3089F9DB1032,
-				3089F9DB1016,
+				3089F9DB1034 /* CaptureEncryptionTests.swift */,
+				3089F9DB1032 /* CaptureStoreTests.swift */,
+				3089F9DB1016 /* KeychainServiceTests.swift */,
 			);
 			path = Storage;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5052' = {
+		3089F9DB5052 /* Attestation */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB1029,
-				3089F9DB1018,
-				3089F9DB1073,
+				3089F9DB1029 /* CaptureAssertionServiceTests.swift */,
+				3089F9DB1018 /* DeviceAttestationServiceTests.swift */,
+				3089F9DB1073 /* VideoAttestationServiceTests.swift */,
 			);
 			path = Attestation;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5053' = {
+		3089F9DB5053 /* Capture */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB1020,
-				'3089F9DB1089',
-				3089F9DB1064,
-				3089F9DB1068,
-				3089F9DB1023,
-				3089F9DB1027,
-				3089F9DB1062,
-				3089F9DB1076,
-				3089F9DB1079,
-				3089F9DB1086,
-				'3089F9DB109B',
-				'3089F9DB109C',
+				3089F9DB1020 /* ARCaptureSessionTests.swift */,
+				3089F9DB1089 /* DepthAnalysisServiceTests.swift */,
+				3089F9DB1064 /* DepthKeyframeBufferTests.swift */,
+				3089F9DB1068 /* EdgeDepthVisualizerTests.swift */,
+				3089F9DB1023 /* FrameProcessorTests.swift */,
+				3089F9DB1027 /* DepthVisualizerTests.swift */,
+				3089F9DB1062 /* VideoRecordingSessionTests.swift */,
+				3089F9DB1076 /* VideoMetadataCollectorTests.swift */,
+				3089F9DB1079 /* VideoProcessingPipelineTests.swift */,
+				3089F9DB1086 /* CaptureModeTests.swift */,
+				3089F9DB109B /* MetadataFilterServiceTests.swift */,
+				3089F9DB109C /* HashOnlyPayloadBuilderTests.swift */,
 			);
 			path = Capture;
 			sourceTree = "<group>";
 		};
-		'3089F9DB5054' = {
+		3089F9DB5054 /* Networking */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB1047,
-				3089F9DB1043,
+				3089F9DB1047 /* RetryManagerTests.swift */,
+				3089F9DB1043 /* UploadServiceTests.swift */,
 			);
 			path = Networking;
+			sourceTree = "<group>";
+		};
+		3089F9DB5055 /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				3089F9DB1096 /* PrivacySettingsManagerTests.swift */,
+			);
+			path = Configuration;
+			sourceTree = "<group>";
+		};
+		3089F9DB5056 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				3089F9DB1095 /* PrivacySettingsTests.swift */,
+				3089F9DB109A /* HashOnlyCapturePayloadTests.swift */,
+				3089F9DB109D /* CaptureDataPrivacyModeTests.swift */,
+			);
+			path = Models;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		'3089F9DB3001' = {
+		3089F9DB3001 /* Rial */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 3089F9DB6001;
+			buildConfigurationList = 3089F9DB6001 /* Build configuration list for PBXNativeTarget "Rial" */;
 			buildPhases = (
-				3089F9DB7001,
-				3089F9DB4001,
-				3089F9DB8001,
+				3089F9DB7001 /* Sources */,
+				3089F9DB4001 /* Frameworks */,
+				3089F9DB8001 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -596,54 +616,54 @@
 			);
 			name = Rial;
 			productName = Rial;
-			productReference = 3089F9DB1008;
+			productReference = 3089F9DB1008 /* Rial.app */;
 			productType = "com.apple.product-type.application";
 		};
-		'3089F9DB3002' = {
+		3089F9DB3002 /* RialTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 3089F9DB6002;
+			buildConfigurationList = 3089F9DB6002 /* Build configuration list for PBXNativeTarget "RialTests" */;
 			buildPhases = (
-				3089F9DB7002,
-				3089F9DB4002,
-				3089F9DB8002,
+				3089F9DB7002 /* Sources */,
+				3089F9DB4002 /* Frameworks */,
+				3089F9DB8002 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				3089F9DB9001,
+				3089F9DB9001 /* PBXTargetDependency */,
 			);
 			name = RialTests;
 			productName = RialTests;
-			productReference = 3089F9DB1009;
+			productReference = 3089F9DB1009 /* RialTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		'3089F9DB3003' = {
+		3089F9DB3003 /* RialUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 3089F9DB6003;
+			buildConfigurationList = 3089F9DB6003 /* Build configuration list for PBXNativeTarget "RialUITests" */;
 			buildPhases = (
-				3089F9DB7003,
-				3089F9DB4003,
-				3089F9DB8003,
+				3089F9DB7003 /* Sources */,
+				3089F9DB4003 /* Frameworks */,
+				3089F9DB8003 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				3089F9DB9002,
+				3089F9DB9002 /* PBXTargetDependency */,
 			);
 			name = RialUITests;
 			productName = RialUITests;
-			productReference = 3089F9DB1010;
+			productReference = 3089F9DB1010 /* RialUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		'3089F9DB0000' = {
+		3089F9DB0000 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1600;
-				LastUpgradeCheck = 1600;
+				LastUpgradeCheck = 2610;
 				TargetAttributes = {
 					3089F9DB3001 = {
 						CreatedOnToolsVersion = 16.0;
@@ -658,7 +678,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 3089F9DBA000;
+			buildConfigurationList = 3089F9DBA000 /* Build configuration list for PBXProject "Rial" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -667,34 +687,34 @@
 				Base,
 			);
 			mainGroup = 3089F9DB5000;
-			productRefGroup = 3089F9DB5020;
+			productRefGroup = 3089F9DB5020 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				3089F9DB3001,
-				3089F9DB3002,
-				3089F9DB3003,
+				3089F9DB3001 /* Rial */,
+				3089F9DB3002 /* RialTests */,
+				3089F9DB3003 /* RialUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		'3089F9DB8001' = {
+		3089F9DB8001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3089F9DB0004,
+				3089F9DB0004 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		'3089F9DB8002' = {
+		3089F9DB8002 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		'3089F9DB8003' = {
+		3089F9DB8003 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -704,138 +724,142 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		'3089F9DB7001' = {
+		3089F9DB7001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3089F9DB0001,
-				3089F9DB0002,
-				3089F9DB0003,
-				3089F9DB0008,
-				3089F9DB0010,
-				3089F9DB0012,
-				3089F9DB0014,
-				3089F9DB0016,
-				3089F9DB0017,
-				3089F9DB0019,
-				3089F9DB0020,
-				3089F9DB0021,
-				3089F9DB0023,
-				3089F9DB0025,
-				3089F9DB0026,
-				3089F9DB0028,
-				3089F9DB0030,
-				3089F9DB0034,
-				3089F9DB0031,
-				3089F9DB0036,
-				3089F9DB0035,
-				3089F9DB0032,
-				3089F9DB0038,
-				3089F9DB0039,
-				3089F9DB003A,
-				3089F9DB003B,
-				3089F9DB003C,
-				3089F9DB003D,
-				3089F9DB003E,
-				3089F9DB003F,
-				3089F9DB0040,
-				3089F9DB0041,
-				3089F9DB0042,
-				3089F9DB0043,
+				3089F9DB0001 /* RialApp.swift in Sources */,
+				3089F9DB0002 /* AppDelegate.swift in Sources */,
+				3089F9DB0003 /* ContentView.swift in Sources */,
+				3089F9DB00A0 /* AppNavigationState.swift in Sources */,
+				3089F9DB0008 /* CryptoService.swift in Sources */,
+				3089F9DB0010 /* KeychainService.swift in Sources */,
+				3089F9DB0012 /* DeviceAttestationService.swift in Sources */,
+				3089F9DB0014 /* ARCaptureSession.swift in Sources */,
+				3089F9DB0016 /* CaptureData.swift in Sources */,
+				3089F9DB0017 /* FrameProcessor.swift in Sources */,
+				3089F9DB0019 /* DepthVisualization.metal in Sources */,
+				3089F9DB0020 /* DepthVisualizer.swift in Sources */,
+				3089F9DB0021 /* DepthOverlayView.swift in Sources */,
+				3089F9DB0023 /* CaptureAssertionService.swift in Sources */,
+				3089F9DB0025 /* CaptureStore.swift in Sources */,
+				3089F9DB0026 /* OfflineQueue.swift in Sources */,
+				3089F9DB0028 /* CaptureEncryption.swift in Sources */,
+				3089F9DB0030 /* APIClient.swift in Sources */,
+				3089F9DB0034 /* CertificatePinning.swift in Sources */,
+				3089F9DB0031 /* DeviceSignature.swift in Sources */,
+				3089F9DB0036 /* NetworkMonitor.swift in Sources */,
+				3089F9DB0035 /* RetryManager.swift in Sources */,
+				3089F9DB0032 /* UploadService.swift in Sources */,
+				3089F9DB00A1 /* DeviceRegistrationService.swift in Sources */,
+				3089F9DB00B0 /* EnvironmentStore.swift in Sources */,
+				3089F9DB00B1 /* DebugEnvironmentView.swift in Sources */,
+				3089F9DB0038 /* ARViewContainer.swift in Sources */,
+				3089F9DB0039 /* CaptureButton.swift in Sources */,
+				3089F9DB003A /* CaptureViewModel.swift in Sources */,
+				3089F9DB003B /* CaptureView.swift in Sources */,
+				3089F9DB003C /* HistoryView.swift in Sources */,
+				3089F9DB003D /* HistoryViewModel.swift in Sources */,
+				3089F9DB003E /* CaptureThumbnailView.swift in Sources */,
+				3089F9DB003F /* EmptyHistoryView.swift in Sources */,
+				3089F9DB0040 /* ResultDetailView.swift in Sources */,
+				3089F9DB0041 /* ConfidenceBadge.swift in Sources */,
+				3089F9DB0042 /* EvidenceSummaryView.swift in Sources */,
+				3089F9DB0043 /* ZoomableImageView.swift in Sources */,
 				4ACD4DC8A3C7953EECB9CFF5 /* AppEnvironment.swift in Sources */,
-				3089F9DB0045,
-				3089F9DB0047,
-				3089F9DB0049,
-				3089F9DB004A,
-				3089F9DB004B,
-				3089F9DB004D,
-				3089F9DB004F,
-				3089F9DB0050,
-				3089F9DB0052,
-				3089F9DB0053,
-				3089F9DB0055,
-				3089F9DB0056,
-				3089F9DB0058,
-				3089F9DB0059,
-				3089F9DB005A,
-				3089F9DB005B,
-				3089F9DB005C,
-				3089F9DB005D,
-				'3089F9DB005F',
-				'3089F9DB0060',
-				'3089F9DB0062',
-				'3089F9DB0063',
-				'3089F9DB0064',
-				'3089F9DB0065',
-				'3089F9DB0066',
-				'3089F9DB0069',
-				'3089F9DB006A',
-				'3089F9DB006B',
-				'3089F9DB0070',
+				3089F9DB0045 /* VideoRecordingSession.swift in Sources */,
+				3089F9DB0047 /* DepthKeyframeBuffer.swift in Sources */,
+				3089F9DB0049 /* EdgeDepthVisualization.metal in Sources */,
+				3089F9DB004A /* EdgeDepthVisualizer.swift in Sources */,
+				3089F9DB004B /* EdgeDepthOverlayView.swift in Sources */,
+				3089F9DB004D /* HashChainService.swift in Sources */,
+				3089F9DB004F /* VideoAttestationService.swift in Sources */,
+				3089F9DB0050 /* PartialVideoBadge.swift in Sources */,
+				3089F9DB0052 /* VideoMetadata.swift in Sources */,
+				3089F9DB0053 /* VideoMetadataCollector.swift in Sources */,
+				3089F9DB0055 /* ProcessedVideoCapture.swift in Sources */,
+				3089F9DB0056 /* VideoProcessingPipeline.swift in Sources */,
+				3089F9DB0058 /* VideoUploadService.swift in Sources */,
+				3089F9DB0059 /* VideoCaptureEntity.swift in Sources */,
+				3089F9DB005A /* ModeSelector.swift in Sources */,
+				3089F9DB005B /* VideoPreviewSheet.swift in Sources */,
+				3089F9DB005C /* UploadProgressView.swift in Sources */,
+				3089F9DB005D /* RecordingProgressBar.swift in Sources */,
+				3089F9DB005F /* DepthAnalysisService.swift in Sources */,
+				3089F9DB0060 /* DepthAnalysisResult.swift in Sources */,
+				3089F9DB0062 /* PrivacySettings.swift in Sources */,
+				3089F9DB0063 /* PrivacySettingsManager.swift in Sources */,
+				3089F9DB0064 /* PrivacySettingsView.swift in Sources */,
+				3089F9DB0065 /* LearnMorePrivacyView.swift in Sources */,
+				3089F9DB0066 /* PrivacyModeIndicator.swift in Sources */,
+				3089F9DB0069 /* HashOnlyCapturePayload.swift in Sources */,
+				3089F9DB006A /* MetadataFilterService.swift in Sources */,
+				3089F9DB006B /* HashOnlyPayloadBuilder.swift in Sources */,
+				3089F9DB0070 /* TemporalDepthAnalysisResult.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		'3089F9DB7002' = {
+		3089F9DB7002 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3089F9DB0005,
-				3089F9DB0009,
-				3089F9DB0011,
-				3089F9DB0013,
-				3089F9DB0015,
-				3089F9DB0018,
-				3089F9DB0022,
-				3089F9DB0024,
-				3089F9DB0027,
-				3089F9DB0029,
-				3089F9DB0037,
-				3089F9DB0033,
-				3089F9DB0046,
-				3089F9DB0048,
-				3089F9DB004C,
-				3089F9DB004E,
-				3089F9DB0051,
-				3089F9DB0054,
-				3089F9DB0057,
-				3089F9DB005E,
-				'3089F9DB0061',
-				'3089F9DB0067',
-				'3089F9DB0068',
-				'3089F9DB006C',
-				'3089F9DB006D',
-				'3089F9DB006E',
-				'3089F9DB006F',
+				3089F9DB0005 /* RialTests.swift in Sources */,
+				3089F9DB0009 /* CryptoServiceTests.swift in Sources */,
+				3089F9DB0011 /* KeychainServiceTests.swift in Sources */,
+				3089F9DB0013 /* DeviceAttestationServiceTests.swift in Sources */,
+				3089F9DB0015 /* ARCaptureSessionTests.swift in Sources */,
+				3089F9DB0018 /* FrameProcessorTests.swift in Sources */,
+				3089F9DB0022 /* DepthVisualizerTests.swift in Sources */,
+				3089F9DB0024 /* CaptureAssertionServiceTests.swift in Sources */,
+				3089F9DB0027 /* CaptureStoreTests.swift in Sources */,
+				3089F9DB0029 /* CaptureEncryptionTests.swift in Sources */,
+				3089F9DB0037 /* RetryManagerTests.swift in Sources */,
+				3089F9DB0033 /* UploadServiceTests.swift in Sources */,
+				3089F9DB0046 /* VideoRecordingSessionTests.swift in Sources */,
+				3089F9DB0048 /* DepthKeyframeBufferTests.swift in Sources */,
+				3089F9DB004C /* EdgeDepthVisualizerTests.swift in Sources */,
+				3089F9DB004E /* HashChainServiceTests.swift in Sources */,
+				3089F9DB0051 /* VideoAttestationServiceTests.swift in Sources */,
+				3089F9DB0054 /* VideoMetadataCollectorTests.swift in Sources */,
+				3089F9DB0057 /* VideoProcessingPipelineTests.swift in Sources */,
+				3089F9DB005E /* CaptureModeTests.swift in Sources */,
+				3089F9DB0061 /* DepthAnalysisServiceTests.swift in Sources */,
+				3089F9DB0067 /* PrivacySettingsTests.swift in Sources */,
+				3089F9DB0068 /* PrivacySettingsManagerTests.swift in Sources */,
+				3089F9DB006C /* HashOnlyCapturePayloadTests.swift in Sources */,
+				3089F9DB006D /* MetadataFilterServiceTests.swift in Sources */,
+				3089F9DB006E /* HashOnlyPayloadBuilderTests.swift in Sources */,
+				3089F9DB006F /* CaptureDataPrivacyModeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		'3089F9DB7003' = {
+		3089F9DB7003 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3089F9DB0006,
-				3089F9DB0007,
-				3089F9DB0044,
+				3089F9DB0006 /* RialUITests.swift in Sources */,
+				3089F9DB0007 /* RialUITestsLaunchTests.swift in Sources */,
+				3089F9DB0044 /* FeatureParityTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		'3089F9DB9001' = {
+		3089F9DB9001 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 3089F9DB3001;
-			targetProxy = 3089F9DB2001;
+			target = 3089F9DB3001 /* Rial */;
+			targetProxy = 3089F9DB2001 /* PBXContainerItemProxy */;
 		};
-		'3089F9DB9002' = {
+		3089F9DB9002 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 3089F9DB3001;
-			targetProxy = 3089F9DB2002;
+			target = 3089F9DB3001 /* Rial */;
+			targetProxy = 3089F9DB2002 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		'3089F9DBA001' = {
+		3089F9DBA001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -893,13 +917,14 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
 		};
-		'3089F9DBA002' = {
+		3089F9DBA002 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -950,13 +975,14 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_VERSION = 5.0;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
-		'3089F9DBB001' = {
+		3089F9DBB001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -964,7 +990,7 @@
 				CODE_SIGN_ENTITLEMENTS = Rial/Rial.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = FB2HXC7FGF;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Rial/Info.plist;
@@ -992,7 +1018,7 @@
 			};
 			name = Debug;
 		};
-		'3089F9DBB002' = {
+		3089F9DBB002 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -1000,7 +1026,7 @@
 				CODE_SIGN_ENTITLEMENTS = Rial/Rial.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = FB2HXC7FGF;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Rial/Info.plist;
@@ -1028,7 +1054,7 @@
 			};
 			name = Release;
 		};
-		'3089F9DBC001' = {
+		3089F9DBC001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -1047,7 +1073,7 @@
 			};
 			name = Debug;
 		};
-		'3089F9DBC002' = {
+		3089F9DBC002 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
@@ -1066,7 +1092,7 @@
 			};
 			name = Release;
 		};
-		'3089F9DBD001' = {
+		3089F9DBD001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -1084,7 +1110,7 @@
 			};
 			name = Debug;
 		};
-		'3089F9DBD002' = {
+		3089F9DBD002 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
@@ -1105,43 +1131,43 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		'3089F9DB6001' = {
+		3089F9DB6001 /* Build configuration list for PBXNativeTarget "Rial" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				3089F9DBB001,
-				3089F9DBB002,
+				3089F9DBB001 /* Debug */,
+				3089F9DBB002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		'3089F9DB6002' = {
+		3089F9DB6002 /* Build configuration list for PBXNativeTarget "RialTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				3089F9DBC001,
-				3089F9DBC002,
+				3089F9DBC001 /* Debug */,
+				3089F9DBC002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		'3089F9DB6003' = {
+		3089F9DB6003 /* Build configuration list for PBXNativeTarget "RialUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				3089F9DBD001,
-				3089F9DBD002,
+				3089F9DBD001 /* Debug */,
+				3089F9DBD002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		'3089F9DBA000' = {
+		3089F9DBA000 /* Build configuration list for PBXProject "Rial" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				3089F9DBA001,
-				3089F9DBA002,
+				3089F9DBA001 /* Debug */,
+				3089F9DBA002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = 3089F9DB0000;
+	rootObject = 3089F9DB0000 /* Project object */;
 }

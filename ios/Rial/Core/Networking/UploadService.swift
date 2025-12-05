@@ -26,32 +26,43 @@ import os.log
 ///
 /// ## Usage
 /// ```swift
-/// let uploadService = UploadService(
-///     baseURL: URL(string: "https://backend-production-5e5a.up.railway.app")!,
-///     captureStore: captureStore,
-///     keychain: keychainService
+/// // Configure once at app startup
+/// UploadService.shared.configure(
+///     baseURL: AppEnvironment.apiBaseURL,
+///     captureStore: CaptureStore.shared,
+///     keychain: KeychainService()
 /// )
 ///
 /// // Upload a capture
-/// try await uploadService.upload(capture)
+/// try await UploadService.shared.upload(capture)
 ///
-/// // Set background completion handler in AppDelegate
-/// uploadService.backgroundCompletionHandler = completionHandler
+/// // In AppDelegate, set completion handler for session identifier
+/// UploadService.shared.backgroundCompletionHandler = completionHandler
 /// ```
 final class UploadService: NSObject {
     private static let logger = Logger(subsystem: "app.rial", category: "upload-service")
 
+    /// ISO8601 formatter for metadata timestamps (reused across uploads)
+    private static let iso8601Formatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
     /// Background session identifier
-    private static let sessionIdentifier = "app.rial.upload"
+    static let sessionIdentifier = "app.rial.upload"
+
+    /// Shared singleton instance
+    static let shared = UploadService()
 
     /// Base URL for API
-    private let baseURL: URL
+    private var baseURL: URL?
 
     /// Capture store for status updates
-    private let captureStore: CaptureStore
+    private var captureStore: CaptureStore?
 
     /// Keychain for device state
-    private let keychain: KeychainService
+    private var keychain: KeychainService?
 
     /// Background URLSession (lazy initialized)
     private lazy var backgroundSession: URLSession = {
@@ -77,19 +88,33 @@ final class UploadService: NSObject {
     /// Lock for thread-safe access to taskToCaptureMap
     private let lock = NSLock()
 
+    /// Thread-safe registration of task to capture mapping.
+    private func registerTask(_ taskId: Int, forCapture captureId: UUID) {
+        lock.lock()
+        defer { lock.unlock() }
+        taskToCaptureMap[taskId] = captureId
+    }
+
     // MARK: - Initialization
 
-    /// Creates a new UploadService.
+    /// Private initializer for singleton.
+    private override init() {
+        super.init()
+    }
+
+    /// Configure the service with dependencies.
+    ///
+    /// Must be called before using the service (typically in AppDelegate).
     ///
     /// - Parameters:
     ///   - baseURL: API base URL
     ///   - captureStore: Store for status updates
     ///   - keychain: Keychain for device credentials
-    init(baseURL: URL, captureStore: CaptureStore, keychain: KeychainService) {
+    func configure(baseURL: URL, captureStore: CaptureStore, keychain: KeychainService) {
         self.baseURL = baseURL
         self.captureStore = captureStore
         self.keychain = keychain
-        super.init()
+        Self.logger.info("UploadService configured with baseURL: \(baseURL.absoluteString)")
     }
 
     // MARK: - Upload Methods
@@ -102,6 +127,10 @@ final class UploadService: NSObject {
     /// - Parameter capture: CaptureData to upload
     /// - Throws: `UploadError` if upload cannot be started
     func upload(_ capture: CaptureData) async throws {
+        guard let baseURL = baseURL, let captureStore = captureStore, let keychain = keychain else {
+            throw UploadError.notConfigured
+        }
+
         Self.logger.info("Starting upload for capture: \(capture.id.uuidString)")
 
         // Update status to uploading
@@ -114,22 +143,21 @@ final class UploadService: NSObject {
             throw UploadError.deviceNotRegistered
         }
 
-        // Create multipart request
-        let (request, tempFileURL) = try createUploadRequest(
+        // Create multipart request (returns boundary for body)
+        let (request, tempFileURL, boundary) = try createUploadRequest(
             for: capture,
-            deviceId: deviceState.deviceId
+            deviceId: deviceState.deviceId,
+            baseURL: baseURL
         )
 
-        // Write multipart body to temp file
-        try writeMultipartBody(for: capture, to: tempFileURL)
+        // Write multipart body to temp file (using same boundary as header)
+        try writeMultipartBody(for: capture, to: tempFileURL, boundary: boundary)
 
         // Create background upload task
         let task = backgroundSession.uploadTask(with: request, fromFile: tempFileURL)
 
         // Track task -> capture mapping
-        lock.lock()
-        taskToCaptureMap[task.taskIdentifier] = capture.id
-        lock.unlock()
+        registerTask(task.taskIdentifier, forCapture: capture.id)
 
         task.resume()
 
@@ -140,28 +168,29 @@ final class UploadService: NSObject {
     ///
     /// Called on app launch to recover interrupted uploads.
     func resumePendingUploads() async {
-        backgroundSession.getTasksWithCompletionHandler { [weak self] _, uploadTasks, _ in
-            Self.logger.info("Found \(uploadTasks.count) pending upload tasks")
+        let (_, uploadTasks, _) = await backgroundSession.tasks
+        Self.logger.info("Found \(uploadTasks.count) pending upload tasks")
 
-            // Tasks will be handled by delegate when they complete
-            for task in uploadTasks {
-                Self.logger.debug("Resuming task \(task.taskIdentifier)")
-            }
+        // Tasks will be handled by delegate when they complete
+        for task in uploadTasks {
+            Self.logger.debug("Resuming task \(task.taskIdentifier)")
         }
     }
 
     // MARK: - Private Methods
 
     /// Create upload request with auth headers.
+    /// Returns (request, tempFileURL, boundary) - boundary must be used in writeMultipartBody.
     private func createUploadRequest(
         for capture: CaptureData,
-        deviceId: String
-    ) throws -> (URLRequest, URL) {
+        deviceId: String,
+        baseURL: URL
+    ) throws -> (URLRequest, URL, String) {
         let url = baseURL.appendingPathComponent("/api/v1/captures")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
 
-        // Generate boundary
+        // Generate boundary (must be used in both header and body)
         let boundary = "Rial-\(UUID().uuidString)"
         request.setValue(
             "multipart/form-data; boundary=\(boundary)",
@@ -182,12 +211,15 @@ final class UploadService: NSObject {
         let tempDir = FileManager.default.temporaryDirectory
         let tempFile = tempDir.appendingPathComponent("upload-\(capture.id.uuidString).multipart")
 
-        return (request, tempFile)
+        return (request, tempFile, boundary)
     }
 
     /// Write multipart body to temp file.
-    private func writeMultipartBody(for capture: CaptureData, to fileURL: URL) throws {
-        let boundary = "Rial-\(UUID().uuidString)"
+    /// - Parameters:
+    ///   - capture: The capture data to upload
+    ///   - fileURL: Temp file to write to
+    ///   - boundary: The boundary string (must match Content-Type header)
+    private func writeMultipartBody(for capture: CaptureData, to fileURL: URL, boundary: String) throws {
         var body = Data()
 
         // JPEG part
@@ -199,17 +231,39 @@ final class UploadService: NSObject {
             boundary: boundary
         ))
 
-        // Depth part
+        // Depth part (backend expects field name "depth_map")
         body.append(multipartPart(
-            name: "depth",
+            name: "depth_map",
             filename: "depth.bin",
             contentType: "application/octet-stream",
             data: capture.depth,
             boundary: boundary
         ))
 
-        // Metadata part (JSON)
-        let metadataJSON = try JSONEncoder().encode(capture.metadata)
+        // Metadata part (JSON) - must match backend's CaptureMetadataPayload format
+        // Assertion is included IN the metadata JSON (as base64), not as a separate part
+        let uploadLocation: UploadLocation? = capture.metadata.location.map { loc in
+            UploadLocation(
+                latitude: loc.latitude,
+                longitude: loc.longitude,
+                altitude: loc.altitude,
+                accuracy: loc.accuracy
+            )
+        }
+
+        let uploadMetadata = UploadMetadataPayload(
+            capturedAt: Self.iso8601Formatter.string(from: capture.metadata.capturedAt),
+            deviceModel: capture.metadata.deviceModel,
+            photoHash: capture.metadata.photoHash,
+            depthMapDimensions: UploadDepthDimensions(
+                width: capture.metadata.depthMapDimensions.width,
+                height: capture.metadata.depthMapDimensions.height
+            ),
+            assertion: capture.assertion?.base64EncodedString(),
+            location: uploadLocation
+        )
+
+        let metadataJSON = try JSONEncoder().encode(uploadMetadata)
         body.append(multipartPart(
             name: "metadata",
             filename: "metadata.json",
@@ -217,17 +271,6 @@ final class UploadService: NSObject {
             data: metadataJSON,
             boundary: boundary
         ))
-
-        // Assertion part (optional)
-        if let assertion = capture.assertion {
-            body.append(multipartPart(
-                name: "assertion",
-                filename: "assertion.bin",
-                contentType: "application/octet-stream",
-                data: assertion,
-                boundary: boundary
-            ))
-        }
 
         // Closing boundary
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
@@ -303,7 +346,7 @@ extension UploadService: URLSessionTaskDelegate {
             Self.logger.error("Upload failed for \(captureId.uuidString): \(error.localizedDescription)")
 
             Task {
-                try? await captureStore.updateStatus(.failed, for: captureId)
+                try? await captureStore?.updateStatus(.failed, for: captureId)
             }
         } else {
             Self.logger.info("Upload completed for \(captureId.uuidString)")
@@ -336,29 +379,75 @@ extension UploadService: URLSessionDataDelegate {
 
         guard let captureId = captureId else { return }
 
-        // Try to parse upload response
+        // Log raw response for debugging
+        if let responseString = String(data: data, encoding: .utf8) {
+            Self.logger.debug("Upload response: \(responseString)")
+        }
+
+        // Try to parse upload response (wrapped in {"data": {...}})
         do {
-            let response = try JSONDecoder().decode(UploadResponse.self, from: data)
+            let response = try JSONDecoder().decode(UploadAPIResponse.self, from: data)
 
             Task {
-                try? await captureStore.updateUploadResult(
+                try? await captureStore?.updateUploadResult(
                     for: captureId,
-                    serverCaptureId: response.captureId,
-                    verificationUrl: response.verificationUrl
+                    serverCaptureId: response.data.captureId,
+                    verificationUrl: response.data.verificationUrl
                 )
             }
 
-            Self.logger.info("Upload success - server ID: \(response.captureId.uuidString)")
+            Self.logger.info("Upload success - server ID: \(response.data.captureId.uuidString)")
         } catch {
             Self.logger.warning("Failed to parse upload response: \(error.localizedDescription)")
         }
     }
 }
 
+// MARK: - Upload Metadata (matches backend CaptureMetadataPayload)
+
+/// Metadata payload for upload that matches backend's expected format.
+/// Uses snake_case keys to match Rust's serde conventions.
+private struct UploadMetadataPayload: Encodable {
+    let capturedAt: String  // ISO 8601 string
+    let deviceModel: String
+    let photoHash: String
+    let depthMapDimensions: UploadDepthDimensions
+    let assertion: String?  // base64 encoded
+    let location: UploadLocation?
+
+    enum CodingKeys: String, CodingKey {
+        case capturedAt = "captured_at"
+        case deviceModel = "device_model"
+        case photoHash = "photo_hash"
+        case depthMapDimensions = "depth_map_dimensions"
+        case assertion
+        case location
+    }
+}
+
+/// Depth dimensions for upload payload.
+private struct UploadDepthDimensions: Encodable {
+    let width: Int
+    let height: Int
+}
+
+/// Location data for upload payload.
+private struct UploadLocation: Encodable {
+    let latitude: Double
+    let longitude: Double
+    let altitude: Double?
+    let accuracy: Double?
+}
+
 // MARK: - UploadResponse
 
-/// Response from capture upload endpoint.
-private struct UploadResponse: Decodable {
+/// Wrapper for API responses that use {"data": {...}} format.
+private struct UploadAPIResponse: Decodable {
+    let data: UploadResponseData
+}
+
+/// Response data from capture upload endpoint.
+private struct UploadResponseData: Decodable {
     let captureId: UUID
     let verificationUrl: String
 
@@ -372,6 +461,9 @@ private struct UploadResponse: Decodable {
 
 /// Errors that can occur during upload.
 enum UploadError: Error, LocalizedError {
+    /// Service not configured
+    case notConfigured
+
     /// Device not registered
     case deviceNotRegistered
 
@@ -386,6 +478,8 @@ enum UploadError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
+        case .notConfigured:
+            return "UploadService not configured. Call configure() first."
         case .deviceNotRegistered:
             return "Device is not registered"
         case .requestFailed(let message):

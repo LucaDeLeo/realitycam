@@ -22,7 +22,6 @@ use axum::{
     Json, Router,
 };
 use axum_extra::extract::Multipart;
-use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
@@ -279,16 +278,18 @@ async fn upload_capture(
     // SECURITY: Server-side hash verification of RAW BYTES
     // ========================================================================
     // Compute SHA256 of raw photo bytes for proper cryptographic security.
-    // Mobile and backend both hash raw bytes (not base64 string) as of Nov 2025.
+    // Mobile sends hex-encoded SHA256 hash (64 characters).
     let computed_hash = Sha256::digest(&parsed.photo_bytes);
-    let claimed_hash_bytes = STANDARD.decode(&parsed.metadata.photo_hash).map_err(|e| {
+    let claimed_hash_bytes = hex::decode(&parsed.metadata.photo_hash).map_err(|e| {
         tracing::warn!(
             request_id = %request_id,
             error = %e,
-            "Invalid base64 encoding in photo_hash"
+            "Invalid hex encoding in photo_hash"
         );
         ApiErrorWithRequestId {
-            error: ApiError::Validation("Invalid base64 encoding in photo_hash".to_string()),
+            error: ApiError::Validation(format!(
+                "Invalid hex encoding in photo_hash: {e}. Expected 64 hex characters."
+            )),
             request_id,
         }
     })?;
@@ -297,13 +298,13 @@ async fn upload_capture(
         tracing::warn!(
             request_id = %request_id,
             device_id = %device_ctx.device_id,
-            computed_hash = %STANDARD.encode(computed_hash),
+            computed_hash = %hex::encode(computed_hash),
             claimed_hash = %parsed.metadata.photo_hash,
             "Photo hash mismatch - rejecting upload"
         );
         return Err(ApiErrorWithRequestId {
             error: ApiError::Validation(
-                "Photo hash does not match uploaded content. Ensure hash is SHA256 of photo bytes."
+                "Photo hash does not match uploaded content. Ensure hash is SHA256 of photo bytes (hex-encoded)."
                     .to_string(),
             ),
             request_id,

@@ -261,7 +261,8 @@ public final class DepthVisualizer {
 /// Depth frame data for visualization.
 ///
 /// Contains the raw depth pixel buffer and associated metadata from an ARFrame.
-public struct DepthFrame: Sendable {
+/// Note: CVPixelBuffer is not Sendable but we handle thread-safety manually.
+public struct DepthFrame: @unchecked Sendable {
     /// Raw Float32 depth values (meters)
     public let depthMap: CVPixelBuffer
 

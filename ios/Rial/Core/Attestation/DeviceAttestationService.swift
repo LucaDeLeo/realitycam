@@ -70,9 +70,16 @@ class DeviceAttestationService {
     /// - Jailbroken devices (security compromised)
     /// - Devices without Secure Enclave
     ///
+    /// In DEBUG builds with `skipAttestation` enabled, always returns `true`
+    /// to allow development without a paid Apple Developer account.
+    ///
     /// - Returns: `true` if DCAppAttest operations are available
     var isSupported: Bool {
-        service.isSupported
+        if AppEnvironment.skipAttestation {
+            logger.warning("Attestation skipped (DEBUG mode) - photos will NOT be verified")
+            return true
+        }
+        return service.isSupported
     }
 
     // MARK: - Key Generation
@@ -97,6 +104,14 @@ class DeviceAttestationService {
     /// // Key ID is automatically persisted to Keychain
     /// ```
     func generateKey() async throws -> String {
+        // Debug bypass - return mock key ID
+        if AppEnvironment.skipAttestation {
+            let mockKeyId = "debug-mock-key-\(UUID().uuidString)"
+            logger.warning("Using mock key ID (DEBUG mode): \(mockKeyId)")
+            try keychain.save(Data(mockKeyId.utf8), forKey: "rial.attestation.keyId")
+            return mockKeyId
+        }
+
         guard service.isSupported else {
             logger.error("DCAppAttest not supported on this device")
             throw AttestationError.unsupported
@@ -145,6 +160,12 @@ class DeviceAttestationService {
     /// // Send attestation to backend for verification
     /// ```
     func attestKey(_ keyId: String, challenge: Data) async throws -> Data {
+        // Debug bypass - return mock attestation
+        if AppEnvironment.skipAttestation {
+            logger.warning("Returning mock attestation (DEBUG mode)")
+            return Data("debug-mock-attestation".utf8)
+        }
+
         guard challenge.count == 32 else {
             logger.error("Invalid challenge size: \(challenge.count) bytes (expected 32)")
             throw AttestationError.invalidChallenge
@@ -196,6 +217,12 @@ class DeviceAttestationService {
     /// // Attach assertion to upload payload
     /// ```
     func generateAssertion(_ keyId: String, clientData: Data) async throws -> Data {
+        // Debug bypass - return mock assertion
+        if AppEnvironment.skipAttestation {
+            logger.warning("Returning mock assertion (DEBUG mode)")
+            return Data("debug-mock-assertion".utf8)
+        }
+
         let startTime = Date()
 
         // Hash client data using CryptoService from Story 6-4

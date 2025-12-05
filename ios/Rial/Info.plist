@@ -26,6 +26,13 @@
 	<string>Rial uses location to verify where photos were taken</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Rial can save verified photos to your library</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Rial connects to local development server for testing</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -79,6 +79,13 @@ final class VideoUploadService: NSObject {
     /// Lock for thread-safe access to taskToCaptureMap
     private let lock = NSLock()
 
+    /// Thread-safe registration of task to capture mapping.
+    private func registerTask(_ taskId: Int, forCapture captureId: UUID) {
+        lock.lock()
+        defer { lock.unlock() }
+        taskToCaptureMap[taskId] = captureId
+    }
+
     /// Response data accumulated during download
     private var responseData: [Int: Data] = [:]
 
@@ -157,9 +164,7 @@ final class VideoUploadService: NSObject {
         let task = backgroundSession.uploadTask(with: request, fromFile: tempFileURL)
 
         // Track task -> capture mapping
-        lock.lock()
-        taskToCaptureMap[task.taskIdentifier] = capture.id
-        lock.unlock()
+        registerTask(task.taskIdentifier, forCapture: capture.id)
 
         task.resume()
 
@@ -170,13 +175,12 @@ final class VideoUploadService: NSObject {
     ///
     /// Called on app launch to recover interrupted uploads.
     func resumePendingUploads() async {
-        backgroundSession.getTasksWithCompletionHandler { [weak self] _, uploadTasks, _ in
-            Self.logger.info("Found \(uploadTasks.count) pending video upload tasks")
+        let (_, uploadTasks, _) = await backgroundSession.tasks
+        Self.logger.info("Found \(uploadTasks.count) pending video upload tasks")
 
-            // Tasks will be handled by delegate when they complete
-            for task in uploadTasks {
-                Self.logger.debug("Resuming video upload task \(task.taskIdentifier)")
-            }
+        // Tasks will be handled by delegate when they complete
+        for task in uploadTasks {
+            Self.logger.debug("Resuming video upload task \(task.taskIdentifier)")
         }
     }
 

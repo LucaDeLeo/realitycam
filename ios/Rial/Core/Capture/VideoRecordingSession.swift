@@ -159,7 +159,7 @@ public extension VideoRecordingSessionDelegate {
 /// - Graceful interruption handling
 ///
 /// - Note: Requires iPhone Pro with LiDAR for depth capture.
-public final class VideoRecordingSession: NSObject {
+public final class VideoRecordingSession: NSObject, @unchecked Sendable {
 
     // MARK: - Properties
 

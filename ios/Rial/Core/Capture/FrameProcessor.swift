@@ -124,6 +124,8 @@ public final class FrameProcessor: @unchecked Sendable {
         )
 
         // Construct final CaptureData (assertion added separately by CaptureAssertionService)
+        // Note: frame.timestamp is seconds since device boot, NOT Unix timestamp
+        // Use Date() for current wall-clock time
         let captureData = CaptureData(
             jpeg: jpegData,
             depth: compressedDepth,
@@ -131,7 +133,7 @@ public final class FrameProcessor: @unchecked Sendable {
             assertion: nil,
             assertionStatus: .none,
             assertionAttemptCount: 0,
-            timestamp: Date(timeIntervalSince1970: frame.timestamp)
+            timestamp: Date()
         )
 
         let processingTime = CFAbsoluteTimeGetCurrent() - startTime
@@ -150,6 +152,7 @@ public final class FrameProcessor: @unchecked Sendable {
     /// Convert CVPixelBuffer to JPEG data.
     ///
     /// Uses CIContext for hardware-accelerated JPEG encoding.
+    /// Applies proper orientation correction for ARKit's camera output.
     ///
     /// - Parameter pixelBuffer: RGB pixel buffer from ARFrame.capturedImage
     /// - Returns: JPEG data (typically 2-4MB for 12MP photo)
@@ -157,7 +160,11 @@ public final class FrameProcessor: @unchecked Sendable {
     private func convertToJPEG(_ pixelBuffer: CVPixelBuffer) async throws -> Data {
         let startTime = CFAbsoluteTimeGetCurrent()
 
-        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+        var ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+
+        // ARKit's capturedImage needs orientation correction.
+        // Apply 90° clockwise rotation for portrait orientation.
+        ciImage = ciImage.oriented(.right)
 
         guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) else {
             Self.logger.error("Failed to create sRGB color space")
@@ -249,8 +256,10 @@ public final class FrameProcessor: @unchecked Sendable {
             height: CVPixelBufferGetHeight(depthBuffer)
         )
 
+        // Note: frame.timestamp is seconds since device boot, NOT Unix timestamp
+        // Use Date() for current wall-clock time
         return CaptureMetadata(
-            capturedAt: Date(timeIntervalSince1970: frame.timestamp),
+            capturedAt: Date(),
             deviceModel: deviceModel,
             photoHash: photoHash,
             location: locationData,

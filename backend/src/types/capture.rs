@@ -40,11 +40,11 @@ pub struct CaptureLocation {
     pub latitude: f64,
     /// Longitude in degrees (-180 to 180)
     pub longitude: f64,
-    /// Altitude in meters (optional)
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Altitude in meters (optional - defaults to None if missing from JSON)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub altitude: Option<f64>,
-    /// Accuracy in meters (optional)
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Accuracy in meters (optional - defaults to None if missing from JSON)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub accuracy: Option<f64>,
 }
 
@@ -57,7 +57,7 @@ pub struct CaptureMetadataPayload {
     pub captured_at: String,
     /// Device model (e.g., "iPhone 15 Pro")
     pub device_model: String,
-    /// SHA-256 hash of the photo, base64-encoded
+    /// SHA-256 hash of the photo, hex-encoded (64 characters, case-insensitive)
     pub photo_hash: String,
     /// Dimensions of the depth map
     pub depth_map_dimensions: DepthMapDimensions,
@@ -133,7 +133,7 @@ pub struct CaptureDetailsResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub media_url: Option<String>,
 
-    /// SHA-256 hash of the media as lowercase hex string (for hash-only captures)
+    /// SHA-256 hash of the media as hex string (for hash-only captures)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub media_hash: Option<String>,
 
@@ -193,9 +193,23 @@ impl CaptureMetadataPayload {
     }
 
     fn validate_photo_hash(&self) -> Result<(), ApiError> {
-        if self.photo_hash.trim().is_empty() {
+        let hash = self.photo_hash.trim();
+        if hash.is_empty() {
             return Err(ApiError::Validation(
                 "photo_hash is required and cannot be empty".to_string(),
+            ));
+        }
+        // SHA-256 hex encoding is exactly 64 characters
+        if hash.len() != 64 {
+            return Err(ApiError::Validation(format!(
+                "photo_hash must be 64 hex characters (SHA-256), got {} characters",
+                hash.len()
+            )));
+        }
+        // Validate all characters are valid hex digits (case-insensitive)
+        if !hash.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Err(ApiError::Validation(
+                "photo_hash must contain only hexadecimal characters (0-9, a-f, A-F)".to_string(),
             ));
         }
         Ok(())
@@ -294,7 +308,9 @@ mod tests {
         CaptureMetadataPayload {
             captured_at: "2025-11-23T10:30:00.123Z".to_string(),
             device_model: "iPhone 15 Pro".to_string(),
-            photo_hash: "dGVzdC1oYXNo".to_string(),
+            // Valid SHA-256 hex hash (64 characters)
+            photo_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                .to_string(),
             depth_map_dimensions: DepthMapDimensions {
                 width: 256,
                 height: 192,
@@ -340,6 +356,31 @@ mod tests {
         metadata.photo_hash = "".to_string();
         let result = metadata.validate();
         assert!(matches!(result, Err(ApiError::Validation(_))));
+    }
+
+    #[test]
+    fn test_invalid_photo_hash_wrong_length() {
+        let mut metadata = valid_metadata();
+        // Too short (only 32 chars instead of 64)
+        metadata.photo_hash = "e3b0c44298fc1c149afbf4c8996fb924".to_string();
+        let result = metadata.validate();
+        assert!(matches!(result, Err(ApiError::Validation(_))));
+        if let Err(ApiError::Validation(msg)) = result {
+            assert!(msg.contains("64 hex characters"));
+        }
+    }
+
+    #[test]
+    fn test_invalid_photo_hash_non_hex_chars() {
+        let mut metadata = valid_metadata();
+        // Contains 'g' which is not a valid hex character
+        metadata.photo_hash =
+            "g3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string();
+        let result = metadata.validate();
+        assert!(matches!(result, Err(ApiError::Validation(_))));
+        if let Err(ApiError::Validation(msg)) = result {
+            assert!(msg.contains("hexadecimal"));
+        }
     }
 
     #[test]

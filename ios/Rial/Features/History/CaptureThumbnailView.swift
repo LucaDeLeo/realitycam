@@ -10,13 +10,28 @@
 import SwiftUI
 
 /// Display item for capture history.
-struct CaptureHistoryItem: Identifiable {
+struct CaptureHistoryItem: Identifiable, Hashable {
     let id: UUID
     let thumbnail: UIImage?
     let status: CaptureStatus
     let createdAt: Date
     let serverCaptureId: UUID?
     let verificationUrl: String?
+    /// Device model from capture metadata
+    let deviceModel: String?
+    /// Whether location was captured
+    let hasLocation: Bool
+    /// Whether assertion was generated
+    let hasAssertion: Bool
+
+    // Hashable conformance (UIImage is not Hashable, so hash by id)
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+
+    static func == (lhs: CaptureHistoryItem, rhs: CaptureHistoryItem) -> Bool {
+        lhs.id == rhs.id
+    }
 }
 
 /// Thumbnail view for a single capture in history grid.
@@ -180,7 +195,10 @@ extension CaptureHistoryItem {
             status: status,
             createdAt: Date(),
             serverCaptureId: status == .uploaded ? UUID() : nil,
-            verificationUrl: status == .uploaded ? "https://verify.rial.app/abc123" : nil
+            verificationUrl: status == .uploaded ? "https://verify.rial.app/abc123" : nil,
+            deviceModel: "iPhone 15 Pro",
+            hasLocation: true,
+            hasAssertion: status == .uploaded
         )
     }
 }

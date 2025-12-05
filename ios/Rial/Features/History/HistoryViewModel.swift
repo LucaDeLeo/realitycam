@@ -53,7 +53,7 @@ final class HistoryViewModel: ObservableObject {
         captureStore: CaptureStore? = nil,
         uploadService: UploadService? = nil
     ) {
-        self.captureStore = captureStore ?? CaptureStore()
+        self.captureStore = captureStore ?? .shared
         self.uploadService = uploadService
     }
 
@@ -65,15 +65,18 @@ final class HistoryViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            let captureData = try await captureStore.fetchAllCaptures()
-            captures = captureData.map { data in
+            let summaries = try await captureStore.fetchHistorySummaries()
+            captures = summaries.map { summary in
                 CaptureHistoryItem(
-                    id: data.id,
-                    thumbnail: generateThumbnail(from: data.jpeg),
-                    status: determineStatus(data),
-                    createdAt: data.timestamp,
-                    serverCaptureId: nil, // Would come from store
-                    verificationUrl: nil
+                    id: summary.id,
+                    thumbnail: generateThumbnail(from: summary.jpegData),
+                    status: summary.status,
+                    createdAt: summary.createdAt,
+                    serverCaptureId: summary.serverCaptureId,
+                    verificationUrl: summary.verificationUrl,
+                    deviceModel: summary.deviceModel,
+                    hasLocation: summary.hasLocation,
+                    hasAssertion: summary.hasAssertion
                 )
             }
 
@@ -84,15 +87,39 @@ final class HistoryViewModel: ObservableObject {
         }
     }
 
-    /// Retry all failed uploads.
+    /// Retry all failed and pending uploads.
     func retryFailedUploads() async {
-        Self.logger.info("Retrying failed uploads")
+        Self.logger.info("Retrying uploads")
+
+        // Ensure device is registered
+        if !DeviceRegistrationService.shared.isRegistered {
+            Self.logger.warning("Device not registered - attempting registration first")
+            do {
+                try await DeviceRegistrationService.shared.registerIfNeeded()
+            } catch {
+                errorMessage = "Device not registered. Please restart the app."
+                return
+            }
+        }
 
         do {
             let pending = try await captureStore.fetchPendingCaptures()
-            let failed = captures.filter { $0.status == .failed }
+            Self.logger.info("Found \(pending.count) pending captures to upload")
 
-            Self.logger.info("Found \(pending.count) pending, \(failed.count) failed uploads")
+            guard !pending.isEmpty else {
+                Self.logger.info("No pending captures to upload")
+                return
+            }
+
+            // Retry each pending capture using shared upload service
+            for capture in pending {
+                do {
+                    try await UploadService.shared.upload(capture)
+                    Self.logger.info("Upload started for: \(capture.id.uuidString)")
+                } catch {
+                    Self.logger.error("Failed to upload \(capture.id.uuidString): \(error.localizedDescription)")
+                }
+            }
 
             // Reload to refresh status
             await loadCaptures()
@@ -130,18 +157,6 @@ final class HistoryViewModel: ObservableObject {
             image.draw(in: CGRect(origin: .zero, size: size))
         }
     }
-
-    /// Determine capture status based on assertion state.
-    private func determineStatus(_ data: CaptureData) -> CaptureStatus {
-        switch data.assertionStatus {
-        case .none, .pending:
-            return .pending
-        case .generated:
-            return .pending // Has assertion but not yet uploaded
-        case .failed:
-            return .failed
-        }
-    }
 }
 
 // MARK: - Preview Support
@@ -158,6 +173,12 @@ extension HistoryViewModel {
             .preview(status: .failed),
         ]
         return vm
+    }
+}
+
+extension HistoryView_Previews {
+    static var mockNavigationState: AppNavigationState {
+        AppNavigationState()
     }
 }
 #endif

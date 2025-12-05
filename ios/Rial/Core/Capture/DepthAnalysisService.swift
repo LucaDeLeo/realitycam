@@ -123,14 +123,11 @@ public final class DepthAnalysisService: @unchecked Sendable {
     ///   - rgbImage: Optional RGB image for edge coherence (currently unused)
     /// - Returns: DepthAnalysisResult with all metrics and final determination
     ///
-    /// - Note: This method runs on a background queue and is async.
+    /// - Note: This method is async and performs CPU-intensive analysis.
     public func analyze(depthMap: CVPixelBuffer, rgbImage: CVPixelBuffer? = nil) async -> DepthAnalysisResult {
-        return await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let result = self.performAnalysis(depthMap: depthMap)
-                continuation.resume(returning: result)
-            }
-        }
+        // performAnalysis is synchronous and CPU-bound
+        // Using nonisolated to avoid Sendable warning on CVPixelBuffer parameter
+        return performAnalysis(depthMap: depthMap)
     }
 
     /// Analyzes multiple depth keyframes to determine temporal consistency (video privacy mode).

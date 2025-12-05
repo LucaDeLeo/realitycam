@@ -1,10 +1,10 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var selectedTab = 0
+    @EnvironmentObject private var navigationState: AppNavigationState
 
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: $navigationState.selectedTab) {
             CaptureView()
                 .tabItem {
                     Label("Capture", systemImage: "camera.fill")
@@ -22,4 +22,6 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+        .environmentObject(AppNavigationState())
+        .environmentObject(PrivacySettingsManager.preview())
 }

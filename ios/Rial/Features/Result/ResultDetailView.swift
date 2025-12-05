@@ -30,15 +30,22 @@ import SwiftUI
 /// }
 /// ```
 struct ResultDetailView: View {
-    let capture: CaptureHistoryItem
+    let initialCapture: CaptureHistoryItem
 
+    @State private var currentCapture: CaptureHistoryItem
     @State private var showShareSheet = false
+    @State private var refreshTimer: Timer?
+
+    init(capture: CaptureHistoryItem) {
+        self.initialCapture = capture
+        self._currentCapture = State(initialValue: capture)
+    }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
                 // Photo with zoom
-                ZoomableImageView(image: capture.thumbnail)
+                ZoomableImageView(image: currentCapture.thumbnail)
                     .frame(height: 300)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
 
@@ -54,9 +61,73 @@ struct ResultDetailView: View {
             toolbarContent
         }
         .sheet(isPresented: $showShareSheet) {
-            if let url = capture.verificationUrl {
+            if let url = currentCapture.verificationUrl {
                 ShareSheet(items: [url])
             }
+        }
+        .onAppear {
+            startStatusPolling()
+        }
+        .onDisappear {
+            stopStatusPolling()
+        }
+    }
+
+    // MARK: - Status Polling
+
+    /// Start polling for status updates while upload is in progress.
+    private func startStatusPolling() {
+        // Only poll if status is not final
+        guard currentCapture.status == .pending || currentCapture.status == .uploading || currentCapture.status == .processing else {
+            return
+        }
+
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            Task {
+                await refreshCaptureStatus()
+            }
+        }
+    }
+
+    /// Stop polling for status updates.
+    private func stopStatusPolling() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+    }
+
+    /// Refresh capture status from store.
+    @MainActor
+    private func refreshCaptureStatus() async {
+        do {
+            // Force refresh to get latest data from persistent store
+            CaptureStore.shared.refreshViewContext()
+            let summaries = try await CaptureStore.shared.fetchHistorySummaries()
+            if let updated = summaries.first(where: { $0.id == initialCapture.id }) {
+                let newCapture = CaptureHistoryItem(
+                    id: updated.id,
+                    thumbnail: currentCapture.thumbnail, // Keep existing thumbnail
+                    status: updated.status,
+                    createdAt: updated.createdAt,
+                    serverCaptureId: updated.serverCaptureId,
+                    verificationUrl: updated.verificationUrl,
+                    deviceModel: updated.deviceModel,
+                    hasLocation: updated.hasLocation,
+                    hasAssertion: updated.hasAssertion
+                )
+
+                // Update if status changed
+                if newCapture.status != currentCapture.status ||
+                   newCapture.verificationUrl != currentCapture.verificationUrl {
+                    currentCapture = newCapture
+
+                    // Stop polling if upload completed or failed
+                    if newCapture.status == .uploaded || newCapture.status == .failed {
+                        stopStatusPolling()
+                    }
+                }
+            }
+        } catch {
+            // Silently fail - will retry on next poll
         }
     }
 
@@ -64,7 +135,7 @@ struct ResultDetailView: View {
 
     @ViewBuilder
     private var statusContent: some View {
-        switch capture.status {
+        switch currentCapture.status {
         case .uploaded:
             uploadedContent
         case .uploading:
@@ -80,23 +151,23 @@ struct ResultDetailView: View {
 
     private var uploadedContent: some View {
         VStack(spacing: 16) {
-            // Confidence badge
-            ConfidenceBadge(level: .high) // Would come from actual server response
+            // Confidence badge - "high" for uploads with assertion, "medium" otherwise
+            ConfidenceBadge(level: currentCapture.hasAssertion ? .high : .medium)
 
-            // Evidence summary
+            // Evidence summary using actual capture data
             EvidenceSummaryView(
                 summary: EvidenceSummary(
-                    attestationVerified: true,
-                    depthAnalyzed: true,
-                    metadataValid: true,
-                    hasLocation: true,
-                    capturedAt: capture.createdAt,
-                    deviceModel: "iPhone Pro" // Would come from actual capture
+                    attestationVerified: currentCapture.hasAssertion,
+                    depthAnalyzed: true, // Always true for successful upload (LiDAR required)
+                    metadataValid: true, // Always true for successful upload
+                    hasLocation: currentCapture.hasLocation,
+                    capturedAt: currentCapture.createdAt,
+                    deviceModel: currentCapture.deviceModel ?? "Unknown Device"
                 )
             )
 
             // Verification link
-            if let urlString = capture.verificationUrl,
+            if let urlString = currentCapture.verificationUrl,
                let url = URL(string: urlString) {
                 Link(destination: url) {
                     HStack {
@@ -191,7 +262,7 @@ struct ResultDetailView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .navigationBarTrailing) {
-            if capture.status == .uploaded, capture.verificationUrl != nil {
+            if currentCapture.status == .uploaded, currentCapture.verificationUrl != nil {
                 Button {
                     showShareSheet = true
                 } label: {

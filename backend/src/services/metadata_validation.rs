@@ -566,7 +566,9 @@ mod tests {
         CaptureMetadataPayload {
             captured_at: Utc::now().to_rfc3339(),
             device_model: "iPhone 15 Pro".to_string(),
-            photo_hash: "test-hash".to_string(),
+            // Valid SHA-256 hex hash (64 characters) - hash of empty string
+            photo_hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                .to_string(),
             depth_map_dimensions: DepthMapDimensions {
                 width: 256,
                 height: 192,
