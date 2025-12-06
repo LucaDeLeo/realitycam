@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context story-key="debug-4-ios-network-interceptor">
+  <metadata>
+    <epicId>debug</epicId>
+    <storyId>4</storyId>
+    <title>iOS Network Interceptor</title>
+    <status>drafted</status>
+    <generatedAt>2025-12-06</generatedAt>
+    <generator>BMAD Story Context Workflow</generator>
+    <sourceStoryPath>docs/sprint-artifacts/stories/debug-4-ios-network-interceptor.md</sourceStoryPath>
+  </metadata>
+
+  <story-reference>
+    <file>docs/sprint-artifacts/stories/debug-4-ios-network-interceptor.md</file>
+    <epic>debug</epic>
+    <tech-spec>docs/tech-spec.md</tech-spec>
+  </story-reference>
+
+  <story>
+    <description>Implement a NetworkDebugInterceptor that captures detailed request/response information from all URLSession calls made through APIClient. The interceptor logs both outgoing requests (URL, method, headers, body size) and incoming responses (status code, duration, body size) with the same correlation ID for end-to-end tracing.</description>
+    <tasks>
+      <task id="1">Create NetworkDebugInterceptor.swift in /ios/Rial/Core/Debug/ with request/response capture methods</task>
+      <task id="2">Implement interceptRequest(_:correlationId:) method that logs API_REQUEST event with method, URL, headers, body_size</task>
+      <task id="3">Implement interceptResponse(_:data:startTime:correlationId:) method that logs API_RESPONSE event with status, duration_ms, body_size</task>
+      <task id="4">Refactor APIClient.perform&lt;T&gt;(_:) to use interceptor for request logging and response timing</task>
+      <task id="5">Refactor APIClient.performNoContent(_:) to use interceptor (DRY up the duplicate logic)</task>
+      <task id="6">Write NetworkDebugInterceptorTests.swift - verify event payloads and correlation ID consistency</task>
+      <task id="7">Manual integration test: trigger API request from app, use bun debug:search --correlation-id to verify both events appear</task>
+    </tasks>
+  </story>
+
+  <acceptanceCriteria>
+    <criterion id="AC1">NetworkDebugInterceptor captures request details (URL, method, headers, body size) and logs API_REQUEST event before each request</criterion>
+    <criterion id="AC2">NetworkDebugInterceptor captures response details (status code, duration_ms, body size) and logs API_RESPONSE event after each response</criterion>
+    <criterion id="AC3">Both request and response logs share the same correlation ID for tracing</criterion>
+    <criterion id="AC4">Response duration is accurately measured in milliseconds from request start to response completion</criterion>
+    <criterion id="AC5">All interceptor code is wrapped in #if DEBUG for zero production impact</criterion>
+    <criterion id="AC6">Unit tests verify request/response capture and correlation ID linking</criterion>
+    <criterion id="AC7">Integration test demonstrates end-to-end tracing: make API call, query debug logs, see correlated request/response pair</criterion>
+  </acceptanceCriteria>
+
+  <documentation-artifacts>
+    <artifact path="docs/tech-spec.md" relevance="Story 4 design (lines 580-586), Correlation ID flow diagram (lines 195-212), iOS DebugLogger architecture (lines 428-475)"/>
+  </documentation-artifacts>
+
+  <existing-code>
+    <file path="ios/Rial/Core/Networking/APIClient.swift" relevance="Hook interceptor into perform() and performNoContent() methods. Current inline debug logging at lines 158-172 and 198-212 needs refactoring to use interceptor">
+      <key-sections>
+        <section name="perform&lt;T&gt;" lines="155-192">Main request method with inline debug logging. Add interceptor call before request (line 163-171) and add response logging after response (line 176+)</section>
+        <section name="performNoContent" lines="195-225">Duplicate debug logging code. Refactor to use same interceptor pattern</section>
+        <section name="correlation-id" lines="159-161">Already generates UUID and sets X-Correlation-ID header - interceptor will use this same ID</section>
+      </key-sections>
+    </file>
+    <file path="ios/Rial/Core/Debug/DebugLogger.swift" relevance="Use DebugLogger.shared.log() for event capture. Key API: log(event:level:payload:correlationId:)">
+      <key-sections>
+        <section name="log-method" lines="110-138">Public log method accepts event, level, payload, correlationId. Interceptor calls this for API_REQUEST and API_RESPONSE events</section>
+        <section name="MainActor" lines="38">Class is @MainActor isolated - async calls required</section>
+      </key-sections>
+    </file>
+    <file path="ios/Rial/Core/Debug/DebugLogEntry.swift" relevance="Log entry model with LogLevel enum and AnyCodable for payload values">
+      <key-sections>
+        <section name="LogLevel" lines="79-84">Enum values: debug, info, warn, error - use .info for API_REQUEST/API_RESPONSE</section>
+        <section name="AnyCodable" lines="99-154">Type-erased wrapper for heterogeneous payload values (String, Int, Bool, etc.)</section>
+      </key-sections>
+    </file>
+    <file path="ios/Rial/Core/Debug/DebugLogShipper.swift" relevance="Reference for actor pattern and error handling - interceptor does not use this directly but follows same conventions"/>
+  </existing-code>
+
+  <test-patterns>
+    <file path="ios/RialTests/Debug/DebugLoggerTests.swift" relevance="Test patterns for debug infrastructure: MockDebugLogShipper, TestableDebugLogger, @MainActor test methods">
+      <patterns>
+        <pattern name="MockDebugLogShipper">Actor-based mock that captures shippedBatches and shipCallCount (lines 16-33)</pattern>
+        <pattern name="TestableDebugLogger">Testable wrapper with dependency injection (lines 249-298)</pattern>
+        <pattern name="async-test-pattern">@MainActor test methods with Task.sleep for async timing (lines 66, 85)</pattern>
+        <pattern name="payload-assertion">Access payload values via entry.payload["key"]?.value (lines 225-227)</pattern>
+      </patterns>
+    </file>
+  </test-patterns>
+
+  <files-to-create>
+    <file path="ios/Rial/Core/Debug/NetworkDebugInterceptor.swift">
+      <template><![CDATA[
+#if DEBUG
+import Foundation
+
+/// Intercepts URLSession requests for debug logging.
+/// Captures request/response details with correlation IDs for cross-stack tracing.
+public struct NetworkDebugInterceptor {
+
+    /// Log an outgoing API request.
+    /// Call this BEFORE session.data(for: request).
+    ///
+    /// - Parameters:
+    ///   - request: The URLRequest being sent
+    ///   - correlationId: UUID linking request/response logs
+    public static func logRequest(
+        _ request: URLRequest,
+        correlationId: UUID
+    ) async {
+        await DebugLogger.shared.log(
+            event: "API_REQUEST",
+            payload: [
+                "method": request.httpMethod ?? "?",
+                "url": request.url?.absoluteString ?? "?",
+                "path": request.url?.path ?? "?",
+                "headers": sanitizedHeaders(request.allHTTPHeaderFields),
+                "body_size": request.httpBody?.count ?? 0
+            ],
+            correlationId: correlationId
+        )
+    }
+
+    /// Log an API response.
+    /// Call this AFTER session.data(for: request) completes.
+    ///
+    /// - Parameters:
+    ///   - response: The HTTPURLResponse received
+    ///   - data: Response body data
+    ///   - startTime: When the request was initiated (for duration calculation)
+    ///   - correlationId: UUID linking request/response logs
+    public static func logResponse(
+        _ response: HTTPURLResponse,
+        data: Data,
+        startTime: Date,
+        correlationId: UUID
+    ) async {
+        let durationMs = Int(Date().timeIntervalSince(startTime) * 1000)
+
+        await DebugLogger.shared.log(
+            event: "API_RESPONSE",
+            payload: [
+                "status": response.statusCode,
+                "duration_ms": durationMs,
+                "body_size": data.count,
+                "url": response.url?.absoluteString ?? "?"
+            ],
+            correlationId: correlationId
+        )
+    }
+
+    /// Sanitize headers to avoid logging sensitive values.
+    private static func sanitizedHeaders(_ headers: [String: String]?) -> [String: String] {
+        guard let headers = headers else { return [:] }
+
+        var sanitized = headers
+        let sensitiveKeys = ["Authorization", "X-Device-Signature", "X-Signature-Timestamp"]
+        for key in sensitiveKeys {
+            if sanitized[key] != nil {
+                sanitized[key] = "[REDACTED]"
+            }
+        }
+        return sanitized
+    }
+}
+#endif
+]]></template>
+    </file>
+    <file path="ios/RialTests/Debug/NetworkDebugInterceptorTests.swift">
+      <requirements>
+        <req>Test logRequest captures method, URL, path, headers, body_size</req>
+        <req>Test logResponse captures status, duration_ms, body_size, url</req>
+        <req>Test correlation ID is passed through to both events</req>
+        <req>Test header sanitization redacts Authorization, X-Device-Signature, X-Signature-Timestamp</req>
+        <req>Test duration_ms is calculated correctly (mock startTime)</req>
+        <req>Follow patterns from DebugLoggerTests.swift - use MockDebugLogShipper pattern</req>
+      </requirements>
+    </file>
+  </files-to-create>
+
+  <development-constraints>
+    <constraint type="compilation">All interceptor code MUST be wrapped in #if DEBUG for zero production binary impact</constraint>
+    <constraint type="architecture">Use static methods on struct (not class/actor) - interceptor is stateless</constraint>
+    <constraint type="threading">DebugLogger.shared.log() is @MainActor - interceptor methods must be async</constraint>
+    <constraint type="security">Redact sensitive headers: Authorization, X-Device-Signature, X-Signature-Timestamp</constraint>
+    <constraint type="naming">Events: API_REQUEST, API_RESPONSE (uppercase with underscore)</constraint>
+    <constraint type="payload">Payload keys: method, url, path, headers, body_size (request) | status, duration_ms, body_size, url (response)</constraint>
+    <constraint type="timing">startTime must be captured BEFORE session.data() call, duration calculated AFTER response</constraint>
+  </development-constraints>
+
+  <dependencies>
+    <internal module="ios/Rial/Core/Debug/DebugLogger.swift">DebugLogger.shared.log() API</internal>
+    <internal module="ios/Rial/Core/Debug/DebugLogEntry.swift">LogLevel enum, AnyCodable wrapper</internal>
+    <internal module="ios/Rial/Core/Networking/APIClient.swift">Integration target for interceptor</internal>
+  </dependencies>
+
+  <testing-context>
+    <framework>XCTest</framework>
+    <location>ios/RialTests/Debug/NetworkDebugInterceptorTests.swift</location>
+    <patterns>
+      <pattern>Use MockDebugLogShipper actor from DebugLoggerTests.swift</pattern>
+      <pattern>@MainActor test methods for async operations</pattern>
+      <pattern>TestableDebugLogger or direct DebugLogger with mock shipper</pattern>
+      <pattern>Assert payload values via entry.payload["key"]?.value</pattern>
+    </patterns>
+    <coverage>
+      <item>Request capture: method, URL, path, headers, body_size</item>
+      <item>Response capture: status, duration_ms, body_size, url</item>
+      <item>Correlation ID consistency between request/response</item>
+      <item>Header sanitization for sensitive keys</item>
+      <item>Duration calculation accuracy</item>
+    </coverage>
+  </testing-context>
+
+  <apiClient-refactoring-guide>
+    <current-pattern>
+      <description>Both perform() and performNoContent() have duplicate inline debug logging</description>
+      <lines>158-172 (perform), 198-212 (performNoContent)</lines>
+    </current-pattern>
+    <target-pattern>
+      <description>Replace inline logging with NetworkDebugInterceptor calls</description>
+      <code><![CDATA[
+func perform<T: Decodable>(_ request: URLRequest) async throws -> T {
+    var request = request
+
+    #if DEBUG
+    let correlationId = UUID()
+    let startTime = Date()
+    request.setValue(correlationId.uuidString, forHTTPHeaderField: "X-Correlation-ID")
+    await NetworkDebugInterceptor.logRequest(request, correlationId: correlationId)
+    #endif
+
+    let (data, response) = try await session.data(for: request)
+
+    #if DEBUG
+    if let httpResponse = response as? HTTPURLResponse {
+        await NetworkDebugInterceptor.logResponse(httpResponse, data: data, startTime: startTime, correlationId: correlationId)
+    }
+    #endif
+
+    guard let httpResponse = response as? HTTPURLResponse else {
+        throw APIError.invalidResponse
+    }
+    // ... rest of method
+}
+]]></code>
+    </target-pattern>
+    <dry-opportunity>Consider extracting common debug setup into helper method if code duplication remains after refactor</dry-opportunity>
+  </apiClient-refactoring-guide>
+
+  <events-reference>
+    <event name="API_REQUEST">
+      <timing>BEFORE session.data() call</timing>
+      <payload>
+        <field name="method" type="String">HTTP method (GET, POST, etc.)</field>
+        <field name="url" type="String">Full URL string</field>
+        <field name="path" type="String">URL path component only</field>
+        <field name="headers" type="[String:String]">Sanitized request headers</field>
+        <field name="body_size" type="Int">Request body size in bytes (0 if no body)</field>
+      </payload>
+    </event>
+    <event name="API_RESPONSE">
+      <timing>AFTER session.data() returns</timing>
+      <payload>
+        <field name="status" type="Int">HTTP status code</field>
+        <field name="duration_ms" type="Int">Request duration in milliseconds</field>
+        <field name="body_size" type="Int">Response body size in bytes</field>
+        <field name="url" type="String">Response URL (may differ from request URL if redirected)</field>
+      </payload>
+    </event>
+  </events-reference>
+</story-context>

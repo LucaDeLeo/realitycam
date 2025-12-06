@@ -112,6 +112,8 @@
 		3089F9DB00C3 /* DebugLogEntryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10C3 /* DebugLogEntryTests.swift */; };
 		3089F9DB00C4 /* DebugLoggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10C4 /* DebugLoggerTests.swift */; };
 		3089F9DB00C5 /* DebugLogShipperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10C5 /* DebugLogShipperTests.swift */; };
+		3089F9DB00C6 /* NetworkDebugInterceptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10C6 /* NetworkDebugInterceptor.swift */; };
+		3089F9DB00C7 /* NetworkDebugInterceptorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10C7 /* NetworkDebugInterceptorTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -241,6 +243,8 @@
 		3089F9DB10C3 /* DebugLogEntryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLogEntryTests.swift; sourceTree = "<group>"; };
 		3089F9DB10C4 /* DebugLoggerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLoggerTests.swift; sourceTree = "<group>"; };
 		3089F9DB10C5 /* DebugLogShipperTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLogShipperTests.swift; sourceTree = "<group>"; };
+		3089F9DB10C6 /* NetworkDebugInterceptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkDebugInterceptor.swift; sourceTree = "<group>"; };
+		3089F9DB10C7 /* NetworkDebugInterceptorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkDebugInterceptorTests.swift; sourceTree = "<group>"; };
 		D9A44E098094F0E08456FEE9 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppEnvironment.swift; path = Rial/Core/Configuration/AppEnvironment.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -326,6 +330,7 @@
 				3089F9DB10C0 /* DebugLogEntry.swift */,
 				3089F9DB10C1 /* DebugLogger.swift */,
 				3089F9DB10C2 /* DebugLogShipper.swift */,
+				3089F9DB10C6 /* NetworkDebugInterceptor.swift */,
 			);
 			path = Debug;
 			sourceTree = "<group>";
@@ -404,6 +409,7 @@
 				3089F9DB10C3 /* DebugLogEntryTests.swift */,
 				3089F9DB10C4 /* DebugLoggerTests.swift */,
 				3089F9DB10C5 /* DebugLogShipperTests.swift */,
+				3089F9DB10C7 /* NetworkDebugInterceptorTests.swift */,
 			);
 			path = Debug;
 			sourceTree = "<group>";
@@ -833,6 +839,7 @@
 				3089F9DB00C0 /* DebugLogEntry.swift in Sources */,
 				3089F9DB00C1 /* DebugLogger.swift in Sources */,
 				3089F9DB00C2 /* DebugLogShipper.swift in Sources */,
+				3089F9DB00C6 /* NetworkDebugInterceptor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -870,6 +877,7 @@
 				3089F9DB00C3 /* DebugLogEntryTests.swift in Sources */,
 				3089F9DB00C4 /* DebugLoggerTests.swift in Sources */,
 				3089F9DB00C5 /* DebugLogShipperTests.swift in Sources */,
+				3089F9DB00C7 /* NetworkDebugInterceptorTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

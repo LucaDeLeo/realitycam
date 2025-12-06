@@ -158,26 +158,31 @@ final class APIClient {
         #if DEBUG
         // Add correlation ID for cross-stack request tracing
         let correlationId = UUID()
+        let startTime = Date()
         request.setValue(correlationId.uuidString, forHTTPHeaderField: "X-Correlation-ID")
-
-        await DebugLogger.shared.log(
-            event: "API_REQUEST",
-            payload: [
-                "method": request.httpMethod ?? "?",
-                "path": request.url?.path ?? "?",
-                "url": request.url?.absoluteString ?? "?"
-            ],
-            correlationId: correlationId
-        )
+        await NetworkDebugInterceptor.logRequest(request, correlationId: correlationId)
         #endif
 
         Self.logger.debug("Request: \(request.httpMethod ?? "?") \(request.url?.path ?? "?")")
 
-        let (data, response) = try await session.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            #if DEBUG
+            await NetworkDebugInterceptor.logError(error, request: request, startTime: startTime, correlationId: correlationId)
+            #endif
+            throw error
+        }
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
         }
+
+        #if DEBUG
+        await NetworkDebugInterceptor.logResponse(httpResponse, data: data, startTime: startTime, correlationId: correlationId)
+        #endif
 
         Self.logger.debug("Response: \(httpResponse.statusCode) (\(data.count) bytes)")
 
@@ -198,26 +203,31 @@ final class APIClient {
         #if DEBUG
         // Add correlation ID for cross-stack request tracing
         let correlationId = UUID()
+        let startTime = Date()
         request.setValue(correlationId.uuidString, forHTTPHeaderField: "X-Correlation-ID")
-
-        await DebugLogger.shared.log(
-            event: "API_REQUEST",
-            payload: [
-                "method": request.httpMethod ?? "?",
-                "path": request.url?.path ?? "?",
-                "url": request.url?.absoluteString ?? "?"
-            ],
-            correlationId: correlationId
-        )
+        await NetworkDebugInterceptor.logRequest(request, correlationId: correlationId)
         #endif
 
         Self.logger.debug("Request: \(request.httpMethod ?? "?") \(request.url?.path ?? "?")")
 
-        let (data, response) = try await session.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            #if DEBUG
+            await NetworkDebugInterceptor.logError(error, request: request, startTime: startTime, correlationId: correlationId)
+            #endif
+            throw error
+        }
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
         }
+
+        #if DEBUG
+        await NetworkDebugInterceptor.logResponse(httpResponse, data: data, startTime: startTime, correlationId: correlationId)
+        #endif
 
         Self.logger.debug("Response: \(httpResponse.statusCode)")
 

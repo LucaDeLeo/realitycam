@@ -152,6 +152,6 @@ development_status:
   # Tech spec created: 2025-12-05
   debug-1-backend-debug-endpoints: done
   debug-2-ios-debug-logger: done
-  debug-3-cli-query-tool: ready-for-dev
-  debug-4-ios-network-interceptor: backlog
+  debug-3-cli-query-tool: done
+  debug-4-ios-network-interceptor: done
   debug-5-web-debug-integration: backlog
