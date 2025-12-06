@@ -151,4 +151,4 @@ development_status:
   # Cross-stack logging infrastructure for internal development
   # Tech spec created: 2025-12-05
   debug-1-backend-debug-endpoints: done
-  debug-2-ios-debug-logger: drafted
+  debug-2-ios-debug-logger: done

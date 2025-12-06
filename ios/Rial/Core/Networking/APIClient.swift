@@ -153,6 +153,24 @@ final class APIClient {
     /// - Parameter request: Configured URLRequest
     /// - Returns: Decoded response
     func perform<T: Decodable>(_ request: URLRequest) async throws -> T {
+        var request = request
+
+        #if DEBUG
+        // Add correlation ID for cross-stack request tracing
+        let correlationId = UUID()
+        request.setValue(correlationId.uuidString, forHTTPHeaderField: "X-Correlation-ID")
+
+        await DebugLogger.shared.log(
+            event: "API_REQUEST",
+            payload: [
+                "method": request.httpMethod ?? "?",
+                "path": request.url?.path ?? "?",
+                "url": request.url?.absoluteString ?? "?"
+            ],
+            correlationId: correlationId
+        )
+        #endif
+
         Self.logger.debug("Request: \(request.httpMethod ?? "?") \(request.url?.path ?? "?")")
 
         let (data, response) = try await session.data(for: request)
@@ -175,6 +193,24 @@ final class APIClient {
 
     /// Perform request expecting no content (204).
     private func performNoContent(_ request: URLRequest) async throws {
+        var request = request
+
+        #if DEBUG
+        // Add correlation ID for cross-stack request tracing
+        let correlationId = UUID()
+        request.setValue(correlationId.uuidString, forHTTPHeaderField: "X-Correlation-ID")
+
+        await DebugLogger.shared.log(
+            event: "API_REQUEST",
+            payload: [
+                "method": request.httpMethod ?? "?",
+                "path": request.url?.path ?? "?",
+                "url": request.url?.absoluteString ?? "?"
+            ],
+            correlationId: correlationId
+        )
+        #endif
+
         Self.logger.debug("Request: \(request.httpMethod ?? "?") \(request.url?.path ?? "?")")
 
         let (data, response) = try await session.data(for: request)
