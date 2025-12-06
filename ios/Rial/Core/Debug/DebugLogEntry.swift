@@ -56,6 +56,21 @@ public struct DebugLogEntry: Codable, Sendable {
         case deviceId = "device_id"
         case sessionId = "session_id"
     }
+
+    // Custom encode to ensure device_id is always present (as null if nil)
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(correlationId, forKey: .correlationId)
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encode(source, forKey: .source)
+        try container.encode(level, forKey: .level)
+        try container.encode(event, forKey: .event)
+        try container.encode(payload, forKey: .payload)
+        // Always encode device_id, even if nil (explicit null in JSON)
+        try container.encode(deviceId, forKey: .deviceId)
+        try container.encode(sessionId, forKey: .sessionId)
+    }
 }
 
 // MARK: - Log Level

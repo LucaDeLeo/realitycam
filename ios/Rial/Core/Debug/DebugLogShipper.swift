@@ -30,10 +30,10 @@ actor DebugLogShipper {
     /// Base URL for API requests
     private let baseURL: URL
 
-    /// JSON encoder configured for API (snake_case keys, ISO8601 dates)
+    /// JSON encoder configured for API (ISO8601 dates)
+    /// Note: No keyEncodingStrategy needed - DebugLogEntry has explicit CodingKeys
     private let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
         encoder.dateEncodingStrategy = .iso8601
         return encoder
     }()

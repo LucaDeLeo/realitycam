@@ -196,15 +196,17 @@ class DeviceAttestationServiceTests: XCTestCase {
     func testSaveDeviceState() {
         let deviceId = "device-uuid-123"
         let attestationKeyId = "key-id-456"
+        let testURL = URL(string: "https://test.example.com")!
 
         do {
             try attestationService.saveDeviceState(
                 deviceId: deviceId,
-                attestationKeyId: attestationKeyId
+                attestationKeyId: attestationKeyId,
+                for: testURL
             )
 
             // Verify it was saved
-            let loadedState = try attestationService.loadDeviceState()
+            let loadedState = try attestationService.loadDeviceState(for: testURL)
             XCTAssertNotNil(loadedState, "Device state should be saved")
             XCTAssertEqual(loadedState?.deviceId, deviceId, "Device ID should match")
             XCTAssertEqual(loadedState?.attestationKeyId, attestationKeyId, "Attestation key ID should match")
@@ -219,8 +221,9 @@ class DeviceAttestationServiceTests: XCTestCase {
     ///
     /// AC6: Returns nil if not registered yet
     func testLoadDeviceStateNotRegistered() {
+        let testURL = URL(string: "https://test.example.com")!
         do {
-            let state = try attestationService.loadDeviceState()
+            let state = try attestationService.loadDeviceState(for: testURL)
             XCTAssertNil(state, "Should return nil when device not registered")
         } catch {
             XCTFail("Load operation should not throw: \(error)")

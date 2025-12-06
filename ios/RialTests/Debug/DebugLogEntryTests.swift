@@ -24,18 +24,18 @@ class DebugLogEntryTests: XCTestCase {
     // MARK: - JSON Encoder Configuration
 
     /// Configured encoder matching DebugLogShipper
+    /// Note: No keyEncodingStrategy needed - DebugLogEntry has explicit CodingKeys
     private let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.sortedKeys] // For predictable test output
         return encoder
     }()
 
     /// Configured decoder for roundtrip testing
+    /// Note: No keyDecodingStrategy needed - DebugLogEntry has explicit CodingKeys
     private let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
         decoder.dateDecodingStrategy = .iso8601
         return decoder
     }()

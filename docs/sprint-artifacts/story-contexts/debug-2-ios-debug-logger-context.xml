@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context story-key="debug-2-ios-debug-logger">
+  <story-reference>
+    <file>docs/sprint-artifacts/stories/debug-2-ios-debug-logger.md</file>
+    <epic>Debug Observability System (Quick-Flow)</epic>
+    <tech-spec>docs/tech-spec.md</tech-spec>
+    <note>Implementation files already exist - story is primarily validation and testing</note>
+  </story-reference>
+
+  <documentation-artifacts>
+    <artifact path="docs/tech-spec.md" relevance="Full technical specification for debug observability system">
+      <sections>
+        <section lines="179-193" topic="Log Entry Schema - JSON format with correlation IDs"/>
+        <section lines="428-475" topic="iOS DebugLogger Architecture - actor pattern, buffering, flush"/>
+        <section lines="563-570" topic="Story 2 Implementation Steps"/>
+        <section lines="146-154" topic="Source Tree Changes - iOS Debug files"/>
+        <section lines="246-256" topic="iOS Swift Patterns - #if DEBUG, Actor concurrency, Codable"/>
+        <section lines="506-519" topic="Security and Performance Considerations"/>
+      </sections>
+    </artifact>
+    <artifact path="docs/architecture.md" relevance="Native Swift architecture patterns and conventions">
+      <sections>
+        <section lines="280-298" topic="Native iOS Dependencies - no third-party for security-critical code"/>
+        <section lines="349-368" topic="Code Style - 4-space indent, camelCase, #if DEBUG"/>
+      </sections>
+    </artifact>
+  </documentation-artifacts>
+
+  <existing-code>
+    <category name="Implementation Files (Already Created)">
+      <file path="ios/Rial/Core/Debug/DebugLogEntry.swift" relevance="Codable model matching backend schema - IMPLEMENTED">
+        <summary>
+          - DebugLogEntry struct with Codable conformance
+          - LogLevel enum (debug, info, warn, error)
+          - LogSource enum (ios, backend, web)
+          - AnyCodable type-erased wrapper for heterogeneous payloads
+          - CodingKeys for snake_case JSON encoding
+          - All wrapped in #if DEBUG
+        </summary>
+      </file>
+      <file path="ios/Rial/Core/Debug/DebugLogger.swift" relevance="Actor-based singleton with buffer management - IMPLEMENTED">
+        <summary>
+          - @MainActor final class with shared singleton
+          - Buffer threshold: 50 entries (triggers auto-flush)
+          - Flush interval: 30 seconds (timer-based)
+          - log() method: event, level, payload, correlationId
+          - flush() method: ships and clears buffer
+          - Uses KeychainService for device ID lookup
+          - Internal init for testability
+          - All wrapped in #if DEBUG
+        </summary>
+      </file>
+      <file path="ios/Rial/Core/Debug/DebugLogShipper.swift" relevance="Batch upload actor with dedicated URLSession - IMPLEMENTED">
+        <summary>
+          - Actor isolation for thread safety
+          - Dedicated URLSession (not APIClient to avoid circular logging)
+          - POST to /debug/logs endpoint
+          - JSONEncoder with convertToSnakeCase and ISO8601 dates
+          - Silent failure - never impacts app functionality
+          - All wrapped in #if DEBUG
+        </summary>
+      </file>
+    </category>
+
+    <category name="Integration Points (Already Wired)">
+      <file path="ios/Rial/Core/Networking/APIClient.swift" relevance="Correlation ID and debug logging already integrated">
+        <excerpt lines="155-172">
+          <![CDATA[
+func perform<T: Decodable>(_ request: URLRequest) async throws -> T {
+    var request = request
+
+    #if DEBUG
+    // Add correlation ID for cross-stack request tracing
+    let correlationId = UUID()
+    request.setValue(correlationId.uuidString, forHTTPHeaderField: "X-Correlation-ID")
+
+    await DebugLogger.shared.log(
+        event: "API_REQUEST",
+        payload: [
+            "method": request.httpMethod ?? "?",
+            "path": request.url?.path ?? "?",
+            "url": request.url?.absoluteString ?? "?"
+        ],
+        correlationId: correlationId
+    )
+    #endif
+    // ...
+}
+          ]]>
+        </excerpt>
+        <notes>
+          - X-Correlation-ID header added per request
+          - DebugLogger.shared.log() called for API_REQUEST events
+          - Same pattern in performNoContent() method
+        </notes>
+      </file>
+      <file path="ios/Rial/App/RialApp.swift" relevance="Background flush hook already implemented">
+        <excerpt lines="20-30">
+          <![CDATA[
+.onChange(of: scenePhase) { newPhase in
+    if newPhase == .background {
+        #if DEBUG
+        // Flush buffered debug logs when app enters background
+        Task {
+            await DebugLogger.shared.flush()
+        }
+        #endif
+    }
+}
+          ]]>
+        </excerpt>
+      </file>
+    </category>
+
+    <category name="Test Files (Already Created)">
+      <file path="ios/RialTests/Debug/DebugLogEntryTests.swift" relevance="Tests for JSON serialization">
+        <summary>
+          - testDebugLogEntry_EncodesToJSON_WithCorrectSnakeCaseKeys
+          - testDebugLogEntry_EncodeDecode_Roundtrip
+          - testDebugLogEntry_WithNilDeviceId_EncodesCorrectly
+          - testLogLevel_SerializesAsExpectedStrings
+          - testLogSource_SerializesAsExpectedStrings
+          - testAnyCodable_* (various type encoding tests)
+          - testDebugLogEntry_BatchEncoding
+        </summary>
+      </file>
+      <file path="ios/RialTests/Debug/DebugLoggerTests.swift" relevance="Tests for buffer management">
+        <summary>
+          - MockDebugLogShipper actor for testing without network
+          - TestableDebugLogger for dependency injection
+          - testDebugLogger_BuffersEntries_UntilThreshold
+          - testDebugLogger_AutoFlushes_WhenThresholdReached
+          - testDebugLogger_ManualFlush_ClearsBuffer
+          - testDebugLogger_EmptyFlush_DoesNotShip
+          - testDebugLogger_LogCreatesValidEntry
+          - testDebugLogger_MultipleFlushes_ShipSeparateBatches
+          - testDebugLogger_AllLogLevels
+          - testDebugLogger_PayloadTypes
+        </summary>
+      </file>
+      <file path="ios/RialTests/Debug/DebugLogShipperTests.swift" relevance="Tests for batch request formatting">
+        <summary>
+          - testDebugLogShipper_EncodesEntries_WithCorrectFormat
+          - testDebugLogShipper_EncodesTimestamp_AsISO8601
+          - testDebugLogShipper_EncodesPayload_WithVariousTypes
+          - testDebugLogShipper_EncodesDeviceId_WhenPresent
+          - testDebugLogShipper_EncodesDeviceId_AsNullWhenNil
+          - testDebugLogShipper_EmptyBatch_DoesNotShip
+          - testDebugLogShipper_LargeBatch_EncodesCorrectly
+          - testDebugLogShipper_RequestBody_HasReasonableSize
+        </summary>
+      </file>
+    </category>
+
+    <category name="Pattern References">
+      <file path="ios/Rial/Core/Networking/UploadService.swift" relevance="Background upload pattern reference">
+        <patterns>
+          - Singleton with configure() method
+          - Background URLSession configuration
+          - NSLock for thread-safe map access
+          - os.log Logger for internal logging
+        </patterns>
+      </file>
+      <file path="ios/Rial/Core/Networking/DeviceRegistrationService.swift" relevance="Device ID access pattern">
+        <patterns>
+          - KeychainService for device state lookup
+          - AppEnvironment.apiBaseURL for current environment
+          - @Published properties for state observation
+        </patterns>
+      </file>
+      <file path="ios/Rial/Models/DepthAnalysisResult.swift" relevance="Codable model pattern with CodingKeys">
+        <patterns>
+          - CodingKeys enum for snake_case mapping
+          - Custom encode(to:) for selective encoding
+          - Factory methods for edge cases
+          - CustomStringConvertible for debugging
+        </patterns>
+      </file>
+    </category>
+  </existing-code>
+
+  <development-constraints>
+    <constraint type="architecture">#if DEBUG wrapping - all debug code must be excluded from Release builds</constraint>
+    <constraint type="architecture">Actor isolation - DebugLogShipper uses actor, DebugLogger uses @MainActor</constraint>
+    <constraint type="architecture">Dedicated URLSession - shipper must NOT use APIClient to avoid circular logging</constraint>
+    <constraint type="architecture">Silent failure - debug logging should never crash or impact app functionality</constraint>
+    <constraint type="serialization">snake_case JSON keys - backend expects correlation_id, device_id, session_id</constraint>
+    <constraint type="serialization">ISO8601 timestamps - backend expects ISO 8601 format for timestamp field</constraint>
+    <constraint type="testing">XCTest with #if DEBUG - test files must also be wrapped</constraint>
+    <constraint type="performance">Buffer threshold 50 - ship when buffer reaches 50 entries</constraint>
+    <constraint type="performance">Flush interval 30s - timer-based auto-flush every 30 seconds</constraint>
+  </development-constraints>
+
+  <dependencies>
+    <internal module="ios/Rial/Core/Storage/KeychainService.swift" purpose="Device ID lookup for log entries"/>
+    <internal module="ios/Rial/Core/Configuration/AppEnvironment.swift" purpose="API base URL for shipper"/>
+    <internal module="Foundation" purpose="URLSession, JSONEncoder, Date, UUID"/>
+    <internal module="os.log" purpose="Local os.log Logger for debug output"/>
+  </dependencies>
+
+  <testing-context>
+    <framework>XCTest (ios/RialTests/)</framework>
+    <patterns>
+      <pattern name="Mock Actor">MockDebugLogShipper actor for testing without network</pattern>
+      <pattern name="Testable Class">TestableDebugLogger with dependency injection</pattern>
+      <pattern name="Async Tests">@MainActor test methods with Task.sleep for timing</pattern>
+    </patterns>
+    <coverage>
+      <area name="DebugLogEntry">JSON encoding, snake_case keys, roundtrip, nil handling</area>
+      <area name="DebugLogger">Buffer threshold, auto-flush, manual flush, empty buffer</area>
+      <area name="DebugLogShipper">Request format, timestamps, payloads, large batches</area>
+    </coverage>
+    <run-command>
+      <![CDATA[
+cd /Users/luca/dev/realitycam/ios
+xcodebuild test -project Rial.xcodeproj -scheme Rial \
+  -destination 'platform=iOS Simulator,name=iPhone 15 Pro' \
+  -only-testing:RialTests/DebugLogEntryTests \
+  -only-testing:RialTests/DebugLoggerTests \
+  -only-testing:RialTests/DebugLogShipperTests
+      ]]>
+    </run-command>
+  </testing-context>
+
+  <implementation-status>
+    <status>MOSTLY COMPLETE</status>
+    <completed-tasks>
+      <task>Task 1: Core/Debug/ directory created and files added to Xcode project</task>
+      <task>Task 2: DebugLogEntry.swift implemented with Codable, LogLevel, LogSource, AnyCodable</task>
+      <task>Task 3: DebugLogger.swift implemented with @MainActor singleton, buffer, log(), flush()</task>
+      <task>Task 4: DebugLogShipper.swift implemented with actor isolation, dedicated URLSession</task>
+      <task>Task 5: Timer-based auto-ship (30s) implemented via Task in startFlushTimer()</task>
+      <task>Task 6: RialTests/Debug/ directory created</task>
+      <task>Task 7: DebugLogEntryTests.swift implemented</task>
+      <task>Task 8: DebugLoggerTests.swift implemented</task>
+      <task>Task 9: DebugLogShipperTests.swift implemented</task>
+      <task>Integration: APIClient has X-Correlation-ID and DebugLogger.log() calls</task>
+      <task>Integration: RialApp has background flush hook</task>
+    </completed-tasks>
+    <remaining-work>
+      <item>Run tests to verify all pass</item>
+      <item>Integration test: verify logs ship to backend (requires backend running)</item>
+      <item>Mark story as complete in sprint tracking</item>
+    </remaining-work>
+  </implementation-status>
+
+  <acceptance-criteria-mapping>
+    <criterion id="AC1" description="DebugLogEntry model correctly serializes to JSON matching backend schema" status="IMPLEMENTED">
+      <evidence>DebugLogEntry has CodingKeys with snake_case mapping, DebugLogEntryTests verify encoding</evidence>
+    </criterion>
+    <criterion id="AC2" description="DebugLogger actor buffers log entries and ships when buffer reaches 50" status="IMPLEMENTED">
+      <evidence>DebugLogger.bufferThreshold = 50, auto-flush in log() when threshold reached</evidence>
+    </criterion>
+    <criterion id="AC3" description="DebugLogger.flush() immediately ships all buffered entries" status="IMPLEMENTED">
+      <evidence>flush() method ships buffer and clears, tested in DebugLoggerTests</evidence>
+    </criterion>
+    <criterion id="AC4" description="DebugLogShipper successfully POSTs to /debug/logs endpoint" status="IMPLEMENTED">
+      <evidence>DebugLogShipper.ship() POSTs to baseURL.appendingPathComponent("debug/logs")</evidence>
+    </criterion>
+    <criterion id="AC5" description="All debug code wrapped in #if DEBUG" status="IMPLEMENTED">
+      <evidence>All three files wrapped in #if DEBUG / #endif, test files also wrapped</evidence>
+    </criterion>
+    <criterion id="AC6" description="Log levels properly supported and serialized" status="IMPLEMENTED">
+      <evidence>LogLevel enum with .debug, .info, .warn, .error, tested in DebugLogEntryTests</evidence>
+    </criterion>
+    <criterion id="AC7" description="Unit tests pass" status="NEEDS VERIFICATION">
+      <evidence>Test files exist, need to run xcodebuild test to verify all pass</evidence>
+    </criterion>
+  </acceptance-criteria-mapping>
+</story-context>
