@@ -9,7 +9,7 @@ axum-extra = { version = "0.10", features = ["typed-header", "multipart"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "trace", "request-id", "propagate-header"] }
 tokio = { version = "1", features = ["full", "signal"] }
-sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono", "json", "macros", "migrate"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls-ring-webpki", "postgres", "uuid", "chrono", "json", "macros", "migrate"] }
 c2pa = { version = "0.63", features = ["file_io"] }
 # ffmpeg-next = "7"  # TODO: Enable when starting Epic 7 video backend (requires ffmpeg libs)
 ed25519-dalek = "2"

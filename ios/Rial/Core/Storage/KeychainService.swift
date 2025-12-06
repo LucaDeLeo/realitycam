@@ -267,58 +267,58 @@ class KeychainService {
 
     // MARK: - Device State Operations
 
-    /// Save device state to Keychain
+    /// Key prefix for device state storage
+    private static let deviceStateKeyPrefix = "rial.device.state"
+
+    /// Generate environment-specific key for device state.
     ///
-    /// Encodes `DeviceState` to JSON and stores it with key "rial.device.state".
-    /// Used by Story 6.2 (DCAppAttest) to persist device registration state.
+    /// Device registrations are per-backend, so we key by API host.
+    /// This allows seamless switching between local/production without
+    /// losing registrations or conflicting device IDs.
     ///
-    /// - Parameter state: DeviceState to store
+    /// - Parameter apiBaseURL: The API base URL to derive the key from
+    /// - Returns: Keychain key like "rial.device.state.localhost" or "rial.device.state.rial-api.fly.dev"
+    private func deviceStateKey(for apiBaseURL: URL) -> String {
+        let host = apiBaseURL.host ?? "unknown"
+        return "\(Self.deviceStateKeyPrefix).\(host)"
+    }
+
+    /// Save device state to Keychain for a specific API environment.
+    ///
+    /// Encodes `DeviceState` to JSON and stores it with an environment-specific key.
+    /// Each backend (localhost, production, etc.) gets its own device registration.
+    ///
+    /// - Parameters:
+    ///   - state: DeviceState to store
+    ///   - apiBaseURL: The API base URL this registration is for
     /// - Throws: `KeychainError.encodingFailed` if JSON encoding fails
     /// - Throws: `KeychainError.saveFailed` if save operation fails
-    ///
-    /// ## Example
-    /// ```swift
-    /// let state = DeviceState(
-    ///     deviceId: UUID(),
-    ///     attestationKeyId: "abc123",
-    ///     isRegistered: true,
-    ///     registeredAt: Date()
-    /// )
-    /// try keychainService.saveDeviceState(state)
-    /// ```
-    func saveDeviceState(_ state: DeviceState) throws {
+    func saveDeviceState(_ state: DeviceState, for apiBaseURL: URL) throws {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
+        let key = deviceStateKey(for: apiBaseURL)
 
         do {
             let data = try encoder.encode(state)
-            try save(data, forKey: "rial.device.state")
-            Self.logger.info("Saved DeviceState to Keychain")
+            try save(data, forKey: key)
+            Self.logger.info("Saved DeviceState to Keychain for \(apiBaseURL.host ?? "unknown")")
         } catch is EncodingError {
             Self.logger.error("Failed to encode DeviceState")
             throw KeychainError.encodingFailed
         }
     }
 
-    /// Load device state from Keychain
+    /// Load device state from Keychain for a specific API environment.
     ///
-    /// Retrieves and decodes `DeviceState` from Keychain storage.
-    /// Returns `nil` if no device state has been saved yet (not an error).
+    /// Retrieves and decodes `DeviceState` for the given API base URL.
+    /// Returns `nil` if no device state exists for this environment.
     ///
+    /// - Parameter apiBaseURL: The API base URL to load registration for
     /// - Returns: DeviceState, or `nil` if not found
-    /// - Throws: `KeychainError.decodingFailed` if JSON decoding fails (corrupted data)
-    ///
-    /// ## Example
-    /// ```swift
-    /// if let state = try keychainService.loadDeviceState() {
-    ///     print("Device registered: \(state.isRegistered)")
-    ///     print("Device ID: \(state.deviceId)")
-    /// } else {
-    ///     print("Device not registered yet")
-    /// }
-    /// ```
-    func loadDeviceState() throws -> DeviceState? {
-        guard let data = try load(forKey: "rial.device.state") else {
+    /// - Throws: `KeychainError.decodingFailed` if JSON decoding fails
+    func loadDeviceState(for apiBaseURL: URL) throws -> DeviceState? {
+        let key = deviceStateKey(for: apiBaseURL)
+        guard let data = try load(forKey: key) else {
             return nil
         }
 
@@ -327,7 +327,57 @@ class KeychainService {
 
         do {
             let state = try decoder.decode(DeviceState.self, from: data)
-            Self.logger.info("Loaded DeviceState from Keychain")
+            Self.logger.info("Loaded DeviceState from Keychain for \(apiBaseURL.host ?? "unknown")")
+            return state
+        } catch {
+            Self.logger.error("Failed to decode DeviceState: \(error.localizedDescription)")
+            throw KeychainError.decodingFailed
+        }
+    }
+
+    /// Delete device state for a specific API environment.
+    ///
+    /// Removes the device registration for the given API base URL.
+    /// Used when resetting registration or switching environments.
+    ///
+    /// - Parameter apiBaseURL: The API base URL to delete registration for
+    /// - Throws: `KeychainError.deleteFailed` if delete operation fails
+    func deleteDeviceState(for apiBaseURL: URL) throws {
+        let key = deviceStateKey(for: apiBaseURL)
+        try delete(forKey: key)
+        Self.logger.info("Deleted DeviceState from Keychain for \(apiBaseURL.host ?? "unknown")")
+    }
+
+    // MARK: - Legacy Device State Operations (deprecated)
+
+    /// Save device state to Keychain (legacy, environment-agnostic).
+    ///
+    /// - Note: Prefer `saveDeviceState(_:for:)` for new code.
+    @available(*, deprecated, message: "Use saveDeviceState(_:for:) instead")
+    func saveDeviceState(_ state: DeviceState) throws {
+        try saveDeviceState(state, for: AppEnvironment.apiBaseURL)
+    }
+
+    /// Load device state from Keychain (legacy, environment-agnostic).
+    ///
+    /// - Note: Prefer `loadDeviceState(for:)` for new code.
+    @available(*, deprecated, message: "Use loadDeviceState(for:) instead")
+    func loadDeviceState() throws -> DeviceState? {
+        // First try current environment
+        if let state = try loadDeviceState(for: AppEnvironment.apiBaseURL) {
+            return state
+        }
+        // Fall back to legacy key for migration
+        guard let data = try load(forKey: Self.deviceStateKeyPrefix) else {
+            return nil
+        }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        do {
+            let state = try decoder.decode(DeviceState.self, from: data)
+            Self.logger.info("Loaded DeviceState from legacy Keychain key")
             return state
         } catch {
             Self.logger.error("Failed to decode DeviceState: \(error.localizedDescription)")

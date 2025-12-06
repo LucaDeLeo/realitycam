@@ -102,6 +102,29 @@ struct DebugEnvironmentView: View {
                     .disabled(!store.isOverrideActive)
                 }
 
+                // Device Registration Section
+                Section {
+                    HStack {
+                        Text("Status")
+                        Spacer()
+                        Text(DeviceRegistrationService.shared.isRegistered ? "Registered" : "Not Registered")
+                            .foregroundColor(DeviceRegistrationService.shared.isRegistered ? .green : .orange)
+                    }
+
+                    Button(role: .destructive) {
+                        DeviceRegistrationService.shared.resetRegistration()
+                    } label: {
+                        HStack {
+                            Image(systemName: "person.badge.minus")
+                            Text("Reset Device Registration")
+                        }
+                    }
+                } header: {
+                    Text("Device Registration")
+                } footer: {
+                    Text("Resets registration for current environment (\(AppEnvironment.apiBaseURL.host ?? "unknown")). Device will re-register on next capture.")
+                }
+
                 // Help Section
                 Section {
                     VStack(alignment: .leading, spacing: 12) {

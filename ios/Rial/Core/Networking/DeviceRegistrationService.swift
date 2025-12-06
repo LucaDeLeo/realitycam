@@ -13,20 +13,22 @@ import os.log
 /// Service for registering device with the backend.
 ///
 /// Handles the full registration flow:
-/// 1. Check if already registered
+/// 1. Check if already registered for current environment
 /// 2. Generate attestation key
 /// 3. Request challenge from backend
 /// 4. Create attestation object
 /// 5. Register with backend
-/// 6. Save device state to keychain
+/// 6. Save device state to keychain (keyed by API host)
+///
+/// ## Environment Awareness
+/// Device registrations are stored per-API-host, allowing seamless
+/// switching between local development and production without
+/// losing registrations or conflicting device IDs.
 final class DeviceRegistrationService {
     private static let logger = Logger(subsystem: "app.rial", category: "device-registration")
 
     /// Shared singleton instance
     static let shared = DeviceRegistrationService()
-
-    /// API client for backend requests
-    private let apiClient: APIClient
 
     /// Attestation service
     private let attestationService: DeviceAttestationService
@@ -34,42 +36,69 @@ final class DeviceRegistrationService {
     /// Keychain for device state
     private let keychain: KeychainService
 
-    /// Registration state
+    /// Registration state for current environment
     @Published private(set) var isRegistered = false
     @Published private(set) var isRegistering = false
     @Published private(set) var registrationError: String?
 
+    /// Current API base URL (dynamic, reads from AppEnvironment)
+    private var currentAPIBaseURL: URL {
+        AppEnvironment.apiBaseURL
+    }
+
+    /// Create API client for current environment
+    private func createAPIClient() -> APIClient {
+        APIClient(baseURL: currentAPIBaseURL)
+    }
+
     // MARK: - Initialization
 
     init(
-        apiClient: APIClient? = nil,
         attestationService: DeviceAttestationService? = nil,
         keychain: KeychainService? = nil
     ) {
         let kc = keychain ?? KeychainService()
         self.keychain = kc
         self.attestationService = attestationService ?? DeviceAttestationService(keychain: kc)
-        self.apiClient = apiClient ?? APIClient(baseURL: AppEnvironment.apiBaseURL)
 
-        // Check initial state
+        // Check initial state for current environment
         checkRegistrationState()
     }
 
     // MARK: - Public Methods
 
-    /// Check if device is already registered.
+    /// Check if device is already registered for current environment.
+    ///
+    /// This checks the registration state for the current `AppEnvironment.apiBaseURL`.
+    /// Different environments (local vs production) have separate registrations.
     func checkRegistrationState() {
+        let apiURL = currentAPIBaseURL
         do {
-            if let state = try keychain.loadDeviceState(), state.isRegistered {
+            if let state = try keychain.loadDeviceState(for: apiURL), state.isRegistered {
                 isRegistered = true
-                Self.logger.info("Device is registered (deviceId: \(state.deviceId))")
+                Self.logger.info("Device is registered for \(apiURL.host ?? "unknown") (deviceId: \(state.deviceId))")
             } else {
                 isRegistered = false
-                Self.logger.info("Device is not registered")
+                Self.logger.info("Device is not registered for \(apiURL.host ?? "unknown")")
             }
         } catch {
             isRegistered = false
             Self.logger.error("Failed to check registration state: \(error.localizedDescription)")
+        }
+    }
+
+    /// Reset device registration for current environment.
+    ///
+    /// Deletes the stored device state, forcing re-registration on next use.
+    /// Useful for debugging or when switching between environments.
+    func resetRegistration() {
+        let apiURL = currentAPIBaseURL
+        do {
+            try keychain.deleteDeviceState(for: apiURL)
+            isRegistered = false
+            Self.logger.info("Reset device registration for \(apiURL.host ?? "unknown")")
+        } catch {
+            Self.logger.error("Failed to reset registration: \(error.localizedDescription)")
         }
     }
 
@@ -116,7 +145,10 @@ final class DeviceRegistrationService {
     // MARK: - Private Methods
 
     private func performRegistration() async throws {
-        Self.logger.info("Starting device registration flow")
+        let apiURL = currentAPIBaseURL
+        let apiClient = createAPIClient()
+
+        Self.logger.info("Starting device registration flow for \(apiURL.host ?? "unknown")")
 
         // Step 1: Generate attestation key
         Self.logger.debug("Step 1: Generating attestation key")
@@ -161,14 +193,15 @@ final class DeviceRegistrationService {
 
         Self.logger.info("Backend registration successful: deviceId=\(response.data.deviceId), level=\(response.data.attestationLevel)")
 
-        // Step 5: Save device state to keychain
-        Self.logger.debug("Step 5: Saving device state to keychain")
+        // Step 5: Save device state to keychain (keyed by API host)
+        Self.logger.debug("Step 5: Saving device state to keychain for \(apiURL.host ?? "unknown")")
         try attestationService.saveDeviceState(
             deviceId: response.data.deviceId,
-            attestationKeyId: keyId
+            attestationKeyId: keyId,
+            for: apiURL
         )
 
-        Self.logger.info("Device state saved to keychain")
+        Self.logger.info("Device state saved to keychain for \(apiURL.host ?? "unknown")")
     }
 
     /// Get device model string.

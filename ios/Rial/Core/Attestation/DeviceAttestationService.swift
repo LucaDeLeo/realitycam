@@ -294,50 +294,46 @@ class DeviceAttestationService {
     ///
     /// Persists device registration information including device ID and
     /// attestation key ID. Called after successful backend registration.
+    /// Device state is keyed by API host to support multiple environments.
     ///
     /// - Parameters:
     ///   - deviceId: UUID string from backend registration response
     ///   - attestationKeyId: The attestation key ID used for registration
+    ///   - apiBaseURL: The API base URL this registration is for
     /// - Throws: `KeychainError` if save operation fails
-    ///
-    /// ## Example
-    /// ```swift
-    /// let response = try await apiClient.registerDevice(attestation: attestationData)
-    /// try attestationService.saveDeviceState(
-    ///     deviceId: response.deviceId,
-    ///     attestationKeyId: keyId
-    /// )
-    /// ```
-    func saveDeviceState(deviceId: String, attestationKeyId: String) throws {
+    func saveDeviceState(deviceId: String, attestationKeyId: String, for apiBaseURL: URL) throws {
         let state = DeviceState(
             deviceId: deviceId,
             attestationKeyId: attestationKeyId,
             isRegistered: true,
             registeredAt: Date()
         )
-        try keychain.saveDeviceState(state)
-        logger.info("Device state saved to Keychain (deviceId: \(deviceId, privacy: .public))")
+        try keychain.saveDeviceState(state, for: apiBaseURL)
+        logger.info("Device state saved to Keychain for \(apiBaseURL.host ?? "unknown") (deviceId: \(deviceId, privacy: .public))")
     }
 
-    /// Load device state from Keychain
+    /// Load device state from Keychain for a specific API environment.
     ///
     /// Retrieves device registration information if the device has been
-    /// registered with the backend. Returns `nil` if not yet registered.
+    /// registered with the specified backend. Returns `nil` if not yet registered.
     ///
+    /// - Parameter apiBaseURL: The API base URL to load registration for
     /// - Returns: DeviceState with registration info, or `nil` if not registered
     /// - Throws: `KeychainError` if load operation fails
+    func loadDeviceState(for apiBaseURL: URL) throws -> DeviceState? {
+        try keychain.loadDeviceState(for: apiBaseURL)
+    }
+
+    /// Delete device state from Keychain for a specific API environment.
     ///
-    /// ## Example
-    /// ```swift
-    /// if let state = try attestationService.loadDeviceState() {
-    ///     print("Device ID: \(state.deviceId)")
-    ///     print("Registered: \(state.isRegistered)")
-    /// } else {
-    ///     print("Device not registered yet")
-    /// }
-    /// ```
-    func loadDeviceState() throws -> DeviceState? {
-        try keychain.loadDeviceState()
+    /// Removes the device registration, forcing re-registration on next use.
+    /// Useful for debugging or resetting the device state.
+    ///
+    /// - Parameter apiBaseURL: The API base URL to delete registration for
+    /// - Throws: `KeychainError` if delete operation fails
+    func deleteDeviceState(for apiBaseURL: URL) throws {
+        try keychain.deleteDeviceState(for: apiBaseURL)
+        logger.info("Device state deleted from Keychain for \(apiBaseURL.host ?? "unknown")")
     }
 }
 

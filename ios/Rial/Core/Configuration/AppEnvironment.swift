@@ -17,14 +17,10 @@ enum AppEnvironment {
 
     /// Base URL for the RealityCam API.
     ///
-    /// Priority (DEBUG builds):
-    /// 1. EnvironmentStore override (runtime debug settings)
+    /// Priority:
+    /// 1. EnvironmentStore override (runtime debug settings, DEBUG only)
     /// 2. Info.plist `API_BASE_URL` key
-    /// 3. Default localhost
-    ///
-    /// Priority (RELEASE builds):
-    /// 1. Info.plist `API_BASE_URL` key
-    /// 2. Default production URL
+    /// 3. Default production URL (https://rial-api.fly.dev)
     static var apiBaseURL: URL {
         #if DEBUG
         // Check for runtime debug override first
@@ -39,15 +35,9 @@ enum AppEnvironment {
             return url
         }
 
-        #if DEBUG
-        // Local development default:
-        // - Simulator: localhost works directly
-        // - Physical device: Use Debug Settings to set your Mac's IP
-        return URL(string: "http://localhost:8080")!
-        #else
-        // Production URL
+        // Production URL (default for both DEBUG and RELEASE)
+        // Use Debug Settings gear icon to switch to localhost for local development
         return URL(string: "https://rial-api.fly.dev")!
-        #endif
     }
 
     /// Whether the app is running in debug mode
