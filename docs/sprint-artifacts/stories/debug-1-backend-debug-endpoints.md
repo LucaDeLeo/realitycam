@@ -1,64 +1,119 @@
-# Story: Backend Debug Endpoints
+# Story Debug-1: Backend Debug Endpoints
 
-## Story Information
-- **Story ID:** debug-1-backend-debug-endpoints
-- **Epic:** Quick-Flow: Debug Observability System
-- **Priority:** High
-- **Estimate:** M (Medium)
+Status: drafted
 
-## Description
+## Story
 
-Implement the backend debug logging infrastructure including database schema, Rust models, services, and REST API endpoints for ingesting, querying, and managing debug logs. This forms the foundation of the cross-stack debug observability system, enabling iOS, web, and CLI clients to ship and retrieve structured debug logs with correlation IDs for tracing requests across the entire stack.
+As a **developer debugging cross-stack issues**,
+I want **backend endpoints to ingest, query, and manage debug log entries**,
+so that **I can store and retrieve structured debug logs from iOS, web, and backend sources with correlation ID tracing**.
 
 ## Acceptance Criteria
 
-- [ ] AC1: Database migration creates `debug_logs` table with correct schema including columns: id (UUID PK), correlation_id (UUID), timestamp (TIMESTAMPTZ), source (TEXT with CHECK constraint for 'ios'|'backend'|'web'), level (TEXT with CHECK constraint for 'debug'|'info'|'warn'|'error'), event (TEXT), payload (JSONB), device_id (UUID nullable), session_id (UUID nullable), created_at (TIMESTAMPTZ)
-- [ ] AC2: Database indexes are created for common query patterns: correlation_id, timestamp DESC, source, event, and partial index for errors
-- [ ] AC3: POST /debug/logs endpoint accepts batch of log entries (up to DEBUG_LOGS_MAX_BATCH, default 100) and returns 201 with count of inserted entries
-- [ ] AC4: GET /debug/logs endpoint supports query parameters: correlation_id, source, level, event (substring match), since (ISO timestamp), limit (default 100, max 1000), order (asc/desc, default desc)
-- [ ] AC5: GET /debug/logs/{id} endpoint returns single log entry by UUID or 404 if not found
-- [ ] AC6: DELETE /debug/logs endpoint clears logs with optional filters (source, level, older_than timestamp) and returns count of deleted entries
-- [ ] AC7: GET /debug/logs/stats endpoint returns aggregated counts grouped by source and level
-- [ ] AC8: Config struct includes debug_logs_enabled (bool), debug_logs_ttl_days (u32, default 7), debug_logs_max_batch (usize, default 100)
-- [ ] AC9: All debug endpoints return 404 when DEBUG_LOGS_ENABLED=false
-- [ ] AC10: Integration tests cover all CRUD operations and query parameter combinations
+1. **AC-1: Debug Logs Database Table**
+   - Given the backend is started
+   - When migrations are applied
+   - Then a `debug_logs` table exists with columns: id, correlation_id, timestamp, source, level, event, payload (JSONB), device_id, session_id, created_at
+   - And appropriate indexes exist for correlation_id, timestamp, source, and event queries
+   - And a partial index exists for error-level logs
 
-## Technical Notes
+2. **AC-2: POST /debug/logs - Batch Ingest**
+   - Given DEBUG_LOGS_ENABLED=true in config
+   - When a POST request is made to `/api/v1/debug/logs` with an array of log entries
+   - Then each valid entry is inserted into the debug_logs table
+   - And the response returns a count of inserted entries
+   - And entries exceeding DEBUG_LOGS_MAX_BATCH (default 100) are rejected with 400
+   - And malformed entries are rejected with validation error
 
-### Log Entry Schema (JSON)
-```typescript
-interface DebugLogEntry {
-  id: string;                    // UUID
-  correlation_id: string;        // Traces request across layers
-  timestamp: string;             // ISO 8601
-  source: "ios" | "backend" | "web";
-  level: "debug" | "info" | "warn" | "error";
-  event: string;                 // e.g., "UPLOAD_REQUEST", "ATTESTATION_VERIFIED"
-  payload: Record<string, any>;  // Structured event data
-  device_id?: string;            // iOS device identifier (DEBUG builds)
-  session_id?: string;           // App session for grouping
-}
-```
+3. **AC-3: GET /debug/logs - Query with Filters**
+   - Given debug logs exist in the database
+   - When a GET request is made to `/api/v1/debug/logs` with optional query params (correlation_id, source, level, event, since, limit, order)
+   - Then matching logs are returned in JSON format
+   - And results are limited to `limit` param (default 100, max 1000)
+   - And results are ordered by timestamp (default desc)
+   - And event filter performs substring match
 
-### Query Parameters (GET /debug/logs)
-| Param | Type | Description |
-|-------|------|-------------|
-| correlation_id | string | Filter by correlation ID |
-| source | string | Filter by source (ios, backend, web) |
-| level | string | Filter by level (debug, info, warn, error) |
-| event | string | Filter by event type (substring match) |
-| since | string | ISO timestamp, logs after this time |
-| limit | number | Max results (default 100, max 1000) |
-| order | string | "asc" or "desc" (default "desc") |
+4. **AC-4: GET /debug/logs/{id} - Single Entry**
+   - Given a debug log entry exists with a specific ID
+   - When a GET request is made to `/api/v1/debug/logs/{id}`
+   - Then the full log entry is returned
+   - And 404 is returned for non-existent IDs
 
-### Existing Patterns to Follow
-- Follow `routes/captures.rs` pattern for endpoint structure
-- Use `services/` pattern for business logic separation
-- SQLx query macros for compile-time checked SQL
-- `tracing::info!` / `tracing::debug!` for internal logging
-- Return `Result<Json<T>, AppError>` from handlers
+5. **AC-5: DELETE /debug/logs - Clear Logs**
+   - Given debug logs exist in the database
+   - When a DELETE request is made to `/api/v1/debug/logs` with optional filters (source, older_than)
+   - Then matching logs are deleted
+   - And a count of deleted entries is returned
+
+6. **AC-6: GET /debug/logs/stats - Aggregated Stats**
+   - Given debug logs exist in the database
+   - When a GET request is made to `/api/v1/debug/logs/stats`
+   - Then counts are returned grouped by source and level
+   - And total count is included
+   - And oldest/newest timestamps are included
+
+7. **AC-7: Configuration Options**
+   - Given the backend config
+   - When DEBUG_LOGS_ENABLED=false
+   - Then all debug endpoints return 404
+   - And when DEBUG_LOGS_TTL_DAYS is set (default 7)
+   - Then logs older than TTL are eligible for cleanup
+   - And when DEBUG_LOGS_MAX_BATCH is set (default 100)
+   - Then batch inserts exceeding the limit are rejected
+
+## Tasks / Subtasks
+
+- [ ] Task 1: Create Database Migration
+  - [ ] 1.1: Create migration file `YYYYMMDDHHMMSS_create_debug_logs.sql`
+  - [ ] 1.2: Define debug_logs table with all columns (id UUID, correlation_id UUID, timestamp TIMESTAMPTZ, source TEXT, level TEXT, event TEXT, payload JSONB, device_id UUID, session_id UUID, created_at TIMESTAMPTZ)
+  - [ ] 1.3: Add CHECK constraints for source (ios, backend, web) and level (debug, info, warn, error)
+  - [ ] 1.4: Create indexes: correlation_id, timestamp DESC, source, event
+  - [ ] 1.5: Create partial index for error-level logs
+
+- [ ] Task 2: Create Debug Log Model
+  - [ ] 2.1: Create `models/debug_log.rs` with DebugLog struct
+  - [ ] 2.2: Add DebugLogEntry struct for API input (without id, created_at)
+  - [ ] 2.3: Implement Serialize/Deserialize derives
+  - [ ] 2.4: Add validation methods for source/level enums
+  - [ ] 2.5: Export from `models/mod.rs`
+
+- [ ] Task 3: Create Debug Logs Service
+  - [ ] 3.1: Create `services/debug_logs.rs` module
+  - [ ] 3.2: Implement `insert_batch()` - bulk insert log entries
+  - [ ] 3.3: Implement `query_logs()` - filtered query with pagination
+  - [ ] 3.4: Implement `get_by_id()` - single log lookup
+  - [ ] 3.5: Implement `delete_logs()` - filtered deletion
+  - [ ] 3.6: Implement `get_stats()` - aggregated counts by source/level
+  - [ ] 3.7: Export from `services/mod.rs`
+
+- [ ] Task 4: Create Debug Routes
+  - [ ] 4.1: Create `routes/debug.rs` module
+  - [ ] 4.2: Implement POST /debug/logs handler with batch validation
+  - [ ] 4.3: Implement GET /debug/logs handler with query param parsing
+  - [ ] 4.4: Implement GET /debug/logs/{id} handler
+  - [ ] 4.5: Implement DELETE /debug/logs handler
+  - [ ] 4.6: Implement GET /debug/logs/stats handler
+  - [ ] 4.7: Create router() function with conditional mounting
+
+- [ ] Task 5: Wire Up Routes and Config
+  - [ ] 5.1: Add debug routes to `routes/mod.rs` with feature flag check
+  - [ ] 5.2: Add config fields to Config struct: debug_logs_enabled, debug_logs_ttl_days, debug_logs_max_batch
+  - [ ] 5.3: Add environment variable parsing in config.rs
+  - [ ] 5.4: Update .env.example with DEBUG_LOGS_* variables
+
+- [ ] Task 6: Write Tests
+  - [ ] 6.1: Unit test for DebugLogEntry validation
+  - [ ] 6.2: Unit test for query parameter parsing
+  - [ ] 6.3: Integration test for POST /debug/logs batch insert
+  - [ ] 6.4: Integration test for GET /debug/logs with filters
+  - [ ] 6.5: Integration test for DELETE /debug/logs
+  - [ ] 6.6: Integration test for GET /debug/logs/stats
+  - [ ] 6.7: Test endpoints return 404 when DEBUG_LOGS_ENABLED=false
+
+## Dev Notes
 
 ### Database Schema
+
 ```sql
 CREATE TABLE debug_logs (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -80,68 +135,88 @@ CREATE INDEX idx_debug_logs_event ON debug_logs(event);
 CREATE INDEX idx_debug_logs_errors ON debug_logs(timestamp DESC) WHERE level = 'error';
 ```
 
-### Configuration
-```rust
-pub struct Config {
-    // ... existing fields ...
-    pub debug_logs_enabled: bool,      // DEBUG_LOGS_ENABLED env var
-    pub debug_logs_ttl_days: u32,      // DEBUG_LOGS_TTL_DAYS env var, default 7
-    pub debug_logs_max_batch: usize,   // DEBUG_LOGS_MAX_BATCH env var, default 100
+### API Request/Response Examples
+
+**POST /api/v1/debug/logs**
+```json
+{
+  "entries": [
+    {
+      "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+      "timestamp": "2025-12-05T10:30:00Z",
+      "source": "ios",
+      "level": "info",
+      "event": "UPLOAD_REQUEST",
+      "payload": { "capture_id": "abc123", "size_bytes": 1024000 },
+      "device_id": "660e8400-e29b-41d4-a716-446655440001",
+      "session_id": "770e8400-e29b-41d4-a716-446655440002"
+    }
+  ]
 }
 ```
 
-## Tasks
+Response: `{ "inserted": 1 }`
 
-- [ ] Task 1: Add migration for `debug_logs` table with schema and indexes
-- [ ] Task 2: Create `models/debug_log.rs` with DebugLog, CreateDebugLog, DebugLogQuery, and DebugLogStats structs
-- [ ] Task 3: Create `services/debug_logs.rs` with insert_batch, query, get_by_id, delete, and get_stats functions
-- [ ] Task 4: Create `routes/debug.rs` with POST /debug/logs, GET /debug/logs, GET /debug/logs/{id}, DELETE /debug/logs, GET /debug/logs/stats endpoints
-- [ ] Task 5: Wire up debug routes in `routes/mod.rs` with conditional enablement based on config
-- [ ] Task 6: Add debug_logs_enabled, debug_logs_ttl_days, debug_logs_max_batch to config.rs
-- [ ] Task 7: Write integration tests for all endpoints and query parameter combinations
+**GET /api/v1/debug/logs?source=ios&level=error&limit=50**
+```json
+{
+  "logs": [...],
+  "count": 50,
+  "has_more": true
+}
+```
 
-## Files to Create
+**GET /api/v1/debug/logs/stats**
+```json
+{
+  "total": 1234,
+  "by_source": { "ios": 800, "backend": 400, "web": 34 },
+  "by_level": { "debug": 500, "info": 600, "warn": 100, "error": 34 },
+  "oldest": "2025-12-01T00:00:00Z",
+  "newest": "2025-12-05T10:30:00Z"
+}
+```
 
-- `backend/migrations/20251206003000_create_debug_logs.sql` - Database migration
-- `backend/src/models/debug_log.rs` - DebugLog model and related structs
-- `backend/src/services/debug_logs.rs` - Debug log service with storage/query logic
-- `backend/src/routes/debug.rs` - Debug API endpoints
+### Config Defaults
 
-## Files to Modify
+| Variable | Default | Description |
+|----------|---------|-------------|
+| DEBUG_LOGS_ENABLED | true | Enable debug log endpoints |
+| DEBUG_LOGS_TTL_DAYS | 7 | Auto-cleanup after N days |
+| DEBUG_LOGS_MAX_BATCH | 100 | Max entries per POST request |
 
-- `backend/src/routes/mod.rs` - Add debug routes registration
-- `backend/src/services/mod.rs` - Export debug_logs module
-- `backend/src/models/mod.rs` - Export debug_log module
-- `backend/src/config.rs` - Add debug logging configuration options
+### Patterns to Follow
 
-## Dependencies
+- Follow `routes/captures.rs` for endpoint structure and error handling
+- Use `services/` pattern for business logic separation
+- Use SQLx query macros for compile-time checked SQL
+- Return `Result<Json<T>, ApiError>` from handlers
+- Use tracing::info!/debug! for internal logging
 
-- None (this is the first story in the Debug Observability epic)
+### Security Notes
 
-## Testing Requirements
-
-### Unit Tests
-- DebugLogQuery parameter validation
-- Config parsing for debug options
-
-### Integration Tests
-- POST /debug/logs with valid batch returns 201
-- POST /debug/logs with oversized batch returns 400
-- POST /debug/logs when disabled returns 404
-- GET /debug/logs returns entries in correct order
-- GET /debug/logs with each query parameter filters correctly
-- GET /debug/logs with combined filters works correctly
-- GET /debug/logs respects limit and max limit
-- GET /debug/logs/{id} returns entry or 404
-- DELETE /debug/logs removes matching entries
-- DELETE /debug/logs with filters removes only matching entries
-- GET /debug/logs/stats returns correct aggregations
-
-### Test Location
-- `backend/src/routes/debug.rs` (inline `#[cfg(test)]` module)
-
----
+- Debug endpoints should only be enabled in development
+- No authentication required (dev-only endpoints)
+- Endpoints return 404 when disabled (not 403) to avoid leaking feature presence
 
 ## Dev Agent Record
 
-_This section will be populated during implementation._
+### Context Reference
+
+- Tech Spec: `docs/tech-spec.md` (Lines 399-424 for schema, 214-234 for endpoints)
+- Architecture: `docs/architecture.md`
+- Pattern Reference: `backend/src/routes/captures.rs`
+
+### File List
+
+(populated during implementation)
+
+### Completion Notes
+
+(populated during implementation)
+
+---
+
+_Story created for Debug Observability System (Quick-Flow)_
+_Date: 2025-12-06_
+_Parent: Debug Observability Epic_

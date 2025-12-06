@@ -20,8 +20,8 @@ use uuid::Uuid;
 
 use crate::error::{ApiError, ApiErrorWithRequestId};
 use crate::models::{
-    BatchInsertResponse, CreateDebugLog, DebugLog, DebugLogDelete, DebugLogQuery, DebugLogStats,
-    DeleteResponse,
+    BatchInsertResponse, CreateDebugLog, DebugLogDelete, DebugLogQuery, DebugLogStats,
+    DeleteResponse, QueryLogsResponse,
 };
 use crate::routes::AppState;
 use crate::services::debug_logs;
@@ -122,19 +122,21 @@ async fn create_logs(
 /// - order: "asc" or "desc" (default "desc")
 ///
 /// # Responses
-/// - 200 OK: Returns array of log entries
+/// - 200 OK: Returns logs with count and has_more pagination info
 /// - 400 Bad Request: Invalid query parameters
 /// - 404 Not Found: Debug logging disabled
 async fn query_logs(
     State(state): State<AppState>,
     Extension(request_id): Extension<Uuid>,
     Query(query): Query<DebugLogQuery>,
-) -> Result<Json<ApiResponse<Vec<DebugLog>>>, ApiErrorWithRequestId> {
+) -> Result<Json<ApiResponse<QueryLogsResponse>>, ApiErrorWithRequestId> {
     // Validate query parameters
     query.validate().map_err(|e| ApiErrorWithRequestId {
         error: ApiError::Validation(e),
         request_id,
     })?;
+
+    let limit = query.effective_limit();
 
     tracing::debug!(
         request_id = %request_id,
@@ -153,7 +155,17 @@ async fn query_logs(
             request_id,
         })?;
 
-    Ok(Json(ApiResponse::new(logs, request_id)))
+    // Determine if there are more results (if we got exactly limit results, there may be more)
+    let count = logs.len();
+    let has_more = count as u32 == limit;
+
+    let response = QueryLogsResponse {
+        logs,
+        count,
+        has_more,
+    };
+
+    Ok(Json(ApiResponse::new(response, request_id)))
 }
 
 /// GET /api/v1/debug/logs/{id} - Get single log entry
@@ -168,7 +180,7 @@ async fn get_log_by_id(
     State(state): State<AppState>,
     Extension(request_id): Extension<Uuid>,
     Path(id): Path<Uuid>,
-) -> Result<Json<ApiResponse<DebugLog>>, ApiErrorWithRequestId> {
+) -> Result<Json<ApiResponse<crate::models::DebugLog>>, ApiErrorWithRequestId> {
     tracing::debug!(
         request_id = %request_id,
         log_id = %id,
@@ -182,7 +194,7 @@ async fn get_log_by_id(
             request_id,
         })?
         .ok_or_else(|| ApiErrorWithRequestId {
-            error: ApiError::Validation(format!("Debug log not found: {id}")),
+            error: ApiError::DebugLogNotFound,
             request_id,
         })?;
 
@@ -467,7 +479,8 @@ mod tests {
             .await
             .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        assert!(!json["data"].as_array().unwrap().is_empty());
+        assert!(!json["data"]["logs"].as_array().unwrap().is_empty());
+        assert!(json["data"]["count"].as_u64().unwrap() > 0);
 
         cleanup_test_data(&state).await;
     }
@@ -503,8 +516,8 @@ mod tests {
             .await
             .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        let data = json["data"].as_array().unwrap();
-        assert!(data.iter().all(|log| log["source"] == "ios"));
+        let logs = json["data"]["logs"].as_array().unwrap();
+        assert!(logs.iter().all(|log| log["source"] == "ios"));
 
         cleanup_test_data(&state).await;
     }
@@ -539,8 +552,8 @@ mod tests {
             .await
             .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        let data = json["data"].as_array().unwrap();
-        assert!(data.iter().all(|log| log["level"] == "error"));
+        let logs = json["data"]["logs"].as_array().unwrap();
+        assert!(logs.iter().all(|log| log["level"] == "error"));
 
         cleanup_test_data(&state).await;
     }
@@ -575,8 +588,8 @@ mod tests {
             .await
             .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        let data = json["data"].as_array().unwrap();
-        assert!(data.iter().all(|log| {
+        let logs = json["data"]["logs"].as_array().unwrap();
+        assert!(logs.iter().all(|log| {
             log["event"]
                 .as_str()
                 .unwrap()
@@ -618,9 +631,9 @@ mod tests {
             .await
             .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        let data = json["data"].as_array().unwrap();
-        assert_eq!(data.len(), 1);
-        assert_eq!(data[0]["correlation_id"], correlation_id.to_string());
+        let logs = json["data"]["logs"].as_array().unwrap();
+        assert_eq!(logs.len(), 1);
+        assert_eq!(logs[0]["correlation_id"], correlation_id.to_string());
 
         cleanup_test_data(&state).await;
     }
@@ -655,8 +668,10 @@ mod tests {
             .await
             .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        let data = json["data"].as_array().unwrap();
-        assert_eq!(data.len(), 5);
+        let logs = json["data"]["logs"].as_array().unwrap();
+        assert_eq!(logs.len(), 5);
+        assert_eq!(json["data"]["count"], 5);
+        assert!(json["data"]["has_more"].as_bool().unwrap()); // 5 == limit, so has_more = true
 
         cleanup_test_data(&state).await;
     }
@@ -693,10 +708,10 @@ mod tests {
             .await
             .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        let data = json["data"].as_array().unwrap();
-        assert!(data.len() >= 2);
+        let logs = json["data"]["logs"].as_array().unwrap();
+        assert!(logs.len() >= 2);
         // First entry should be older (FIRST)
-        assert_eq!(data[0]["event"], "FIRST");
+        assert_eq!(logs[0]["event"], "FIRST");
 
         cleanup_test_data(&state).await;
     }
@@ -732,10 +747,10 @@ mod tests {
             .await
             .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        let data = json["data"].as_array().unwrap();
-        assert_eq!(data.len(), 1);
-        assert_eq!(data[0]["source"], "ios");
-        assert_eq!(data[0]["level"], "error");
+        let logs = json["data"]["logs"].as_array().unwrap();
+        assert_eq!(logs.len(), 1);
+        assert_eq!(logs[0]["source"], "ios");
+        assert_eq!(logs[0]["level"], "error");
 
         cleanup_test_data(&state).await;
     }
@@ -822,7 +837,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
 
         cleanup_test_data(&state).await;
     }

@@ -12,7 +12,7 @@ mod verification_log;
 pub use capture::{Capture, CreateCaptureParams};
 pub use debug_log::{
     BatchInsertResponse, CreateDebugLog, DebugLog, DebugLogDelete, DebugLogQuery, DebugLogStats,
-    DeleteResponse, LevelCounts, LogLevel, LogSource, SourceCounts,
+    DeleteResponse, LevelCounts, LogLevel, LogSource, QueryLogsResponse, SourceCounts,
 };
 pub use device::Device;
 pub use evidence::{

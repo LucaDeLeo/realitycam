@@ -252,6 +252,10 @@ pub struct DebugLogStats {
     pub by_source: SourceCounts,
     /// Counts grouped by level
     pub by_level: LevelCounts,
+    /// Timestamp of oldest log entry
+    pub oldest: Option<DateTime<Utc>>,
+    /// Timestamp of newest log entry
+    pub newest: Option<DateTime<Utc>>,
 }
 
 /// Counts by log source
@@ -269,6 +273,21 @@ pub struct LevelCounts {
     pub info: i64,
     pub warn: i64,
     pub error: i64,
+}
+
+// ============================================================================
+// Query Logs Response
+// ============================================================================
+
+/// Response for query logs operation with pagination info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QueryLogsResponse {
+    /// The log entries
+    pub logs: Vec<DebugLog>,
+    /// Number of entries returned
+    pub count: usize,
+    /// Whether there are more results available
+    pub has_more: bool,
 }
 
 // ============================================================================
@@ -438,6 +457,8 @@ mod tests {
 
     #[test]
     fn test_stats_serialization() {
+        let oldest = Utc::now() - chrono::Duration::hours(24);
+        let newest = Utc::now();
         let stats = DebugLogStats {
             total: 100,
             by_source: SourceCounts {
@@ -451,11 +472,15 @@ mod tests {
                 warn: 20,
                 error: 10,
             },
+            oldest: Some(oldest),
+            newest: Some(newest),
         };
 
         let json = serde_json::to_string(&stats).unwrap();
         assert!(json.contains("\"total\":100"));
         assert!(json.contains("\"ios\":50"));
         assert!(json.contains("\"error\":10"));
+        assert!(json.contains("\"oldest\":"));
+        assert!(json.contains("\"newest\":"));
     }
 }

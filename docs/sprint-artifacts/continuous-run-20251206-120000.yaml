@@ -1,0 +1,30 @@
+# Continuous Story Processing Run
+# Started: 2025-12-06T12:00:00Z
+# Tech Spec: docs/tech-spec.md (Debug Observability System - Quick-Flow)
+
+run_id: 20251206-120000
+started_at: 2025-12-06T12:00:00Z
+tech_spec: docs/tech-spec.md
+branch: main
+
+# Queue (5 stories from tech-spec)
+queue:
+  - story_key: debug-1-backend-debug-endpoints
+    status: backlog
+    title: "Backend Debug Endpoints"
+  - story_key: debug-2-ios-debug-logger
+    status: backlog
+    title: "iOS Debug Logger"
+  - story_key: debug-3-cli-query-tool
+    status: backlog
+    title: "CLI Query Tool"
+  - story_key: debug-4-ios-network-interceptor
+    status: backlog
+    title: "iOS Network Interceptor"
+  - story_key: debug-5-web-debug-integration
+    status: backlog
+    title: "Web Debug Integration"
+
+completed: []
+
+checkpoint: null

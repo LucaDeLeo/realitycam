@@ -243,13 +243,19 @@ pub async fn delete(pool: &PgPool, params: &DebugLogDelete) -> Result<u64, ApiEr
 /// * `pool` - Database connection pool
 ///
 /// # Returns
-/// * Aggregated counts by source and level
+/// * Aggregated counts by source and level, plus oldest/newest timestamps
 pub async fn get_stats(pool: &PgPool) -> Result<DebugLogStats, ApiError> {
-    // Get total count
-    let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM debug_logs")
+    // Get total count and timestamp range
+    let stats_row: (
+        i64,
+        Option<chrono::DateTime<chrono::Utc>>,
+        Option<chrono::DateTime<chrono::Utc>>,
+    ) = sqlx::query_as("SELECT COUNT(*), MIN(timestamp), MAX(timestamp) FROM debug_logs")
         .fetch_one(pool)
         .await
         .map_err(ApiError::Database)?;
+
+    let (total, oldest, newest) = stats_row;
 
     // Get counts by source
     let source_rows: Vec<(String, i64)> =
@@ -287,9 +293,11 @@ pub async fn get_stats(pool: &PgPool) -> Result<DebugLogStats, ApiError> {
     }
 
     Ok(DebugLogStats {
-        total: total.0,
+        total,
         by_source,
         by_level,
+        oldest,
+        newest,
     })
 }
 
