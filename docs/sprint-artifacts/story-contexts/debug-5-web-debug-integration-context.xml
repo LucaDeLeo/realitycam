@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context story-key="debug-5-web-debug-integration">
+  <story-reference>
+    <file>docs/sprint-artifacts/stories/debug-5-web-debug-integration.md</file>
+    <epic>Debug Observability System (Quick-Flow)</epic>
+    <tech-spec>docs/tech-spec.md</tech-spec>
+  </story-reference>
+
+  <documentation-artifacts>
+    <artifact path="docs/tech-spec.md" relevance="Log entry schema (lines 180-193), Web debug integration requirements (lines 587-593), Source tree changes for web (lines 156-160)"/>
+    <artifact path="docs/architecture.md" relevance="Project structure overview, Next.js 16 with React 19.2.1, web app patterns"/>
+    <artifact path="docs/sprint-artifacts/stories/debug-1-backend-debug-endpoints.md" relevance="POST /debug/logs endpoint format and request/response schema"/>
+  </documentation-artifacts>
+
+  <existing-code>
+    <file path="apps/web/src/lib/api.ts" relevance="API client to modify - add correlation ID header and debug logging calls to getCapture, getCapturePublic, verifyFile methods">
+      <summary>
+        - ApiClient class with methods: getCapture, getCapturePublic, verifyFile
+        - Uses fetch with AbortController timeout pattern
+        - Base URL from NEXT_PUBLIC_API_URL env var (default: http://localhost:8080)
+        - Exports singleton apiClient instance
+        - createTimeoutController helper for request timeouts
+      </summary>
+    </file>
+    <file path="apps/web/src/lib/status.ts" relevance="Example of well-structured lib module with TypeScript interfaces and exported functions">
+      <summary>
+        - Clean module organization with sections
+        - Uses switch statements for mapping functions
+        - Imports shared types from @realitycam/shared
+        - JSDoc comments on exported functions
+      </summary>
+    </file>
+    <file path="apps/web/src/lib/utils.ts" relevance="Utility module pattern - simple, focused exports">
+      <summary>
+        - Single utility function (cn for class merging)
+        - Uses clsx and tailwind-merge
+      </summary>
+    </file>
+    <file path="apps/web/src/app/layout.tsx" relevance="Root layout to modify - add DebugInitializer component for page load logging">
+      <summary>
+        - RootLayout with Geist fonts
+        - Simple body wrapper with font variables
+        - No existing client components in layout
+      </summary>
+    </file>
+  </existing-code>
+
+  <backend-api-reference>
+    <endpoint path="POST /api/v1/debug/logs" description="Batch ingest debug log entries">
+      <request-format>
+{
+  "entries": [
+    {
+      "correlation_id": "550e8400-e29b-41d4-a716-446655440000",
+      "timestamp": "2025-12-05T10:30:00Z",
+      "source": "web",
+      "level": "info",
+      "event": "PAGE_LOAD",
+      "payload": { "path": "/verify/abc123", "referrer": null }
+    }
+  ]
+}
+      </request-format>
+      <response-format>{ "inserted": 1 }</response-format>
+      <notes>
+        - source must be "ios", "backend", or "web"
+        - level must be "debug", "info", "warn", or "error"
+        - id field is optional (backend generates UUID if not provided)
+        - device_id and session_id are optional
+        - Max batch size: 100 entries (DEBUG_LOGS_MAX_BATCH)
+      </notes>
+    </endpoint>
+  </backend-api-reference>
+
+  <development-constraints>
+    <constraint type="security">All debug logging code MUST be gated by process.env.NODE_ENV === 'development' - zero production impact</constraint>
+    <constraint type="architecture">Use fire-and-forget semantics for log sending - never block app functionality for debug logging</constraint>
+    <constraint type="architecture">Silently ignore all fetch errors in debug logger - debug logging should never break the app</constraint>
+    <constraint type="correlation">Use same X-Correlation-ID header format as iOS for cross-stack tracing</constraint>
+    <constraint type="code-style">2-space indentation, camelCase functions/variables, PascalCase types/interfaces</constraint>
+    <constraint type="code-style">ESLint + Prettier enforced - follow existing lib module patterns</constraint>
+    <constraint type="immediate-send">Unlike iOS (batched every 30s), web logs are sent immediately via POST</constraint>
+  </development-constraints>
+
+  <dependencies>
+    <external name="crypto" version="native" notes="Web Crypto API for crypto.randomUUID()"/>
+    <internal module="apps/web/src/lib/api.ts" notes="Modify ApiClient methods"/>
+  </dependencies>
+
+  <files-to-create>
+    <file path="apps/web/src/lib/debug-logger.ts" description="Debug logging utility with logDebugEvent, generateCorrelationId, and event-specific helpers"/>
+    <file path="apps/web/src/components/DebugInitializer.tsx" description="Client component for page load logging on mount (dev only)"/>
+  </files-to-create>
+
+  <files-to-modify>
+    <file path="apps/web/src/lib/api.ts">
+      <changes>
+        - Import generateCorrelationId, logApiRequest, logApiResponse, logApiError from debug-logger
+        - In getCapture: generate correlationId, track startTime, add X-Correlation-ID header, log request/response/error
+        - In getCapturePublic: same pattern as getCapture
+        - In verifyFile: same pattern as getCapture
+      </changes>
+    </file>
+    <file path="apps/web/src/app/layout.tsx">
+      <changes>
+        - Import DebugInitializer component
+        - Add {process.env.NODE_ENV === 'development' and DebugInitializer /} inside body
+      </changes>
+    </file>
+  </files-to-modify>
+
+  <implementation-details>
+    <interface name="DebugLogEntry">
+      <field name="id" type="string" optional="true" description="UUID - backend generates if not provided"/>
+      <field name="correlation_id" type="string" optional="false" description="UUID linking related events"/>
+      <field name="timestamp" type="string" optional="false" description="ISO 8601 timestamp"/>
+      <field name="source" type="'web'" optional="false" description="Always 'web' for this logger"/>
+      <field name="level" type="'debug' | 'info' | 'warn' | 'error'" optional="false"/>
+      <field name="event" type="string" optional="false" description="e.g., PAGE_LOAD, API_REQUEST"/>
+      <field name="payload" type="Record&lt;string, unknown&gt;" optional="false" description="Event-specific data"/>
+      <field name="session_id" type="string" optional="true" description="Optional browser session ID"/>
+    </interface>
+
+    <function name="generateCorrelationId" returns="string">
+      <description>Creates UUID v4 correlation ID for linking related logs</description>
+      <implementation>return crypto.randomUUID();</implementation>
+    </function>
+
+    <function name="logDebugEvent" returns="Promise&lt;void&gt;">
+      <params>
+        <param name="event" type="string"/>
+        <param name="level" type="'debug' | 'info' | 'warn' | 'error'"/>
+        <param name="payload" type="Record&lt;string, unknown&gt;"/>
+        <param name="correlationId" type="string" optional="true"/>
+      </params>
+      <description>Core logging function - sends to backend /debug/logs endpoint</description>
+      <key-behavior>
+        - Return immediately if NODE_ENV !== 'development'
+        - Fire-and-forget: no await, catch errors silently
+        - POST to DEBUG_ENDPOINT with { entries: [entry] }
+      </key-behavior>
+    </function>
+
+    <function name="logPageLoad" returns="void">
+      <params>
+        <param name="path" type="string"/>
+        <param name="referrer" type="string" optional="true"/>
+      </params>
+      <description>Log PAGE_LOAD event with path, referrer, user_agent</description>
+    </function>
+
+    <function name="logApiRequest" returns="void">
+      <params>
+        <param name="url" type="string"/>
+        <param name="method" type="string"/>
+        <param name="correlationId" type="string"/>
+      </params>
+      <description>Log API_REQUEST event before fetch call</description>
+    </function>
+
+    <function name="logApiResponse" returns="void">
+      <params>
+        <param name="url" type="string"/>
+        <param name="status" type="number"/>
+        <param name="durationMs" type="number"/>
+        <param name="correlationId" type="string"/>
+      </params>
+      <description>Log API_RESPONSE event after successful response</description>
+    </function>
+
+    <function name="logApiError" returns="void">
+      <params>
+        <param name="url" type="string"/>
+        <param name="error" type="string"/>
+        <param name="correlationId" type="string"/>
+      </params>
+      <description>Log API_ERROR event on fetch failure or timeout</description>
+    </function>
+
+    <events-table>
+      <event name="PAGE_LOAD" payload="path, referrer, user_agent, timestamp" when="Initial page mount"/>
+      <event name="API_REQUEST" payload="url, method, correlation_id" when="Before fetch call"/>
+      <event name="API_RESPONSE" payload="url, status, duration_ms, correlation_id" when="After successful response"/>
+      <event name="API_ERROR" payload="url, error, correlation_id" when="On fetch failure or timeout"/>
+    </events-table>
+  </implementation-details>
+
+  <testing-context>
+    <framework>Vitest for unit tests, manual testing with backend</framework>
+    <test-approach>
+      - Test in development mode: run Next.js dev server
+      - Make API calls through web app
+      - Query logs with: bun debug:search --source web
+      - Verify correlation IDs match between web and backend logs
+    </test-approach>
+    <verification-command>bun debug:search --source web</verification-command>
+  </testing-context>
+
+  <api-client-modification-example>
+    <method name="getCapture">
+      <before-snippet>
+async getCapture(id: string): Promise&lt;CaptureResponse | null&gt; {
+  const { controller, timeoutId } = createTimeoutController();
+  try {
+    const response = await fetch(`${this.baseUrl}/api/v1/captures/${id}`, {
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+      </before-snippet>
+      <after-snippet>
+async getCapture(id: string): Promise&lt;CaptureResponse | null&gt; {
+  const correlationId = generateCorrelationId();
+  const startTime = Date.now();
+  const url = `${this.baseUrl}/api/v1/captures/${id}`;
+
+  logApiRequest(url, 'GET', correlationId);
+
+  const { controller, timeoutId } = createTimeoutController();
+  try {
+    const response = await fetch(url, {
+      cache: 'no-store',
+      signal: controller.signal,
+      headers: {
+        'X-Correlation-ID': correlationId,
+      },
+    });
+
+    clearTimeout(timeoutId);
+    const durationMs = Date.now() - startTime;
+    logApiResponse(url, response.status, durationMs, correlationId);
+      </after-snippet>
+    </method>
+  </api-client-modification-example>
+
+  <debug-initializer-component>
+    <description>Client component that logs PAGE_LOAD on initial mount</description>
+    <code-pattern>
+'use client';
+
+import { useEffect } from 'react';
+import { logPageLoad } from '@/lib/debug-logger';
+
+export function DebugInitializer() {
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      logPageLoad(window.location.pathname, document.referrer || undefined);
+    }
+  }, []);
+
+  return null;
+}
+    </code-pattern>
+  </debug-initializer-component>
+
+  <acceptance-criteria-checklist>
+    <criterion id="AC1" description="debug-logger.ts exports functions to log events with structured payloads to /debug/logs"/>
+    <criterion id="AC2" description="generateCorrelationId() creates UUID v4 correlation IDs"/>
+    <criterion id="AC3" description="API requests include X-Correlation-ID header and log API_REQUEST, API_RESPONSE, API_ERROR events"/>
+    <criterion id="AC4" description="PAGE_LOAD events logged on initial page load with path, referrer, timestamp"/>
+    <criterion id="AC5" description="All debug code gated by NODE_ENV === 'development'"/>
+    <criterion id="AC6" description="Logs sent immediately with fire-and-forget semantics"/>
+  </acceptance-criteria-checklist>
+
+  <related-stories>
+    <story key="debug-1-backend-debug-endpoints" status="done" relevance="Provides POST /debug/logs endpoint this story posts to"/>
+    <story key="debug-3-cli-query-tool" status="done" relevance="CLI tool to verify logs: bun debug:search --source web"/>
+  </related-stories>
+</story-context>

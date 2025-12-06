@@ -154,4 +154,4 @@ development_status:
   debug-2-ios-debug-logger: done
   debug-3-cli-query-tool: done
   debug-4-ios-network-interceptor: done
-  debug-5-web-debug-integration: backlog
+  debug-5-web-debug-integration: done

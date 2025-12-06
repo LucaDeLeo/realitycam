@@ -15,6 +15,13 @@ import type {
   ProcessingInfo,
 } from '@realitycam/shared';
 
+import {
+  generateCorrelationId,
+  logApiRequest,
+  logApiResponse,
+  logApiError,
+} from './debug-logger';
+
 // Re-export shared types for backwards compatibility
 export type {
   ConfidenceLevel,
@@ -162,14 +169,25 @@ export class ApiClient {
    * Get capture details by ID (requires device auth - for mobile app)
    */
   async getCapture(id: string): Promise<CaptureResponse | null> {
+    const correlationId = generateCorrelationId();
+    const startTime = Date.now();
+    const url = `${this.baseUrl}/api/v1/captures/${id}`;
+
+    logApiRequest(url, 'GET', correlationId);
+
     const { controller, timeoutId } = createTimeoutController();
     try {
-      const response = await fetch(`${this.baseUrl}/api/v1/captures/${id}`, {
+      const response = await fetch(url, {
         cache: 'no-store',
         signal: controller.signal,
+        headers: {
+          'X-Correlation-ID': correlationId,
+        },
       });
 
       clearTimeout(timeoutId);
+      const durationMs = Date.now() - startTime;
+      logApiResponse(url, response.status, durationMs, correlationId);
 
       if (!response.ok) {
         if (response.status === 404) {
@@ -181,7 +199,9 @@ export class ApiClient {
       return response.json();
     } catch (error) {
       clearTimeout(timeoutId);
-      if (error instanceof Error && error.name === 'AbortError') {
+      const err = error instanceof Error ? error : new Error('Unknown error');
+      logApiError(url, err, correlationId);
+      if (err.name === 'AbortError') {
         console.error('Request timed out fetching capture:', id);
       } else {
         console.error('Failed to fetch capture:', error);
@@ -195,14 +215,25 @@ export class ApiClient {
    * Uses the public /api/v1/verify/{id} endpoint
    */
   async getCapturePublic(id: string): Promise<CapturePublicResponse | null> {
+    const correlationId = generateCorrelationId();
+    const startTime = Date.now();
+    const url = `${this.baseUrl}/api/v1/verify/${id}`;
+
+    logApiRequest(url, 'GET', correlationId);
+
     const { controller, timeoutId } = createTimeoutController();
     try {
-      const response = await fetch(`${this.baseUrl}/api/v1/verify/${id}`, {
+      const response = await fetch(url, {
         cache: 'no-store',
         signal: controller.signal,
+        headers: {
+          'X-Correlation-ID': correlationId,
+        },
       });
 
       clearTimeout(timeoutId);
+      const durationMs = Date.now() - startTime;
+      logApiResponse(url, response.status, durationMs, correlationId);
 
       if (!response.ok) {
         if (response.status === 404) {
@@ -214,7 +245,9 @@ export class ApiClient {
       return response.json();
     } catch (error) {
       clearTimeout(timeoutId);
-      if (error instanceof Error && error.name === 'AbortError') {
+      const err = error instanceof Error ? error : new Error('Unknown error');
+      logApiError(url, err, correlationId);
+      if (err.name === 'AbortError') {
         console.error('Request timed out fetching public capture:', id);
       } else {
         console.error('Failed to fetch capture public:', error);
@@ -227,19 +260,30 @@ export class ApiClient {
    * Verify a file by uploading it for hash verification
    */
   async verifyFile(file: File): Promise<FileVerificationResponse> {
+    const correlationId = generateCorrelationId();
+    const startTime = Date.now();
+    const url = `${this.baseUrl}/api/v1/verify-file`;
+
+    logApiRequest(url, 'POST', correlationId);
+
     // Use longer timeout for file uploads (30 seconds)
     const { controller, timeoutId } = createTimeoutController(30_000);
     const formData = new FormData();
     formData.append('file', file);
 
     try {
-      const response = await fetch(`${this.baseUrl}/api/v1/verify-file`, {
+      const response = await fetch(url, {
         method: 'POST',
         body: formData,
         signal: controller.signal,
+        headers: {
+          'X-Correlation-ID': correlationId,
+        },
       });
 
       clearTimeout(timeoutId);
+      const durationMs = Date.now() - startTime;
+      logApiResponse(url, response.status, durationMs, correlationId);
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: { message: 'Unknown error' } }));
@@ -249,7 +293,9 @@ export class ApiClient {
       return response.json();
     } catch (error) {
       clearTimeout(timeoutId);
-      if (error instanceof Error && error.name === 'AbortError') {
+      const err = error instanceof Error ? error : new Error('Unknown error');
+      logApiError(url, err, correlationId);
+      if (err.name === 'AbortError') {
         throw new Error('Request timed out. Please try again.');
       }
       throw error;
