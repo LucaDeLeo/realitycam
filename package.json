@@ -16,7 +16,10 @@
     "test": "bun run --filter @realitycam/web test:unit --run",
     "test:ci": "bun run typecheck && bun run lint && bun run test",
     "docker:up": "docker-compose -f infrastructure/docker-compose.yml up -d",
-    "docker:down": "docker-compose -f infrastructure/docker-compose.yml down"
+    "docker:down": "docker-compose -f infrastructure/docker-compose.yml down",
+    "debug:tail": "bun run packages/debug-cli/src/index.ts tail",
+    "debug:search": "bun run packages/debug-cli/src/index.ts search",
+    "debug:clear": "bun run packages/debug-cli/src/index.ts clear"
   },
   "devDependencies": {
     "next": "16.0.7"

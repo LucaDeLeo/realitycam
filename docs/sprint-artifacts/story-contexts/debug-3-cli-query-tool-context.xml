@@ -1,0 +1,360 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context story-key="debug-3-cli-query-tool">
+  <story-reference>
+    <file>docs/sprint-artifacts/stories/debug-3-cli-query-tool.md</file>
+    <epic>Debug Observability System (Quick-Flow)</epic>
+    <tech-spec>docs/tech-spec.md</tech-spec>
+  </story-reference>
+
+  <documentation-artifacts>
+    <artifact path="docs/tech-spec.md#CLI Commands (lines 477-502)" relevance="CLI command specifications for tail, search, clear"/>
+    <artifact path="docs/tech-spec.md#CLI Output Formatting (lines 680-687)" relevance="Color coding and JSON output requirements"/>
+    <artifact path="docs/tech-spec.md#Dependencies - Web CLI (lines 311-315)" relevance="commander v11 and chalk v5 dependencies"/>
+    <artifact path="docs/tech-spec.md#Backend Debug Endpoints (lines 214-235)" relevance="API endpoints and query parameters"/>
+    <artifact path="docs/architecture.md" relevance="Project structure and Bun workspace conventions"/>
+    <artifact path="CLAUDE.md" relevance="Monorepo commands and development patterns"/>
+  </documentation-artifacts>
+
+  <existing-code>
+    <!-- Workspace Configuration -->
+    <file path="package.json" relevance="Bun workspace config - add debug:* scripts here">
+      <snippet><![CDATA[
+{
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev:web": "bun run --filter @realitycam/web dev",
+    // ... existing scripts
+    // Add: "debug:tail", "debug:search", "debug:clear"
+  }
+}
+      ]]></snippet>
+    </file>
+
+    <!-- Existing Package Pattern Reference -->
+    <file path="packages/shared/package.json" relevance="Reference for package.json structure in packages/">
+      <snippet><![CDATA[
+{
+  "name": "@realitycam/shared",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": { ".": { "types": "./src/index.ts", "default": "./src/index.ts" } },
+  "scripts": { "typecheck": "tsc --noEmit", "lint": "tsc --noEmit" },
+  "devDependencies": { "typescript": "^5.9.2" },
+  "sideEffects": false
+}
+      ]]></snippet>
+    </file>
+
+    <!-- API Client Pattern Reference -->
+    <file path="apps/web/src/lib/api.ts" relevance="API client pattern to follow for debug-cli/src/lib/api.ts">
+      <snippet><![CDATA[
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
+const REQUEST_TIMEOUT_MS = 10_000;
+
+function createTimeoutController(timeoutMs: number = REQUEST_TIMEOUT_MS): {
+  controller: AbortController;
+  timeoutId: NodeJS.Timeout;
+} {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  return { controller, timeoutId };
+}
+
+export class ApiClient {
+  public baseUrl: string;
+  constructor(baseUrl: string = API_URL) {
+    this.baseUrl = baseUrl;
+  }
+  // Methods use fetch with AbortController for timeout
+}
+      ]]></snippet>
+    </file>
+
+    <!-- Backend Debug Routes (endpoints to integrate with) -->
+    <file path="backend/src/routes/debug.rs" relevance="Debug log endpoints - GET, DELETE /api/v1/debug/logs">
+      <snippet><![CDATA[
+// Routes:
+// - POST /logs - Batch insert log entries
+// - GET /logs - Query logs with filters
+// - GET /logs/stats - Get aggregated statistics
+// - GET /logs/{id} - Get single log entry
+// - DELETE /logs - Delete logs with filters
+
+pub fn router() -> Router<AppState> {
+    Router::new()
+        .route("/logs", post(create_logs))
+        .route("/logs", get(query_logs))
+        .route("/logs", delete(delete_logs))
+        .route("/logs/stats", get(get_stats))
+        .route("/logs/{id}", get(get_log_by_id))
+}
+
+// GET /api/v1/debug/logs Query Parameters:
+// - correlation_id: Filter by correlation ID (exact match)
+// - source: Filter by source (ios, backend, web)
+// - level: Filter by level (debug, info, warn, error)
+// - event: Filter by event type (substring match)
+// - since: ISO timestamp, logs after this time
+// - limit: Max results (default 100, max 1000)
+// - order: "asc" or "desc" (default "desc")
+
+// DELETE /api/v1/debug/logs Query Parameters:
+// - source: Filter by source
+// - level: Filter by level
+// - older_than: ISO timestamp, delete logs before this time
+      ]]></snippet>
+    </file>
+
+    <!-- Backend Debug Log Model (response types) -->
+    <file path="backend/src/models/debug_log.rs" relevance="Response type definitions for API client">
+      <snippet><![CDATA[
+// Log source: "ios" | "backend" | "web"
+pub enum LogSource { Ios, Backend, Web }
+
+// Log level: "debug" | "info" | "warn" | "error"
+pub enum LogLevel { Debug, Info, Warn, Error }
+
+// Response for query logs
+pub struct QueryLogsResponse {
+    pub logs: Vec<DebugLog>,
+    pub count: usize,
+    pub has_more: bool,
+}
+
+// Single debug log entry
+pub struct DebugLog {
+    pub id: Uuid,
+    pub correlation_id: Uuid,
+    pub timestamp: DateTime<Utc>,
+    pub source: String,      // "ios" | "backend" | "web"
+    pub level: String,       // "debug" | "info" | "warn" | "error"
+    pub event: String,
+    pub payload: serde_json::Value,
+    pub device_id: Option<Uuid>,
+    pub session_id: Option<Uuid>,
+    pub created_at: DateTime<Utc>,
+}
+
+// Response for delete operation
+pub struct DeleteResponse {
+    pub deleted: u64,
+}
+      ]]></snippet>
+    </file>
+  </existing-code>
+
+  <target-files>
+    <!-- Files to create for this story -->
+    <file path="packages/debug-cli/package.json" action="create">
+      Package configuration with commander v11 and chalk v5 dependencies.
+      Use "type": "module" for ESM support (chalk v5 is ESM-only).
+    </file>
+    <file path="packages/debug-cli/tsconfig.json" action="create">
+      TypeScript configuration for CLI package.
+    </file>
+    <file path="packages/debug-cli/src/index.ts" action="create">
+      CLI entry point with commander program setup and global --api-url option.
+    </file>
+    <file path="packages/debug-cli/src/lib/api.ts" action="create">
+      Backend API client with getDebugLogs() and deleteDebugLogs() methods.
+    </file>
+    <file path="packages/debug-cli/src/lib/formatters.ts" action="create">
+      Output formatting with chalk colors and JSON mode.
+    </file>
+    <file path="packages/debug-cli/src/lib/time-parser.ts" action="create">
+      Human-readable time parsing for --since and --older-than.
+    </file>
+    <file path="packages/debug-cli/src/commands/tail.ts" action="create">
+      Tail command with --source, --level, -n, --follow options.
+    </file>
+    <file path="packages/debug-cli/src/commands/search.ts" action="create">
+      Search command with --correlation-id, --event, --since, --json options.
+    </file>
+    <file path="packages/debug-cli/src/commands/clear.ts" action="create">
+      Clear command with --older-than, --source, --yes options.
+    </file>
+    <file path="packages/debug-cli/tests/tail.test.ts" action="create">
+      Integration tests for tail command.
+    </file>
+    <file path="packages/debug-cli/tests/search.test.ts" action="create">
+      Integration tests for search command.
+    </file>
+    <file path="packages/debug-cli/tests/clear.test.ts" action="create">
+      Integration tests for clear command.
+    </file>
+    <file path="package.json" action="modify">
+      Add debug:tail, debug:search, debug:clear scripts to root package.json.
+    </file>
+  </target-files>
+
+  <development-constraints>
+    <constraint type="runtime">Use Bun runtime - native test runner or Vitest for tests</constraint>
+    <constraint type="esm">chalk v5 is ESM-only - package.json must have "type": "module"</constraint>
+    <constraint type="cli">commander v11 supports ES modules - use named exports</constraint>
+    <constraint type="api">Default API URL is http://localhost:8080 - use --api-url for override</constraint>
+    <constraint type="colors">Log levels: red=error, yellow=warn, blue=info, gray=debug</constraint>
+    <constraint type="output">Support --json flag for machine-readable output (Claude consumption)</constraint>
+    <constraint type="confirmation">Clear command must prompt for confirmation unless --yes provided</constraint>
+    <constraint type="time-parsing">Parse: "X minutes ago", "X hours ago", "X days ago", "Xm", "Xh", "Xd", "Xw"</constraint>
+  </development-constraints>
+
+  <dependencies>
+    <external name="commander" version="^11" purpose="CLI argument parsing"/>
+    <external name="chalk" version="^5" purpose="Terminal colors (ESM-only)"/>
+    <external name="typescript" version="^5.9.2" purpose="TypeScript compiler"/>
+    <internal module="package.json" purpose="Workspace scripts addition"/>
+  </dependencies>
+
+  <api-reference>
+    <endpoint method="GET" path="/api/v1/debug/logs">
+      <description>Query debug logs with filters</description>
+      <query-params>
+        <param name="correlation_id" type="UUID" required="false">Filter by correlation ID (exact match)</param>
+        <param name="source" type="string" required="false">Filter by source: ios, backend, web</param>
+        <param name="level" type="string" required="false">Filter by level: debug, info, warn, error</param>
+        <param name="event" type="string" required="false">Filter by event (substring match, case-insensitive)</param>
+        <param name="since" type="ISO8601" required="false">Filter logs after this timestamp</param>
+        <param name="limit" type="number" required="false">Max results (default 100, max 1000)</param>
+        <param name="order" type="string" required="false">Sort order: asc or desc (default: desc)</param>
+      </query-params>
+      <response><![CDATA[
+{
+  "data": {
+    "logs": [
+      {
+        "id": "uuid",
+        "correlation_id": "uuid",
+        "timestamp": "ISO8601",
+        "source": "ios|backend|web",
+        "level": "debug|info|warn|error",
+        "event": "EVENT_NAME",
+        "payload": {},
+        "device_id": "uuid|null",
+        "session_id": "uuid|null",
+        "created_at": "ISO8601"
+      }
+    ],
+    "count": 10,
+    "has_more": false
+  },
+  "meta": { "request_id": "uuid", "timestamp": "ISO8601" }
+}
+      ]]></response>
+    </endpoint>
+    <endpoint method="DELETE" path="/api/v1/debug/logs">
+      <description>Delete debug logs with filters</description>
+      <query-params>
+        <param name="source" type="string" required="false">Filter by source</param>
+        <param name="level" type="string" required="false">Filter by level</param>
+        <param name="older_than" type="ISO8601" required="false">Delete logs older than timestamp</param>
+      </query-params>
+      <response><![CDATA[
+{
+  "data": { "deleted": 42 },
+  "meta": { "request_id": "uuid", "timestamp": "ISO8601" }
+}
+      ]]></response>
+    </endpoint>
+  </api-reference>
+
+  <testing-context>
+    <framework>Bun native test runner or Vitest</framework>
+    <patterns>Mock API responses using msw or simple fetch mocking</patterns>
+    <coverage>
+      - All CLI commands with various filter combinations
+      - Time parsing for relative times
+      - Confirmation prompt flow for clear command
+      - JSON output mode
+      - Error handling for API failures
+    </coverage>
+    <test-data>
+      Backend has POST /api/v1/debug/logs for inserting test data.
+      Tests can seed data then query/delete it.
+    </test-data>
+  </testing-context>
+
+  <output-format-examples>
+    <example name="colored-output-default">
+      <description>Default colorized output for tail/search</description>
+      <format><![CDATA[
+2024-12-05T10:30:15Z  [ERROR]  ios      UPLOAD_FAILED    correlation: abc-123
+2024-12-05T10:30:14Z  [INFO]   backend  CAPTURE_STORED   correlation: abc-123
+2024-12-05T10:30:12Z  [DEBUG]  ios      UPLOAD_REQUEST   correlation: abc-123
+      ]]></format>
+      <notes>
+        - [ERROR] in red, [WARN] in yellow, [INFO] in blue, [DEBUG] in gray
+        - Columns aligned for readability
+        - Correlation ID shown for easy copy-paste
+      </notes>
+    </example>
+    <example name="json-output">
+      <description>Machine-readable JSON output with --json flag</description>
+      <format><![CDATA[
+[
+  {"id": "...", "correlation_id": "abc-123", "timestamp": "2024-12-05T10:30:15Z", "source": "ios", "level": "error", "event": "UPLOAD_FAILED", "payload": {...}},
+  ...
+]
+      ]]></format>
+    </example>
+  </output-format-examples>
+
+  <cli-command-reference>
+    <command name="tail">
+      <usage>bun debug:tail [options]</usage>
+      <options>
+        <option flag="--source" value="ios|backend|web">Filter by source</option>
+        <option flag="--level" value="debug|info|warn|error">Filter by level</option>
+        <option flag="-n" value="number">Limit output to last N entries (default 100)</option>
+        <option flag="--follow">Continuously poll for new logs (2s interval)</option>
+        <option flag="--json">Output raw JSON</option>
+        <option flag="--api-url" value="url">Override API URL (default: http://localhost:8080)</option>
+      </options>
+    </command>
+    <command name="search">
+      <usage>bun debug:search [options]</usage>
+      <options>
+        <option flag="--correlation-id" value="uuid">Filter by correlation ID</option>
+        <option flag="--event" value="pattern">Filter by event pattern (case-insensitive substring)</option>
+        <option flag="--since" value="time">Filter logs newer than (e.g., "1 hour ago", "30m")</option>
+        <option flag="--json">Output raw JSON</option>
+        <option flag="--api-url" value="url">Override API URL</option>
+      </options>
+    </command>
+    <command name="clear">
+      <usage>bun debug:clear [options]</usage>
+      <options>
+        <option flag="--older-than" value="duration">Clear logs older than (e.g., "1d", "2h", "1w")</option>
+        <option flag="--source" value="ios|backend|web">Clear only specific source</option>
+        <option flag="--yes">Skip confirmation prompt</option>
+        <option flag="--api-url" value="url">Override API URL</option>
+      </options>
+    </command>
+  </cli-command-reference>
+
+  <implementation-notes>
+    <note category="structure">
+      The packages/debug-cli/ directory already exists with empty src/commands/ and src/lib/ subdirectories.
+      Create files in these directories according to the story tasks.
+    </note>
+    <note category="esm">
+      chalk v5 is ESM-only. Ensure package.json has "type": "module" and use import syntax.
+    </note>
+    <note category="polling">
+      --follow mode should poll every 2 seconds. Track the last seen timestamp to request only new logs.
+      Handle Ctrl+C gracefully to stop polling.
+    </note>
+    <note category="confirmation">
+      Use readline or similar for confirmation prompt in clear command.
+      Example: "Are you sure you want to delete logs? (y/N)"
+    </note>
+    <note category="time-parsing">
+      Relative time parsing examples:
+      - "1 hour ago" -> subtract 1 hour from now
+      - "30 minutes ago" -> subtract 30 minutes
+      - "2 days ago" -> subtract 2 days
+      - "1h", "30m", "2d", "1w" -> shorthand format
+    </note>
+  </implementation-notes>
+</story-context>
