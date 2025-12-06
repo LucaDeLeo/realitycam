@@ -6,6 +6,7 @@ pub mod attestation;
 pub mod c2pa;
 pub mod capture_attestation;
 pub mod challenge_store;
+pub mod debug_logs;
 pub mod depth_analysis;
 pub mod hash_chain_verifier;
 pub mod metadata_validation;

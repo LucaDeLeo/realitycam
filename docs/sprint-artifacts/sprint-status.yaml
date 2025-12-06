@@ -146,3 +146,9 @@ development_status:
   8-7-file-verification-hash-only: done
   8-8-video-privacy-mode: done
   epic-8-retrospective: optional
+
+  # Debug Observability System (Quick-Flow)
+  # Cross-stack logging infrastructure for internal development
+  # Tech spec created: 2025-12-05
+  debug-1-backend-debug-endpoints: done
+  debug-2-ios-debug-logger: drafted

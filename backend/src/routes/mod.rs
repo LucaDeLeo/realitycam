@@ -15,6 +15,7 @@ use crate::services::{ChallengeStore, StorageService};
 pub mod captures;
 pub mod captures_hash_only;
 pub mod captures_video;
+pub mod debug;
 pub mod devices;
 pub mod health;
 pub mod test;
@@ -104,6 +105,12 @@ pub fn api_router(state: AppState) -> Router {
     if state.config.enable_test_endpoints {
         tracing::warn!("Test endpoints enabled - DO NOT USE IN PRODUCTION");
         v1_router = v1_router.nest("/test", test::router());
+    }
+
+    // Conditionally add debug routes (SECURITY: only enabled via DEBUG_LOGS_ENABLED)
+    if state.config.debug_logs_enabled {
+        tracing::warn!("Debug log endpoints enabled - DO NOT USE IN PRODUCTION");
+        v1_router = v1_router.nest("/debug", debug::router());
     }
 
     let v1_router = v1_router.with_state(state);

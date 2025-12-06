@@ -77,6 +77,18 @@ pub struct Config {
     /// In dev, this should be accessible from client devices (not localhost)
     /// In production, this would typically be a CloudFront CDN URL
     pub s3_public_endpoint: String,
+
+    /// Enable debug log endpoints (/api/v1/debug/*)
+    /// SECURITY: Should ONLY be enabled in development/test environments
+    /// When false, debug endpoints return 404
+    pub debug_logs_enabled: bool,
+
+    /// Time-to-live for debug logs in days (default: 7)
+    /// Logs older than this are eligible for cleanup
+    pub debug_logs_ttl_days: u32,
+
+    /// Maximum batch size for debug log ingestion (default: 100)
+    pub debug_logs_max_batch: usize,
 }
 
 impl Config {
@@ -156,6 +168,17 @@ impl Config {
                 // For production, this should be set to CloudFront/CDN URL
                 env::var("S3_ENDPOINT").unwrap_or_else(|_| "http://localhost:4566".to_string())
             }),
+            debug_logs_enabled: env::var("DEBUG_LOGS_ENABLED")
+                .map(|v| v.to_lowercase() == "true" || v == "1")
+                .unwrap_or(true), // Default: enabled for development
+            debug_logs_ttl_days: env::var("DEBUG_LOGS_TTL_DAYS")
+                .unwrap_or_else(|_| "7".to_string())
+                .parse()
+                .expect("DEBUG_LOGS_TTL_DAYS must be a number"),
+            debug_logs_max_batch: env::var("DEBUG_LOGS_MAX_BATCH")
+                .unwrap_or_else(|_| "100".to_string())
+                .parse()
+                .expect("DEBUG_LOGS_MAX_BATCH must be a number"),
         }
     }
 
@@ -184,6 +207,9 @@ impl Config {
             require_verified_devices: false,
             enable_test_endpoints: true, // Enabled for tests
             s3_public_endpoint: "http://localhost:4566".to_string(),
+            debug_logs_enabled: true, // Enabled for tests
+            debug_logs_ttl_days: 7,
+            debug_logs_max_batch: 100,
         }
     }
 }

@@ -1,0 +1,440 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<story-context story-key="debug-1-backend-debug-endpoints">
+  <metadata>
+    <generated>2025-12-05</generated>
+    <source-story>docs/sprint-artifacts/stories/debug-1-backend-debug-endpoints.md</source-story>
+    <source-tech-spec>docs/tech-spec.md</source-tech-spec>
+    <source-architecture>docs/architecture.md</source-architecture>
+    <workflow-type>Quick-Flow</workflow-type>
+    <epic-spec-note>This is a Quick-Flow feature. The tech-spec (docs/tech-spec.md) serves as the combined PRD and epic specification. No separate PRD or epic document exists.</epic-spec-note>
+  </metadata>
+
+  <story-summary>
+    Implement backend debug logging infrastructure including:
+    - Database schema for debug_logs table with correlation IDs
+    - Rust models (DebugLog, CreateDebugLog, DebugLogQuery, DebugLogStats)
+    - Debug logs service for storage/query operations
+    - REST API endpoints: POST/GET/DELETE /debug/logs, GET /debug/logs/{id}, GET /debug/logs/stats
+    - Configuration options for enabling/disabling and TTL settings
+    - Conditional endpoint enablement based on DEBUG_LOGS_ENABLED config
+  </story-summary>
+
+  <acceptance-criteria>
+    <ac id="AC1">Database migration creates debug_logs table with correct schema: id (UUID PK), correlation_id (UUID), timestamp (TIMESTAMPTZ), source (TEXT with CHECK for ios|backend|web), level (TEXT with CHECK for debug|info|warn|error), event (TEXT), payload (JSONB), device_id (UUID nullable), session_id (UUID nullable), created_at (TIMESTAMPTZ)</ac>
+    <ac id="AC2">Database indexes for common query patterns: correlation_id, timestamp DESC, source, event, and partial index for errors</ac>
+    <ac id="AC3">POST /debug/logs accepts batch up to DEBUG_LOGS_MAX_BATCH (default 100), returns 201 with count</ac>
+    <ac id="AC4">GET /debug/logs supports query params: correlation_id, source, level, event (substring), since (ISO), limit (default 100, max 1000), order (asc/desc)</ac>
+    <ac id="AC5">GET /debug/logs/{id} returns single entry by UUID or 404</ac>
+    <ac id="AC6">DELETE /debug/logs clears logs with optional filters (source, level, older_than), returns count</ac>
+    <ac id="AC7">GET /debug/logs/stats returns aggregated counts grouped by source and level</ac>
+    <ac id="AC8">Config includes debug_logs_enabled (bool), debug_logs_ttl_days (u32, default 7), debug_logs_max_batch (usize, default 100)</ac>
+    <ac id="AC9">All debug endpoints return 404 when DEBUG_LOGS_ENABLED=false</ac>
+    <ac id="AC10">Integration tests cover all CRUD operations and query parameter combinations</ac>
+  </acceptance-criteria>
+
+  <existing-patterns>
+    <pattern name="route-handler">
+      <description>Route handlers follow Axum pattern with State, Extension extractors and typed responses</description>
+      <code-reference file="backend/src/routes/captures.rs" lines="56-60">
+        <![CDATA[
+/// Creates the captures routes router.
+pub fn router() -> Router<AppState> {
+    Router::new()
+        .route("/", post(upload_capture))
+        .route("/{id}", get(get_capture))
+}
+        ]]>
+      </code-reference>
+      <code-reference file="backend/src/routes/captures.rs" lines="247-248">
+        <![CDATA[
+async fn upload_capture(
+    State(state): State<AppState>,
+    Extension(request_id): Extension<Uuid>,
+    Extension(device_ctx): Extension<DeviceContext>,
+    multipart: Multipart,
+) -> Result<(StatusCode, Json<ApiResponse<CaptureUploadResponse>>), ApiErrorWithRequestId> {
+        ]]>
+      </code-reference>
+    </pattern>
+
+    <pattern name="route-registration">
+      <description>Routes are registered in mod.rs with optional conditional enablement</description>
+      <code-reference file="backend/src/routes/mod.rs" lines="103-107">
+        <![CDATA[
+// Conditionally add test routes (SECURITY: only enabled via ENABLE_TEST_ENDPOINTS)
+if state.config.enable_test_endpoints {
+    tracing::warn!("Test endpoints enabled - DO NOT USE IN PRODUCTION");
+    v1_router = v1_router.nest("/test", test::router());
+}
+        ]]>
+      </code-reference>
+    </pattern>
+
+    <pattern name="app-state">
+      <description>Shared application state passed to all routes</description>
+      <code-reference file="backend/src/routes/mod.rs" lines="24-34">
+        <![CDATA[
+#[derive(Clone)]
+pub struct AppState {
+    /// Database connection pool
+    pub db: PgPool,
+    /// Challenge store for attestation verification
+    pub challenge_store: Arc<ChallengeStore>,
+    /// Application configuration
+    pub config: Arc<Config>,
+    /// S3 storage service (shared, connection-pooled)
+    pub storage: Arc<StorageService>,
+}
+        ]]>
+      </code-reference>
+    </pattern>
+
+    <pattern name="service-layer">
+      <description>Services are modules with public functions, re-exported in mod.rs</description>
+      <code-reference file="backend/src/services/mod.rs" lines="1-16">
+        <![CDATA[
+//! Service modules for RealityCam backend
+//!
+//! This module contains business logic services that are used by route handlers.
+
+pub mod attestation;
+pub mod c2pa;
+pub mod capture_attestation;
+// ... other modules
+
+pub use attestation::{...};
+pub use depth_analysis::{analyze_depth_map, analyze_depth_map_from_bytes};
+        ]]>
+      </code-reference>
+    </pattern>
+
+    <pattern name="model-definition">
+      <description>Models use sqlx::FromRow for DB mapping, serde for JSON</description>
+      <code-reference file="backend/src/models/evidence.rs" lines="75-87">
+        <![CDATA[
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HardwareAttestation {
+    pub status: CheckStatus,
+    pub level: AttestationLevel,
+    pub device_model: String,
+    pub assertion_verified: bool,
+    pub counter_valid: bool,
+}
+        ]]>
+      </code-reference>
+    </pattern>
+
+    <pattern name="config-extension">
+      <description>Config struct with env var loading and defaults</description>
+      <code-reference file="backend/src/config.rs" lines="68-74">
+        <![CDATA[
+/// Enable test seeding endpoints (/api/v1/test/*)
+/// SECURITY: Should ONLY be enabled in development/test environments
+/// When false (default), test endpoints return 404
+pub enable_test_endpoints: bool,
+        ]]>
+      </code-reference>
+      <code-reference file="backend/src/config.rs" lines="151-153">
+        <![CDATA[
+enable_test_endpoints: env::var("ENABLE_TEST_ENDPOINTS")
+    .map(|v| v.to_lowercase() == "true" || v == "1")
+    .unwrap_or(false), // Default: disabled for security
+        ]]>
+      </code-reference>
+    </pattern>
+
+    <pattern name="migration-schema">
+      <description>SQL migrations with indexes and comments</description>
+      <code-reference file="backend/migrations/20251122000002_create_captures.sql">
+        <![CDATA[
+CREATE TABLE captures (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    device_id           UUID NOT NULL REFERENCES devices(id),
+    target_media_hash   BYTEA NOT NULL UNIQUE,
+    depth_map_key       TEXT,
+    evidence            JSONB NOT NULL DEFAULT '{}',
+    confidence_level    TEXT NOT NULL DEFAULT 'low',
+    status              TEXT NOT NULL DEFAULT 'pending',
+    captured_at         TIMESTAMPTZ NOT NULL,
+    uploaded_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_captures_hash ON captures USING hash(target_media_hash);
+CREATE INDEX idx_captures_device ON captures(device_id);
+
+COMMENT ON TABLE captures IS 'Photo captures with verification evidence';
+        ]]>
+      </code-reference>
+    </pattern>
+
+    <pattern name="error-handling">
+      <description>Errors use ApiError enum with status codes and safe messages</description>
+      <code-reference file="backend/src/error.rs" lines="42-111">
+        <![CDATA[
+#[derive(Debug, Error)]
+pub enum ApiError {
+    #[error("Validation error: {0}")]
+    Validation(String),
+
+    #[error("Device not found")]
+    DeviceNotFound,
+
+    #[error("Capture not found")]
+    CaptureNotFound,
+    // ...
+}
+
+impl ApiError {
+    pub fn status_code(&self) -> StatusCode {
+        match self {
+            ApiError::Validation(_) => StatusCode::BAD_REQUEST,
+            ApiError::DeviceNotFound => StatusCode::NOT_FOUND,
+            // ...
+        }
+    }
+}
+        ]]>
+      </code-reference>
+    </pattern>
+
+    <pattern name="request-id-middleware">
+      <description>Request ID middleware extracts UUID and passes via Extension</description>
+      <code-reference file="backend/src/main.rs" lines="94-131">
+        <![CDATA[
+.layer(SetRequestIdLayer::new(
+    x_request_id.clone(),
+    MakeRequestUuid,
+))
+.layer(PropagateRequestIdLayer::new(x_request_id))
+.layer(
+    TraceLayer::new_for_http()
+        .make_span_with(|request: &axum::http::Request<_>| {
+            let request_id = request
+                .headers()
+                .get(X_REQUEST_ID)
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| Uuid::parse_str(s).ok())
+                .unwrap_or_else(Uuid::new_v4);
+
+            tracing::info_span!(
+                "http_request",
+                method = %request.method(),
+                uri = %request.uri(),
+                request_id = %request_id,
+            )
+        })
+        ]]>
+      </code-reference>
+    </pattern>
+  </existing-patterns>
+
+  <implementation-guidance>
+    <database-schema>
+      <![CDATA[
+-- From story and tech-spec
+CREATE TABLE debug_logs (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    correlation_id  UUID NOT NULL,
+    timestamp       TIMESTAMPTZ NOT NULL,
+    source          TEXT NOT NULL CHECK (source IN ('ios', 'backend', 'web')),
+    level           TEXT NOT NULL CHECK (level IN ('debug', 'info', 'warn', 'error')),
+    event           TEXT NOT NULL,
+    payload         JSONB NOT NULL DEFAULT '{}',
+    device_id       UUID,
+    session_id      UUID,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Indexes for common queries
+CREATE INDEX idx_debug_logs_correlation ON debug_logs(correlation_id);
+CREATE INDEX idx_debug_logs_timestamp ON debug_logs(timestamp DESC);
+CREATE INDEX idx_debug_logs_source ON debug_logs(source);
+CREATE INDEX idx_debug_logs_event ON debug_logs(event);
+
+-- Partial index for errors (often queried)
+CREATE INDEX idx_debug_logs_errors ON debug_logs(timestamp DESC) WHERE level = 'error';
+      ]]>
+    </database-schema>
+
+    <log-entry-schema>
+      <![CDATA[
+interface DebugLogEntry {
+  id: string;                    // UUID
+  correlation_id: string;        // Traces request across layers
+  timestamp: string;             // ISO 8601
+  source: "ios" | "backend" | "web";
+  level: "debug" | "info" | "warn" | "error";
+  event: string;                 // e.g., "UPLOAD_REQUEST", "ATTESTATION_VERIFIED"
+  payload: Record<string, any>;  // Structured event data
+  device_id?: string;            // iOS device identifier (DEBUG builds)
+  session_id?: string;           // App session for grouping
+}
+      ]]>
+    </log-entry-schema>
+
+    <query-parameters>
+      <param name="correlation_id" type="string" description="Filter by correlation ID (exact match)" />
+      <param name="source" type="string" description="Filter by source (ios, backend, web)" />
+      <param name="level" type="string" description="Filter by level (debug, info, warn, error)" />
+      <param name="event" type="string" description="Filter by event type (substring match via ILIKE)" />
+      <param name="since" type="string" description="ISO timestamp, logs after this time" />
+      <param name="limit" type="number" description="Max results (default 100, max 1000)" />
+      <param name="order" type="string" description="asc or desc (default desc)" />
+    </query-parameters>
+
+    <config-additions>
+      <![CDATA[
+// In Config struct:
+pub debug_logs_enabled: bool,      // DEBUG_LOGS_ENABLED env var
+pub debug_logs_ttl_days: u32,      // DEBUG_LOGS_TTL_DAYS env var, default 7
+pub debug_logs_max_batch: usize,   // DEBUG_LOGS_MAX_BATCH env var, default 100
+      ]]>
+    </config-additions>
+
+    <endpoint-specifications>
+      <endpoint method="POST" path="/debug/logs" description="Ingest batch of log entries">
+        <request>Array of DebugLogEntry (up to max_batch)</request>
+        <response status="201">{"count": N}</response>
+        <response status="400">Batch too large or invalid entries</response>
+        <response status="404">Debug logging disabled</response>
+      </endpoint>
+      <endpoint method="GET" path="/debug/logs" description="Query logs with filters">
+        <response status="200">Array of DebugLogEntry</response>
+        <response status="404">Debug logging disabled</response>
+      </endpoint>
+      <endpoint method="GET" path="/debug/logs/{id}" description="Get single log entry">
+        <response status="200">DebugLogEntry</response>
+        <response status="404">Not found or debug logging disabled</response>
+      </endpoint>
+      <endpoint method="DELETE" path="/debug/logs" description="Clear logs with optional filters">
+        <query-params>source, level, older_than (ISO timestamp)</query-params>
+        <response status="200">{"deleted": N}</response>
+        <response status="404">Debug logging disabled</response>
+      </endpoint>
+      <endpoint method="GET" path="/debug/logs/stats" description="Get aggregated counts">
+        <response status="200">{"by_source": {...}, "by_level": {...}, "total": N}</response>
+        <response status="404">Debug logging disabled</response>
+      </endpoint>
+    </endpoint-specifications>
+
+    <security-notes>
+      - Debug endpoints should ONLY be enabled in development/test environments
+      - Use DEBUG_LOGS_ENABLED=false (default) for production
+      - Return 404 when disabled (not 403) to avoid revealing endpoint existence
+      - No authentication required on debug endpoints (internal dev use only)
+      - Pattern follows existing enable_test_endpoints behavior
+    </security-notes>
+  </implementation-guidance>
+
+  <file-inventory>
+    <files-to-create>
+      <file path="backend/migrations/20251206003000_create_debug_logs.sql" purpose="Database migration for debug_logs table with schema and indexes">
+        Timestamp follows existing migration naming convention
+      </file>
+      <file path="backend/src/models/debug_log.rs" purpose="DebugLog model and related structs (CreateDebugLog, DebugLogQuery, DebugLogStats)">
+        - DebugLog: FromRow for DB mapping, Serialize/Deserialize for JSON
+        - CreateDebugLog: For batch insert (no id, created_at auto-generated)
+        - DebugLogQuery: Query parameters with validation
+        - DebugLogStats: Aggregated counts response
+      </file>
+      <file path="backend/src/services/debug_logs.rs" purpose="Debug log service with storage/query logic">
+        Functions: insert_batch, query, get_by_id, delete, get_stats
+        Use sqlx query macros for compile-time checked SQL
+      </file>
+      <file path="backend/src/routes/debug.rs" purpose="Debug API endpoints">
+        - POST /debug/logs (batch insert)
+        - GET /debug/logs (query with filters)
+        - GET /debug/logs/{id} (single entry)
+        - DELETE /debug/logs (clear with filters)
+        - GET /debug/logs/stats (aggregations)
+        Include inline #[cfg(test)] module for integration tests
+      </file>
+    </files-to-create>
+    <files-to-modify>
+      <file path="backend/src/routes/mod.rs" changes="Add debug routes registration with conditional enablement based on config.debug_logs_enabled">
+        Add: pub mod debug;
+        Add: Conditional nest similar to test routes pattern
+      </file>
+      <file path="backend/src/services/mod.rs" changes="Export debug_logs module">
+        Add: pub mod debug_logs;
+        Add: pub use debug_logs::*;
+      </file>
+      <file path="backend/src/models/mod.rs" changes="Export debug_log module">
+        Add: mod debug_log;
+        Add: pub use debug_log::{DebugLog, CreateDebugLog, DebugLogQuery, DebugLogStats};
+      </file>
+      <file path="backend/src/config.rs" changes="Add debug logging configuration options">
+        Add fields: debug_logs_enabled, debug_logs_ttl_days, debug_logs_max_batch
+        Add env var parsing with defaults
+        Add to default_for_test()
+      </file>
+    </files-to-modify>
+  </file-inventory>
+
+  <testing-requirements>
+    <test-location>backend/src/routes/debug.rs (inline #[cfg(test)] module)</test-location>
+    <unit-tests>
+      <test name="DebugLogQuery parameter validation">Validate limit bounds, order values</test>
+      <test name="Config parsing for debug options">Verify env var parsing and defaults</test>
+    </unit-tests>
+    <integration-tests>
+      <test name="POST /debug/logs with valid batch returns 201">Insert batch, verify count returned</test>
+      <test name="POST /debug/logs with oversized batch returns 400">Exceed max_batch limit</test>
+      <test name="POST /debug/logs when disabled returns 404">Set debug_logs_enabled=false</test>
+      <test name="GET /debug/logs returns entries in correct order">Verify desc by default</test>
+      <test name="GET /debug/logs with each query parameter filters correctly">Test correlation_id, source, level, event, since</test>
+      <test name="GET /debug/logs with combined filters works correctly">Multiple params together</test>
+      <test name="GET /debug/logs respects limit and max limit">Default 100, cap at 1000</test>
+      <test name="GET /debug/logs/{id} returns entry or 404">Test existing and non-existing IDs</test>
+      <test name="DELETE /debug/logs removes matching entries">Verify count returned</test>
+      <test name="DELETE /debug/logs with filters removes only matching entries">Test source, level, older_than</test>
+      <test name="GET /debug/logs/stats returns correct aggregations">Verify by_source, by_level, total</test>
+    </integration-tests>
+  </testing-requirements>
+
+  <dependencies>
+    <existing>
+      <dependency name="tracing" version="0.1" purpose="Backend structured logging" />
+      <dependency name="sqlx" version="0.8" purpose="Database queries with compile-time checking" />
+      <dependency name="axum" version="0.8" purpose="HTTP endpoints" />
+      <dependency name="serde_json" version="1" purpose="JSON serialization" />
+      <dependency name="uuid" version="1" purpose="UUID generation and parsing" />
+      <dependency name="chrono" version="0.4" purpose="Timestamp handling" />
+    </existing>
+    <new>None - all required dependencies already in Cargo.toml</new>
+  </dependencies>
+
+  <conventions>
+    <code-style>
+      - 4-space indentation
+      - snake_case for functions/variables
+      - PascalCase for types
+      - /// doc comments for public items
+      - Clippy-clean code
+    </code-style>
+    <api-response-format>
+      <![CDATA[
+// Success
+{
+  "data": { /* payload */ },
+  "meta": {
+    "request_id": "uuid",
+    "timestamp": "2025-12-05T10:30:00Z"
+  }
+}
+
+// Error
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Human readable message"
+  },
+  "meta": {
+    "request_id": "uuid",
+    "timestamp": "2025-12-05T10:30:00Z"
+  }
+}
+      ]]>
+    </api-response-format>
+  </conventions>
+</story-context>
