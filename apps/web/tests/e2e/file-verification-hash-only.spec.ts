@@ -6,9 +6,16 @@ import { test, expect } from '@playwright/test';
  * Tests the file verification flow for hash-only captures where media
  * is not stored on the server. Verifies Privacy Mode badge display,
  * hash value display, evidence summary, and metadata flags handling.
+ *
+ * NOTE: These tests require test data setup and backend test endpoints.
+ * Skipped in production - use hash-only-verification.spec.ts for prod tests.
  */
 
+// Skip entire suite in production - requires test endpoints and fixtures
+const isProduction = process.env.TEST_ENV === 'production';
+
 test.describe('Hash-Only File Verification', () => {
+  test.skip(() => isProduction, 'Requires test fixtures - skipped in production');
   test.beforeEach(async ({ page }) => {
     // Navigate to file verification page (assuming /verify route)
     await page.goto('/verify');
