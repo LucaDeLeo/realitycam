@@ -120,6 +120,9 @@
 		3089F9DB00D3 /* TextureClassificationResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10D3 /* TextureClassificationResult.swift */; };
 		3089F9DB00D4 /* TextureClassificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10D4 /* TextureClassificationService.swift */; };
 		3089F9DB00D5 /* TextureClassificationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10D5 /* TextureClassificationServiceTests.swift */; };
+		3089F9DB00D6 /* ArtifactAnalysisResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10D6 /* ArtifactAnalysisResult.swift */; };
+		3089F9DB00D7 /* ArtifactDetectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10D7 /* ArtifactDetectionService.swift */; };
+		3089F9DB00D8 /* ArtifactDetectionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10D8 /* ArtifactDetectionServiceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -257,6 +260,9 @@
 		3089F9DB10D3 /* TextureClassificationResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextureClassificationResult.swift; sourceTree = "<group>"; };
 		3089F9DB10D4 /* TextureClassificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextureClassificationService.swift; sourceTree = "<group>"; };
 		3089F9DB10D5 /* TextureClassificationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextureClassificationServiceTests.swift; sourceTree = "<group>"; };
+		3089F9DB10D6 /* ArtifactAnalysisResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtifactAnalysisResult.swift; sourceTree = "<group>"; };
+		3089F9DB10D7 /* ArtifactDetectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtifactDetectionService.swift; sourceTree = "<group>"; };
+		3089F9DB10D8 /* ArtifactDetectionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtifactDetectionServiceTests.swift; sourceTree = "<group>"; };
 		D9A44E098094F0E08456FEE9 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppEnvironment.swift; path = Rial/Core/Configuration/AppEnvironment.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -340,6 +346,7 @@
 		3089F9DB50D0 /* Detection */ = {
 			isa = PBXGroup;
 			children = (
+				3089F9DB10D7 /* ArtifactDetectionService.swift */,
 				3089F9DB10D1 /* MoireDetectionService.swift */,
 				3089F9DB10D4 /* TextureClassificationService.swift */,
 			);
@@ -381,6 +388,7 @@
 		3089F9DB5005 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				3089F9DB10D6 /* ArtifactAnalysisResult.swift */,
 				3089F9DB1021 /* CaptureData.swift */,
 				3089F9DB1088 /* DepthAnalysisResult.swift */,
 				3089F9DB1077 /* ProcessedVideoCapture.swift */,
@@ -431,6 +439,7 @@
 		3089F9DB50D1 /* Detection */ = {
 			isa = PBXGroup;
 			children = (
+				3089F9DB10D8 /* ArtifactDetectionServiceTests.swift */,
 				3089F9DB10D2 /* MoireDetectionServiceTests.swift */,
 				3089F9DB10D5 /* TextureClassificationServiceTests.swift */,
 			);
@@ -878,6 +887,8 @@
 				3089F9DB00D1 /* MoireDetectionService.swift in Sources */,
 				3089F9DB00D3 /* TextureClassificationResult.swift in Sources */,
 				3089F9DB00D4 /* TextureClassificationService.swift in Sources */,
+				3089F9DB00D6 /* ArtifactAnalysisResult.swift in Sources */,
+				3089F9DB00D7 /* ArtifactDetectionService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -918,6 +929,7 @@
 				3089F9DB00C7 /* NetworkDebugInterceptorTests.swift in Sources */,
 				3089F9DB00D2 /* MoireDetectionServiceTests.swift in Sources */,
 				3089F9DB00D5 /* TextureClassificationServiceTests.swift in Sources */,
+				3089F9DB00D8 /* ArtifactDetectionServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
