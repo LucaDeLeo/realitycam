@@ -170,7 +170,7 @@ development_status:
   9-1-moire-pattern-detection: done
   9-2-texture-classification-coreml: done
   9-3-artifact-detection: done
-  9-4-confidence-aggregation: backlog
+  9-4-confidence-aggregation: done
   9-5-cross-validation-logic: backlog
   9-6-detection-payload-integration: backlog
   9-7-backend-multi-signal-storage: backlog
