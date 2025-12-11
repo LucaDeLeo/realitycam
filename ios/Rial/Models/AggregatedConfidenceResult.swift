@@ -86,6 +86,12 @@ public struct AggregatedConfidenceResult: Codable, Sendable, Equatable {
     /// Aggregation status indicating success or failure mode.
     public let status: AggregationStatus
 
+    /// Enhanced cross-validation result (optional, only when enableEnhancedCrossValidation=true).
+    public let crossValidation: CrossValidationResult?
+
+    /// Aggregated confidence interval (optional, from enhanced cross-validation).
+    public let confidenceInterval: ConfidenceInterval?
+
     // MARK: - CodingKeys
 
     private enum CodingKeys: String, CodingKey {
@@ -99,6 +105,8 @@ public struct AggregatedConfidenceResult: Codable, Sendable, Equatable {
         case computedAt = "computed_at"
         case algorithmVersion = "algorithm_version"
         case status
+        case crossValidation = "cross_validation"
+        case confidenceInterval = "confidence_interval"
     }
 
     // MARK: - Initialization
@@ -116,6 +124,8 @@ public struct AggregatedConfidenceResult: Codable, Sendable, Equatable {
     ///   - computedAt: Analysis timestamp (defaults to now)
     ///   - algorithmVersion: Algorithm version (defaults to current)
     ///   - status: Aggregation status (defaults to .success)
+    ///   - crossValidation: Enhanced cross-validation result (optional)
+    ///   - confidenceInterval: Aggregated confidence interval (optional)
     public init(
         overallConfidence: Float,
         confidenceLevel: AggregatedConfidenceLevel,
@@ -126,7 +136,9 @@ public struct AggregatedConfidenceResult: Codable, Sendable, Equatable {
         analysisTimeMs: Int64,
         computedAt: Date = Date(),
         algorithmVersion: String = ConfidenceAggregationConstants.algorithmVersion,
-        status: AggregationStatus = .success
+        status: AggregationStatus = .success,
+        crossValidation: CrossValidationResult? = nil,
+        confidenceInterval: ConfidenceInterval? = nil
     ) {
         self.overallConfidence = max(0, min(1, overallConfidence))
         self.confidenceLevel = confidenceLevel
@@ -143,6 +155,8 @@ public struct AggregatedConfidenceResult: Codable, Sendable, Equatable {
         self.computedAt = computedAt
         self.algorithmVersion = algorithmVersion
         self.status = status
+        self.crossValidation = crossValidation
+        self.confidenceInterval = confidenceInterval
     }
 
     // MARK: - Convenience Accessors
@@ -178,7 +192,9 @@ public struct AggregatedConfidenceResult: Codable, Sendable, Equatable {
             analysisTimeMs: analysisTimeMs,
             computedAt: computedAt,
             algorithmVersion: algorithmVersion,
-            status: status
+            status: status,
+            crossValidation: crossValidation,
+            confidenceInterval: confidenceInterval
         )
     }
 
@@ -377,6 +393,15 @@ public enum ConfidenceFlag: String, Codable, Sendable, Hashable {
 
     /// Multiple methods returned borderline scores (0.4-0.6).
     case ambiguousResults = "ambiguous_results"
+
+    /// Cross-validation detected consistency anomaly (enhanced mode).
+    case consistencyAnomaly = "consistency_anomaly"
+
+    /// Temporal inconsistency detected in multi-frame analysis (enhanced mode).
+    case temporalInconsistency = "temporal_inconsistency"
+
+    /// High uncertainty in confidence interval (enhanced mode).
+    case highUncertainty = "high_uncertainty"
 }
 
 // MARK: - AggregationStatus

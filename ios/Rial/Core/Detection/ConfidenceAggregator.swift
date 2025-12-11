@@ -96,45 +96,145 @@ public final class ConfidenceAggregator: @unchecked Sendable {
     ///   - moire: Moire pattern detection result (optional, 15% weight)
     ///   - texture: Texture classification result (optional, 15% weight)
     ///   - artifacts: Artifact detection result (optional, 15% weight)
+    ///   - enableEnhancedCrossValidation: Enable enhanced cross-validation via CrossValidationService (default: false)
     /// - Returns: Aggregated confidence result with overall score and breakdown
     public func aggregate(
         depth: DepthAnalysisResult? = nil,
         moire: MoireAnalysisResult? = nil,
         texture: TextureClassificationResult? = nil,
-        artifacts: ArtifactAnalysisResult? = nil
+        artifacts: ArtifactAnalysisResult? = nil,
+        enableEnhancedCrossValidation: Bool = false
     ) async -> AggregatedConfidenceResult {
-        return await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let startTime = CFAbsoluteTimeGetCurrent()
+        let startTime = CFAbsoluteTimeGetCurrent()
 
+        // Perform basic aggregation synchronously on background queue
+        let baseResult = await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
                 let result = self.performAggregation(
                     depth: depth,
                     moire: moire,
                     texture: texture,
                     artifacts: artifacts
                 )
-
-                let elapsed = Int64((CFAbsoluteTimeGetCurrent() - startTime) * 1000)
-                let finalResult = result.with(analysisTimeMs: elapsed)
-
-                Self.logger.info("""
-                    Confidence aggregation complete in \(elapsed)ms:
-                    overallConfidence=\(String(format: "%.3f", finalResult.overallConfidence)),
-                    level=\(finalResult.confidenceLevel.rawValue),
-                    primary=\(finalResult.primarySignalValid),
-                    agree=\(finalResult.supportingSignalsAgree),
-                    flags=\(finalResult.flags.map(\.rawValue))
-                    """)
-
-                if elapsed > ConfidenceAggregationConstants.maxTimeMs {
-                    Self.logger.warning("""
-                        Aggregation exceeded target time: \(elapsed)ms > \(ConfidenceAggregationConstants.maxTimeMs)ms
-                        """)
-                }
-
-                continuation.resume(returning: finalResult)
+                continuation.resume(returning: result)
             }
         }
+
+        // If enhanced cross-validation is enabled, run it and incorporate results
+        var finalResult: AggregatedConfidenceResult
+        if enableEnhancedCrossValidation {
+            let crossValidationResult = await CrossValidationService.shared.validate(
+                depth: depth,
+                moire: moire,
+                texture: texture,
+                artifacts: artifacts
+            )
+
+            finalResult = incorporateCrossValidation(
+                baseResult: baseResult,
+                crossValidation: crossValidationResult
+            )
+        } else {
+            finalResult = baseResult
+        }
+
+        let elapsed = Int64((CFAbsoluteTimeGetCurrent() - startTime) * 1000)
+        finalResult = finalResult.with(analysisTimeMs: elapsed)
+
+        Self.logger.info("""
+            Confidence aggregation complete in \(elapsed)ms:
+            overallConfidence=\(String(format: "%.3f", finalResult.overallConfidence)),
+            level=\(finalResult.confidenceLevel.rawValue),
+            primary=\(finalResult.primarySignalValid),
+            agree=\(finalResult.supportingSignalsAgree),
+            flags=\(finalResult.flags.map(\.rawValue)),
+            enhanced=\(enableEnhancedCrossValidation)
+            """)
+
+        if elapsed > ConfidenceAggregationConstants.maxTimeMs {
+            Self.logger.warning("""
+                Aggregation exceeded target time: \(elapsed)ms > \(ConfidenceAggregationConstants.maxTimeMs)ms
+                """)
+        }
+
+        return finalResult
+    }
+
+    /// Incorporates CrossValidationResult into the base aggregation result.
+    private func incorporateCrossValidation(
+        baseResult: AggregatedConfidenceResult,
+        crossValidation: CrossValidationResult
+    ) -> AggregatedConfidenceResult {
+        var flags = baseResult.flags
+        var overallConfidence = baseResult.overallConfidence
+
+        // Apply penalty from cross-validation
+        if crossValidation.overallPenalty > 0 {
+            overallConfidence = max(0, overallConfidence - crossValidation.overallPenalty)
+            Self.logger.debug("Applied cross-validation penalty: \(String(format: "%.3f", crossValidation.overallPenalty))")
+        }
+
+        // Add flags based on cross-validation results
+        if !crossValidation.anomalies.isEmpty {
+            flags.append(.consistencyAnomaly)
+        }
+
+        if let temporal = crossValidation.temporalConsistency, !temporal.anomalies.isEmpty {
+            flags.append(.temporalInconsistency)
+        }
+
+        if crossValidation.aggregatedInterval.isHighUncertainty {
+            flags.append(.highUncertainty)
+        }
+
+        // Remove duplicates
+        flags = Array(Set(flags))
+
+        // Re-determine confidence level with penalty applied
+        let primarySignalValid = baseResult.primarySignalValid
+        let allMethodsAvailable = baseResult.methodBreakdownByMethod.values.allSatisfy { $0.available }
+        let allAgree = baseResult.supportingSignalsAgree && crossValidation.validationStatus == .pass
+
+        var confidenceLevel = determineConfidenceLevel(
+            confidence: overallConfidence,
+            primaryValid: primarySignalValid,
+            allMethodsAvailable: allMethodsAvailable,
+            allAgree: allAgree
+        )
+
+        // Cap based on cross-validation status
+        if crossValidation.validationStatus == .fail && confidenceLevel > .medium {
+            confidenceLevel = .medium
+            Self.logger.debug("Capped confidence at MEDIUM due to cross-validation failure")
+        }
+
+        // Apply existing caps
+        if flags.contains(.screenDetected) || flags.contains(.printDetected) {
+            if confidenceLevel > .medium {
+                confidenceLevel = .medium
+            }
+        }
+
+        if flags.contains(.methodsDisagree) || flags.contains(.primarySupportingDisagree) {
+            if confidenceLevel > ConfidenceAggregationConstants.disagreementCap {
+                confidenceLevel = ConfidenceAggregationConstants.disagreementCap
+            }
+        }
+
+        return AggregatedConfidenceResult(
+            overallConfidence: overallConfidence,
+            confidenceLevel: confidenceLevel,
+            methodBreakdown: baseResult.methodBreakdownByMethod,
+            primarySignalValid: primarySignalValid,
+            supportingSignalsAgree: allAgree,
+            flags: flags.sorted { $0.rawValue < $1.rawValue },
+            analysisTimeMs: 0, // Will be updated after
+            computedAt: baseResult.computedAt,
+            algorithmVersion: baseResult.algorithmVersion,
+            status: baseResult.status,
+            crossValidation: crossValidation,
+            confidenceInterval: crossValidation.aggregatedInterval
+        )
     }
 
     // MARK: - Internal Aggregation
@@ -164,10 +264,10 @@ public final class ConfidenceAggregator: @unchecked Sendable {
         }
 
         // Normalize scores
-        let depthScore = normalizeDepth(depth)
-        let moireScore = normalizeMoire(moire)
-        let textureScore = normalizeTexture(texture)
-        let artifactsScore = normalizeArtifacts(artifacts)
+        let depthScore = Self.normalizeDepth(depth)
+        let moireScore = Self.normalizeMoire(moire)
+        let textureScore = Self.normalizeTexture(texture)
+        let artifactsScore = Self.normalizeArtifacts(artifacts)
 
         Self.logger.debug("""
             Normalized scores:
@@ -331,7 +431,9 @@ public final class ConfidenceAggregator: @unchecked Sendable {
     /// Scoring:
     /// - Real scene: Base 0.8 + bonuses for variance/layers (up to 1.0)
     /// - Not real scene: Base 0.2 - penalties for flatness (down to 0.0)
-    private func normalizeDepth(_ result: DepthAnalysisResult?) -> Float? {
+    ///
+    /// - Note: Internal static to allow reuse by CrossValidationService.
+    internal static func normalizeDepth(_ result: DepthAnalysisResult?) -> Float? {
         guard let result = result, result.status == .completed else {
             return nil
         }
@@ -363,7 +465,9 @@ public final class ConfidenceAggregator: @unchecked Sendable {
     /// INVERTED: Screen detected = LOW score (less authentic)
     /// - No screen detected -> 1.0
     /// - Screen detected with high confidence -> low score
-    private func normalizeMoire(_ result: MoireAnalysisResult?) -> Float? {
+    ///
+    /// - Note: Internal static to allow reuse by CrossValidationService.
+    internal static func normalizeMoire(_ result: MoireAnalysisResult?) -> Float? {
         guard let result = result, result.status == .completed else {
             return nil
         }
@@ -381,7 +485,9 @@ public final class ConfidenceAggregator: @unchecked Sendable {
     /// Normalizes Texture classification result to 0.0-1.0 authenticity score.
     ///
     /// Real scene = high score, screen/print = low score
-    private func normalizeTexture(_ result: TextureClassificationResult?) -> Float? {
+    ///
+    /// - Note: Internal static to allow reuse by CrossValidationService.
+    internal static func normalizeTexture(_ result: TextureClassificationResult?) -> Float? {
         guard let result = result, result.status == .success else {
             return nil
         }
@@ -401,7 +507,9 @@ public final class ConfidenceAggregator: @unchecked Sendable {
     /// Normalizes Artifact detection result to 0.0-1.0 authenticity score.
     ///
     /// INVERTED: Artifacts detected = LOW score (less authentic)
-    private func normalizeArtifacts(_ result: ArtifactAnalysisResult?) -> Float? {
+    ///
+    /// - Note: Internal static to allow reuse by CrossValidationService.
+    internal static func normalizeArtifacts(_ result: ArtifactAnalysisResult?) -> Float? {
         guard let result = result, result.status == .success else {
             return nil
         }
