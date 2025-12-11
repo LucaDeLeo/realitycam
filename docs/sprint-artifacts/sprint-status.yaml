@@ -168,7 +168,7 @@ development_status:
   # FRs: FR63-FR69
   epic-9: in-progress
   9-1-moire-pattern-detection: done
-  9-2-texture-classification-coreml: backlog
+  9-2-texture-classification-coreml: done
   9-3-artifact-detection: backlog
   9-4-confidence-aggregation: backlog
   9-5-cross-validation-logic: backlog
