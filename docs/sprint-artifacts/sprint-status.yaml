@@ -1,21 +1,28 @@
-# generated: 2025-11-22
-# project: realitycam
-# project_key: realitycam
+# generated: 2025-12-11
+# project: rial.
+# project_key: rial
 # tracking_system: file-system
 # story_location: docs/sprint-artifacts
 
 # STATUS DEFINITIONS:
 # ==================
 # Epic Status:
-#   - backlog: Epic exists in epic file but not contexted
+#   - backlog: Epic not yet started
 #   - contexted: Epic tech context created (required before drafting stories)
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → contexted: When epic tech-spec created
+#   - contexted → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: When all stories reach 'done' status
 #
 # Story Status:
 #   - backlog: Story only exists in epic file
 #   - drafted: Story file created in stories folder
 #   - ready-for-dev: Draft approved and story context created
 #   - in-progress: Developer actively working on implementation
-#   - review: Under SM review (via code-review workflow)
+#   - review: Ready for code review (via Dev's code-review workflow)
 #   - done: Story completed
 #
 # Retrospective Status:
@@ -24,20 +31,20 @@
 #
 # WORKFLOW NOTES:
 # ===============
-# - Epics should be 'contexted' before stories can be 'drafted'
+# - Epic transitions to 'in-progress' automatically when first story is created
 # - Stories can be worked in parallel if team capacity allows
 # - SM typically drafts next story after previous one is 'done' to incorporate learnings
-# - Dev moves story to 'review', SM reviews, then Dev moves to 'done'
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
-generated: 2025-11-22
-project: realitycam
-project_key: realitycam
+generated: 2025-12-11
+project: rial.
+project_key: rial
 tracking_system: file-system
 story_location: docs/sprint-artifacts
 
 development_status:
   # Epic 1: Foundation & Project Setup (5 stories)
-  epic-1: contexted
+  epic-1: done
   1-1-monorepo-structure-development-environment: done
   1-2-database-schema-migrations: done
   1-3-backend-api-skeleton: done
@@ -46,7 +53,7 @@ development_status:
   epic-1-retrospective: optional
 
   # Epic 2: Device Registration & Hardware Attestation (6 stories)
-  epic-2: contexted
+  epic-2: done
   2-1-iphone-pro-detection-capability-check: done
   2-2-secure-enclave-key-generation: done
   2-3-dcappattest-integration: done
@@ -56,7 +63,7 @@ development_status:
   epic-2-retrospective: optional
 
   # Epic 3: Photo Capture with LiDAR Depth (6 stories)
-  epic-3: contexted
+  epic-3: done
   3-1-camera-view-lidar-depth-overlay: done
   3-2-photo-capture-depth-map: done
   3-3-gps-metadata-collection: done
@@ -66,7 +73,7 @@ development_status:
   epic-3-retrospective: optional
 
   # Epic 4: Upload, Processing & Evidence Generation (8 stories)
-  epic-4: contexted
+  epic-4: done
   4-1-capture-upload-endpoint: done
   4-2-upload-queue-retry: done
   4-3-offline-storage-auto-upload: done
@@ -78,7 +85,7 @@ development_status:
   epic-4-retrospective: optional
 
   # Epic 5: C2PA Integration & Verification Interface (8 stories)
-  epic-5: contexted
+  epic-5: done
   5-1-c2pa-manifest-generation: done
   5-2-c2pa-signing-ed25519: done
   5-3-c2pa-embedding-storage: done
@@ -91,9 +98,8 @@ development_status:
 
   # Epic 6: Native Swift Implementation (16 stories)
   # Added via Sprint Change Proposal SCP-006 (2025-11-25)
-  # Can be developed in parallel - provides native alternative to Epics 2-4 mobile
-  # Tech spec created: 2025-11-25
-  epic-6: contexted
+  # Provides native alternative to Epics 2-4 mobile with maximum security posture
+  epic-6: done
   6-1-initialize-native-ios-project: done
   6-2-dcappattest-direct-integration: done
   6-3-cryptokit-integration: done
@@ -114,8 +120,7 @@ development_status:
 
   # Epic 7: Video Capture with LiDAR Depth (14 stories)
   # Extends photo capture to video with frame-by-frame depth verification
-  # Tech spec created: 2025-11-26
-  epic-7: contexted
+  epic-7: done
   7-1-arkit-video-recording-session: done
   7-2-depth-keyframe-extraction: done
   7-3-realtime-edge-depth-overlay: done
@@ -135,8 +140,7 @@ development_status:
   # Epic 8: Privacy-First Capture Mode (8 stories)
   # Added via Sprint Change Proposal SCP-008 (2025-12-01)
   # Enables zero-knowledge provenance with client-side depth analysis
-  # Tech spec created: 2025-12-01
-  epic-8: contexted
+  epic-8: done
   8-1-client-side-depth-analysis: done
   8-2-privacy-mode-settings-ui: done
   8-3-hash-only-capture-payload: done
@@ -149,9 +153,70 @@ development_status:
 
   # Debug Observability System (Quick-Flow)
   # Cross-stack logging infrastructure for internal development
-  # Tech spec created: 2025-12-05
   debug-1-backend-debug-endpoints: done
   debug-2-ios-debug-logger: done
   debug-3-cli-query-tool: done
   debug-4-ios-network-interceptor: done
   debug-5-web-debug-integration: done
+
+  # ============================================
+  # EXPANSION EPICS (Post-MVP)
+  # ============================================
+
+  # Epic 9: iOS Defense-in-Depth (8 stories)
+  # Multi-signal detection: Moiré, texture, artifacts layered on LiDAR
+  # FRs: FR63-FR69
+  epic-9: in-progress
+  9-1-moire-pattern-detection: done
+  9-2-texture-classification-coreml: backlog
+  9-3-artifact-detection: backlog
+  9-4-confidence-aggregation: backlog
+  9-5-cross-validation-logic: backlog
+  9-6-detection-payload-integration: backlog
+  9-7-backend-multi-signal-storage: backlog
+  9-8-multi-signal-integration-testing: backlog
+  epic-9-retrospective: optional
+
+  # Epic 10: Cross-Platform Foundation (6 stories)
+  # Backend Android attestation + unified evidence model
+  # FRs: FR70-FR75
+  epic-10: backlog
+  10-1-android-key-attestation-service: backlog
+  10-2-attestation-security-level-extraction: backlog
+  10-3-software-attestation-rejection: backlog
+  10-4-challenge-freshness-validation: backlog
+  10-5-unified-evidence-schema: backlog
+  10-6-backward-compatibility-migration: backlog
+  epic-10-retrospective: optional
+
+  # Epic 11: Detection Transparency (4 stories)
+  # Show users HOW confidence is calculated
+  # FRs: FR76-FR79
+  # Requires: Epic 9 or Epic 10
+  epic-11: backlog
+  11-1-method-breakdown-component: backlog
+  11-2-cross-validation-status-display: backlog
+  11-3-platform-indicator-badge: backlog
+  11-4-methodology-explainer-page: backlog
+  epic-11-retrospective: optional
+
+  # Epic 12: Android Native App (14 stories)
+  # Full Android app with TEE/StrongBox + parallax + multi-signal
+  # FRs: FR80-FR88
+  # Requires: Epic 10
+  epic-12: backlog
+  12-1-android-project-setup: backlog
+  12-2-tee-strongbox-key-generation: backlog
+  12-3-key-attestation-integration: backlog
+  12-4-multi-camera-capture-session: backlog
+  12-5-parallax-depth-estimation: backlog
+  12-6-moire-detection-vulkan: backlog
+  12-7-texture-classification-tflite: backlog
+  12-8-confidence-aggregation: backlog
+  12-9-encrypted-local-storage: backlog
+  12-10-workmanager-upload-queue: backlog
+  12-11-api-request-signing: backlog
+  12-12-capture-ui-compose: backlog
+  12-13-history-result-views: backlog
+  12-14-feature-parity-validation: backlog
+  epic-12-retrospective: optional
