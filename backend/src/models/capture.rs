@@ -134,6 +134,13 @@ pub struct Capture {
 
     /// Privacy metadata flags (JSONB)
     pub metadata_flags: Option<serde_json::Value>,
+
+    // ========================================================================
+    // Multi-signal detection fields (Story 9-7)
+    // ========================================================================
+    /// Multi-signal detection results from iOS (JSONB)
+    /// Contains moire, texture, artifacts, aggregated_confidence, cross_validation
+    pub detection_results: Option<serde_json::Value>,
 }
 
 /// Parameters for creating a new capture record

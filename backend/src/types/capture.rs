@@ -140,6 +140,34 @@ pub struct CaptureDetailsResponse {
     /// Privacy metadata flags showing what metadata was included
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata_flags: Option<serde_json::Value>,
+
+    // ========================================================================
+    // Multi-signal detection fields (Story 9-7)
+    // ========================================================================
+    /// Whether detection data is available for this capture
+    #[serde(default)]
+    pub detection_available: bool,
+
+    /// Full detection results from iOS multi-signal analysis (JSONB)
+    /// Contains moire, texture, artifacts, aggregated_confidence, cross_validation
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detection: Option<serde_json::Value>,
+
+    /// Detection confidence level: "high", "medium", "low", or "suspicious"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detection_confidence_level: Option<String>,
+
+    /// Whether primary signal (LiDAR depth) passed validation
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detection_primary_valid: Option<bool>,
+
+    /// Whether supporting signals agree with primary signal
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detection_signals_agree: Option<bool>,
+
+    /// Number of detection methods used
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detection_method_count: Option<u8>,
 }
 
 // ============================================================================

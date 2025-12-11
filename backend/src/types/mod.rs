@@ -3,6 +3,7 @@
 //! Defines the standard API response format per architecture specification.
 
 pub mod capture;
+pub mod detection;
 pub mod hash_chain_verification;
 pub mod hash_only;
 pub mod video_capture;
@@ -42,6 +43,8 @@ pub use hash_only::{
     FilteredLocation, FilteredMetadata, HashOnlyCapturePayload, HashOnlyCaptureResponse,
     InsertHashOnlyCaptureParams, MetadataFlags, VideoHashChainData,
 };
+
+pub use detection::{DetectionResults, DetectionSummary};
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

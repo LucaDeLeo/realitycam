@@ -40,7 +40,7 @@ use crate::services::{
 const BACKEND_VERSION: &str = env!("CARGO_PKG_VERSION");
 use crate::types::{
     capture::{validate_depth_map_size, validate_photo_size},
-    ApiResponse, CaptureMetadataPayload, CaptureUploadResponse,
+    ApiResponse, CaptureMetadataPayload, CaptureUploadResponse, DetectionResults,
 };
 
 // ============================================================================
@@ -68,18 +68,22 @@ struct ParsedMultipart {
     photo_bytes: Vec<u8>,
     depth_map_bytes: Vec<u8>,
     metadata: CaptureMetadataPayload,
+    /// Optional multi-signal detection results from iOS (Story 9-7)
+    detection: Option<DetectionResults>,
 }
 
 /// Parses multipart form data for capture upload
 ///
-/// Extracts three parts:
-/// - "photo" - JPEG image (max 10MB)
-/// - "depth_map" - Gzipped depth data (max 5MB)
-/// - "metadata" - JSON metadata payload
+/// Extracts parts:
+/// - "photo" - JPEG image (max 10MB) [required]
+/// - "depth_map" - Gzipped depth data (max 5MB) [required]
+/// - "metadata" - JSON metadata payload [required]
+/// - "detection" - JSON detection results from iOS multi-signal analysis [optional, Story 9-7]
 async fn parse_multipart(mut multipart: Multipart) -> Result<ParsedMultipart, ApiError> {
     let mut photo_bytes: Option<Vec<u8>> = None;
     let mut depth_map_bytes: Option<Vec<u8>> = None;
     let mut metadata: Option<CaptureMetadataPayload> = None;
+    let mut detection: Option<DetectionResults> = None;
 
     while let Some(field) = multipart.next_field().await.map_err(|e| {
         tracing::warn!(error = %e, "Failed to read multipart field");
@@ -131,6 +135,54 @@ async fn parse_multipart(mut multipart: Multipart) -> Result<ParsedMultipart, Ap
                 tracing::debug!("Metadata field parsed and validated");
             }
 
+            // Story 9-7: Parse optional detection results from iOS multi-signal analysis
+            Some("detection") => {
+                let text = field.text().await.map_err(|e| {
+                    tracing::warn!(error = %e, "Failed to read detection field");
+                    ApiError::Validation("Failed to read detection data".to_string())
+                })?;
+
+                match serde_json::from_str::<DetectionResults>(&text) {
+                    Ok(parsed) => {
+                        // Validate detection data (non-blocking - log warnings only)
+                        let warnings = parsed.validate();
+                        if !warnings.is_empty() {
+                            tracing::warn!(
+                                warnings = ?warnings,
+                                "[detection] Detection validation warnings (non-blocking)"
+                            );
+                        }
+
+                        // Log detection availability
+                        let method_count = [
+                            parsed.moire.is_some(),
+                            parsed.texture.is_some(),
+                            parsed.artifacts.is_some(),
+                        ]
+                        .iter()
+                        .filter(|&&x| x)
+                        .count();
+
+                        tracing::info!(
+                            method_count = method_count,
+                            has_aggregated = parsed.aggregated_confidence.is_some(),
+                            has_cross_validation = parsed.cross_validation.is_some(),
+                            processing_time_ms = parsed.total_processing_time_ms,
+                            "[detection] Detection field parsed successfully"
+                        );
+
+                        detection = Some(parsed);
+                    }
+                    Err(e) => {
+                        // Log error but don't reject upload - detection is optional
+                        tracing::warn!(
+                            error = %e,
+                            "[detection] Failed to parse detection JSON (non-blocking)"
+                        );
+                    }
+                }
+            }
+
             Some(other) => {
                 tracing::debug!(field = other, "Ignoring unknown multipart field");
             }
@@ -151,10 +203,17 @@ async fn parse_multipart(mut multipart: Multipart) -> Result<ParsedMultipart, Ap
     let metadata = metadata
         .ok_or_else(|| ApiError::Validation("Missing required part: metadata".to_string()))?;
 
+    // Log detection availability for monitoring
+    tracing::info!(
+        detection_available = detection.is_some(),
+        "[detection] Multipart parsing complete"
+    );
+
     Ok(ParsedMultipart {
         photo_bytes,
         depth_map_bytes,
         metadata,
+        detection,
     })
 }
 
@@ -174,6 +233,8 @@ struct InsertCaptureWithEvidenceParams {
     pub location_precise: Option<serde_json::Value>,
     pub evidence: serde_json::Value,
     pub confidence_level: String,
+    /// Multi-signal detection results from iOS (Story 9-7)
+    pub detection_results: Option<serde_json::Value>,
 }
 
 /// Inserts a new capture record into the database with evidence
@@ -186,13 +247,15 @@ async fn insert_capture_with_evidence(
 
     // Using query_scalar with explicit SQL to avoid compile-time schema dependency
     // This allows the code to compile before the migration is applied
+    // Story 9-7: Added detection_results column for multi-signal detection data
     sqlx::query_scalar::<_, Uuid>(
         r#"
         INSERT INTO captures (
             id, device_id, target_media_hash, photo_s3_key, depth_map_s3_key,
-            evidence, confidence_level, status, location_precise, captured_at
+            evidence, confidence_level, status, location_precise, captured_at,
+            detection_results
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING id
         "#,
     )
@@ -206,6 +269,7 @@ async fn insert_capture_with_evidence(
     .bind("complete") // Status set to complete after evidence pipeline (Story 4-7)
     .bind(&params.location_precise)
     .bind(params.captured_at)
+    .bind(&params.detection_results) // Story 9-7: Multi-signal detection results
     .fetch_one(pool)
     .await
     .map_err(|e| {
@@ -583,6 +647,32 @@ async fn upload_capture(
         crate::models::ConfidenceLevel::Suspicious => "suspicious",
     };
 
+    // Story 9-7: Serialize detection results to JSONB for storage
+    let detection_json = parsed.detection.as_ref().map(|d| {
+        serde_json::to_value(d).unwrap_or_else(|e| {
+            tracing::warn!(
+                error = %e,
+                "[detection] Failed to serialize detection results, storing null"
+            );
+            serde_json::Value::Null
+        })
+    });
+
+    // Log detection storage
+    if let Some(ref detection) = parsed.detection {
+        let summary = detection.summary();
+        tracing::info!(
+            request_id = %request_id,
+            capture_id = %capture_id,
+            detection_available = summary.detection_available,
+            detection_confidence_level = ?summary.detection_confidence_level,
+            detection_primary_valid = summary.detection_primary_valid,
+            detection_signals_agree = summary.detection_signals_agree,
+            detection_method_count = summary.detection_method_count,
+            "[detection] Storing detection results"
+        );
+    }
+
     let db_capture_id = insert_capture_with_evidence(
         &state.db,
         InsertCaptureWithEvidenceParams {
@@ -595,6 +685,7 @@ async fn upload_capture(
             location_precise,
             evidence: evidence_json,
             confidence_level: confidence_str.to_string(),
+            detection_results: detection_json, // Story 9-7: Multi-signal detection
         },
     )
     .await
@@ -665,6 +756,7 @@ async fn get_capture(
 
     // Query the capture from database
     // NOTE: Using runtime query to avoid SQLX_OFFLINE cache issues when schema changes
+    // Story 9-7: Added detection_results column
     let capture = sqlx::query_as::<_, crate::models::Capture>(
         r#"
         SELECT id, device_id, target_media_hash, photo_s3_key, depth_map_s3_key,
@@ -672,7 +764,8 @@ async fn get_capture(
                location_precise, location_coarse, captured_at, uploaded_at,
                capture_type, video_s3_key, hash_chain_s3_key, duration_ms,
                frame_count, is_partial, checkpoint_index,
-               capture_mode, media_stored, analysis_source, metadata_flags
+               capture_mode, media_stored, analysis_source, metadata_flags,
+               detection_results
         FROM captures
         WHERE id = $1
         "#,
@@ -720,7 +813,43 @@ async fn get_capture(
         None
     };
 
-    // Build response with hash-only fields
+    // Story 9-7: Extract detection summary from detection_results
+    let (
+        detection_available,
+        detection,
+        detection_confidence_level,
+        detection_primary_valid,
+        detection_signals_agree,
+        detection_method_count,
+    ) = if let Some(ref detection_json) = capture.detection_results {
+        // Try to deserialize to get summary fields
+        match serde_json::from_value::<DetectionResults>(detection_json.clone()) {
+            Ok(detection_data) => {
+                let summary = detection_data.summary();
+                (
+                    true,
+                    Some(detection_json.clone()),
+                    summary.detection_confidence_level,
+                    Some(summary.detection_primary_valid),
+                    Some(summary.detection_signals_agree),
+                    Some(summary.detection_method_count),
+                )
+            }
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    capture_id = %capture_id,
+                    "[detection] Failed to deserialize detection_results for summary"
+                );
+                // Still return the raw JSON even if we can't parse it
+                (true, Some(detection_json.clone()), None, None, None, None)
+            }
+        }
+    } else {
+        (false, None, None, None, None, None)
+    };
+
+    // Build response with hash-only fields and detection fields
     let response = crate::types::CaptureDetailsResponse {
         capture_id: capture.id,
         device_id: capture.device_id,
@@ -737,6 +866,13 @@ async fn get_capture(
         media_url: None, // Full captures get URL from verification page, hash-only is always null
         media_hash,
         metadata_flags: capture.metadata_flags,
+        // Detection fields (Story 9-7)
+        detection_available,
+        detection,
+        detection_confidence_level,
+        detection_primary_valid,
+        detection_signals_agree,
+        detection_method_count,
     };
 
     tracing::info!(
@@ -745,6 +881,8 @@ async fn get_capture(
         confidence_level = %response.confidence_level,
         capture_mode = ?response.capture_mode,
         media_stored = ?response.media_stored,
+        detection_available = response.detection_available,
+        detection_method_count = ?response.detection_method_count,
         "Capture retrieved successfully"
     );
 
