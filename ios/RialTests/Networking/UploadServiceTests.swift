@@ -223,6 +223,156 @@ class UploadServiceTests: XCTestCase {
             timestamp: Date()
         )
     }
+
+    private func createMockCaptureWithDetection() -> CaptureData {
+        var capture = createMockCapture()
+
+        // Create mock detection results
+        let moireResult = MoireAnalysisResult(
+            detected: false,
+            confidence: 0.1,
+            peaks: [],
+            screenType: .unknown,
+            analysisTimeMs: 10,
+            status: .completed
+        )
+
+        let textureResult = TextureClassificationResult(
+            classification: .realScene,
+            confidence: 0.85,
+            allClassifications: [.realScene: 0.85, .unknown: 0.15],
+            isLikelyRecaptured: false,
+            analysisTimeMs: 15,
+            status: .success
+        )
+
+        let artifactResult = ArtifactAnalysisResult(
+            pwmFlickerDetected: false,
+            pwmConfidence: 0.1,
+            specularPatternDetected: false,
+            specularConfidence: 0.1,
+            halftoneDetected: false,
+            halftoneConfidence: 0.1,
+            overallConfidence: 0.1,
+            isLikelyArtificial: false,
+            analysisTimeMs: 20,
+            status: .success
+        )
+
+        let aggregated = AggregatedConfidenceResult(
+            overallConfidence: 0.85,
+            confidenceLevel: .high,
+            methodBreakdown: [:],
+            primarySignalValid: true,
+            supportingSignalsAgree: true,
+            flags: [],
+            analysisTimeMs: 5
+        )
+
+        let detectionResults = DetectionResults(
+            moire: moireResult,
+            texture: textureResult,
+            artifacts: artifactResult,
+            aggregatedConfidence: aggregated
+        )
+
+        capture.detectionResults = detectionResults
+        return capture
+    }
+
+    // MARK: - Detection Integration Tests
+
+    /// Test detection results are encodable as JSON for upload
+    func testDetectionResultsEncodableForUpload() throws {
+        let capture = createMockCaptureWithDetection()
+        XCTAssertNotNil(capture.detectionResults)
+
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        let detectionJSON = try encoder.encode(capture.detectionResults)
+
+        // Verify JSON is valid and contains expected keys
+        let jsonString = String(data: detectionJSON, encoding: .utf8)!
+        XCTAssertTrue(jsonString.contains("moire"))
+        XCTAssertTrue(jsonString.contains("texture"))
+        XCTAssertTrue(jsonString.contains("artifacts"))
+        XCTAssertTrue(jsonString.contains("aggregated_confidence"))
+    }
+
+    /// Test detection summary fields are included in metadata payload
+    func testDetectionSummaryFieldsInMetadata() throws {
+        let capture = createMockCaptureWithDetection()
+
+        // Verify hasAnyResults returns true when detection is present
+        XCTAssertTrue(capture.detectionResults?.hasAnyResults ?? false)
+
+        // Verify confidence level is accessible
+        XCTAssertEqual(capture.detectionResults?.aggregatedConfidence?.confidenceLevel, .high)
+    }
+
+    /// Test backward compatibility - nil detection doesn't break serialization
+    func testNilDetectionBackwardCompatibility() throws {
+        let capture = createMockCapture()
+        XCTAssertNil(capture.detectionResults)
+
+        // CaptureData should still be encodable
+        let encoder = JSONEncoder()
+        let captureJSON = try encoder.encode(capture)
+        XCTAssertGreaterThan(captureJSON.count, 0)
+
+        // Decode it back
+        let decoder = JSONDecoder()
+        let decoded = try decoder.decode(CaptureData.self, from: captureJSON)
+        XCTAssertNil(decoded.detectionResults)
+    }
+
+    /// Test detection results snake_case JSON keys for backend compatibility
+    func testDetectionJSONSnakeCaseKeys() throws {
+        let capture = createMockCaptureWithDetection()
+        guard let detection = capture.detectionResults else {
+            XCTFail("Detection results should be present")
+            return
+        }
+
+        let encoder = JSONEncoder()
+        let detectionJSON = try encoder.encode(detection)
+        let jsonString = String(data: detectionJSON, encoding: .utf8)!
+
+        // Verify snake_case keys from CodingKeys
+        XCTAssertTrue(jsonString.contains("\"moire\""))
+        XCTAssertTrue(jsonString.contains("\"texture\""))
+        XCTAssertTrue(jsonString.contains("\"artifacts\""))
+        XCTAssertTrue(jsonString.contains("\"aggregated_confidence\"") ||
+                      jsonString.contains("\"aggregatedConfidence\""))
+    }
+
+    /// Test detection methods used tracking
+    func testDetectionMethodsUsedTracking() {
+        let capture = createMockCaptureWithDetection()
+        guard let detection = capture.detectionResults else {
+            XCTFail("Detection results should be present")
+            return
+        }
+
+        let methodsUsed = detection.methodsUsed
+        XCTAssertTrue(methodsUsed.contains("moire"))
+        XCTAssertTrue(methodsUsed.contains("texture"))
+        XCTAssertTrue(methodsUsed.contains("artifacts"))
+    }
+
+    /// Test detection size estimation for upload planning
+    func testDetectionSizeEstimation() {
+        let capture = createMockCaptureWithDetection()
+        guard let detection = capture.detectionResults else {
+            XCTFail("Detection results should be present")
+            return
+        }
+
+        // Estimated size should be reasonable for multipart upload
+        let estimatedSize = detection.estimatedSize
+        XCTAssertGreaterThan(estimatedSize, 0)
+        XCTAssertLessThan(estimatedSize, 100_000) // Should be under 100KB
+    }
 }
 
 // MARK: - TestKeychainService

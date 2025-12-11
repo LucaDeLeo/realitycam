@@ -24,18 +24,24 @@ import os.log
 /// and metadata assembly.
 ///
 /// ## Performance Targets
-/// - Total processing: < 200ms (P95)
+/// - Base processing: < 200ms (P95)
 /// - JPEG conversion: < 100ms
 /// - Depth compression: < 50ms
 /// - SHA-256 hash: < 30ms
+/// - Detection (optional): < 200ms additional (parallel)
+/// - Total with detection: < 500ms
 ///
 /// ## Usage
 /// ```swift
 /// let processor = FrameProcessor()
 /// let frame = captureSession.captureCurrentFrame()!
 ///
+/// // Without detection
 /// let captureData = try await processor.process(frame, location: currentLocation)
-/// // captureData is ready for CoreData persistence and upload
+///
+/// // With multi-signal detection (Story 9-6)
+/// let captureData = try await processor.process(frame, location: currentLocation, runDetection: true)
+/// // captureData.detectionResults contains moire, texture, artifacts, and aggregated confidence
 /// ```
 ///
 /// - Important: Processing runs on background queues to avoid blocking UI.
@@ -83,18 +89,22 @@ public final class FrameProcessor: @unchecked Sendable {
     /// Process an ARFrame into upload-ready CaptureData.
     ///
     /// Converts the ARFrame's RGB photo to JPEG, compresses the depth map,
-    /// computes SHA-256 hash, and assembles metadata.
+    /// computes SHA-256 hash, assembles metadata, and optionally runs
+    /// multi-signal detection (Story 9-6).
     ///
     /// - Parameters:
     ///   - frame: ARFrame with capturedImage and sceneDepth
     ///   - location: Optional GPS location (nil if unavailable/denied)
+    ///   - runDetection: If true, runs moire/texture/artifact detection (default: false)
     /// - Returns: Complete CaptureData ready for storage and upload
     /// - Throws: `FrameProcessingError` if processing fails
     ///
     /// - Note: This method runs on a background queue and is async.
-    public func process(_ frame: ARFrame, location: CLLocation?) async throws -> CaptureData {
+    /// - Note: When `runDetection` is true, processing time increases by ~200ms but
+    ///         detection runs in parallel with base processing when possible.
+    public func process(_ frame: ARFrame, location: CLLocation?, runDetection: Bool = false) async throws -> CaptureData {
         let startTime = CFAbsoluteTimeGetCurrent()
-        Self.logger.info("Starting frame processing")
+        Self.logger.info("Starting frame processing (detection=\(runDetection))")
 
         // Validate depth data is available
         guard let depthData = frame.sceneDepth, let depthBuffer = Optional(depthData.depthMap) else {
@@ -123,6 +133,20 @@ public final class FrameProcessor: @unchecked Sendable {
             photoHash: photoHash
         )
 
+        // Run detection if enabled (Story 9-6)
+        var detectionResults: DetectionResults?
+        if runDetection {
+            let detectionStartTime = CFAbsoluteTimeGetCurrent()
+            detectionResults = await DetectionOrchestrator.shared.runAllDetections(jpegData: jpegData)
+            let detectionTime = CFAbsoluteTimeGetCurrent() - detectionStartTime
+
+            Self.logger.info("""
+                Detection completed in \(String(format: "%.1f", detectionTime * 1000))ms:
+                hasResults=\(detectionResults?.hasAnyResults ?? false),
+                confidenceLevel=\(detectionResults?.confidenceLevel?.rawValue ?? "nil")
+                """)
+        }
+
         // Construct final CaptureData (assertion added separately by CaptureAssertionService)
         // Note: frame.timestamp is seconds since device boot, NOT Unix timestamp
         // Use Date() for current wall-clock time
@@ -133,15 +157,17 @@ public final class FrameProcessor: @unchecked Sendable {
             assertion: nil,
             assertionStatus: .none,
             assertionAttemptCount: 0,
-            timestamp: Date()
+            timestamp: Date(),
+            detectionResults: detectionResults
         )
 
         let processingTime = CFAbsoluteTimeGetCurrent() - startTime
-        Self.logger.info("Frame processing complete in \(String(format: "%.1f", processingTime * 1000))ms - JPEG: \(jpegData.count) bytes, Depth: \(compressedDepth.count) bytes")
+        Self.logger.info("Frame processing complete in \(String(format: "%.1f", processingTime * 1000))ms - JPEG: \(jpegData.count) bytes, Depth: \(compressedDepth.count) bytes, Detection: \(detectionResults != nil ? "included" : "skipped")")
 
-        // Warn if processing exceeded target
-        if processingTime > 0.2 {
-            Self.logger.warning("Processing exceeded 200ms target: \(String(format: "%.1f", processingTime * 1000))ms")
+        // Warn if processing exceeded target (200ms without detection, 500ms with)
+        let targetTime = runDetection ? 0.5 : 0.2
+        if processingTime > targetTime {
+            Self.logger.warning("Processing exceeded \(Int(targetTime * 1000))ms target: \(String(format: "%.1f", processingTime * 1000))ms")
         }
 
         return captureData

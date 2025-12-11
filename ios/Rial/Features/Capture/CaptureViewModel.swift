@@ -463,16 +463,29 @@ final class CaptureViewModel: ObservableObject {
         }
 
         do {
-            // Process frame
-            let captureData = try await frameProcessor.process(frame, location: nil)
+            // Process frame with multi-signal detection enabled by default (Story 9-6)
+            // Detection runs in parallel and adds ~200ms to processing
+            let captureData = try await frameProcessor.process(frame, location: nil, runDetection: true)
+
+            // Log detection results for debugging
+            if let detection = captureData.detectionResults {
+                Self.logger.info("""
+                    Detection results:
+                    hasAnyResults=\(detection.hasAnyResults),
+                    confidenceLevel=\(detection.confidenceLevel?.rawValue ?? "nil"),
+                    methods=\(detection.methodsUsed.joined(separator: ", "))
+                    """)
+            }
 
             // Check privacy mode
             if let privacyManager = privacySettingsManager,
                privacyManager.isPrivacyModeEnabled {
                 // Privacy mode: run client-side depth analysis and build hash-only payload
+                // Detection results are still included alongside the hash
                 await performPrivacyModeCapture(frame: frame, captureData: captureData, privacySettings: privacyManager.settings)
             } else {
                 // Full mode: existing flow with full upload
+                // Detection results flow through to upload
                 await performFullModeCapture(captureData: captureData)
             }
         } catch {
@@ -568,6 +581,7 @@ final class CaptureViewModel: ObservableObject {
         if assertionService.isAvailable {
             do {
                 let assertion = try await assertionService.createAssertion(for: captureData)
+                // Preserve detection results when creating new CaptureData (Story 9-6)
                 finalCapture = CaptureData(
                     id: captureData.id,
                     jpeg: captureData.jpeg,
@@ -577,7 +591,10 @@ final class CaptureViewModel: ObservableObject {
                     assertionStatus: .generated,
                     assertionAttemptCount: 1,
                     timestamp: captureData.timestamp,
-                    uploadMode: .full
+                    uploadMode: .full,
+                    depthAnalysisResult: captureData.depthAnalysisResult,
+                    privacySettings: captureData.privacySettings,
+                    detectionResults: captureData.detectionResults
                 )
             } catch {
                 Self.logger.warning("Assertion failed, saving without: \(error.localizedDescription)")
@@ -594,7 +611,7 @@ final class CaptureViewModel: ObservableObject {
             }
         }
 
-        Self.logger.info("Full mode capture processed successfully")
+        Self.logger.info("Full mode capture processed successfully, detection=\(captureData.detectionResults != nil)")
     }
 
     private func clearPendingCapture() {

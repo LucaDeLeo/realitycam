@@ -75,6 +75,12 @@ public struct CaptureData: Codable, Identifiable, Sendable {
     /// Snapshot of privacy settings at capture time - nil for non-privacy captures
     public var privacySettings: PrivacySettings?
 
+    // MARK: - Multi-Signal Detection Fields (Story 9-6)
+
+    /// Multi-signal detection results (moire, texture, artifacts, aggregated confidence).
+    /// Nil for backward compatibility with existing captures without detection.
+    public var detectionResults: DetectionResults?
+
     /// Creates a new CaptureData instance.
     ///
     /// - Parameters:
@@ -89,6 +95,7 @@ public struct CaptureData: Codable, Identifiable, Sendable {
     ///   - uploadMode: Upload mode (.full or .hashOnly, defaults to nil for backward compat)
     ///   - depthAnalysisResult: Client-side depth analysis result (defaults to nil)
     ///   - privacySettings: Privacy settings snapshot (defaults to nil)
+    ///   - detectionResults: Multi-signal detection results (defaults to nil)
     public init(
         id: UUID = UUID(),
         jpeg: Data,
@@ -100,7 +107,8 @@ public struct CaptureData: Codable, Identifiable, Sendable {
         timestamp: Date = Date(),
         uploadMode: UploadMode? = nil,
         depthAnalysisResult: DepthAnalysisResult? = nil,
-        privacySettings: PrivacySettings? = nil
+        privacySettings: PrivacySettings? = nil,
+        detectionResults: DetectionResults? = nil
     ) {
         self.id = id
         self.jpeg = jpeg
@@ -113,11 +121,12 @@ public struct CaptureData: Codable, Identifiable, Sendable {
         self.uploadMode = uploadMode
         self.depthAnalysisResult = depthAnalysisResult
         self.privacySettings = privacySettings
+        self.detectionResults = detectionResults
     }
 
     /// Total size of capture data in bytes (approximate for upload estimation)
     public var totalSizeBytes: Int {
-        jpeg.count + depth.count + (assertion?.count ?? 0)
+        jpeg.count + depth.count + (assertion?.count ?? 0) + (detectionResults?.estimatedSize ?? 0)
     }
 
     /// Human-readable size string (e.g., "3.2 MB")

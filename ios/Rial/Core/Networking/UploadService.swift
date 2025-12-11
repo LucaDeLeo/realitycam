@@ -251,6 +251,10 @@ final class UploadService: NSObject {
             )
         }
 
+        // Extract detection summary for metadata (Story 9-6)
+        let detectionResults = capture.detectionResults
+        let hasDetection = detectionResults?.hasAnyResults ?? false
+
         let uploadMetadata = UploadMetadataPayload(
             capturedAt: Self.iso8601Formatter.string(from: capture.metadata.capturedAt),
             deviceModel: capture.metadata.deviceModel,
@@ -260,7 +264,11 @@ final class UploadService: NSObject {
                 height: capture.metadata.depthMapDimensions.height
             ),
             assertion: capture.assertion?.base64EncodedString(),
-            location: uploadLocation
+            location: uploadLocation,
+            detectionAvailable: hasDetection,
+            detectionConfidenceLevel: detectionResults?.confidenceLevel?.rawValue,
+            detectionPrimaryValid: detectionResults?.primarySignalValid,
+            detectionSignalsAgree: detectionResults?.signalsAgree
         )
 
         let metadataJSON = try JSONEncoder().encode(uploadMetadata)
@@ -271,6 +279,21 @@ final class UploadService: NSObject {
             data: metadataJSON,
             boundary: boundary
         ))
+
+        // Detection part (JSON) - only included when detection results are present (Story 9-6)
+        if let detectionResults = capture.detectionResults, detectionResults.hasAnyResults {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            let detectionJSON = try encoder.encode(detectionResults)
+            body.append(multipartPart(
+                name: "detection",
+                filename: "detection.json",
+                contentType: "application/json",
+                data: detectionJSON,
+                boundary: boundary
+            ))
+            Self.logger.info("Upload includes multi-signal detection data (\(detectionJSON.count) bytes)")
+        }
 
         // Closing boundary
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
@@ -415,6 +438,12 @@ private struct UploadMetadataPayload: Encodable {
     let assertion: String?  // base64 encoded
     let location: UploadLocation?
 
+    // Detection summary fields (Story 9-6)
+    let detectionAvailable: Bool
+    let detectionConfidenceLevel: String?
+    let detectionPrimaryValid: Bool?
+    let detectionSignalsAgree: Bool?
+
     enum CodingKeys: String, CodingKey {
         case capturedAt = "captured_at"
         case deviceModel = "device_model"
@@ -422,6 +451,10 @@ private struct UploadMetadataPayload: Encodable {
         case depthMapDimensions = "depth_map_dimensions"
         case assertion
         case location
+        case detectionAvailable = "detection_available"
+        case detectionConfidenceLevel = "detection_confidence_level"
+        case detectionPrimaryValid = "detection_primary_valid"
+        case detectionSignalsAgree = "detection_signals_agree"
     }
 }
 

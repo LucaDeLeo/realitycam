@@ -129,6 +129,10 @@
 		3089F9DB00DC /* CrossValidationResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10DC /* CrossValidationResult.swift */; };
 		3089F9DB00DD /* CrossValidationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10DD /* CrossValidationService.swift */; };
 		3089F9DB00DE /* CrossValidationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10DE /* CrossValidationServiceTests.swift */; };
+		3089F9DB00DF /* DetectionResults.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10DF /* DetectionResults.swift */; };
+		3089F9DB00E0 /* DetectionOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10E0 /* DetectionOrchestrator.swift */; };
+		3089F9DB00E1 /* DetectionResultsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10E1 /* DetectionResultsTests.swift */; };
+		3089F9DB00E2 /* DetectionOrchestratorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3089F9DB10E2 /* DetectionOrchestratorTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -275,6 +279,10 @@
 		3089F9DB10DC /* CrossValidationResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossValidationResult.swift; sourceTree = "<group>"; };
 		3089F9DB10DD /* CrossValidationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossValidationService.swift; sourceTree = "<group>"; };
 		3089F9DB10DE /* CrossValidationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossValidationServiceTests.swift; sourceTree = "<group>"; };
+		3089F9DB10DF /* DetectionResults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionResults.swift; sourceTree = "<group>"; };
+		3089F9DB10E0 /* DetectionOrchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionOrchestrator.swift; sourceTree = "<group>"; };
+		3089F9DB10E1 /* DetectionResultsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionResultsTests.swift; sourceTree = "<group>"; };
+		3089F9DB10E2 /* DetectionOrchestratorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectionOrchestratorTests.swift; sourceTree = "<group>"; };
 		D9A44E098094F0E08456FEE9 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppEnvironment.swift; path = Rial/Core/Configuration/AppEnvironment.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -361,6 +369,7 @@
 				3089F9DB10D7 /* ArtifactDetectionService.swift */,
 				3089F9DB10DA /* ConfidenceAggregator.swift */,
 				3089F9DB10DD /* CrossValidationService.swift */,
+				3089F9DB10E0 /* DetectionOrchestrator.swift */,
 				3089F9DB10D1 /* MoireDetectionService.swift */,
 				3089F9DB10D4 /* TextureClassificationService.swift */,
 			);
@@ -407,6 +416,7 @@
 				3089F9DB1021 /* CaptureData.swift */,
 				3089F9DB10DC /* CrossValidationResult.swift */,
 				3089F9DB1088 /* DepthAnalysisResult.swift */,
+				3089F9DB10DF /* DetectionResults.swift */,
 				3089F9DB1077 /* ProcessedVideoCapture.swift */,
 				3089F9DB1074 /* VideoMetadata.swift */,
 				3089F9DB1090 /* PrivacySettings.swift */,
@@ -458,6 +468,7 @@
 				3089F9DB10D8 /* ArtifactDetectionServiceTests.swift */,
 				3089F9DB10DB /* ConfidenceAggregatorTests.swift */,
 				3089F9DB10DE /* CrossValidationServiceTests.swift */,
+				3089F9DB10E2 /* DetectionOrchestratorTests.swift */,
 				3089F9DB10D2 /* MoireDetectionServiceTests.swift */,
 				3089F9DB10D5 /* TextureClassificationServiceTests.swift */,
 			);
@@ -693,9 +704,10 @@
 		3089F9DB5056 /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				3089F9DB1095 /* PrivacySettingsTests.swift */,
-				3089F9DB109A /* HashOnlyCapturePayloadTests.swift */,
 				3089F9DB109D /* CaptureDataPrivacyModeTests.swift */,
+				3089F9DB10E1 /* DetectionResultsTests.swift */,
+				3089F9DB109A /* HashOnlyCapturePayloadTests.swift */,
+				3089F9DB1095 /* PrivacySettingsTests.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -911,6 +923,8 @@
 				3089F9DB00DA /* ConfidenceAggregator.swift in Sources */,
 				3089F9DB00DC /* CrossValidationResult.swift in Sources */,
 				3089F9DB00DD /* CrossValidationService.swift in Sources */,
+				3089F9DB00DF /* DetectionResults.swift in Sources */,
+				3089F9DB00E0 /* DetectionOrchestrator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -954,6 +968,8 @@
 				3089F9DB00D8 /* ArtifactDetectionServiceTests.swift in Sources */,
 				3089F9DB00DB /* ConfidenceAggregatorTests.swift in Sources */,
 				3089F9DB00DE /* CrossValidationServiceTests.swift in Sources */,
+				3089F9DB00E1 /* DetectionResultsTests.swift in Sources */,
+				3089F9DB00E2 /* DetectionOrchestratorTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
