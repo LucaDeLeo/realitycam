@@ -6,12 +6,14 @@ import { EvidencePanel } from '@/components/Evidence/EvidencePanel';
 import { MethodBreakdownSection } from '@/components/Evidence/MethodBreakdownSection';
 import { PartialVideoBanner } from '@/components/Evidence/PartialVideoBanner';
 import { PrivacyModeBadge } from '@/components/Evidence/PrivacyModeBadge';
+import { PlatformBadge } from '@/components/Evidence/PlatformBadge';
 import { ImagePlaceholder } from '@/components/Media/ImagePlaceholder';
 import { HashOnlyMediaPlaceholder } from '@/components/Media/HashOnlyMediaPlaceholder';
 import { VideoPlayer, VideoPlaceholder } from '@/components/Media/VideoPlayer';
 import { apiClient, formatDate, formatDateDayOnly, type ConfidenceLevel, type CheckStatus } from '@/lib/api';
 import { mapToEvidenceStatus } from '@/lib/status';
-import type { DetectionResults } from '@realitycam/shared';
+import { extractPlatformInfo, createPlatformEvidenceItem } from '@/lib/platform';
+import type { DetectionResults, Platform } from '@realitycam/shared';
 
 interface VerifyPageProps {
   params: Promise<{ id: string }>;
@@ -26,9 +28,10 @@ const DEMO_CAPTURE: CapturePublicData = {
   location_coarse: 'San Francisco, CA',
   evidence: {
     type: 'photo',
+    platform: 'ios', // Story 11-3: Explicit platform field
     hardware_attestation: {
       status: 'pass',
-      level: 'full',
+      level: 'secure_enclave', // Story 11-3: Use attestation level enum
       verified: true,
       device_model: 'iPhone 15 Pro',
     },
@@ -130,11 +133,12 @@ const DEMO_VIDEO_CAPTURE: CapturePublicData = {
   location_coarse: 'San Francisco, CA',
   evidence: {
     type: 'video',
+    platform: 'ios', // Story 11-3: Explicit platform field
     duration_ms: 15000,
     frame_count: 450,
     hardware_attestation: {
       status: 'pass',
-      level: 'full',
+      level: 'secure_enclave', // Story 11-3: Use attestation level enum
       verified: true,
       device_model: 'iPhone 15 Pro',
       assertion_valid: true,
@@ -266,11 +270,12 @@ const DEMO_PARTIAL_VIDEO_CAPTURE: CapturePublicData = {
   location_coarse: 'San Francisco, CA',
   evidence: {
     type: 'video',
+    platform: 'ios', // Story 11-3: Explicit platform field
     duration_ms: 10000,
     frame_count: 300,
     hardware_attestation: {
       status: 'pass',
-      level: 'full',
+      level: 'secure_enclave', // Story 11-3: Use attestation level enum
       verified: true,
       device_model: 'iPhone 15 Pro',
       assertion_valid: true,
@@ -326,10 +331,11 @@ const DEMO_HASH_ONLY_CAPTURE: CapturePublicData = {
   location_coarse: 'San Francisco, CA',
   evidence: {
     type: 'photo',
+    platform: 'ios', // Story 11-3: Explicit platform field
     analysis_source: 'device',
     hardware_attestation: {
       status: 'pass',
-      level: 'full',
+      level: 'secure_enclave', // Story 11-3: Use attestation level enum
       verified: true,
       device_model: 'iPhone 15 Pro',
     },
@@ -376,12 +382,13 @@ const DEMO_VIDEO_HASH_ONLY_CAPTURE: CapturePublicData = {
   location_coarse: 'San Francisco, CA',
   evidence: {
     type: 'video',
+    platform: 'ios', // Story 11-3: Explicit platform field
     analysis_source: 'device',
     duration_ms: 15000,
     frame_count: 450,
     hardware_attestation: {
       status: 'pass',
-      level: 'full',
+      level: 'secure_enclave', // Story 11-3: Use attestation level enum
       verified: true,
       device_model: 'iPhone 15 Pro',
       assertion_valid: true,
@@ -444,9 +451,10 @@ const DEMO_WARN_CAPTURE: CapturePublicData = {
   location_coarse: 'San Francisco, CA',
   evidence: {
     type: 'photo',
+    platform: 'ios', // Story 11-3: Explicit platform field
     hardware_attestation: {
       status: 'pass',
-      level: 'full',
+      level: 'secure_enclave', // Story 11-3: Use attestation level enum
       verified: true,
       device_model: 'iPhone 15 Pro',
     },
@@ -602,6 +610,7 @@ interface CapturePublicData {
   evidence: {
     // Common fields
     type?: string; // 'photo' | 'video'
+    platform?: Platform; // Story 11-3: Platform identifier
     hardware_attestation: {
       status: string;
       level?: string;
@@ -705,18 +714,26 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
   const hasMedia = capture?.media_stored !== false;
   const mediaType = isVideo ? 'Video' : 'Photo';
 
+  // Extract platform info (Story 11-3)
+  const platformInfo = capture?.evidence ? extractPlatformInfo(capture.evidence) : null;
+
   // Build evidence items based on capture type
   let evidenceItems;
   if (capture?.evidence) {
     if (isVideo) {
       // Video evidence items (Story 7-13)
-      const items = [
-        {
-          label: 'Hardware Attestation',
-          status: mapToEvidenceStatus(capture.evidence.hardware_attestation?.status),
-          value: capture.evidence.hardware_attestation?.device_model || capture.evidence.metadata?.device_model || undefined,
-        },
-      ];
+      const items = [];
+
+      // Story 11-3: Add platform item first
+      if (platformInfo) {
+        items.push(createPlatformEvidenceItem(platformInfo));
+      }
+
+      items.push({
+        label: 'Hardware Attestation',
+        status: mapToEvidenceStatus(capture.evidence.hardware_attestation?.status),
+        value: capture.evidence.hardware_attestation?.device_model || capture.evidence.metadata?.device_model || undefined,
+      });
 
       // Hash chain integrity (video-specific)
       if (capture.evidence.hash_chain) {
@@ -774,7 +791,14 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
       // Photo evidence items (existing logic + hash-only support)
       const isDeviceAnalysis = capture.evidence.analysis_source === 'device';
 
-      evidenceItems = [
+      // Story 11-3: Build items array with platform first
+      const items = [];
+
+      if (platformInfo) {
+        items.push(createPlatformEvidenceItem(platformInfo));
+      }
+
+      items.push(
         {
           label: 'Hardware Attestation',
           status: mapToEvidenceStatus(capture.evidence.hardware_attestation?.status),
@@ -804,7 +828,9 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
           status: capture.evidence.metadata?.location_available ? 'pass' as CheckStatus : 'unavailable' as CheckStatus,
           value: capture.location_coarse || (capture.evidence.metadata?.location_opted_out ? 'Opted out' : undefined),
         },
-      ];
+      );
+
+      evidenceItems = items;
     }
   }
 
@@ -901,13 +927,14 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
                   Verification Summary
                 </h2>
 
-                {/* Confidence Badge and Privacy Mode Badge */}
+                {/* Confidence Badge, Platform Badge, and Privacy Mode Badge (Story 11-3) */}
                 <div className="mb-6" data-testid="confidence-score">
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
                     Confidence Level
                   </p>
                   <div className="flex flex-wrap gap-2" data-testid="verification-status">
                     <ConfidenceBadge level={capture?.confidence_level as ConfidenceLevel || 'pending'} />
+                    {platformInfo && <PlatformBadge platformInfo={platformInfo} />}
                     {isHashOnly && <PrivacyModeBadge />}
                   </div>
                 </div>
@@ -1026,6 +1053,7 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
             <MethodBreakdownSection
               detection={capture.detection}
               defaultExpanded={true}
+              platform={platformInfo?.platform}
             />
           )}
 

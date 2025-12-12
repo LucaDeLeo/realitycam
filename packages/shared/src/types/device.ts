@@ -3,7 +3,33 @@
  * Used across mobile app and shared package
  */
 
-export type Platform = 'ios';
+/** Platform identifier for capture source */
+export type Platform = 'ios' | 'android';
+
+/** iOS attestation levels */
+export type iOSAttestationLevel = 'secure_enclave' | 'unverified';
+
+/** Android attestation levels (StrongBox > TEE > unverified) */
+export type AndroidAttestationLevel = 'strongbox' | 'tee' | 'unverified';
+
+/** Combined attestation level for display purposes */
+export type AttestationLevel = iOSAttestationLevel | AndroidAttestationLevel;
+
+/** Platform info extracted from evidence for display */
+export interface PlatformInfo {
+  /** Platform: "ios" or "android" */
+  platform: Platform;
+  /** Attestation level */
+  attestation_level: AttestationLevel;
+  /** Device model (if available) */
+  device_model?: string;
+  /** Whether LiDAR is available (iOS Pro only) */
+  has_lidar?: boolean;
+  /** Whether depth analysis is available */
+  depth_available: boolean;
+  /** Depth analysis method */
+  depth_method?: 'lidar' | 'parallax' | null;
+}
 
 /**
  * Device capabilities detected on app launch

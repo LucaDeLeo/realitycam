@@ -61,6 +61,10 @@ export type {
 // Device Types
 export type {
   Platform,
+  iOSAttestationLevel,
+  AndroidAttestationLevel,
+  AttestationLevel,
+  PlatformInfo,
   DeviceCapabilities,
   DeviceRegistrationState,
   KeyGenerationStatus,

@@ -1,17 +1,20 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import type { DetectionResults, AggregatedConfidence, ConfidenceLevel, CrossValidationResult } from '@realitycam/shared';
+import type { DetectionResults, AggregatedConfidence, ConfidenceLevel, CrossValidationResult, Platform } from '@realitycam/shared';
 import { ConfidenceBadge } from './ConfidenceBadge';
 import { MethodScoreBar } from './MethodScoreBar';
 import { MethodTooltip } from './MethodTooltip';
 import { CrossValidationSection } from './CrossValidationSection';
+import { CompactPlatformBadge } from './PlatformBadge';
 
 interface MethodBreakdownSectionProps {
   /** Detection results from API */
   detection: DetectionResults;
   /** Whether section is expanded by default */
   defaultExpanded?: boolean;
+  /** Platform for compact badge display (Story 11-3) */
+  platform?: Platform;
   /** Additional className */
   className?: string;
 }
@@ -44,6 +47,7 @@ function getCrossValidation(detection: DetectionResults): CrossValidationResult 
 export function MethodBreakdownSection({
   detection,
   defaultExpanded = true,
+  platform,
   className = '',
 }: MethodBreakdownSectionProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
@@ -111,6 +115,8 @@ export function MethodBreakdownSection({
           >
             Detection Methods
           </h3>
+          {/* Story 11-3: Compact platform badge in header */}
+          {platform && <CompactPlatformBadge platform={platform} />}
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
             {methodCount} methods
           </span>
