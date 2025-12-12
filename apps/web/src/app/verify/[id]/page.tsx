@@ -95,6 +95,27 @@ const DEMO_CAPTURE: CapturePublicData = {
       supporting_signals_agree: true,
       flags: [],
     },
+    // Cross-validation (Story 11-2) - pass status, no anomalies
+    cross_validation: {
+      validation_status: 'pass',
+      pairwise_consistencies: [
+        { method_a: 'lidar_depth', method_b: 'moire', expected_relationship: 'negative', actual_agreement: 0.87, anomaly_score: 0.05, is_anomaly: false },
+        { method_a: 'lidar_depth', method_b: 'texture', expected_relationship: 'positive', actual_agreement: 0.92, anomaly_score: 0.02, is_anomaly: false },
+        { method_a: 'lidar_depth', method_b: 'artifacts', expected_relationship: 'positive', actual_agreement: 0.85, anomaly_score: 0.08, is_anomaly: false },
+        { method_a: 'moire', method_b: 'texture', expected_relationship: 'neutral', actual_agreement: 0.78, anomaly_score: 0.12, is_anomaly: false },
+      ],
+      confidence_intervals: {
+        lidar_depth: { lower_bound: 0.93, point_estimate: 0.98, upper_bound: 1.0 },
+        moire: { lower_bound: 0.0, point_estimate: 0.0, upper_bound: 0.1 },
+        texture: { lower_bound: 0.85, point_estimate: 0.92, upper_bound: 0.97 },
+      },
+      aggregated_interval: { lower_bound: 0.87, point_estimate: 0.95, upper_bound: 0.98 },
+      anomalies: [],
+      overall_penalty: 0,
+      analysis_time_ms: 3,
+      algorithm_version: '1.0',
+      computed_at: new Date().toISOString(),
+    },
     computed_at: new Date().toISOString(),
     total_processing_time_ms: 85,
   },
@@ -200,6 +221,36 @@ const DEMO_VIDEO_CAPTURE: CapturePublicData = {
       primary_signal_valid: true,
       supporting_signals_agree: true,
       flags: ['artifacts_unavailable'],
+    },
+    // Cross-validation (Story 11-2) - video with temporal consistency
+    cross_validation: {
+      validation_status: 'pass',
+      pairwise_consistencies: [
+        { method_a: 'lidar_depth', method_b: 'moire', expected_relationship: 'negative', actual_agreement: 0.89, anomaly_score: 0.04, is_anomaly: false },
+        { method_a: 'lidar_depth', method_b: 'texture', expected_relationship: 'positive', actual_agreement: 0.91, anomaly_score: 0.03, is_anomaly: false },
+        { method_a: 'moire', method_b: 'texture', expected_relationship: 'neutral', actual_agreement: 0.75, anomaly_score: 0.10, is_anomaly: false },
+      ],
+      temporal_consistency: {
+        frame_count: 30,
+        stability_scores: {
+          lidar_depth: 0.94,
+          moire: 0.88,
+          texture: 0.91,
+        },
+        anomalies: [],
+        overall_stability: 0.91,
+      },
+      confidence_intervals: {
+        lidar_depth: { lower_bound: 0.90, point_estimate: 0.95, upper_bound: 0.98 },
+        moire: { lower_bound: 0.0, point_estimate: 0.0, upper_bound: 0.08 },
+        texture: { lower_bound: 0.82, point_estimate: 0.88, upper_bound: 0.93 },
+      },
+      aggregated_interval: { lower_bound: 0.85, point_estimate: 0.91, upper_bound: 0.96 },
+      anomalies: [],
+      overall_penalty: 0,
+      analysis_time_ms: 45,
+      algorithm_version: '1.0',
+      computed_at: new Date().toISOString(),
     },
     computed_at: new Date().toISOString(),
     total_processing_time_ms: 120,
@@ -384,6 +435,116 @@ const DEMO_VIDEO_HASH_ONLY_CAPTURE: CapturePublicData = {
   // Note: video_url intentionally omitted for hash-only
 };
 
+// Demo data for /verify/demo-warn route (Story 11-2 - warn status with anomaly)
+const DEMO_WARN_CAPTURE: CapturePublicData = {
+  capture_id: 'demo-warn',
+  confidence_level: 'medium',
+  captured_at: new Date().toISOString(),
+  uploaded_at: new Date().toISOString(),
+  location_coarse: 'San Francisco, CA',
+  evidence: {
+    type: 'photo',
+    hardware_attestation: {
+      status: 'pass',
+      level: 'full',
+      verified: true,
+      device_model: 'iPhone 15 Pro',
+    },
+    depth_analysis: {
+      status: 'pass',
+      is_likely_real_scene: true,
+      depth_layers: 35,
+      depth_variance: 0.58,
+      flat_region_ratio: 0.25,
+    },
+    metadata: {
+      timestamp_valid: true,
+      timestamp_delta_seconds: 3,
+      model_verified: true,
+      model_name: 'iPhone 15 Pro',
+      location_available: true,
+      location_opted_out: false,
+    },
+    processing: {
+      processed_at: new Date().toISOString(),
+      processing_time_ms: 920,
+      version: '1.0.0',
+    },
+  },
+  photo_url: '/images/WhatsApp Image 2025-11-23 at 20.24.05.jpeg',
+  detection_available: true,
+  detection: {
+    moire: {
+      detected: false,
+      confidence: 0.15,
+      status: 'completed',
+    },
+    texture: {
+      classification: 'real_scene',
+      confidence: 0.72,
+      is_likely_recaptured: false,
+      status: 'success',
+    },
+    artifacts: {
+      pwm_flicker_detected: false,
+      specular_pattern_detected: false,
+      halftone_detected: false,
+      overall_confidence: 0.0,
+      is_likely_artificial: false,
+      status: 'success',
+    },
+    lidar: {
+      depth_variance: 0.58,
+      depth_layers: 35,
+      edge_coherence: 0.75,
+    },
+    aggregated_confidence: {
+      overall_confidence: 0.82,
+      confidence_level: 'medium',
+      method_breakdown: {
+        lidar_depth: { available: true, score: 0.88, weight: 0.55, contribution: 0.484, status: 'pass' },
+        moire: { available: true, score: 0.15, weight: 0.15, contribution: 0.022, status: 'warn' },
+        texture: { available: true, score: 0.72, weight: 0.15, contribution: 0.108, status: 'pass' },
+        supporting: { available: true, score: 0.65, weight: 0.15, contribution: 0.098, status: 'pass' },
+      },
+      primary_signal_valid: true,
+      supporting_signals_agree: false,
+      flags: ['inconsistent_signals'],
+    },
+    // Cross-validation (Story 11-2) - warn status with anomalies
+    cross_validation: {
+      validation_status: 'warn',
+      pairwise_consistencies: [
+        { method_a: 'lidar_depth', method_b: 'moire', expected_relationship: 'negative', actual_agreement: 0.75, anomaly_score: 0.15, is_anomaly: false },
+        { method_a: 'lidar_depth', method_b: 'texture', expected_relationship: 'positive', actual_agreement: 0.23, anomaly_score: 0.65, is_anomaly: true },
+        { method_a: 'lidar_depth', method_b: 'artifacts', expected_relationship: 'positive', actual_agreement: 0.82, anomaly_score: 0.10, is_anomaly: false },
+        { method_a: 'moire', method_b: 'texture', expected_relationship: 'neutral', actual_agreement: 0.45, anomaly_score: 0.35, is_anomaly: false },
+      ],
+      confidence_intervals: {
+        lidar_depth: { lower_bound: 0.78, point_estimate: 0.88, upper_bound: 0.94 },
+        moire: { lower_bound: 0.05, point_estimate: 0.15, upper_bound: 0.30 },
+        texture: { lower_bound: 0.55, point_estimate: 0.72, upper_bound: 0.85 },
+      },
+      aggregated_interval: { lower_bound: 0.70, point_estimate: 0.82, upper_bound: 0.90 },
+      anomalies: [
+        {
+          anomaly_type: 'contradictory_signals',
+          severity: 'medium',
+          affected_methods: ['lidar_depth', 'texture'],
+          details: 'LiDAR indicates flat surface but texture classification suggests real material with depth variation',
+          confidence_impact: -0.15,
+        },
+      ],
+      overall_penalty: 0.15,
+      analysis_time_ms: 8,
+      algorithm_version: '1.0',
+      computed_at: new Date().toISOString(),
+    },
+    computed_at: new Date().toISOString(),
+    total_processing_time_ms: 95,
+  },
+};
+
 // Video-specific evidence types (Story 7-13)
 interface HashChainEvidence {
   status: string; // 'pass' | 'partial' | 'fail'
@@ -525,6 +686,8 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
     capture = DEMO_HASH_ONLY_CAPTURE;
   } else if (id === 'demo-video-hash-only') {
     capture = DEMO_VIDEO_HASH_ONLY_CAPTURE;
+  } else if (id === 'demo-warn') {
+    capture = DEMO_WARN_CAPTURE;
   } else {
     // Fetch capture data from backend
     const response = await apiClient.getCapturePublic(id);

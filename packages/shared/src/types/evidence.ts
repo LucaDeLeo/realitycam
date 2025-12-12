@@ -154,6 +154,10 @@ export interface AggregatedConfidence {
   supporting_signals_agree: boolean;
   /** Any warning or info flags */
   flags: string[];
+  /** Cross-validation result (Story 11-2 - alternative location, check both places) */
+  cross_validation?: CrossValidationResult;
+  /** Confidence interval bounds (Story 11-2) */
+  confidence_interval?: ConfidenceInterval;
 }
 
 /** LiDAR depth analysis details for tooltip display */
@@ -224,8 +228,80 @@ export interface DetectionResults {
   lidar?: LidarDepthDetails;
   /** Aggregated confidence from all methods */
   aggregated_confidence?: AggregatedConfidence;
+  /** Cross-validation results (Story 11-2) - may be top-level or nested in aggregated_confidence */
+  cross_validation?: CrossValidationResult;
   /** When detection was computed (ISO 8601) */
   computed_at: string;
   /** Total processing time in milliseconds */
   total_processing_time_ms: number;
+}
+
+// ============================================================================
+// Cross-Validation Types (Epic 11 - Detection Transparency, Story 11-2)
+// ============================================================================
+
+/** Cross-validation result between detection methods */
+export interface CrossValidationResult {
+  /** Overall validation status */
+  validation_status: 'pass' | 'warn' | 'fail';
+  /** Pairwise consistency checks */
+  pairwise_consistencies: PairwiseConsistency[];
+  /** Temporal consistency (video only) */
+  temporal_consistency?: TemporalConsistency;
+  /** Per-method confidence intervals (keys: lidar_depth, moire, texture, artifacts) */
+  confidence_intervals: Record<string, ConfidenceInterval>;
+  /** Aggregated confidence interval */
+  aggregated_interval: ConfidenceInterval;
+  /** Detected anomalies */
+  anomalies: AnomalyReport[];
+  /** Overall penalty applied to confidence */
+  overall_penalty: number;
+  /** Analysis time in milliseconds */
+  analysis_time_ms: number;
+  /** Algorithm version */
+  algorithm_version: string;
+  /** When computed (ISO 8601) */
+  computed_at: string;
+}
+
+/** Pairwise consistency between two methods */
+export interface PairwiseConsistency {
+  method_a: string;
+  method_b: string;
+  expected_relationship: 'positive' | 'negative' | 'neutral';
+  actual_agreement: number;
+  anomaly_score: number;
+  is_anomaly: boolean;
+}
+
+/** Temporal consistency for video captures */
+export interface TemporalConsistency {
+  frame_count: number;
+  stability_scores: Record<string, number>;
+  anomalies: TemporalAnomaly[];
+  overall_stability: number;
+}
+
+/** Temporal anomaly in video analysis */
+export interface TemporalAnomaly {
+  frame_index: number;
+  method: string;
+  delta_score: number;
+  anomaly_type: 'sudden_jump' | 'oscillation' | 'drift';
+}
+
+/** Confidence interval bounds (matches backend ConfidenceInterval) */
+export interface ConfidenceInterval {
+  lower_bound: number;
+  point_estimate: number;
+  upper_bound: number;
+}
+
+/** Anomaly report from cross-validation */
+export interface AnomalyReport {
+  anomaly_type: 'contradictory_signals' | 'too_high_agreement' | 'isolated_disagreement' | 'boundary_cluster' | 'correlation_anomaly';
+  severity: 'low' | 'medium' | 'high';
+  affected_methods: string[];
+  details: string;
+  confidence_impact: number;
 }

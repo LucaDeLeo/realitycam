@@ -24,6 +24,13 @@ export type {
   TextureClassificationResult,
   ArtifactAnalysisResult,
   DetectionResults,
+  // Cross-Validation Types (Story 11-2)
+  CrossValidationResult,
+  PairwiseConsistency,
+  TemporalConsistency,
+  TemporalAnomaly,
+  ConfidenceInterval,
+  AnomalyReport,
 } from './types/evidence';
 
 // Capture Types

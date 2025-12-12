@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import type { DetectionResults, AggregatedConfidence, ConfidenceLevel } from '@realitycam/shared';
+import type { DetectionResults, AggregatedConfidence, ConfidenceLevel, CrossValidationResult } from '@realitycam/shared';
 import { ConfidenceBadge } from './ConfidenceBadge';
 import { MethodScoreBar } from './MethodScoreBar';
 import { MethodTooltip } from './MethodTooltip';
+import { CrossValidationSection } from './CrossValidationSection';
 
 interface MethodBreakdownSectionProps {
   /** Detection results from API */
@@ -21,6 +22,14 @@ interface MethodBreakdownSectionProps {
 function countAvailableMethods(aggregated?: AggregatedConfidence): number {
   if (!aggregated?.method_breakdown) return 0;
   return Object.values(aggregated.method_breakdown).filter(m => m.available).length;
+}
+
+/**
+ * Get cross-validation data from detection results.
+ * Checks both top-level and nested in aggregated_confidence (Story 11-2).
+ */
+function getCrossValidation(detection: DetectionResults): CrossValidationResult | undefined {
+  return detection.cross_validation ?? detection.aggregated_confidence?.cross_validation;
 }
 
 /**
@@ -66,6 +75,7 @@ export function MethodBreakdownSection({
 
   const methodCount = countAvailableMethods(aggregated);
   const overallPercent = Math.round(aggregated.overall_confidence * 100);
+  const crossValidation = getCrossValidation(detection);
 
   // Order methods: lidar_depth first (primary), then others
   const methodEntries = Object.entries(aggregated.method_breakdown);
@@ -129,7 +139,7 @@ export function MethodBreakdownSection({
         role="region"
         aria-labelledby="method-breakdown-header"
         className={`transition-all duration-200 ease-in-out ${
-          isExpanded ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
+          isExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
         }`}
       >
         {/* Overall Confidence Summary */}
@@ -239,6 +249,14 @@ export function MethodBreakdownSection({
             ))}
           </div>
         </div>
+
+        {/* Cross-Validation Section (Story 11-2) */}
+        {crossValidation && (
+          <CrossValidationSection
+            crossValidation={crossValidation}
+            defaultExpanded={true}
+          />
+        )}
 
         {/* Processing Info */}
         {detection.total_processing_time_ms > 0 && (
