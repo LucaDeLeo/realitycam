@@ -192,8 +192,9 @@ async fn create_test_evidence(
         CheckStatus::Unavailable
     };
 
-    let evidence = EvidencePackage {
-        hardware_attestation: HardwareAttestation {
+    // Story 10-5: Use iOS builder for test evidence
+    let evidence = EvidencePackage::for_ios(
+        HardwareAttestation {
             status: hw_status,
             level: AttestationLevel::SecureEnclave,
             device_model: req.metadata.device_model.clone(),
@@ -201,7 +202,7 @@ async fn create_test_evidence(
             counter_valid: req.c2pa.signature_valid,
             security_level: None, // Story 10-2: Test endpoint doesn't need security level
         },
-        depth_analysis: DepthAnalysis {
+        DepthAnalysis {
             status: depth_status,
             depth_variance: req.depth_analysis.variance,
             depth_layers: req.depth_analysis.depth_layers,
@@ -211,8 +212,10 @@ async fn create_test_evidence(
             is_likely_real_scene: req.depth_analysis.has_depth
                 && req.depth_analysis.depth_layers > 1,
             source: None,
+            method: Some("lidar".to_string()), // Story 10-5
+            unavailable_reason: None,
         },
-        metadata: MetadataEvidence {
+        MetadataEvidence {
             timestamp_valid: true,
             timestamp_delta_seconds: 0,
             model_verified: true,
@@ -222,8 +225,8 @@ async fn create_test_evidence(
             location_opted_out: false,
             location_coarse: None,
         },
-        processing: ProcessingInfo::new(100, env!("CARGO_PKG_VERSION")),
-    };
+        ProcessingInfo::new(100, env!("CARGO_PKG_VERSION")),
+    );
 
     // Calculate confidence level from score
     let confidence_level = match req.confidence_score {

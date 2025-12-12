@@ -185,7 +185,7 @@ development_status:
   10-2-attestation-security-level-extraction: done
   10-3-software-attestation-rejection: done
   10-4-challenge-freshness-validation: done
-  10-5-unified-evidence-schema: backlog
+  10-5-unified-evidence-schema: done
   10-6-backward-compatibility-migration: backlog
   epic-10-retrospective: optional
 

@@ -220,6 +220,7 @@ async fn upload_hash_only_capture(
     let hardware_attestation: HardwareAttestation = assertion_result.into();
 
     // Build depth analysis from client-provided data (AC 6.3: source="device")
+    // Story 10-5: Add method field for device-side LiDAR analysis
     let depth_analysis = DepthAnalysis {
         status: if payload.depth_analysis.is_likely_real_scene {
             CheckStatus::Pass
@@ -234,6 +235,8 @@ async fn upload_hash_only_capture(
         max_depth: payload.depth_analysis.max_depth as f64,
         is_likely_real_scene: payload.depth_analysis.is_likely_real_scene,
         source: Some(AnalysisSource::Device), // Hash-only captures use device-side analysis
+        method: Some("lidar".to_string()),    // Story 10-5: iOS hash-only uses LiDAR
+        unavailable_reason: None,
     };
 
     // Build metadata evidence from filtered metadata
@@ -243,13 +246,14 @@ async fn upload_hash_only_capture(
     let processing_time_ms = processing_start.elapsed().as_millis() as u64;
     let processing_info = ProcessingInfo::new(processing_time_ms, BACKEND_VERSION);
 
-    // Assemble evidence package
-    let evidence_package = EvidencePackage {
+    // Assemble evidence package using iOS builder (Story 10-5)
+    // Currently all hash-only captures are from iOS devices
+    let evidence_package = EvidencePackage::for_ios(
         hardware_attestation,
         depth_analysis,
-        metadata: metadata_evidence,
-        processing: processing_info,
-    };
+        metadata_evidence,
+        processing_info,
+    );
 
     // Calculate confidence level
     let confidence_level = evidence_package.calculate_confidence();

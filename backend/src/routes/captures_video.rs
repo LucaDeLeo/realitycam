@@ -248,7 +248,9 @@ async fn insert_video_capture(
     is_partial: bool,
 ) -> Result<Uuid, ApiError> {
     // Initial evidence package (minimal for video - full evidence built in Stories 7-9, 7-10)
+    // Story 10-5: Include platform field for unified schema consistency
     let evidence = json!({
+        "platform": "ios",  // Story 10-5: Currently all video captures are from iOS
         "hardware_attestation": {
             "status": "pending",
             "assertion_verified": false,
@@ -258,7 +260,8 @@ async fn insert_video_capture(
         "depth_analysis": {
             "status": "pending",
             "analysis_type": "video_keyframes",
-            "keyframe_count": 0
+            "keyframe_count": 0,
+            "method": "lidar"  // Story 10-5: iOS video uses LiDAR
         },
         "hash_chain": {
             "status": "pending",

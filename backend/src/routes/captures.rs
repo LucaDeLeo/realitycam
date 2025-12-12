@@ -546,19 +546,32 @@ async fn upload_capture(
 
     // ========================================================================
     // STORY 4.7: Evidence Package & Processing Info
+    // Story 10-5: Use platform-aware builder and set depth method
     // ========================================================================
     // Finalize evidence package with processing timing and version info.
 
     let processing_time_ms = processing_start.elapsed().as_millis() as u64;
     let processing_info = ProcessingInfo::new(processing_time_ms, BACKEND_VERSION);
 
-    // Build complete evidence package
-    let evidence_package = EvidencePackage {
+    // Story 10-5: Set depth analysis method (LiDAR for iOS full captures)
+    let depth_analysis = if depth_analysis.status == crate::models::CheckStatus::Pass {
+        crate::models::DepthAnalysis {
+            method: Some("lidar".to_string()),
+            source: Some(crate::types::hash_only::AnalysisSource::Server),
+            ..depth_analysis
+        }
+    } else {
+        depth_analysis
+    };
+
+    // Build complete evidence package using iOS builder (Story 10-5)
+    // Currently all captures via this endpoint are from iOS devices
+    let evidence_package = EvidencePackage::for_ios(
         hardware_attestation,
         depth_analysis,
-        metadata: metadata_evidence,
-        processing: processing_info,
-    };
+        metadata_evidence,
+        processing_info,
+    );
 
     // Calculate confidence level based on evidence
     let confidence_level = evidence_package.calculate_confidence();

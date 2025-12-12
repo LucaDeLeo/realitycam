@@ -641,12 +641,10 @@ mod tests {
     };
 
     fn create_test_evidence() -> EvidencePackage {
-        EvidencePackage {
-            hardware_attestation: HardwareAttestation::pass(
-                "iPhone 15 Pro".to_string(),
-                AttestationLevel::SecureEnclave,
-            ),
-            depth_analysis: DepthAnalysis {
+        // Story 10-5: Use iOS builder for test evidence
+        EvidencePackage::for_ios(
+            HardwareAttestation::pass("iPhone 15 Pro".to_string(), AttestationLevel::SecureEnclave),
+            DepthAnalysis {
                 status: CheckStatus::Pass,
                 depth_variance: 2.4,
                 depth_layers: 5,
@@ -655,10 +653,12 @@ mod tests {
                 max_depth: 4.2,
                 is_likely_real_scene: true,
                 source: None,
+                method: Some("lidar".to_string()), // Story 10-5
+                unavailable_reason: None,
             },
-            metadata: MetadataEvidence::default(),
-            processing: ProcessingInfo::new(1000, "0.1.0"),
-        }
+            MetadataEvidence::default(),
+            ProcessingInfo::new(1000, "0.1.0"),
+        )
     }
 
     #[test]
@@ -1042,12 +1042,10 @@ mod tests {
     use crate::types::hash_only::AnalysisSource;
 
     fn create_test_hash_only_evidence() -> EvidencePackage {
-        EvidencePackage {
-            hardware_attestation: HardwareAttestation::pass(
-                "iPhone 15 Pro".to_string(),
-                AttestationLevel::SecureEnclave,
-            ),
-            depth_analysis: DepthAnalysis {
+        // Story 10-5: Use iOS builder for test evidence
+        EvidencePackage::for_ios(
+            HardwareAttestation::pass("iPhone 15 Pro".to_string(), AttestationLevel::SecureEnclave),
+            DepthAnalysis {
                 status: CheckStatus::Pass,
                 depth_variance: 2.4,
                 depth_layers: 5,
@@ -1056,10 +1054,12 @@ mod tests {
                 max_depth: 4.2,
                 is_likely_real_scene: true,
                 source: Some(AnalysisSource::Device), // Hash-only uses device analysis
+                method: Some("lidar".to_string()),    // Story 10-5
+                unavailable_reason: None,
             },
-            metadata: MetadataEvidence::default(),
-            processing: ProcessingInfo::new(100, "0.1.0"), // Faster processing for hash-only
-        }
+            MetadataEvidence::default(),
+            ProcessingInfo::new(100, "0.1.0"), // Faster processing for hash-only
+        )
     }
 
     #[test]

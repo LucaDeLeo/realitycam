@@ -712,7 +712,9 @@ fn analyze_depth_map_from_bytes_inner(
         min_depth: stats.min_depth,
         max_depth: stats.max_depth,
         is_likely_real_scene: is_real,
-        source: None, // Server-side analysis
+        source: None,             // Server-side analysis (set by caller)
+        method: None,             // Story 10-5: Set by caller
+        unavailable_reason: None, // Story 10-5: Set by caller if needed
     })
 }
 
@@ -876,7 +878,9 @@ async fn analyze_depth_map_inner(
         min_depth: stats.min_depth,
         max_depth: stats.max_depth,
         is_likely_real_scene: is_real,
-        source: None, // Server-side analysis
+        source: None,             // Server-side analysis (set by caller)
+        method: None,             // Story 10-5: Set by caller
+        unavailable_reason: None, // Story 10-5: Set by caller if needed
     })
 }
 

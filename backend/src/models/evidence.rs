@@ -1,7 +1,9 @@
-//! Evidence types for capture verification (Story 4-4)
+//! Evidence types for capture verification (Story 4-4, Story 10-5)
 //!
 //! This module defines the evidence package structure for capture verification,
 //! including hardware attestation results and confidence level calculations.
+//!
+//! Story 10-5: Extended for unified evidence schema supporting both iOS and Android platforms.
 
 use serde::{Deserialize, Serialize};
 
@@ -177,6 +179,8 @@ impl HardwareAttestation {
 ///
 /// Records the result of analyzing the LiDAR depth map
 /// to verify it represents a real 3D scene.
+///
+/// Story 10-5: Added `method` and `unavailable_reason` fields for cross-platform support.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DepthAnalysis {
     /// Overall status of the depth analysis check
@@ -196,6 +200,14 @@ pub struct DepthAnalysis {
     /// Source of depth analysis: "server" for full captures, "device" for hash-only captures (Story 8-5)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source: Option<AnalysisSource>,
+    /// Depth analysis method: "lidar", "parallax" (future), or None if unavailable (Story 10-5)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub method: Option<String>,
+    /// Reason why depth is unavailable, e.g., "android_no_lidar", "depth_map_missing" (Story 10-5)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub unavailable_reason: Option<String>,
 }
 
 impl Default for DepthAnalysis {
@@ -210,7 +222,43 @@ impl Default for DepthAnalysis {
             max_depth: 0.0,
             is_likely_real_scene: false,
             source: None,
+            method: None,
+            unavailable_reason: None,
         }
+    }
+}
+
+impl DepthAnalysis {
+    /// Creates depth analysis marked as unavailable for Android (no LiDAR) (Story 10-5)
+    ///
+    /// Android devices currently don't have LiDAR sensors. This helper creates
+    /// a DepthAnalysis with appropriate unavailable status and reason.
+    /// Note: Android parallax depth will be added in Epic 12.
+    pub fn unavailable_android() -> Self {
+        Self {
+            status: CheckStatus::Unavailable,
+            depth_variance: 0.0,
+            depth_layers: 0,
+            edge_coherence: 0.0,
+            min_depth: 0.0,
+            max_depth: 0.0,
+            is_likely_real_scene: false,
+            source: None,
+            method: None,
+            unavailable_reason: Some("android_no_lidar".to_string()),
+        }
+    }
+
+    /// Sets the depth analysis method (Story 10-5)
+    pub fn with_method(mut self, method: &str) -> Self {
+        self.method = Some(method.to_string());
+        self
+    }
+
+    /// Sets the unavailable reason (Story 10-5)
+    pub fn with_unavailable_reason(mut self, reason: &str) -> Self {
+        self.unavailable_reason = Some(reason.to_string());
+        self
     }
 }
 
@@ -279,13 +327,25 @@ impl ProcessingInfo {
 // Evidence Package Structure
 // ============================================================================
 
-/// Complete evidence package for a capture (Story 4-7)
+/// Default platform for backward compatibility (Story 10-5)
+/// All existing captures before Story 10-5 are iOS, so we default to "ios".
+fn default_platform() -> String {
+    "ios".to_string()
+}
+
+/// Complete evidence package for a capture (Story 4-7, Story 10-5)
 ///
 /// Contains all verification evidence collected during
 /// capture processing: hardware attestation, depth analysis,
 /// metadata validation, and processing info.
+///
+/// Story 10-5: Added `platform` field to support both iOS and Android captures.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvidencePackage {
+    /// Platform: "ios" or "android" (Story 10-5)
+    /// Defaults to "ios" for backward compatibility with existing evidence.
+    #[serde(default = "default_platform")]
+    pub platform: String,
     /// Hardware attestation evidence
     pub hardware_attestation: HardwareAttestation,
     /// Depth analysis evidence
@@ -297,6 +357,62 @@ pub struct EvidencePackage {
 }
 
 impl EvidencePackage {
+    /// Creates evidence package for iOS capture (Story 10-5)
+    ///
+    /// Use this builder when processing captures from iOS devices with DCAppAttest.
+    pub fn for_ios(
+        hardware_attestation: HardwareAttestation,
+        depth_analysis: DepthAnalysis,
+        metadata: MetadataEvidence,
+        processing: ProcessingInfo,
+    ) -> Self {
+        Self {
+            platform: "ios".to_string(),
+            hardware_attestation,
+            depth_analysis,
+            metadata,
+            processing,
+        }
+    }
+
+    /// Creates evidence package for Android capture (Story 10-5)
+    ///
+    /// Use this builder when processing captures from Android devices with Key Attestation.
+    pub fn for_android(
+        hardware_attestation: HardwareAttestation,
+        depth_analysis: DepthAnalysis,
+        metadata: MetadataEvidence,
+        processing: ProcessingInfo,
+    ) -> Self {
+        Self {
+            platform: "android".to_string(),
+            hardware_attestation,
+            depth_analysis,
+            metadata,
+            processing,
+        }
+    }
+
+    /// Creates evidence package with specified platform (Story 10-5)
+    ///
+    /// Generic builder that accepts platform string. Useful when platform
+    /// is determined at runtime (e.g., from device record).
+    pub fn with_platform(
+        platform: &str,
+        hardware_attestation: HardwareAttestation,
+        depth_analysis: DepthAnalysis,
+        metadata: MetadataEvidence,
+        processing: ProcessingInfo,
+    ) -> Self {
+        Self {
+            platform: platform.to_lowercase(),
+            hardware_attestation,
+            depth_analysis,
+            metadata,
+            processing,
+        }
+    }
+
     /// Calculates the confidence level based on all evidence
     ///
     /// Logic:
@@ -304,6 +420,9 @@ impl EvidencePackage {
     /// - If both hw and depth pass -> High
     /// - If either hw or depth pass -> Medium
     /// - If both unavailable -> Low
+    ///
+    /// Story 10-5 Note: This logic naturally handles Android captures where
+    /// depth is unavailable (hw_pass=true, depth_pass=false -> Medium).
     pub fn calculate_confidence(&self) -> ConfidenceLevel {
         // If any check explicitly failed, mark as suspicious
         if self.hardware_attestation.status == CheckStatus::Fail
@@ -517,17 +636,17 @@ mod tests {
 
     #[test]
     fn test_confidence_hw_fail_is_suspicious() {
-        let evidence = EvidencePackage {
-            hardware_attestation: HardwareAttestation::fail(
+        let evidence = EvidencePackage::for_ios(
+            HardwareAttestation::fail(
                 "iPhone 15 Pro".to_string(),
                 AttestationLevel::SecureEnclave,
                 false,
                 false,
             ),
-            depth_analysis: DepthAnalysis::default(),
-            metadata: MetadataEvidence::default(),
-            processing: ProcessingInfo::default(),
-        };
+            DepthAnalysis::default(),
+            MetadataEvidence::default(),
+            ProcessingInfo::default(),
+        );
         assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Suspicious);
     }
 
@@ -539,43 +658,37 @@ mod tests {
             ..Default::default()
         };
 
-        let evidence = EvidencePackage {
-            hardware_attestation: HardwareAttestation::pass(
-                "iPhone 15 Pro".to_string(),
-                AttestationLevel::SecureEnclave,
-            ),
-            depth_analysis: depth,
-            metadata: MetadataEvidence::default(),
-            processing: ProcessingInfo::default(),
-        };
+        let evidence = EvidencePackage::for_ios(
+            HardwareAttestation::pass("iPhone 15 Pro".to_string(), AttestationLevel::SecureEnclave),
+            depth,
+            MetadataEvidence::default(),
+            ProcessingInfo::default(),
+        );
         assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::High);
     }
 
     #[test]
     fn test_confidence_hw_pass_depth_unavailable_is_medium() {
-        let evidence = EvidencePackage {
-            hardware_attestation: HardwareAttestation::pass(
-                "iPhone 15 Pro".to_string(),
-                AttestationLevel::SecureEnclave,
-            ),
-            depth_analysis: DepthAnalysis::default(),
-            metadata: MetadataEvidence::default(),
-            processing: ProcessingInfo::default(),
-        };
+        let evidence = EvidencePackage::for_ios(
+            HardwareAttestation::pass("iPhone 15 Pro".to_string(), AttestationLevel::SecureEnclave),
+            DepthAnalysis::default(),
+            MetadataEvidence::default(),
+            ProcessingInfo::default(),
+        );
         assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Medium);
     }
 
     #[test]
     fn test_confidence_both_unavailable_is_low() {
-        let evidence = EvidencePackage {
-            hardware_attestation: HardwareAttestation::unavailable(
+        let evidence = EvidencePackage::for_ios(
+            HardwareAttestation::unavailable(
                 "iPhone 15 Pro".to_string(),
                 AttestationLevel::SecureEnclave,
             ),
-            depth_analysis: DepthAnalysis::default(),
-            metadata: MetadataEvidence::default(),
-            processing: ProcessingInfo::default(),
-        };
+            DepthAnalysis::default(),
+            MetadataEvidence::default(),
+            ProcessingInfo::default(),
+        );
         assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Low);
     }
 
@@ -587,15 +700,12 @@ mod tests {
             ..Default::default()
         };
 
-        let evidence = EvidencePackage {
-            hardware_attestation: HardwareAttestation::pass(
-                "iPhone 15 Pro".to_string(),
-                AttestationLevel::SecureEnclave,
-            ),
-            depth_analysis: depth,
-            metadata: MetadataEvidence::default(),
-            processing: ProcessingInfo::default(),
-        };
+        let evidence = EvidencePackage::for_ios(
+            HardwareAttestation::pass("iPhone 15 Pro".to_string(), AttestationLevel::SecureEnclave),
+            depth,
+            MetadataEvidence::default(),
+            ProcessingInfo::default(),
+        );
         assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Suspicious);
     }
 
@@ -607,15 +717,15 @@ mod tests {
             ..Default::default()
         };
 
-        let evidence = EvidencePackage {
-            hardware_attestation: HardwareAttestation::unavailable(
+        let evidence = EvidencePackage::for_ios(
+            HardwareAttestation::unavailable(
                 "iPhone 15 Pro".to_string(),
                 AttestationLevel::SecureEnclave,
             ),
-            depth_analysis: depth,
-            metadata: MetadataEvidence::default(),
-            processing: ProcessingInfo::default(),
-        };
+            depth,
+            MetadataEvidence::default(),
+            ProcessingInfo::default(),
+        );
         assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Medium);
     }
 
@@ -629,17 +739,15 @@ mod tests {
 
     #[test]
     fn test_evidence_package_serialization() {
-        let evidence = EvidencePackage {
-            hardware_attestation: HardwareAttestation::pass(
-                "iPhone 15 Pro".to_string(),
-                AttestationLevel::SecureEnclave,
-            ),
-            depth_analysis: DepthAnalysis::default(),
-            metadata: MetadataEvidence::default(),
-            processing: ProcessingInfo::new(1000, "0.1.0"),
-        };
+        let evidence = EvidencePackage::for_ios(
+            HardwareAttestation::pass("iPhone 15 Pro".to_string(), AttestationLevel::SecureEnclave),
+            DepthAnalysis::default(),
+            MetadataEvidence::default(),
+            ProcessingInfo::new(1000, "0.1.0"),
+        );
 
         let json = serde_json::to_string(&evidence).unwrap();
+        assert!(json.contains("\"platform\":\"ios\""));
         assert!(json.contains("\"hardware_attestation\""));
         assert!(json.contains("\"depth_analysis\""));
         assert!(json.contains("\"metadata\""));
@@ -696,15 +804,12 @@ mod tests {
             ..Default::default()
         };
 
-        let evidence = EvidencePackage {
-            hardware_attestation: HardwareAttestation::pass(
-                "iPhone 15 Pro".to_string(),
-                AttestationLevel::SecureEnclave,
-            ),
-            depth_analysis: depth,
-            metadata: MetadataEvidence::default(),
-            processing: ProcessingInfo::default(),
-        };
+        let evidence = EvidencePackage::for_ios(
+            HardwareAttestation::pass("iPhone 15 Pro".to_string(), AttestationLevel::SecureEnclave),
+            depth,
+            MetadataEvidence::default(),
+            ProcessingInfo::default(),
+        );
 
         // Confidence is HIGH regardless of source=Device
         assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::High);
@@ -720,15 +825,12 @@ mod tests {
             ..Default::default()
         };
 
-        let evidence = EvidencePackage {
-            hardware_attestation: HardwareAttestation::pass(
-                "iPhone 15 Pro".to_string(),
-                AttestationLevel::SecureEnclave,
-            ),
-            depth_analysis: depth,
-            metadata: MetadataEvidence::default(),
-            processing: ProcessingInfo::default(),
-        };
+        let evidence = EvidencePackage::for_ios(
+            HardwareAttestation::pass("iPhone 15 Pro".to_string(), AttestationLevel::SecureEnclave),
+            depth,
+            MetadataEvidence::default(),
+            ProcessingInfo::default(),
+        );
 
         assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Suspicious);
     }
@@ -743,15 +845,12 @@ mod tests {
             ..Default::default()
         };
 
-        let evidence = EvidencePackage {
-            hardware_attestation: HardwareAttestation::pass(
-                "iPhone 15 Pro".to_string(),
-                AttestationLevel::SecureEnclave,
-            ),
-            depth_analysis: depth,
-            metadata: MetadataEvidence::default(),
-            processing: ProcessingInfo::default(),
-        };
+        let evidence = EvidencePackage::for_ios(
+            HardwareAttestation::pass("iPhone 15 Pro".to_string(), AttestationLevel::SecureEnclave),
+            depth,
+            MetadataEvidence::default(),
+            ProcessingInfo::default(),
+        );
 
         assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Medium);
     }
@@ -790,5 +889,413 @@ mod tests {
 
         let depth: DepthAnalysis = serde_json::from_str(json).unwrap();
         assert_eq!(depth.source, None);
+    }
+
+    // ========================================================================
+    // Story 10-5: Unified Evidence Schema Tests
+    // ========================================================================
+
+    #[test]
+    fn test_evidence_package_for_ios_builder() {
+        let evidence = EvidencePackage::for_ios(
+            HardwareAttestation::pass("iPhone 15 Pro".to_string(), AttestationLevel::SecureEnclave),
+            DepthAnalysis::default(),
+            MetadataEvidence::default(),
+            ProcessingInfo::default(),
+        );
+
+        assert_eq!(evidence.platform, "ios");
+    }
+
+    #[test]
+    fn test_evidence_package_for_android_builder() {
+        let evidence = EvidencePackage::for_android(
+            HardwareAttestation::pass("Pixel 8 Pro".to_string(), AttestationLevel::StrongBox),
+            DepthAnalysis::unavailable_android(),
+            MetadataEvidence::default(),
+            ProcessingInfo::default(),
+        );
+
+        assert_eq!(evidence.platform, "android");
+    }
+
+    #[test]
+    fn test_evidence_package_with_platform_builder() {
+        let evidence = EvidencePackage::with_platform(
+            "Android", // Should be lowercased
+            HardwareAttestation::pass("Pixel 8 Pro".to_string(), AttestationLevel::StrongBox),
+            DepthAnalysis::unavailable_android(),
+            MetadataEvidence::default(),
+            ProcessingInfo::default(),
+        );
+
+        assert_eq!(evidence.platform, "android");
+    }
+
+    #[test]
+    fn test_evidence_package_serialization_includes_platform() {
+        let evidence = EvidencePackage::for_ios(
+            HardwareAttestation::pass("iPhone 15 Pro".to_string(), AttestationLevel::SecureEnclave),
+            DepthAnalysis::default().with_method("lidar"),
+            MetadataEvidence::default(),
+            ProcessingInfo::default(),
+        );
+
+        let json = serde_json::to_string(&evidence).unwrap();
+        assert!(json.contains("\"platform\":\"ios\""));
+    }
+
+    #[test]
+    fn test_evidence_package_android_serialization() {
+        let evidence = EvidencePackage::for_android(
+            HardwareAttestation::pass("Pixel 8 Pro".to_string(), AttestationLevel::StrongBox),
+            DepthAnalysis::unavailable_android(),
+            MetadataEvidence::default(),
+            ProcessingInfo::default(),
+        );
+
+        let json = serde_json::to_string(&evidence).unwrap();
+        assert!(json.contains("\"platform\":\"android\""));
+        assert!(json.contains("\"unavailable_reason\":\"android_no_lidar\""));
+    }
+
+    #[test]
+    fn test_backward_compatibility_deserialize_without_platform() {
+        // Legacy evidence without platform field should default to "ios"
+        let json = r#"{
+            "hardware_attestation": {
+                "status": "pass",
+                "level": "secure_enclave",
+                "device_model": "iPhone 15 Pro",
+                "assertion_verified": true,
+                "counter_valid": true
+            },
+            "depth_analysis": {
+                "status": "pass",
+                "depth_variance": 2.4,
+                "depth_layers": 5,
+                "edge_coherence": 0.87,
+                "min_depth": 0.8,
+                "max_depth": 4.2,
+                "is_likely_real_scene": true
+            },
+            "metadata": {
+                "timestamp_valid": true,
+                "timestamp_delta_seconds": 0,
+                "model_verified": true,
+                "model_name": "iPhone 15 Pro",
+                "resolution_valid": true,
+                "location_available": false,
+                "location_opted_out": true
+            },
+            "processing": {
+                "processed_at": "2025-01-01T00:00:00Z",
+                "processing_time_ms": 1000,
+                "backend_version": "0.1.0"
+            }
+        }"#;
+
+        let evidence: EvidencePackage = serde_json::from_str(json).unwrap();
+        assert_eq!(evidence.platform, "ios"); // Default value
+    }
+
+    #[test]
+    fn test_depth_analysis_method_serialization() {
+        let depth = DepthAnalysis {
+            status: CheckStatus::Pass,
+            is_likely_real_scene: true,
+            method: Some("lidar".to_string()),
+            ..Default::default()
+        };
+
+        let json = serde_json::to_string(&depth).unwrap();
+        assert!(json.contains("\"method\":\"lidar\""));
+    }
+
+    #[test]
+    fn test_depth_analysis_unavailable_reason_serialization() {
+        let depth = DepthAnalysis::unavailable_android();
+
+        let json = serde_json::to_string(&depth).unwrap();
+        assert!(json.contains("\"unavailable_reason\":\"android_no_lidar\""));
+        assert!(!json.contains("\"method\"")); // Method should be None/omitted
+    }
+
+    #[test]
+    fn test_depth_analysis_method_omitted_when_none() {
+        let depth = DepthAnalysis::default();
+
+        let json = serde_json::to_string(&depth).unwrap();
+        assert!(!json.contains("\"method\""));
+        assert!(!json.contains("\"unavailable_reason\""));
+    }
+
+    #[test]
+    fn test_depth_analysis_with_method_builder() {
+        let depth = DepthAnalysis {
+            status: CheckStatus::Pass,
+            is_likely_real_scene: true,
+            ..Default::default()
+        }
+        .with_method("lidar");
+
+        assert_eq!(depth.method, Some("lidar".to_string()));
+    }
+
+    #[test]
+    fn test_depth_analysis_with_unavailable_reason_builder() {
+        let depth = DepthAnalysis::default().with_unavailable_reason("depth_map_missing");
+
+        assert_eq!(
+            depth.unavailable_reason,
+            Some("depth_map_missing".to_string())
+        );
+    }
+
+    #[test]
+    fn test_confidence_ios_hw_pass_depth_pass_is_high() {
+        // iOS: hw pass + depth pass = HIGH
+        let depth = DepthAnalysis {
+            status: CheckStatus::Pass,
+            is_likely_real_scene: true,
+            method: Some("lidar".to_string()),
+            ..Default::default()
+        };
+
+        let evidence = EvidencePackage::for_ios(
+            HardwareAttestation::pass("iPhone 15 Pro".to_string(), AttestationLevel::SecureEnclave),
+            depth,
+            MetadataEvidence::default(),
+            ProcessingInfo::default(),
+        );
+
+        assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::High);
+    }
+
+    #[test]
+    fn test_confidence_ios_hw_pass_depth_unavailable_is_medium() {
+        // iOS: hw pass + depth unavailable = MEDIUM
+        let evidence = EvidencePackage::for_ios(
+            HardwareAttestation::pass("iPhone 15 Pro".to_string(), AttestationLevel::SecureEnclave),
+            DepthAnalysis::default(), // Unavailable
+            MetadataEvidence::default(),
+            ProcessingInfo::default(),
+        );
+
+        assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Medium);
+    }
+
+    #[test]
+    fn test_confidence_android_strongbox_depth_unavailable_is_medium() {
+        // Android: StrongBox pass + no depth = MEDIUM (AC 6.1)
+        let evidence = EvidencePackage::for_android(
+            HardwareAttestation::pass("Pixel 8 Pro".to_string(), AttestationLevel::StrongBox),
+            DepthAnalysis::unavailable_android(),
+            MetadataEvidence::default(),
+            ProcessingInfo::default(),
+        );
+
+        assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Medium);
+    }
+
+    #[test]
+    fn test_confidence_android_tee_depth_unavailable_is_medium() {
+        // Android: TEE pass + no depth = MEDIUM (AC 6.2)
+        let evidence = EvidencePackage::for_android(
+            HardwareAttestation::pass(
+                "Samsung Galaxy S24".to_string(),
+                AttestationLevel::TrustedEnvironment,
+            ),
+            DepthAnalysis::unavailable_android(),
+            MetadataEvidence::default(),
+            ProcessingInfo::default(),
+        );
+
+        assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Medium);
+    }
+
+    #[test]
+    fn test_confidence_android_hw_fail_is_suspicious() {
+        // Android: hw fail = SUSPICIOUS (AC 6.3)
+        let evidence = EvidencePackage::for_android(
+            HardwareAttestation::fail(
+                "Pixel 8 Pro".to_string(),
+                AttestationLevel::StrongBox,
+                false,
+                false,
+            ),
+            DepthAnalysis::unavailable_android(),
+            MetadataEvidence::default(),
+            ProcessingInfo::default(),
+        );
+
+        assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Suspicious);
+    }
+
+    #[test]
+    fn test_confidence_ios_hw_fail_is_suspicious() {
+        // iOS: hw fail = SUSPICIOUS (unchanged from Story 4-4)
+        let evidence = EvidencePackage::for_ios(
+            HardwareAttestation::fail(
+                "iPhone 15 Pro".to_string(),
+                AttestationLevel::SecureEnclave,
+                false,
+                false,
+            ),
+            DepthAnalysis::default(),
+            MetadataEvidence::default(),
+            ProcessingInfo::default(),
+        );
+
+        assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Suspicious);
+    }
+
+    #[test]
+    fn test_confidence_ios_depth_fail_is_suspicious() {
+        // iOS: depth fail = SUSPICIOUS (unchanged from Story 4-4)
+        let depth = DepthAnalysis {
+            status: CheckStatus::Fail,
+            is_likely_real_scene: false,
+            method: Some("lidar".to_string()),
+            ..Default::default()
+        };
+
+        let evidence = EvidencePackage::for_ios(
+            HardwareAttestation::pass("iPhone 15 Pro".to_string(), AttestationLevel::SecureEnclave),
+            depth,
+            MetadataEvidence::default(),
+            ProcessingInfo::default(),
+        );
+
+        assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Suspicious);
+    }
+
+    #[test]
+    fn test_backward_compatibility_deserialize_depth_without_method() {
+        // Legacy depth analysis without method field should work
+        let json = r#"{
+            "status": "pass",
+            "depth_variance": 2.4,
+            "depth_layers": 5,
+            "edge_coherence": 0.87,
+            "min_depth": 0.8,
+            "max_depth": 4.2,
+            "is_likely_real_scene": true,
+            "source": "server"
+        }"#;
+
+        let depth: DepthAnalysis = serde_json::from_str(json).unwrap();
+        assert_eq!(depth.method, None);
+        assert_eq!(depth.unavailable_reason, None);
+        assert_eq!(depth.source, Some(AnalysisSource::Server));
+    }
+
+    #[test]
+    fn test_legacy_evidence_confidence_unchanged() {
+        // Verify confidence calculation for legacy iOS evidence is unchanged
+        let json = r#"{
+            "hardware_attestation": {
+                "status": "pass",
+                "level": "secure_enclave",
+                "device_model": "iPhone 15 Pro",
+                "assertion_verified": true,
+                "counter_valid": true
+            },
+            "depth_analysis": {
+                "status": "pass",
+                "depth_variance": 2.4,
+                "depth_layers": 5,
+                "edge_coherence": 0.87,
+                "min_depth": 0.8,
+                "max_depth": 4.2,
+                "is_likely_real_scene": true
+            },
+            "metadata": {
+                "timestamp_valid": true,
+                "timestamp_delta_seconds": 0,
+                "model_verified": true,
+                "model_name": "iPhone 15 Pro",
+                "resolution_valid": true,
+                "location_available": false,
+                "location_opted_out": true
+            },
+            "processing": {
+                "processed_at": "2025-01-01T00:00:00Z",
+                "processing_time_ms": 1000,
+                "backend_version": "0.1.0"
+            }
+        }"#;
+
+        let evidence: EvidencePackage = serde_json::from_str(json).unwrap();
+
+        // Platform should default to "ios"
+        assert_eq!(evidence.platform, "ios");
+
+        // Confidence should be HIGH (both hw and depth pass)
+        assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::High);
+    }
+
+    #[test]
+    fn test_depth_analysis_unavailable_android_helper() {
+        let depth = DepthAnalysis::unavailable_android();
+
+        assert_eq!(depth.status, CheckStatus::Unavailable);
+        assert_eq!(depth.depth_variance, 0.0);
+        assert_eq!(depth.depth_layers, 0);
+        assert!(!depth.is_likely_real_scene);
+        assert_eq!(depth.method, None);
+        assert_eq!(
+            depth.unavailable_reason,
+            Some("android_no_lidar".to_string())
+        );
+    }
+
+    #[test]
+    fn test_evidence_serialization_round_trip_ios() {
+        let original = EvidencePackage::for_ios(
+            HardwareAttestation::pass("iPhone 15 Pro".to_string(), AttestationLevel::SecureEnclave),
+            DepthAnalysis {
+                status: CheckStatus::Pass,
+                is_likely_real_scene: true,
+                method: Some("lidar".to_string()),
+                source: Some(AnalysisSource::Server),
+                ..Default::default()
+            },
+            MetadataEvidence::default(),
+            ProcessingInfo::new(1000, "0.1.0"),
+        );
+
+        let json = serde_json::to_string(&original).unwrap();
+        let parsed: EvidencePackage = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed.platform, "ios");
+        assert_eq!(parsed.depth_analysis.method, Some("lidar".to_string()));
+        assert_eq!(
+            parsed.calculate_confidence(),
+            original.calculate_confidence()
+        );
+    }
+
+    #[test]
+    fn test_evidence_serialization_round_trip_android() {
+        let original = EvidencePackage::for_android(
+            HardwareAttestation::pass("Pixel 8 Pro".to_string(), AttestationLevel::StrongBox),
+            DepthAnalysis::unavailable_android(),
+            MetadataEvidence::default(),
+            ProcessingInfo::new(500, "0.1.0"),
+        );
+
+        let json = serde_json::to_string(&original).unwrap();
+        let parsed: EvidencePackage = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed.platform, "android");
+        assert_eq!(
+            parsed.depth_analysis.unavailable_reason,
+            Some("android_no_lidar".to_string())
+        );
+        assert_eq!(
+            parsed.calculate_confidence(),
+            original.calculate_confidence()
+        );
     }
 }
