@@ -1,0 +1,79 @@
+{
+  "moire": {
+    "detected": false,
+    "confidence": 0.0,
+    "peaks": [],
+    "screen_type": null,
+    "analysis_time_ms": 25,
+    "algorithm_version": "1.0",
+    "computed_at": "2025-12-11T10:30:00.000Z",
+    "status": "completed"
+  },
+  "texture": {
+    "classification": "real_scene",
+    "confidence": 0.88,
+    "all_classifications": {
+      "real_scene": 0.88,
+      "lcd_screen": 0.07,
+      "oled_screen": 0.03,
+      "printed_paper": 0.02
+    },
+    "is_likely_recaptured": false,
+    "analysis_time_ms": 20,
+    "algorithm_version": "1.0",
+    "computed_at": "2025-12-11T10:30:00.000Z",
+    "status": "success",
+    "unavailability_reason": null
+  },
+  "artifacts": null,
+  "aggregated_confidence": {
+    "overall_confidence": 0.72,
+    "confidence_level": "medium",
+    "method_breakdown": {
+      "lidar_depth": {
+        "available": false,
+        "score": null,
+        "weight": 0.0,
+        "contribution": 0.0,
+        "status": "unavailable"
+      },
+      "moire": {
+        "available": true,
+        "score": 1.0,
+        "weight": 0.5,
+        "contribution": 0.5,
+        "status": "pass"
+      },
+      "texture": {
+        "available": true,
+        "score": 0.88,
+        "weight": 0.5,
+        "contribution": 0.44,
+        "status": "pass"
+      },
+      "artifacts": {
+        "available": false,
+        "score": null,
+        "weight": 0.0,
+        "contribution": 0.0,
+        "status": "unavailable"
+      }
+    },
+    "primary_signal_valid": false,
+    "supporting_signals_agree": true,
+    "flags": ["partialAnalysis"],
+    "analysis_time_ms": 3,
+    "computed_at": "2025-12-11T10:30:00.000Z",
+    "algorithm_version": "1.0",
+    "status": "partial",
+    "cross_validation": null,
+    "confidence_interval": {
+      "lower_bound": 0.65,
+      "point_estimate": 0.72,
+      "upper_bound": 0.80
+    }
+  },
+  "cross_validation": null,
+  "computed_at": "2025-12-11T10:30:00.000Z",
+  "total_processing_time_ms": 48
+}

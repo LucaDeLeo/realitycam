@@ -1,0 +1,22 @@
+{
+  "moire": null,
+  "texture": null,
+  "artifacts": null,
+  "aggregated_confidence": {
+    "overall_confidence": 0.65,
+    "confidence_level": "medium",
+    "method_breakdown": {},
+    "primary_signal_valid": false,
+    "supporting_signals_agree": false,
+    "flags": ["partialAnalysis"],
+    "analysis_time_ms": 1,
+    "computed_at": "2025-12-11T10:30:00.000Z",
+    "algorithm_version": "1.0",
+    "status": "partial",
+    "cross_validation": null,
+    "confidence_interval": null
+  },
+  "cross_validation": null,
+  "computed_at": "2025-12-11T10:30:00.000Z",
+  "total_processing_time_ms": 5
+}

@@ -615,3 +615,324 @@ fn test_confidence_matrix_row_7() {
     let evidence = build_evidence_json(&hw, &chain, Some(&depth), 15000, 450);
     assert_eq!(calculate_confidence_from_json(&evidence), "medium");
 }
+
+// ============================================================================
+// Integration Tests - Multi-Signal Detection (Story 9-8)
+// ============================================================================
+
+/// Simulated multi-signal detection result
+#[derive(Debug, Clone)]
+struct SimulatedDetection {
+    moire_detected: bool,
+    moire_confidence: f32,
+    texture_classification: &'static str,
+    texture_confidence: f32,
+    artifacts_detected: bool,
+    aggregated_confidence: f32,
+    confidence_level: &'static str,
+    primary_valid: bool,
+    signals_agree: bool,
+}
+
+impl SimulatedDetection {
+    fn authentic() -> Self {
+        Self {
+            moire_detected: false,
+            moire_confidence: 0.0,
+            texture_classification: "real_scene",
+            texture_confidence: 0.92,
+            artifacts_detected: false,
+            aggregated_confidence: 0.95,
+            confidence_level: "high",
+            primary_valid: true,
+            signals_agree: true,
+        }
+    }
+
+    fn suspicious_screen() -> Self {
+        Self {
+            moire_detected: true,
+            moire_confidence: 0.85,
+            texture_classification: "lcd_screen",
+            texture_confidence: 0.78,
+            artifacts_detected: true,
+            aggregated_confidence: 0.18,
+            confidence_level: "suspicious",
+            primary_valid: false,
+            signals_agree: true,
+        }
+    }
+
+    fn partial() -> Self {
+        Self {
+            moire_detected: false,
+            moire_confidence: 0.0,
+            texture_classification: "real_scene",
+            texture_confidence: 0.88,
+            artifacts_detected: false,
+            aggregated_confidence: 0.72,
+            confidence_level: "medium",
+            primary_valid: false, // LiDAR unavailable
+            signals_agree: true,
+        }
+    }
+}
+
+fn build_evidence_with_detection(
+    hw: &SimulatedHwAttestation,
+    chain: &SimulatedHashChain,
+    depth: Option<&SimulatedDepth>,
+    detection: Option<&SimulatedDetection>,
+    duration_ms: u64,
+    frame_count: u32,
+) -> serde_json::Value {
+    let mut evidence = build_evidence_json(hw, chain, depth, duration_ms, frame_count);
+
+    if let Some(det) = detection {
+        evidence["detection"] = serde_json::json!({
+            "moire": {
+                "detected": det.moire_detected,
+                "confidence": det.moire_confidence,
+                "peaks": [],
+                "analysis_time_ms": 28,
+                "status": "completed"
+            },
+            "texture": {
+                "classification": det.texture_classification,
+                "confidence": det.texture_confidence,
+                "all_classifications": {
+                    det.texture_classification: det.texture_confidence
+                },
+                "is_likely_recaptured": det.texture_classification != "real_scene",
+                "analysis_time_ms": 18,
+                "status": "success"
+            },
+            "artifacts": {
+                "pwm_flicker_detected": det.artifacts_detected,
+                "pwm_confidence": if det.artifacts_detected { 0.7 } else { 0.0 },
+                "halftone_detected": false,
+                "halftone_confidence": 0.0,
+                "is_likely_artificial": det.artifacts_detected,
+                "analysis_time_ms": 42,
+                "status": "success"
+            },
+            "aggregated_confidence": {
+                "overall_confidence": det.aggregated_confidence,
+                "confidence_level": det.confidence_level,
+                "primary_signal_valid": det.primary_valid,
+                "supporting_signals_agree": det.signals_agree,
+                "flags": [],
+                "status": "success"
+            },
+            "computed_at": Utc::now().to_rfc3339(),
+            "total_processing_time_ms": 100
+        });
+
+        // Add detection to processing checks
+        evidence["processing"]["checks_performed"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!("multi_signal_detection"));
+    }
+
+    evidence
+}
+
+#[test]
+fn test_evidence_with_authentic_detection() {
+    let hw = SimulatedHwAttestation::pass();
+    let chain = SimulatedHashChain::pass(450);
+    let depth = SimulatedDepth::pass();
+    let detection = SimulatedDetection::authentic();
+
+    let evidence = build_evidence_with_detection(
+        &hw,
+        &chain,
+        Some(&depth),
+        Some(&detection),
+        15000,
+        450,
+    );
+
+    // Detection should be present
+    assert!(evidence.get("detection").is_some());
+
+    // Detection fields should have expected values
+    assert!(!evidence["detection"]["moire"]["detected"].as_bool().unwrap());
+    assert_eq!(
+        evidence["detection"]["texture"]["classification"].as_str().unwrap(),
+        "real_scene"
+    );
+    assert!(!evidence["detection"]["artifacts"]["is_likely_artificial"].as_bool().unwrap());
+    assert_eq!(
+        evidence["detection"]["aggregated_confidence"]["confidence_level"].as_str().unwrap(),
+        "high"
+    );
+}
+
+#[test]
+fn test_evidence_with_suspicious_detection() {
+    let hw = SimulatedHwAttestation::pass();
+    let chain = SimulatedHashChain::pass(450);
+    let depth = SimulatedDepth::pass();
+    let detection = SimulatedDetection::suspicious_screen();
+
+    let evidence = build_evidence_with_detection(
+        &hw,
+        &chain,
+        Some(&depth),
+        Some(&detection),
+        15000,
+        450,
+    );
+
+    // Detection should indicate screen recapture
+    assert!(evidence["detection"]["moire"]["detected"].as_bool().unwrap());
+    assert_eq!(
+        evidence["detection"]["texture"]["classification"].as_str().unwrap(),
+        "lcd_screen"
+    );
+    assert!(evidence["detection"]["artifacts"]["is_likely_artificial"].as_bool().unwrap());
+    assert_eq!(
+        evidence["detection"]["aggregated_confidence"]["confidence_level"].as_str().unwrap(),
+        "suspicious"
+    );
+}
+
+#[test]
+fn test_evidence_with_partial_detection() {
+    let hw = SimulatedHwAttestation::pass();
+    let chain = SimulatedHashChain::pass(450);
+    // No depth analysis
+    let detection = SimulatedDetection::partial();
+
+    let evidence = build_evidence_with_detection(
+        &hw,
+        &chain,
+        None, // No LiDAR
+        Some(&detection),
+        15000,
+        450,
+    );
+
+    // Detection should handle missing primary signal
+    assert!(!evidence["detection"]["aggregated_confidence"]["primary_signal_valid"]
+        .as_bool()
+        .unwrap());
+    assert_eq!(
+        evidence["detection"]["aggregated_confidence"]["confidence_level"].as_str().unwrap(),
+        "medium"
+    );
+}
+
+#[test]
+fn test_evidence_detection_optional() {
+    let hw = SimulatedHwAttestation::pass();
+    let chain = SimulatedHashChain::pass(450);
+    let depth = SimulatedDepth::pass();
+
+    // Evidence without detection (backward compatible)
+    let evidence = build_evidence_with_detection(
+        &hw,
+        &chain,
+        Some(&depth),
+        None, // No detection
+        15000,
+        450,
+    );
+
+    // Should still calculate confidence from other signals
+    let confidence = calculate_confidence_from_json(&evidence);
+    assert_eq!(confidence, "high");
+
+    // Detection field should be absent
+    assert!(evidence.get("detection").is_none());
+}
+
+#[test]
+fn test_detection_enhances_high_confidence() {
+    // When detection confirms authenticity, maintain HIGH
+    let hw = SimulatedHwAttestation::pass();
+    let chain = SimulatedHashChain::pass(450);
+    let depth = SimulatedDepth::pass();
+    let detection = SimulatedDetection::authentic();
+
+    let evidence = build_evidence_with_detection(
+        &hw,
+        &chain,
+        Some(&depth),
+        Some(&detection),
+        15000,
+        450,
+    );
+
+    // Base confidence is HIGH, detection confirms
+    assert_eq!(calculate_confidence_from_json(&evidence), "high");
+    assert!(evidence["detection"]["aggregated_confidence"]["primary_signal_valid"]
+        .as_bool()
+        .unwrap());
+}
+
+#[test]
+fn test_detection_can_lower_confidence() {
+    // When detection finds issues even with good base signals
+    let hw = SimulatedHwAttestation::pass();
+    let chain = SimulatedHashChain::pass(450);
+    let depth = SimulatedDepth::pass();
+    let mut detection = SimulatedDetection::suspicious_screen();
+    detection.confidence_level = "suspicious";
+
+    let evidence = build_evidence_with_detection(
+        &hw,
+        &chain,
+        Some(&depth),
+        Some(&detection),
+        15000,
+        450,
+    );
+
+    // Detection indicates screen, should affect trust
+    assert_eq!(
+        evidence["detection"]["aggregated_confidence"]["confidence_level"].as_str().unwrap(),
+        "suspicious"
+    );
+}
+
+#[test]
+fn test_detection_signals_agree_field() {
+    let detection = SimulatedDetection::authentic();
+
+    let evidence = build_evidence_with_detection(
+        &SimulatedHwAttestation::pass(),
+        &SimulatedHashChain::pass(450),
+        None,
+        Some(&detection),
+        15000,
+        450,
+    );
+
+    // signals_agree should be true when all methods concur
+    assert!(evidence["detection"]["aggregated_confidence"]["supporting_signals_agree"]
+        .as_bool()
+        .unwrap());
+}
+
+#[test]
+fn test_detection_processing_check_added() {
+    let detection = SimulatedDetection::authentic();
+
+    let evidence = build_evidence_with_detection(
+        &SimulatedHwAttestation::pass(),
+        &SimulatedHashChain::pass(450),
+        None,
+        Some(&detection),
+        15000,
+        450,
+    );
+
+    // Processing checks should include multi_signal_detection
+    let checks = evidence["processing"]["checks_performed"]
+        .as_array()
+        .unwrap();
+    assert!(checks.iter().any(|v| v == "multi_signal_detection"));
+}

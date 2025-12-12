@@ -1,0 +1,143 @@
+{
+  "moire": {
+    "detected": true,
+    "confidence": 0.85,
+    "peaks": [
+      {
+        "frequency": 96.0,
+        "magnitude": 0.72,
+        "angle": 0.0,
+        "prominence": 8.5
+      },
+      {
+        "frequency": 96.0,
+        "magnitude": 0.68,
+        "angle": 1.5708,
+        "prominence": 7.8
+      },
+      {
+        "frequency": 192.0,
+        "magnitude": 0.35,
+        "angle": 0.0,
+        "prominence": 4.2
+      }
+    ],
+    "screen_type": "lcd",
+    "analysis_time_ms": 32,
+    "algorithm_version": "1.0",
+    "computed_at": "2025-12-11T10:30:00.000Z",
+    "status": "completed"
+  },
+  "texture": {
+    "classification": "lcd_screen",
+    "confidence": 0.78,
+    "all_classifications": {
+      "real_scene": 0.15,
+      "lcd_screen": 0.78,
+      "oled_screen": 0.05,
+      "printed_paper": 0.02
+    },
+    "is_likely_recaptured": true,
+    "analysis_time_ms": 22,
+    "algorithm_version": "1.0",
+    "computed_at": "2025-12-11T10:30:00.000Z",
+    "status": "success",
+    "unavailability_reason": null
+  },
+  "artifacts": {
+    "pwm_flicker_detected": true,
+    "pwm_confidence": 0.72,
+    "specular_pattern_detected": true,
+    "specular_confidence": 0.65,
+    "halftone_detected": false,
+    "halftone_confidence": 0.0,
+    "overall_confidence": 0.68,
+    "is_likely_artificial": true,
+    "analysis_time_ms": 55,
+    "status": "success",
+    "algorithm_version": "1.0",
+    "computed_at": "2025-12-11T10:30:00.000Z"
+  },
+  "aggregated_confidence": {
+    "overall_confidence": 0.18,
+    "confidence_level": "suspicious",
+    "method_breakdown": {
+      "lidar_depth": {
+        "available": true,
+        "score": 0.15,
+        "weight": 0.55,
+        "contribution": 0.0825,
+        "status": "fail"
+      },
+      "moire": {
+        "available": true,
+        "score": 0.15,
+        "weight": 0.15,
+        "contribution": 0.0225,
+        "status": "fail"
+      },
+      "texture": {
+        "available": true,
+        "score": 0.22,
+        "weight": 0.15,
+        "contribution": 0.033,
+        "status": "fail"
+      },
+      "artifacts": {
+        "available": true,
+        "score": 0.32,
+        "weight": 0.15,
+        "contribution": 0.048,
+        "status": "fail"
+      }
+    },
+    "primary_signal_valid": false,
+    "supporting_signals_agree": true,
+    "flags": ["primarySignalFailed", "screenDetected", "methodsDisagree"],
+    "analysis_time_ms": 4,
+    "computed_at": "2025-12-11T10:30:00.000Z",
+    "algorithm_version": "1.0",
+    "status": "success",
+    "cross_validation": null,
+    "confidence_interval": {
+      "lower_bound": 0.10,
+      "point_estimate": 0.18,
+      "upper_bound": 0.28
+    }
+  },
+  "cross_validation": {
+    "validation_status": "fail",
+    "pairwise_consistencies": [
+      {
+        "method_a": "lidar_depth",
+        "method_b": "moire",
+        "expected_relationship": "positive",
+        "actual_agreement": 0.90,
+        "anomaly_score": 0.05,
+        "is_anomaly": false
+      }
+    ],
+    "temporal_consistency": null,
+    "confidence_intervals": {},
+    "aggregated_interval": {
+      "lower_bound": 0.10,
+      "point_estimate": 0.18,
+      "upper_bound": 0.28
+    },
+    "anomalies": [
+      {
+        "anomaly_type": "contradictory_signals",
+        "severity": "high",
+        "affected_methods": ["moire", "texture"],
+        "details": "Strong screen detection from multiple methods",
+        "confidence_impact": 0.15
+      }
+    ],
+    "overall_penalty": 0.15,
+    "analysis_time_ms": 5,
+    "algorithm_version": "1.0",
+    "computed_at": "2025-12-11T10:30:00.000Z"
+  },
+  "computed_at": "2025-12-11T10:30:00.000Z",
+  "total_processing_time_ms": 118
+}
