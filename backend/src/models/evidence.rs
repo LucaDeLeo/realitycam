@@ -117,7 +117,9 @@ pub struct HardwareAttestation {
     pub counter_valid: bool,
     /// Detailed security level information (Story 10-2)
     /// Omitted when not available (backward compatibility)
+    /// Defaults to None for legacy evidence without this field (Story 10-6)
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub security_level: Option<SecurityLevelInfo>,
 }
 
@@ -1297,5 +1299,232 @@ mod tests {
             parsed.calculate_confidence(),
             original.calculate_confidence()
         );
+    }
+
+    // ========================================================================
+    // Story 10-6: Backward Compatibility Migration Tests
+    // ========================================================================
+
+    #[test]
+    fn test_backward_compatibility_hw_attestation_without_security_level() {
+        // AC 2.4: Legacy evidence without hardware_attestation.security_level field
+        // should deserialize with security_level = None
+        let json = r#"{
+            "status": "pass",
+            "level": "secure_enclave",
+            "device_model": "iPhone 15 Pro",
+            "assertion_verified": true,
+            "counter_valid": true
+        }"#;
+
+        let hw: HardwareAttestation = serde_json::from_str(json).unwrap();
+        assert_eq!(hw.status, CheckStatus::Pass);
+        assert_eq!(hw.level, AttestationLevel::SecureEnclave);
+        assert_eq!(hw.device_model, "iPhone 15 Pro");
+        assert!(hw.assertion_verified);
+        assert!(hw.counter_valid);
+        assert!(hw.security_level.is_none()); // Should default to None
+    }
+
+    #[test]
+    fn test_backward_compatibility_full_legacy_ios_evidence() {
+        // AC 2: Full legacy iOS evidence (pre-Epic 10) deserialization
+        // Tests all backward compatibility requirements:
+        // - AC 2.1: No platform field -> defaults to "ios"
+        // - AC 2.2: No depth_analysis.method field -> defaults to None
+        // - AC 2.3: No depth_analysis.unavailable_reason field -> defaults to None
+        // - AC 2.4: No hardware_attestation.security_level field -> defaults to None
+        // - AC 2.5: Confidence calculation produces identical results
+        let legacy_json = r#"{
+            "hardware_attestation": {
+                "status": "pass",
+                "level": "secure_enclave",
+                "device_model": "iPhone 15 Pro",
+                "assertion_verified": true,
+                "counter_valid": true
+            },
+            "depth_analysis": {
+                "status": "pass",
+                "depth_variance": 2.4,
+                "depth_layers": 5,
+                "edge_coherence": 0.87,
+                "min_depth": 0.8,
+                "max_depth": 4.2,
+                "is_likely_real_scene": true
+            },
+            "metadata": {
+                "timestamp_valid": true,
+                "timestamp_delta_seconds": 0,
+                "model_verified": true,
+                "model_name": "iPhone 15 Pro",
+                "resolution_valid": true,
+                "location_available": false,
+                "location_opted_out": true
+            },
+            "processing": {
+                "processed_at": "2025-01-01T00:00:00Z",
+                "processing_time_ms": 1000,
+                "backend_version": "0.1.0"
+            }
+        }"#;
+
+        let evidence: EvidencePackage = serde_json::from_str(legacy_json).unwrap();
+
+        // AC 2.1: Platform defaults to "ios"
+        assert_eq!(evidence.platform, "ios");
+
+        // AC 2.2: Method defaults to None
+        assert_eq!(evidence.depth_analysis.method, None);
+
+        // AC 2.3: Unavailable reason defaults to None
+        assert_eq!(evidence.depth_analysis.unavailable_reason, None);
+
+        // AC 2.4: Security level defaults to None
+        assert!(evidence.hardware_attestation.security_level.is_none());
+
+        // AC 2.5: Confidence calculation unchanged (HIGH for both hw+depth pass)
+        assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::High);
+
+        // Verify other evidence fields preserved
+        assert_eq!(evidence.hardware_attestation.status, CheckStatus::Pass);
+        assert_eq!(
+            evidence.hardware_attestation.level,
+            AttestationLevel::SecureEnclave
+        );
+        assert!(evidence.hardware_attestation.assertion_verified);
+        assert!(evidence.hardware_attestation.counter_valid);
+        assert_eq!(evidence.depth_analysis.status, CheckStatus::Pass);
+        assert!(evidence.depth_analysis.is_likely_real_scene);
+    }
+
+    #[test]
+    fn test_backward_compatibility_legacy_hw_unavailable_depth_pass() {
+        // Legacy iOS evidence with hw unavailable, depth pass -> MEDIUM confidence
+        // Verifies confidence calculation unchanged for this edge case
+        let json = r#"{
+            "hardware_attestation": {
+                "status": "unavailable",
+                "level": "secure_enclave",
+                "device_model": "iPhone 15 Pro",
+                "assertion_verified": false,
+                "counter_valid": false
+            },
+            "depth_analysis": {
+                "status": "pass",
+                "depth_variance": 2.4,
+                "depth_layers": 5,
+                "edge_coherence": 0.87,
+                "min_depth": 0.8,
+                "max_depth": 4.2,
+                "is_likely_real_scene": true
+            },
+            "metadata": {
+                "timestamp_valid": true,
+                "timestamp_delta_seconds": 0,
+                "model_verified": true,
+                "model_name": "iPhone 15 Pro",
+                "resolution_valid": true,
+                "location_available": false,
+                "location_opted_out": true
+            },
+            "processing": {
+                "processed_at": "2025-01-01T00:00:00Z",
+                "processing_time_ms": 1000,
+                "backend_version": "0.1.0"
+            }
+        }"#;
+
+        let evidence: EvidencePackage = serde_json::from_str(json).unwrap();
+        assert_eq!(evidence.platform, "ios");
+        assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Medium);
+    }
+
+    #[test]
+    fn test_backward_compatibility_legacy_suspicious_evidence() {
+        // Legacy iOS evidence with hw fail -> SUSPICIOUS confidence
+        // Verifies confidence calculation unchanged for failure case
+        let json = r#"{
+            "hardware_attestation": {
+                "status": "fail",
+                "level": "secure_enclave",
+                "device_model": "iPhone 15 Pro",
+                "assertion_verified": false,
+                "counter_valid": false
+            },
+            "depth_analysis": {
+                "status": "pass",
+                "depth_variance": 2.4,
+                "depth_layers": 5,
+                "edge_coherence": 0.87,
+                "min_depth": 0.8,
+                "max_depth": 4.2,
+                "is_likely_real_scene": true
+            },
+            "metadata": {
+                "timestamp_valid": true,
+                "timestamp_delta_seconds": 0,
+                "model_verified": true,
+                "model_name": "iPhone 15 Pro",
+                "resolution_valid": true,
+                "location_available": false,
+                "location_opted_out": true
+            },
+            "processing": {
+                "processed_at": "2025-01-01T00:00:00Z",
+                "processing_time_ms": 1000,
+                "backend_version": "0.1.0"
+            }
+        }"#;
+
+        let evidence: EvidencePackage = serde_json::from_str(json).unwrap();
+        assert_eq!(evidence.platform, "ios");
+        assert_eq!(evidence.calculate_confidence(), ConfidenceLevel::Suspicious);
+    }
+
+    #[test]
+    fn test_api_response_includes_platform_for_legacy() {
+        // AC 2.6: API responses include platform field for both legacy and new captures
+        // Simulate serialization of legacy evidence (deserialized then re-serialized)
+        let legacy_json = r#"{
+            "hardware_attestation": {
+                "status": "pass",
+                "level": "secure_enclave",
+                "device_model": "iPhone 15 Pro",
+                "assertion_verified": true,
+                "counter_valid": true
+            },
+            "depth_analysis": {
+                "status": "pass",
+                "depth_variance": 2.4,
+                "depth_layers": 5,
+                "edge_coherence": 0.87,
+                "min_depth": 0.8,
+                "max_depth": 4.2,
+                "is_likely_real_scene": true
+            },
+            "metadata": {
+                "timestamp_valid": true,
+                "timestamp_delta_seconds": 0,
+                "model_verified": true,
+                "model_name": "iPhone 15 Pro",
+                "resolution_valid": true,
+                "location_available": false,
+                "location_opted_out": true
+            },
+            "processing": {
+                "processed_at": "2025-01-01T00:00:00Z",
+                "processing_time_ms": 1000,
+                "backend_version": "0.1.0"
+            }
+        }"#;
+
+        // Deserialize legacy evidence
+        let evidence: EvidencePackage = serde_json::from_str(legacy_json).unwrap();
+
+        // Re-serialize (simulates API response)
+        let response_json = serde_json::to_string(&evidence).unwrap();
+
+        // Verify platform field is present in response
+        assert!(response_json.contains("\"platform\":\"ios\""));
     }
 }

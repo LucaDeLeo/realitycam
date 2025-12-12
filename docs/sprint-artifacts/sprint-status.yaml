@@ -180,13 +180,13 @@ development_status:
   # Epic 10: Cross-Platform Foundation (6 stories)
   # Backend Android attestation + unified evidence model
   # FRs: FR70-FR75
-  epic-10: in-progress
+  epic-10: done
   10-1-android-key-attestation-service: done
   10-2-attestation-security-level-extraction: done
   10-3-software-attestation-rejection: done
   10-4-challenge-freshness-validation: done
   10-5-unified-evidence-schema: done
-  10-6-backward-compatibility-migration: backlog
+  10-6-backward-compatibility-migration: done
   epic-10-retrospective: optional
 
   # Epic 11: Detection Transparency (4 stories)
