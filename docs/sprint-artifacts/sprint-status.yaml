@@ -183,7 +183,7 @@ development_status:
   epic-10: in-progress
   10-1-android-key-attestation-service: done
   10-2-attestation-security-level-extraction: done
-  10-3-software-attestation-rejection: backlog
+  10-3-software-attestation-rejection: done
   10-4-challenge-freshness-validation: backlog
   10-5-unified-evidence-schema: backlog
   10-6-backward-compatibility-migration: backlog

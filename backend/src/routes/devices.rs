@@ -51,14 +51,16 @@ use uuid::Uuid;
 use crate::error::{ApiError, ApiErrorWithRequestId};
 use crate::models::Device;
 use crate::routes::AppState;
-use crate::services::{verify_attestation, ChallengeError};
+use crate::services::{
+    verify_android_attestation, verify_attestation, AndroidAttestationError, ChallengeError,
+};
 use crate::types::ApiResponse;
 
 // ============================================================================
 // Request/Response Types (AC-1, AC-11)
 // ============================================================================
 
-/// Nested attestation payload (tech-spec format)
+/// Nested attestation payload (tech-spec format for iOS)
 #[derive(Debug, Deserialize)]
 pub struct AttestationPayload {
     /// Base64-encoded key ID from DCAppAttest
@@ -69,25 +71,45 @@ pub struct AttestationPayload {
     pub challenge: String,
 }
 
-/// Device registration request payload supporting both formats (AC-11).
+/// Android attestation payload (Story 10-3)
+///
+/// Contains the certificate chain and challenge for Android Key Attestation verification.
+#[derive(Debug, Deserialize)]
+pub struct AndroidAttestationPayload {
+    /// Optional key identifier (can be derived from leaf cert if not provided)
+    #[serde(default)]
+    pub key_id: Option<String>,
+    /// Base64-encoded DER certificate chain [leaf, intermediate(s)..., root]
+    pub certificate_chain: Vec<String>,
+    /// Base64-encoded challenge used for attestation
+    pub challenge: String,
+}
+
+/// Device registration request payload supporting iOS and Android (AC-11, Story 10-3).
 ///
 /// Contains device information, public key, and attestation object from the mobile app.
-/// The attestation_object is base64-encoded CBOR data from DCAppAttest.
+/// For iOS: attestation_object is base64-encoded CBOR data from DCAppAttest.
+/// For Android: android_attestation contains certificate chain for Key Attestation.
 #[derive(Debug, Deserialize)]
 pub struct DeviceRegistrationRequest {
-    /// Platform identifier (must be "ios" for MVP)
+    /// Platform identifier: "ios" or "android"
     pub platform: String,
-    /// Device model (e.g., "iPhone 15 Pro")
+    /// Device model (e.g., "iPhone 15 Pro", "Pixel 8 Pro")
     pub model: String,
-    /// Whether the device has LiDAR sensor
+    /// Whether the device has LiDAR sensor (must be false for Android)
     pub has_lidar: bool,
 
-    // Tech-spec nested format (preferred)
-    /// Nested attestation payload
+    // iOS attestation: Tech-spec nested format (preferred)
+    /// Nested attestation payload for iOS DCAppAttest
     #[serde(default)]
     pub attestation: Option<AttestationPayload>,
 
-    // Story 2.4 flattened format (backward compatibility)
+    // Android attestation (Story 10-3)
+    /// Android Key Attestation payload
+    #[serde(default)]
+    pub android_attestation: Option<AndroidAttestationPayload>,
+
+    // Story 2.4 flattened format (backward compatibility for iOS)
     /// Attestation key ID from DCAppAttest (unique device identifier)
     #[serde(default)]
     pub device_id: Option<String>,
@@ -103,7 +125,7 @@ pub struct DeviceRegistrationRequest {
 }
 
 impl DeviceRegistrationRequest {
-    /// Extracts attestation data, supporting both nested and flattened formats.
+    /// Extracts iOS attestation data, supporting both nested and flattened formats.
     /// Returns (key_id, attestation_object_b64, challenge_b64_option)
     pub fn get_attestation_data(&self) -> Result<(String, String, Option<String>), ApiError> {
         // Prefer nested format
@@ -127,6 +149,31 @@ impl DeviceRegistrationRequest {
         let challenge = self.challenge.clone();
 
         Ok((key_id, attestation_object, challenge))
+    }
+
+    /// Extracts and validates Android attestation data (Story 10-3).
+    /// Returns the AndroidAttestationPayload reference.
+    pub fn get_android_attestation_data(&self) -> Result<&AndroidAttestationPayload, ApiError> {
+        let android_att = self
+            .android_attestation
+            .as_ref()
+            .ok_or_else(|| ApiError::Validation("missing android_attestation field".to_string()))?;
+
+        // Validate certificate_chain has at least 2 entries
+        if android_att.certificate_chain.len() < 2 {
+            return Err(ApiError::InvalidAttestationFormat(
+                "certificate_chain requires at least 2 certificates (leaf + root)".to_string(),
+            ));
+        }
+
+        // Validate challenge is not empty
+        if android_att.challenge.trim().is_empty() {
+            return Err(ApiError::Validation(
+                "android_attestation.challenge is required".to_string(),
+            ));
+        }
+
+        Ok(android_att)
     }
 }
 
@@ -187,23 +234,21 @@ pub fn router() -> Router<AppState> {
 // Validation Functions (AC-2, AC-3)
 // ============================================================================
 
-/// Validates the device registration request.
+/// Validates the common device registration request fields.
 ///
 /// Checks:
-/// - Platform is "ios" (MVP constraint)
+/// - Platform is "ios" or "android"
 /// - Model is non-empty
-/// - Attestation data is valid base64
-fn validate_registration_request(
-    req: &DeviceRegistrationRequest,
-) -> Result<(String, String, Option<Vec<u8>>), ApiError> {
-    // Validate platform is "ios" (MVP constraint)
-    if req.platform.to_lowercase() != "ios" {
+fn validate_common_registration_request(req: &DeviceRegistrationRequest) -> Result<(), ApiError> {
+    // Validate platform is "ios" or "android"
+    let platform = req.platform.to_lowercase();
+    if platform != "ios" && platform != "android" {
         tracing::warn!(
             platform = %req.platform,
             "Validation failed: unsupported platform"
         );
         return Err(ApiError::Validation(
-            "platform must be 'ios' (only supported platform for MVP)".to_string(),
+            "unsupported platform - must be 'ios' or 'android'".to_string(),
         ));
     }
 
@@ -215,6 +260,16 @@ fn validate_registration_request(
         ));
     }
 
+    Ok(())
+}
+
+/// Validates iOS device registration request.
+///
+/// Checks:
+/// - Attestation data is valid base64
+fn validate_ios_registration_request(
+    req: &DeviceRegistrationRequest,
+) -> Result<(String, String, Option<Vec<u8>>), ApiError> {
     // Extract attestation data
     let (key_id, attestation_object_b64, challenge_b64) = req.get_attestation_data()?;
 
@@ -237,6 +292,26 @@ fn validate_registration_request(
     };
 
     Ok((key_id, attestation_object_b64, challenge_bytes))
+}
+
+/// Validates Android device registration request (Story 10-3).
+///
+/// Checks:
+/// - has_lidar is false (Android devices don't have LiDAR)
+/// - android_attestation is present with valid certificate chain
+fn validate_android_registration_request(
+    req: &DeviceRegistrationRequest,
+) -> Result<&AndroidAttestationPayload, ApiError> {
+    // Android devices cannot have LiDAR
+    if req.has_lidar {
+        tracing::warn!("Validation failed: Android devices do not have LiDAR");
+        return Err(ApiError::Validation(
+            "has_lidar must be false for Android devices".to_string(),
+        ));
+    }
+
+    // Validate and return Android attestation data
+    req.get_android_attestation_data()
 }
 
 /// Decodes a base64 string, returning an error with the field name on failure.
@@ -407,19 +482,19 @@ async fn get_challenge(
     Ok((StatusCode::OK, Json(ApiResponse::new(response, request_id))))
 }
 
-/// POST /api/v1/devices/register - Register a new device (AC-9, AC-10, AC-11)
+/// POST /api/v1/devices/register - Register a new device (AC-9, AC-10, AC-11, Story 10-3)
 ///
-/// Registers a device with its attestation data. Performs DCAppAttest verification
-/// when challenge is provided. On verification success, device is stored with
-/// attestation_level = "secure_enclave". On failure or no challenge, device is
-/// stored with attestation_level = "unverified".
+/// Registers a device with its attestation data. Routes to platform-specific handlers:
+/// - iOS: DCAppAttest verification, stores with attestation_level = "secure_enclave"
+/// - Android: Key Attestation verification, stores with attestation_level = "tee" or "strongbox"
 ///
 /// # Request Body
-/// Supports both nested and flattened formats (see module docs).
+/// Supports iOS (nested/flattened) and Android formats (see module docs).
 ///
 /// # Responses
 /// - 201 Created: Device successfully registered
 /// - 400 Bad Request: Validation error
+/// - 403 Forbidden: Android software-only attestation rejected (FR72)
 /// - 409 Conflict: Device already registered
 /// - 500 Internal Server Error: Database error
 async fn register_device(
@@ -433,11 +508,35 @@ async fn register_device(
         model = %req.model,
         has_lidar = %req.has_lidar,
         has_attestation = req.attestation.is_some(),
+        has_android_attestation = req.android_attestation.is_some(),
         "Processing device registration request"
     );
 
-    // Validate request
-    let (key_id, attestation_object_b64, challenge_bytes) = validate_registration_request(&req)
+    // Validate common fields
+    validate_common_registration_request(&req).map_err(|e| ApiErrorWithRequestId {
+        error: e,
+        request_id,
+    })?;
+
+    // Platform routing (Story 10-3)
+    match req.platform.to_lowercase().as_str() {
+        "ios" => register_ios_device(state, request_id, req).await,
+        "android" => register_android_device(state, request_id, req).await,
+        _ => Err(ApiErrorWithRequestId {
+            error: ApiError::Validation("unsupported platform".to_string()),
+            request_id,
+        }),
+    }
+}
+
+/// Registers an iOS device with DCAppAttest verification.
+async fn register_ios_device(
+    state: AppState,
+    request_id: Uuid,
+    req: DeviceRegistrationRequest,
+) -> Result<(StatusCode, Json<ApiResponse<DeviceRegistrationResponse>>), ApiErrorWithRequestId> {
+    // Validate iOS-specific request
+    let (key_id, attestation_object_b64, challenge_bytes) = validate_ios_registration_request(&req)
         .map_err(|e| ApiErrorWithRequestId {
             error: e,
             request_id,
@@ -671,6 +770,209 @@ async fn register_unverified_device(
 }
 
 // ============================================================================
+// Android Device Registration (Story 10-3)
+// ============================================================================
+
+/// Registers an Android device with Key Attestation verification.
+///
+/// This handler integrates with `verify_android_attestation()` to:
+/// 1. Parse and validate the certificate chain
+/// 2. Verify chain roots to Google Hardware Attestation CA
+/// 3. Extract security level from attestation extension
+/// 4. Reject software-only attestation (FR72)
+/// 5. Store device with TEE or StrongBox security level
+async fn register_android_device(
+    state: AppState,
+    request_id: Uuid,
+    req: DeviceRegistrationRequest,
+) -> Result<(StatusCode, Json<ApiResponse<DeviceRegistrationResponse>>), ApiErrorWithRequestId> {
+    // Validate Android-specific request (rejects has_lidar=true)
+    let android_att =
+        validate_android_registration_request(&req).map_err(|e| ApiErrorWithRequestId {
+            error: e,
+            request_id,
+        })?;
+
+    tracing::info!(
+        request_id = %request_id,
+        platform = "android",
+        model = %req.model,
+        cert_chain_len = android_att.certificate_chain.len(),
+        has_key_id = android_att.key_id.is_some(),
+        "Processing Android device registration"
+    );
+
+    // Call verify_android_attestation with certificate chain
+    // Challenge validation happens inside verify_android_attestation via ChallengeStore
+    let attestation_result = verify_android_attestation(
+        &android_att.certificate_chain,
+        state.challenge_store.clone(),
+        &state.config,
+        request_id,
+    )
+    .await
+    .map_err(|e| {
+        let api_error = map_android_attestation_error(e.clone(), request_id);
+        tracing::warn!(
+            request_id = %request_id,
+            error = %e,
+            error_code = %api_error.code(),
+            "Android attestation verification failed"
+        );
+        ApiErrorWithRequestId {
+            error: api_error,
+            request_id,
+        }
+    })?;
+
+    // Extract key_id from attestation payload or use provided value
+    let key_id = android_att.key_id.clone().unwrap_or_else(|| {
+        STANDARD
+            .encode(&attestation_result.public_key[..32.min(attestation_result.public_key.len())])
+    });
+
+    // Get security level strings
+    let security_level_str = attestation_result.attestation_security_level.as_str();
+    let keymaster_level_str = attestation_result.keymaster_security_level.as_str();
+
+    // Store certificate chain as JSON array of base64 strings for debugging/auditing
+    let cert_chain_json = serde_json::to_vec(&android_att.certificate_chain).map_err(|e| {
+        tracing::error!(
+            request_id = %request_id,
+            error = %e,
+            "Failed to serialize certificate chain"
+        );
+        ApiErrorWithRequestId {
+            error: ApiError::Internal(anyhow::anyhow!("Failed to serialize certificate chain")),
+            request_id,
+        }
+    })?;
+
+    // Log successful verification
+    tracing::info!(
+        request_id = %request_id,
+        platform = "android",
+        security_level = %security_level_str,
+        keymaster_level = %keymaster_level_str,
+        device_brand = ?attestation_result.device_info.brand,
+        device_model = ?attestation_result.device_info.model,
+        os_patch_level = ?attestation_result.device_info.os_patch_level,
+        public_key_len = attestation_result.public_key.len(),
+        "Android attestation verification successful"
+    );
+
+    // Insert device into database
+    let device = insert_device(
+        &state.db,
+        InsertDeviceParams {
+            key_id: &key_id,
+            platform: "android",
+            model: &req.model,
+            has_lidar: false, // Android devices don't have LiDAR
+            attestation_bytes: &cert_chain_json,
+            attestation_level: security_level_str,
+            public_key: Some(&attestation_result.public_key),
+            assertion_counter: 0, // Android doesn't use counter like iOS
+            security_level: Some(security_level_str),
+            keymaster_security_level: Some(keymaster_level_str),
+        },
+    )
+    .await
+    .map_err(|e| ApiErrorWithRequestId {
+        error: e,
+        request_id,
+    })?;
+
+    // Build security level response
+    let security_level_response = SecurityLevelResponse {
+        attestation: security_level_str.to_string(),
+        keymaster: Some(keymaster_level_str.to_string()),
+        platform: "android".to_string(),
+    };
+
+    // Build response
+    let response_data = DeviceRegistrationResponse {
+        device_id: device.id,
+        attestation_level: device.attestation_level.clone(),
+        has_lidar: device.has_lidar,
+        security_level: Some(security_level_response),
+    };
+
+    // Log successful registration
+    tracing::info!(
+        request_id = %request_id,
+        device_id = %device.id,
+        attestation_key_id = %device.attestation_key_id,
+        model = %device.model,
+        attestation_level = %device.attestation_level,
+        security_level = %security_level_str,
+        keymaster_security_level = %keymaster_level_str,
+        "Android device registered successfully"
+    );
+
+    Ok((
+        StatusCode::CREATED,
+        Json(ApiResponse::new(response_data, request_id)),
+    ))
+}
+
+/// Maps AndroidAttestationError to ApiError (Story 10-3, AC7, AC8)
+fn map_android_attestation_error(error: AndroidAttestationError, request_id: Uuid) -> ApiError {
+    match error {
+        // Software-only attestation rejection (FR72) -> 403
+        AndroidAttestationError::SoftwareOnlyAttestation => {
+            tracing::warn!(
+                request_id = %request_id,
+                reason = "software_only_attestation",
+                "Android device registration REJECTED - software attestation"
+            );
+            ApiError::AndroidSoftwareOnlyAttestation
+        }
+
+        // Certificate chain errors -> 400 (format errors) or 403 (trust errors)
+        AndroidAttestationError::InvalidBase64 => ApiError::InvalidAttestationFormat(
+            "Invalid base64 encoding in certificate chain".to_string(),
+        ),
+        AndroidAttestationError::InvalidCertificate(msg) => {
+            ApiError::InvalidAttestationFormat(format!("Invalid X.509 certificate: {msg}"))
+        }
+        AndroidAttestationError::IncompleteCertChain => ApiError::InvalidAttestationFormat(
+            "Certificate chain requires at least 2 certificates".to_string(),
+        ),
+        AndroidAttestationError::CertificateExpired => ApiError::CertificateExpired,
+        AndroidAttestationError::ChainVerificationFailed(msg) => {
+            ApiError::AndroidChainVerificationFailed(msg)
+        }
+        AndroidAttestationError::RootCaMismatch => ApiError::UntrustedAttestation(
+            "Certificate chain does not root to Google Hardware Attestation CA".to_string(),
+        ),
+
+        // Attestation extension errors -> 400
+        AndroidAttestationError::MissingAttestationExtension => ApiError::InvalidAttestationFormat(
+            "Leaf certificate missing Key Attestation extension".to_string(),
+        ),
+        AndroidAttestationError::InvalidAttestationExtension(msg) => {
+            ApiError::InvalidAttestationFormat(format!("Invalid attestation extension: {msg}"))
+        }
+
+        // Challenge errors -> 400
+        AndroidAttestationError::ChallengeMismatch => {
+            ApiError::ChallengeInvalid("Challenge does not match server-issued value".to_string())
+        }
+        AndroidAttestationError::ChallengeExpired => ApiError::ChallengeExpired,
+        AndroidAttestationError::ChallengeNotFound => ApiError::ChallengeNotFound,
+
+        // Key errors -> 400
+        AndroidAttestationError::InvalidPublicKey(msg) => {
+            ApiError::InvalidAttestationFormat(format!("Invalid public key: {msg}"))
+        }
+        AndroidAttestationError::UnsupportedKeyType(msg) => {
+            ApiError::InvalidAttestationFormat(format!("Unsupported key type: {msg}"))
+        }
+    }
+}
+
+// ============================================================================
 // Unit Tests
 // ============================================================================
 
@@ -688,6 +990,7 @@ mod tests {
                 attestation_object: "dGVzdC1hdHRlc3RhdGlvbg==".to_string(),
                 challenge: "dGVzdC1jaGFsbGVuZ2U=".to_string(),
             }),
+            android_attestation: None,
             device_id: None,
             public_key: None,
             attestation_object: None,
@@ -701,9 +1004,31 @@ mod tests {
             model: "iPhone 15 Pro".to_string(),
             has_lidar: true,
             attestation: None,
+            android_attestation: None,
             device_id: Some("test-device-id".to_string()),
             public_key: Some("dGVzdC1wdWJsaWMta2V5".to_string()),
             attestation_object: Some("dGVzdC1hdHRlc3RhdGlvbg==".to_string()),
+            challenge: None,
+        }
+    }
+
+    fn valid_android_request() -> DeviceRegistrationRequest {
+        DeviceRegistrationRequest {
+            platform: "android".to_string(),
+            model: "Pixel 8 Pro".to_string(),
+            has_lidar: false,
+            attestation: None,
+            android_attestation: Some(AndroidAttestationPayload {
+                key_id: Some("test-android-key-id".to_string()),
+                certificate_chain: vec![
+                    "dGVzdC1sZWFmLWNlcnQ=".to_string(), // leaf cert
+                    "dGVzdC1yb290LWNlcnQ=".to_string(), // root cert
+                ],
+                challenge: "dGVzdC1jaGFsbGVuZ2U=".to_string(),
+            }),
+            device_id: None,
+            public_key: None,
+            attestation_object: None,
             challenge: None,
         }
     }
@@ -731,41 +1056,49 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_registration_request_success_nested() {
+    fn test_validate_ios_registration_request_success_nested() {
         let req = valid_nested_request();
-        let result = validate_registration_request(&req);
+        let result = validate_ios_registration_request(&req);
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_validate_registration_request_success_flattened() {
+    fn test_validate_ios_registration_request_success_flattened() {
         let req = valid_flattened_request();
-        let result = validate_registration_request(&req);
+        let result = validate_ios_registration_request(&req);
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_validate_registration_request_invalid_platform() {
+    fn test_validate_common_registration_request_invalid_platform() {
         let mut req = valid_nested_request();
-        req.platform = "android".to_string();
-        let result = validate_registration_request(&req);
+        req.platform = "windows".to_string();
+        let result = validate_common_registration_request(&req);
         assert!(matches!(result, Err(ApiError::Validation(_))));
     }
 
     #[test]
-    fn test_validate_registration_request_empty_model() {
+    fn test_validate_common_registration_request_empty_model() {
         let mut req = valid_nested_request();
         req.model = "".to_string();
-        let result = validate_registration_request(&req);
+        let result = validate_common_registration_request(&req);
         assert!(matches!(result, Err(ApiError::Validation(_))));
     }
 
     #[test]
-    fn test_validate_registration_request_platform_case_insensitive() {
+    fn test_validate_common_registration_request_platform_case_insensitive() {
         let mut req = valid_nested_request();
         req.platform = "iOS".to_string();
-        let result = validate_registration_request(&req);
+        let result = validate_common_registration_request(&req);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_common_registration_request_android_platform() {
+        let mut req = valid_nested_request();
+        req.platform = "android".to_string();
+        let result = validate_common_registration_request(&req);
+        assert!(result.is_ok()); // Android is now a valid platform
     }
 
     #[test]
@@ -795,5 +1128,172 @@ mod tests {
         req.attestation_object = None;
         let result = req.get_attestation_data();
         assert!(matches!(result, Err(ApiError::Validation(_))));
+    }
+
+    // ============================================================================
+    // Android Registration Tests (Story 10-3)
+    // ============================================================================
+
+    #[test]
+    fn test_android_attestation_payload_deserialization() {
+        let json = r#"{
+            "key_id": "test-key-id",
+            "certificate_chain": ["Y2VydDE=", "Y2VydDI="],
+            "challenge": "Y2hhbGxlbmdl"
+        }"#;
+        let payload: AndroidAttestationPayload = serde_json::from_str(json).unwrap();
+        assert_eq!(payload.key_id, Some("test-key-id".to_string()));
+        assert_eq!(payload.certificate_chain.len(), 2);
+        assert_eq!(payload.challenge, "Y2hhbGxlbmdl");
+    }
+
+    #[test]
+    fn test_android_attestation_payload_without_key_id() {
+        let json = r#"{
+            "certificate_chain": ["Y2VydDE=", "Y2VydDI="],
+            "challenge": "Y2hhbGxlbmdl"
+        }"#;
+        let payload: AndroidAttestationPayload = serde_json::from_str(json).unwrap();
+        assert!(payload.key_id.is_none());
+        assert_eq!(payload.certificate_chain.len(), 2);
+    }
+
+    #[test]
+    fn test_get_android_attestation_data_success() {
+        let req = valid_android_request();
+        let result = req.get_android_attestation_data();
+        assert!(result.is_ok());
+        let att = result.unwrap();
+        assert_eq!(att.certificate_chain.len(), 2);
+        assert_eq!(att.key_id, Some("test-android-key-id".to_string()));
+    }
+
+    #[test]
+    fn test_get_android_attestation_data_missing() {
+        let req = valid_nested_request(); // iOS request has no android_attestation
+        let result = req.get_android_attestation_data();
+        assert!(matches!(result, Err(ApiError::Validation(_))));
+    }
+
+    #[test]
+    fn test_get_android_attestation_data_incomplete_chain() {
+        let mut req = valid_android_request();
+        req.android_attestation = Some(AndroidAttestationPayload {
+            key_id: Some("test-key".to_string()),
+            certificate_chain: vec!["c2luZ2xlLWNlcnQ=".to_string()], // only 1 cert
+            challenge: "Y2hhbGxlbmdl".to_string(),
+        });
+        let result = req.get_android_attestation_data();
+        assert!(matches!(result, Err(ApiError::InvalidAttestationFormat(_))));
+    }
+
+    #[test]
+    fn test_get_android_attestation_data_empty_challenge() {
+        let mut req = valid_android_request();
+        req.android_attestation = Some(AndroidAttestationPayload {
+            key_id: Some("test-key".to_string()),
+            certificate_chain: vec!["Y2VydDE=".to_string(), "Y2VydDI=".to_string()],
+            challenge: "   ".to_string(), // whitespace only
+        });
+        let result = req.get_android_attestation_data();
+        assert!(matches!(result, Err(ApiError::Validation(_))));
+    }
+
+    #[test]
+    fn test_validate_android_registration_request_success() {
+        let req = valid_android_request();
+        let result = validate_android_registration_request(&req);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_android_registration_request_rejects_lidar() {
+        let mut req = valid_android_request();
+        req.has_lidar = true;
+        let result = validate_android_registration_request(&req);
+        assert!(matches!(result, Err(ApiError::Validation(_))));
+        if let Err(ApiError::Validation(msg)) = result {
+            assert!(msg.contains("has_lidar"));
+        }
+    }
+
+    #[test]
+    fn test_map_android_attestation_error_software_only() {
+        let request_id = Uuid::new_v4();
+        let error = map_android_attestation_error(
+            AndroidAttestationError::SoftwareOnlyAttestation,
+            request_id,
+        );
+        assert!(matches!(error, ApiError::AndroidSoftwareOnlyAttestation));
+    }
+
+    #[test]
+    fn test_map_android_attestation_error_invalid_base64() {
+        let request_id = Uuid::new_v4();
+        let error =
+            map_android_attestation_error(AndroidAttestationError::InvalidBase64, request_id);
+        assert!(matches!(error, ApiError::InvalidAttestationFormat(_)));
+    }
+
+    #[test]
+    fn test_map_android_attestation_error_root_ca_mismatch() {
+        let request_id = Uuid::new_v4();
+        let error =
+            map_android_attestation_error(AndroidAttestationError::RootCaMismatch, request_id);
+        assert!(matches!(error, ApiError::UntrustedAttestation(_)));
+    }
+
+    #[test]
+    fn test_map_android_attestation_error_certificate_expired() {
+        let request_id = Uuid::new_v4();
+        let error =
+            map_android_attestation_error(AndroidAttestationError::CertificateExpired, request_id);
+        assert!(matches!(error, ApiError::CertificateExpired));
+    }
+
+    #[test]
+    fn test_map_android_attestation_error_challenge_expired() {
+        let request_id = Uuid::new_v4();
+        let error =
+            map_android_attestation_error(AndroidAttestationError::ChallengeExpired, request_id);
+        assert!(matches!(error, ApiError::ChallengeExpired));
+    }
+
+    #[test]
+    fn test_map_android_attestation_error_challenge_not_found() {
+        let request_id = Uuid::new_v4();
+        let error =
+            map_android_attestation_error(AndroidAttestationError::ChallengeNotFound, request_id);
+        assert!(matches!(error, ApiError::ChallengeNotFound));
+    }
+
+    #[test]
+    fn test_map_android_attestation_error_missing_attestation_extension() {
+        let request_id = Uuid::new_v4();
+        let error = map_android_attestation_error(
+            AndroidAttestationError::MissingAttestationExtension,
+            request_id,
+        );
+        assert!(matches!(error, ApiError::InvalidAttestationFormat(_)));
+    }
+
+    #[test]
+    fn test_android_registration_request_deserialization() {
+        let json = r#"{
+            "platform": "android",
+            "model": "Pixel 8 Pro",
+            "has_lidar": false,
+            "android_attestation": {
+                "key_id": "test-key",
+                "certificate_chain": ["Y2VydDE=", "Y2VydDI="],
+                "challenge": "Y2hhbGxlbmdl"
+            }
+        }"#;
+        let req: DeviceRegistrationRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.platform, "android");
+        assert_eq!(req.model, "Pixel 8 Pro");
+        assert!(!req.has_lidar);
+        assert!(req.android_attestation.is_some());
+        assert!(req.attestation.is_none());
     }
 }

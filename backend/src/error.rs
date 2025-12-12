@@ -37,6 +37,15 @@ pub mod codes {
     pub const PAYLOAD_TOO_LARGE: &str = "PAYLOAD_TOO_LARGE";
     pub const RATE_LIMITED: &str = "RATE_LIMITED";
     pub const FORBIDDEN: &str = "FORBIDDEN";
+    // Android attestation error codes (Story 10-3)
+    pub const ANDROID_SOFTWARE_ONLY_ATTESTATION: &str = "ANDROID_SOFTWARE_ONLY_ATTESTATION";
+    pub const ANDROID_ATTESTATION_FAILED: &str = "ANDROID_ATTESTATION_FAILED";
+    pub const ANDROID_CHAIN_VERIFICATION_FAILED: &str = "ANDROID_CHAIN_VERIFICATION_FAILED";
+    pub const UNTRUSTED_ATTESTATION: &str = "UNTRUSTED_ATTESTATION";
+    pub const CERTIFICATE_EXPIRED: &str = "CERTIFICATE_EXPIRED";
+    pub const INVALID_ATTESTATION_FORMAT: &str = "INVALID_ATTESTATION_FORMAT";
+    pub const CHALLENGE_EXPIRED: &str = "CHALLENGE_EXPIRED";
+    pub const CHALLENGE_NOT_FOUND: &str = "CHALLENGE_NOT_FOUND";
 }
 
 /// API error type with associated HTTP status codes.
@@ -112,6 +121,31 @@ pub enum ApiError {
 
     #[error("Access forbidden")]
     Forbidden(String),
+
+    // Android attestation errors (Story 10-3)
+    #[error("Android software-only attestation rejected")]
+    AndroidSoftwareOnlyAttestation,
+
+    #[error("Android attestation failed: {0}")]
+    AndroidAttestationFailed(String),
+
+    #[error("Android certificate chain verification failed: {0}")]
+    AndroidChainVerificationFailed(String),
+
+    #[error("Untrusted attestation: {0}")]
+    UntrustedAttestation(String),
+
+    #[error("Certificate expired")]
+    CertificateExpired,
+
+    #[error("Invalid attestation format: {0}")]
+    InvalidAttestationFormat(String),
+
+    #[error("Challenge expired")]
+    ChallengeExpired,
+
+    #[error("Challenge not found")]
+    ChallengeNotFound,
 }
 
 impl ApiError {
@@ -141,6 +175,15 @@ impl ApiError {
             ApiError::PayloadTooLarge(_) => codes::PAYLOAD_TOO_LARGE,
             ApiError::RateLimited => codes::RATE_LIMITED,
             ApiError::Forbidden(_) => codes::FORBIDDEN,
+            // Android attestation errors (Story 10-3)
+            ApiError::AndroidSoftwareOnlyAttestation => codes::ANDROID_SOFTWARE_ONLY_ATTESTATION,
+            ApiError::AndroidAttestationFailed(_) => codes::ANDROID_ATTESTATION_FAILED,
+            ApiError::AndroidChainVerificationFailed(_) => codes::ANDROID_CHAIN_VERIFICATION_FAILED,
+            ApiError::UntrustedAttestation(_) => codes::UNTRUSTED_ATTESTATION,
+            ApiError::CertificateExpired => codes::CERTIFICATE_EXPIRED,
+            ApiError::InvalidAttestationFormat(_) => codes::INVALID_ATTESTATION_FORMAT,
+            ApiError::ChallengeExpired => codes::CHALLENGE_EXPIRED,
+            ApiError::ChallengeNotFound => codes::CHALLENGE_NOT_FOUND,
         }
     }
 
@@ -170,6 +213,17 @@ impl ApiError {
             ApiError::PayloadTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
             ApiError::RateLimited => StatusCode::TOO_MANY_REQUESTS,
             ApiError::Forbidden(_) => StatusCode::FORBIDDEN,
+            // Android attestation errors (Story 10-3)
+            // Software-only attestation: 403 (authenticated but unauthorized per FR72)
+            ApiError::AndroidSoftwareOnlyAttestation => StatusCode::FORBIDDEN,
+            ApiError::AndroidAttestationFailed(_) => StatusCode::BAD_REQUEST,
+            ApiError::AndroidChainVerificationFailed(_) => StatusCode::BAD_REQUEST,
+            // Root CA mismatch: 403 (untrusted source)
+            ApiError::UntrustedAttestation(_) => StatusCode::FORBIDDEN,
+            ApiError::CertificateExpired => StatusCode::BAD_REQUEST,
+            ApiError::InvalidAttestationFormat(_) => StatusCode::BAD_REQUEST,
+            ApiError::ChallengeExpired => StatusCode::BAD_REQUEST,
+            ApiError::ChallengeNotFound => StatusCode::BAD_REQUEST,
         }
     }
 
@@ -210,6 +264,19 @@ impl ApiError {
                 "Rate limit exceeded. Please wait before trying again.".to_string()
             }
             ApiError::Forbidden(msg) => msg.clone(),
+            // Android attestation errors (Story 10-3)
+            ApiError::AndroidSoftwareOnlyAttestation => {
+                "Software-only attestation rejected. Device requires TEE or StrongBox hardware security.".to_string()
+            }
+            ApiError::AndroidAttestationFailed(_) => "Android attestation verification failed".to_string(),
+            ApiError::AndroidChainVerificationFailed(_) => "Certificate chain verification failed".to_string(),
+            ApiError::UntrustedAttestation(_) => {
+                "Certificate chain does not root to Google Hardware Attestation CA".to_string()
+            }
+            ApiError::CertificateExpired => "Certificate chain contains expired certificate".to_string(),
+            ApiError::InvalidAttestationFormat(msg) => format!("Invalid attestation format: {msg}"),
+            ApiError::ChallengeExpired => "Challenge has expired (5 minute validity)".to_string(),
+            ApiError::ChallengeNotFound => "Challenge not found - request a new challenge".to_string(),
         }
     }
 
