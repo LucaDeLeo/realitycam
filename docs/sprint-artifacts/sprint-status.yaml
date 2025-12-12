@@ -193,8 +193,8 @@ development_status:
   # Show users HOW confidence is calculated
   # FRs: FR76-FR79
   # Requires: Epic 9 or Epic 10
-  epic-11: backlog
-  11-1-method-breakdown-component: backlog
+  epic-11: in-progress
+  11-1-method-breakdown-component: ready-for-dev
   11-2-cross-validation-status-display: backlog
   11-3-platform-indicator-badge: backlog
   11-4-methodology-explainer-page: backlog

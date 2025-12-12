@@ -1,0 +1,23 @@
+# Continuous Story Execution Run
+# Started: 2025-12-12T14:00:00Z
+# Epic: 11 (Detection Transparency)
+
+run_id: continuous-run-20251212-140000
+started_at: "2025-12-12T14:00:00Z"
+epic: 11
+git_branch: main
+git_status: clean
+
+queue:
+  - story_key: 11-1-method-breakdown-component
+    initial_status: backlog
+  - story_key: 11-2-cross-validation-status-display
+    initial_status: backlog
+  - story_key: 11-3-platform-indicator-badge
+    initial_status: backlog
+  - story_key: 11-4-methodology-explainer-page
+    initial_status: backlog
+
+progress: []
+
+checkpoint: null

@@ -13,6 +13,17 @@ export type {
   MetadataFlags, // Story 8-7
   TemporalDepthAnalysis, // Story 8-8
   HashChainEvidence, // Story 8-8
+  // Detection Types (Story 11-1)
+  DetectionMethodStatus,
+  DetectionMethodResult,
+  AggregatedConfidence,
+  LidarDepthDetails,
+  MoireScreenType,
+  MoireDetectionResult,
+  TextureClassification,
+  TextureClassificationResult,
+  ArtifactAnalysisResult,
+  DetectionResults,
 } from './types/evidence';
 
 // Capture Types

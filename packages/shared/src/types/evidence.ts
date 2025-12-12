@@ -116,3 +116,116 @@ export interface Evidence {
   /** Hash chain evidence for video integrity (Story 8-8) */
   hash_chain?: HashChainEvidence;
 }
+
+// ============================================================================
+// Detection Types (Epic 11 - Detection Transparency, Story 11-1)
+// ============================================================================
+
+/** Method status indicating the result of a detection method */
+export type DetectionMethodStatus = 'pass' | 'fail' | 'warn' | 'not_detected' | 'unavailable';
+
+/** Result for a single detection method in the breakdown */
+export interface DetectionMethodResult {
+  /** Whether the method was available and executed */
+  available: boolean;
+  /** Score from 0.0 to 1.0, null if unavailable */
+  score: number | null;
+  /** Weight in confidence calculation (0.0 to 1.0) */
+  weight: number;
+  /** Contribution to final score (score * weight) */
+  contribution: number;
+  /** Status string: "pass", "fail", "warn", "not_detected", "unavailable" */
+  status: DetectionMethodStatus;
+  /** Reason why method is unavailable (e.g., "Model not loaded", "Analysis timeout") */
+  unavailable_reason?: string;
+}
+
+/** Aggregated confidence from multi-signal detection */
+export interface AggregatedConfidence {
+  /** Overall confidence score (0.0 to 1.0) */
+  overall_confidence: number;
+  /** Confidence level using 4-level scale (backend maps very_high -> high) */
+  confidence_level: ConfidenceLevel;
+  /** Breakdown by detection method */
+  method_breakdown: Record<string, DetectionMethodResult>;
+  /** Whether primary signal (LiDAR) is valid */
+  primary_signal_valid: boolean;
+  /** Whether supporting signals agree with primary */
+  supporting_signals_agree: boolean;
+  /** Any warning or info flags */
+  flags: string[];
+}
+
+/** LiDAR depth analysis details for tooltip display */
+export interface LidarDepthDetails {
+  /** Depth variance indicating scene complexity */
+  depth_variance?: number;
+  /** Number of distinct depth layers detected */
+  depth_layers?: number;
+  /** Edge coherence score (0.0 to 1.0) */
+  edge_coherence?: number;
+}
+
+/** Screen type detected by moire analysis */
+export type MoireScreenType = 'lcd' | 'oled' | 'high_refresh' | 'unknown';
+
+/** Moire detection result from screen pattern analysis */
+export interface MoireDetectionResult {
+  /** Whether moire patterns were detected */
+  detected: boolean;
+  /** Confidence in detection (0.0 to 1.0) */
+  confidence: number;
+  /** Type of screen detected if moire found */
+  screen_type?: MoireScreenType;
+  /** Analysis status */
+  status: 'completed' | 'unavailable' | 'failed';
+}
+
+/** Classification result from texture analysis */
+export type TextureClassification = 'real_scene' | 'lcd_screen' | 'oled_screen' | 'printed_paper' | 'unknown';
+
+/** Texture classification result */
+export interface TextureClassificationResult {
+  /** Classification of the texture */
+  classification: TextureClassification;
+  /** Confidence in classification (0.0 to 1.0) */
+  confidence: number;
+  /** Whether the scene is likely recaptured */
+  is_likely_recaptured: boolean;
+  /** Analysis status */
+  status: 'success' | 'unavailable' | 'error';
+}
+
+/** Artifact analysis result (PWM, specular, halftone detection) */
+export interface ArtifactAnalysisResult {
+  /** Whether PWM flicker patterns were detected */
+  pwm_flicker_detected: boolean;
+  /** Whether specular reflection patterns were detected */
+  specular_pattern_detected: boolean;
+  /** Whether halftone printing patterns were detected */
+  halftone_detected: boolean;
+  /** Overall confidence in artifact detection (0.0 to 1.0) */
+  overall_confidence: number;
+  /** Whether the scene is likely artificial/recaptured */
+  is_likely_artificial: boolean;
+  /** Analysis status */
+  status: 'success' | 'unavailable' | 'error';
+}
+
+/** Complete detection results from multi-signal analysis */
+export interface DetectionResults {
+  /** Moire pattern detection result */
+  moire?: MoireDetectionResult;
+  /** Texture classification result */
+  texture?: TextureClassificationResult;
+  /** Artifact analysis result */
+  artifacts?: ArtifactAnalysisResult;
+  /** LiDAR depth analysis details for tooltip display */
+  lidar?: LidarDepthDetails;
+  /** Aggregated confidence from all methods */
+  aggregated_confidence?: AggregatedConfidence;
+  /** When detection was computed (ISO 8601) */
+  computed_at: string;
+  /** Total processing time in milliseconds */
+  total_processing_time_ms: number;
+}

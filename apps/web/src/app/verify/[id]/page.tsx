@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ConfidenceBadge } from '@/components/Evidence/ConfidenceBadge';
 import { EvidencePanel } from '@/components/Evidence/EvidencePanel';
+import { MethodBreakdownSection } from '@/components/Evidence/MethodBreakdownSection';
 import { PartialVideoBanner } from '@/components/Evidence/PartialVideoBanner';
 import { PrivacyModeBadge } from '@/components/Evidence/PrivacyModeBadge';
 import { ImagePlaceholder } from '@/components/Media/ImagePlaceholder';
@@ -10,6 +11,7 @@ import { HashOnlyMediaPlaceholder } from '@/components/Media/HashOnlyMediaPlaceh
 import { VideoPlayer, VideoPlaceholder } from '@/components/Media/VideoPlayer';
 import { apiClient, formatDate, formatDateDayOnly, type ConfidenceLevel, type CheckStatus } from '@/lib/api';
 import { mapToEvidenceStatus } from '@/lib/status';
+import type { DetectionResults } from '@realitycam/shared';
 
 interface VerifyPageProps {
   params: Promise<{ id: string }>;
@@ -52,6 +54,50 @@ const DEMO_CAPTURE: CapturePublicData = {
     },
   },
   photo_url: '/images/WhatsApp Image 2025-11-23 at 20.24.05.jpeg',
+  // Detection results (Story 11-1)
+  detection_available: true,
+  detection: {
+    moire: {
+      detected: false,
+      confidence: 0.0,
+      status: 'completed',
+    },
+    texture: {
+      classification: 'real_scene',
+      confidence: 0.92,
+      is_likely_recaptured: false,
+      status: 'success',
+    },
+    artifacts: {
+      pwm_flicker_detected: false,
+      specular_pattern_detected: false,
+      halftone_detected: false,
+      overall_confidence: 0.0,
+      is_likely_artificial: false,
+      status: 'success',
+    },
+    // LiDAR depth details for tooltip display
+    lidar: {
+      depth_variance: 0.73,
+      depth_layers: 42,
+      edge_coherence: 0.91,
+    },
+    aggregated_confidence: {
+      overall_confidence: 0.95,
+      confidence_level: 'high',
+      method_breakdown: {
+        lidar_depth: { available: true, score: 0.98, weight: 0.55, contribution: 0.539, status: 'pass' },
+        moire: { available: true, score: 0.0, weight: 0.15, contribution: 0.0, status: 'not_detected' },
+        texture: { available: true, score: 0.92, weight: 0.15, contribution: 0.138, status: 'pass' },
+        supporting: { available: true, score: 0.79, weight: 0.15, contribution: 0.118, status: 'pass' },
+      },
+      primary_signal_valid: true,
+      supporting_signals_agree: true,
+      flags: [],
+    },
+    computed_at: new Date().toISOString(),
+    total_processing_time_ms: 85,
+  },
 };
 
 // Demo data for /verify/demo-video route (works without backend - video)
@@ -113,6 +159,51 @@ const DEMO_VIDEO_CAPTURE: CapturePublicData = {
     },
   },
   video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+  // Detection results (Story 11-1) - video with one unavailable method
+  detection_available: true,
+  detection: {
+    moire: {
+      detected: false,
+      confidence: 0.0,
+      status: 'completed',
+    },
+    texture: {
+      classification: 'real_scene',
+      confidence: 0.88,
+      is_likely_recaptured: false,
+      status: 'success',
+    },
+    artifacts: {
+      pwm_flicker_detected: false,
+      specular_pattern_detected: false,
+      halftone_detected: false,
+      overall_confidence: 0.0,
+      is_likely_artificial: false,
+      status: 'unavailable', // Demonstrating unavailable state
+    },
+    // LiDAR depth details for tooltip display
+    lidar: {
+      depth_variance: 0.68,
+      depth_layers: 38,
+      edge_coherence: 0.87,
+    },
+    aggregated_confidence: {
+      overall_confidence: 0.91,
+      confidence_level: 'high',
+      method_breakdown: {
+        lidar_depth: { available: true, score: 0.95, weight: 0.55, contribution: 0.522, status: 'pass' },
+        moire: { available: true, score: 0.0, weight: 0.15, contribution: 0.0, status: 'not_detected' },
+        texture: { available: true, score: 0.88, weight: 0.15, contribution: 0.132, status: 'pass' },
+        // Demonstrating unavailable_reason field for tooltip display
+        artifacts: { available: false, score: null, weight: 0.15, contribution: 0.0, status: 'unavailable', unavailable_reason: 'Model not loaded for video analysis' },
+      },
+      primary_signal_valid: true,
+      supporting_signals_agree: true,
+      flags: ['artifacts_unavailable'],
+    },
+    computed_at: new Date().toISOString(),
+    total_processing_time_ms: 120,
+  },
 };
 
 // Demo data for partial video
@@ -398,6 +489,13 @@ interface CapturePublicData {
   capture_mode?: 'full' | 'hash_only';
   media_stored?: boolean;
   media_hash?: string;
+  // Detection fields (Story 11-1)
+  detection_available?: boolean;
+  detection?: DetectionResults;
+  detection_confidence_level?: string;
+  detection_primary_valid?: boolean;
+  detection_signals_agree?: boolean;
+  detection_method_count?: number;
 }
 
 // Helper to format video duration
@@ -758,6 +856,14 @@ export default async function VerifyPage({ params }: VerifyPageProps) {
             <EvidencePanel items={evidenceItems} defaultExpanded={true} />
           ) : (
             <EvidencePanel />
+          )}
+
+          {/* Detection Method Breakdown (Story 11-1) */}
+          {capture?.detection_available && capture?.detection && (
+            <MethodBreakdownSection
+              detection={capture.detection}
+              defaultExpanded={true}
+            />
           )}
 
           {/* Back Link */}
