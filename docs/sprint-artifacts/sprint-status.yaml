@@ -180,8 +180,8 @@ development_status:
   # Epic 10: Cross-Platform Foundation (6 stories)
   # Backend Android attestation + unified evidence model
   # FRs: FR70-FR75
-  epic-10: backlog
-  10-1-android-key-attestation-service: backlog
+  epic-10: in-progress
+  10-1-android-key-attestation-service: done
   10-2-attestation-security-level-extraction: backlog
   10-3-software-attestation-rejection: backlog
   10-4-challenge-freshness-validation: backlog

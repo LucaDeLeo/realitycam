@@ -2,6 +2,7 @@
 //!
 //! This module contains business logic services that are used by route handlers.
 
+pub mod android_attestation;
 pub mod attestation;
 pub mod c2pa;
 pub mod capture_attestation;
@@ -15,6 +16,13 @@ pub mod storage;
 pub mod video_depth_analysis;
 pub mod video_evidence;
 
+pub use android_attestation::{
+    parse_certificate_chain as parse_android_certificate_chain, parse_key_attestation_extension,
+    validate_challenge as validate_android_challenge, validate_security_level,
+    verify_android_attestation, verify_certificate_chain as verify_android_certificate_chain,
+    AndroidAttestationError, AndroidAttestationObject, AndroidAttestationResult, AndroidDeviceInfo,
+    AuthorizationList, KeyDescription, RootOfTrust, SecurityLevel, VerifiedBootState,
+};
 pub use attestation::{
     decode_attestation_object, extract_public_key, parse_authenticator_data, verify_attestation,
     verify_certificate_chain, AttestationError, AttestationObject, AuthenticatorData,

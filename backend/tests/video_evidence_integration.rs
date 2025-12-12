@@ -745,27 +745,29 @@ fn test_evidence_with_authentic_detection() {
     let depth = SimulatedDepth::pass();
     let detection = SimulatedDetection::authentic();
 
-    let evidence = build_evidence_with_detection(
-        &hw,
-        &chain,
-        Some(&depth),
-        Some(&detection),
-        15000,
-        450,
-    );
+    let evidence =
+        build_evidence_with_detection(&hw, &chain, Some(&depth), Some(&detection), 15000, 450);
 
     // Detection should be present
     assert!(evidence.get("detection").is_some());
 
     // Detection fields should have expected values
-    assert!(!evidence["detection"]["moire"]["detected"].as_bool().unwrap());
+    assert!(!evidence["detection"]["moire"]["detected"]
+        .as_bool()
+        .unwrap());
     assert_eq!(
-        evidence["detection"]["texture"]["classification"].as_str().unwrap(),
+        evidence["detection"]["texture"]["classification"]
+            .as_str()
+            .unwrap(),
         "real_scene"
     );
-    assert!(!evidence["detection"]["artifacts"]["is_likely_artificial"].as_bool().unwrap());
+    assert!(!evidence["detection"]["artifacts"]["is_likely_artificial"]
+        .as_bool()
+        .unwrap());
     assert_eq!(
-        evidence["detection"]["aggregated_confidence"]["confidence_level"].as_str().unwrap(),
+        evidence["detection"]["aggregated_confidence"]["confidence_level"]
+            .as_str()
+            .unwrap(),
         "high"
     );
 }
@@ -777,24 +779,26 @@ fn test_evidence_with_suspicious_detection() {
     let depth = SimulatedDepth::pass();
     let detection = SimulatedDetection::suspicious_screen();
 
-    let evidence = build_evidence_with_detection(
-        &hw,
-        &chain,
-        Some(&depth),
-        Some(&detection),
-        15000,
-        450,
-    );
+    let evidence =
+        build_evidence_with_detection(&hw, &chain, Some(&depth), Some(&detection), 15000, 450);
 
     // Detection should indicate screen recapture
-    assert!(evidence["detection"]["moire"]["detected"].as_bool().unwrap());
+    assert!(evidence["detection"]["moire"]["detected"]
+        .as_bool()
+        .unwrap());
     assert_eq!(
-        evidence["detection"]["texture"]["classification"].as_str().unwrap(),
+        evidence["detection"]["texture"]["classification"]
+            .as_str()
+            .unwrap(),
         "lcd_screen"
     );
-    assert!(evidence["detection"]["artifacts"]["is_likely_artificial"].as_bool().unwrap());
+    assert!(evidence["detection"]["artifacts"]["is_likely_artificial"]
+        .as_bool()
+        .unwrap());
     assert_eq!(
-        evidence["detection"]["aggregated_confidence"]["confidence_level"].as_str().unwrap(),
+        evidence["detection"]["aggregated_confidence"]["confidence_level"]
+            .as_str()
+            .unwrap(),
         "suspicious"
     );
 }
@@ -816,11 +820,15 @@ fn test_evidence_with_partial_detection() {
     );
 
     // Detection should handle missing primary signal
-    assert!(!evidence["detection"]["aggregated_confidence"]["primary_signal_valid"]
-        .as_bool()
-        .unwrap());
+    assert!(
+        !evidence["detection"]["aggregated_confidence"]["primary_signal_valid"]
+            .as_bool()
+            .unwrap()
+    );
     assert_eq!(
-        evidence["detection"]["aggregated_confidence"]["confidence_level"].as_str().unwrap(),
+        evidence["detection"]["aggregated_confidence"]["confidence_level"]
+            .as_str()
+            .unwrap(),
         "medium"
     );
 }
@@ -857,20 +865,16 @@ fn test_detection_enhances_high_confidence() {
     let depth = SimulatedDepth::pass();
     let detection = SimulatedDetection::authentic();
 
-    let evidence = build_evidence_with_detection(
-        &hw,
-        &chain,
-        Some(&depth),
-        Some(&detection),
-        15000,
-        450,
-    );
+    let evidence =
+        build_evidence_with_detection(&hw, &chain, Some(&depth), Some(&detection), 15000, 450);
 
     // Base confidence is HIGH, detection confirms
     assert_eq!(calculate_confidence_from_json(&evidence), "high");
-    assert!(evidence["detection"]["aggregated_confidence"]["primary_signal_valid"]
-        .as_bool()
-        .unwrap());
+    assert!(
+        evidence["detection"]["aggregated_confidence"]["primary_signal_valid"]
+            .as_bool()
+            .unwrap()
+    );
 }
 
 #[test]
@@ -882,18 +886,14 @@ fn test_detection_can_lower_confidence() {
     let mut detection = SimulatedDetection::suspicious_screen();
     detection.confidence_level = "suspicious";
 
-    let evidence = build_evidence_with_detection(
-        &hw,
-        &chain,
-        Some(&depth),
-        Some(&detection),
-        15000,
-        450,
-    );
+    let evidence =
+        build_evidence_with_detection(&hw, &chain, Some(&depth), Some(&detection), 15000, 450);
 
     // Detection indicates screen, should affect trust
     assert_eq!(
-        evidence["detection"]["aggregated_confidence"]["confidence_level"].as_str().unwrap(),
+        evidence["detection"]["aggregated_confidence"]["confidence_level"]
+            .as_str()
+            .unwrap(),
         "suspicious"
     );
 }
@@ -912,9 +912,11 @@ fn test_detection_signals_agree_field() {
     );
 
     // signals_agree should be true when all methods concur
-    assert!(evidence["detection"]["aggregated_confidence"]["supporting_signals_agree"]
-        .as_bool()
-        .unwrap());
+    assert!(
+        evidence["detection"]["aggregated_confidence"]["supporting_signals_agree"]
+            .as_bool()
+            .unwrap()
+    );
 }
 
 #[test]

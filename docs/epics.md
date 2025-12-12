@@ -11,20 +11,26 @@
 
 This document provides the complete epic and story breakdown for rial., decomposing the requirements from the [PRD](./prd.md) into implementable stories.
 
-**Living Document Notice:** This is the initial version. It will be updated after UX Design and Architecture workflows add interaction and technical details to stories.
+**Document Status:** MVP Complete (8 epics, 63 stories). Expansion epics 9-12 defined (Android + multi-signal). See `sprint-status.yaml` for implementation tracking.
 
 ## Epic Summary
 
-| Epic | Title | User Value | FRs Covered |
-|------|-------|------------|-------------|
-| 1 | Foundation & Project Setup | Development infrastructure ready | Setup for all FRs |
-| 2 | Device Registration & Attestation | Device can securely register with hardware attestation | FR1-FR5, FR41-FR43 |
-| 3 | Photo Capture with LiDAR Depth | User can capture attested photos with depth data | FR6-FR13 |
-| 4 | Upload & Evidence Processing | Captured photos are processed with full evidence pipeline | FR14-FR26, FR44-FR46 |
-| 5 | C2PA & Verification Experience | Users can verify photos via shareable links | FR27-FR40 |
-| 6 | Native Swift Implementation | Maximum security via native iOS with zero JS bridge | FR1-FR19, FR41-FR46 (native) |
-| 7 | Video Capture with LiDAR Depth | Attested video with frame-by-frame depth verification | FR47-FR55 |
-| 8 | Privacy-First Capture Mode | Zero-knowledge provenance with client-side analysis | FR56-FR62 |
+| Epic | Title | Stories | User Value | Status |
+|------|-------|---------|------------|--------|
+| 1 | Foundation & Project Setup | 5 | Development infrastructure ready | Done |
+| 2 | Device Registration & Attestation | 6 | Device can securely register with hardware attestation | Done |
+| 3 | Photo Capture with LiDAR Depth | 6 | User can capture attested photos with depth data | Done |
+| 4 | Upload & Evidence Processing | 8 | Captured photos are processed with full evidence pipeline | Done |
+| 5 | C2PA & Verification Experience | 8 | Users can verify photos via shareable links | Done |
+| 6 | Native Swift Implementation | 16 | Maximum security via native iOS with zero JS bridge | Done |
+| 7 | Video Capture with LiDAR Depth | 14 | Attested video with frame-by-frame depth verification | Done |
+| 8 | Privacy-First Capture Mode | 8 | Zero-knowledge provenance with client-side analysis | Done |
+| **9** | **iOS Defense-in-Depth** | TBD | Enhanced confidence via multi-signal detection (Moiré, texture, artifacts) | Backlog |
+| **10** | **Cross-Platform Foundation** | TBD | Backend support for Android attestation + unified evidence model | Backlog |
+| **11** | **Detection Transparency** | TBD | Users see HOW confidence was calculated (method breakdown) | Backlog |
+| **12** | **Android Native App** | TBD | Android users capture attested media with MEDIUM-HIGH confidence | Backlog |
+
+**MVP: 63 Stories** (Epics 1-8, Done) | **Expansion: ~35 Stories** (Epics 9-12, Backlog)
 
 ---
 
@@ -32,7 +38,7 @@ This document provides the complete epic and story breakdown for rial., decompos
 
 ### Device & Attestation (FR1-FR5)
 - **FR1:** App detects iPhone Pro device with LiDAR capability
-- **FR2:** App generates cryptographic keys in Secure Enclave via @expo/app-integrity
+- **FR2:** App generates cryptographic keys in Secure Enclave via native `CryptoKit` and `DeviceCheck` frameworks
 - **FR3:** App requests DCAppAttest attestation from iOS (one-time device registration)
 - **FR4:** Backend verifies DCAppAttest attestation object against Apple's service
 - **FR5:** System assigns attestation level: secure_enclave or unverified
@@ -115,6 +121,46 @@ This document provides the complete epic and story breakdown for rial., decompos
 - **FR60:** Backend stores hash + evidence without raw media (media never touches server)
 - **FR61:** Verification page displays "Hash Verified" with note about device attestation
 - **FR62:** Users can configure per-capture metadata: location, timestamp, device info granularity
+
+---
+
+## Expansion Functional Requirements (Post-MVP)
+
+> These requirements are planned for post-MVP phases. See PRD Expansion Roadmap for details.
+
+### Phase 1: iOS Multi-Signal Detection (FR63-FR69)
+- **FR63:** iOS app performs Moiré pattern detection via 2D FFT (Accelerate framework)
+- **FR64:** iOS app performs texture classification via CoreML (MobileNetV3 model)
+- **FR65:** iOS app detects supporting artifacts (PWM, specular reflection, halftone)
+- **FR66:** iOS app aggregates confidence scores from all available detection methods
+- **FR67:** iOS app performs cross-validation when multiple methods available
+- **FR68:** iOS app includes detection breakdown in capture payload
+- **FR69:** Backend stores and validates multi-signal detection results
+
+### Phase 2: Backend Platform Expansion (FR70-FR75)
+- **FR70:** Backend verifies Android Key Attestation certificate chains to Google root
+- **FR71:** Backend extracts attestation security level (StrongBox/TEE/Software)
+- **FR72:** Backend rejects software-only attestation
+- **FR73:** Backend implements challenge freshness validation (time-bound nonces)
+- **FR74:** Backend stores unified evidence model with method breakdown
+- **FR75:** Backend maintains backward compatibility with MVP evidence schema
+
+### Phase 3: Verification UI Enhancement (FR76-FR79)
+- **FR76:** Verification page displays detection method breakdown with scores
+- **FR77:** Verification page shows cross-validation status (agree/disagree/partial)
+- **FR78:** Verification page indicates platform (iOS/Android) and attestation method
+- **FR79:** Verification page explains confidence calculation methodology
+
+### Phase 4: Android App (FR80-FR88)
+- **FR80:** Android app generates keypair in TEE/StrongBox via Android Keystore
+- **FR81:** Android app requests Key Attestation certificate chain
+- **FR82:** Android app performs multi-camera parallax depth estimation
+- **FR83:** Android app performs Moiré detection via Vulkan Compute or CPU FFT
+- **FR84:** Android app performs texture classification via TensorFlow Lite
+- **FR85:** Android app aggregates confidence with attestation level weighting
+- **FR86:** Android app stores captures in encrypted local storage (Keystore-backed key)
+- **FR87:** Android app implements offline queue with WorkManager
+- **FR88:** Android app signs all API requests with TEE/StrongBox-backed key
 
 ---
 
@@ -3149,39 +3195,208 @@ So that **I can hash-only verify videos too**.
 
 ---
 
-## Summary
+# Expansion Epics (Post-MVP)
 
-**Total: 8 Epics, 79 Stories**
-
-| Epic | Stories | FRs Covered |
-|------|---------|-------------|
-| Epic 1: Foundation & Project Setup | 6 | Infrastructure |
-| Epic 2: Device Registration & Attestation | 7 | FR1-FR5, FR41-FR43 |
-| Epic 3: Photo Capture with LiDAR Depth | 8 | FR6-FR13 |
-| Epic 4: Upload & Evidence Processing | 10 | FR14-FR26, FR44-FR46 |
-| Epic 5: C2PA & Verification Experience | 10 | FR27-FR40 |
-| Epic 6: Native Swift Implementation | 16 | FR1-FR19, FR41-FR46 (native) |
-| Epic 7: Video Capture with LiDAR Depth | 14 | FR47-FR55 |
-| Epic 8: Privacy-First Capture Mode | 8 | FR56-FR62 |
-
-**Context Incorporated:**
-- ✅ PRD requirements (all 62 FRs mapped)
-- ✅ Architecture technical decisions (tech stack, API contracts, patterns)
-- ✅ Native Swift re-implementation for maximum security posture
-- ✅ Video capture with frame-by-frame depth and hash chain integrity
-- ✅ Privacy-first capture with client-side depth analysis (ADR-011)
-
-**Epic 6 Note:** Provides native Swift alternatives to Epics 2-4 mobile functionality. Can be developed in parallel. After Story 6.16 validation, Expo/RN code can be deprecated.
-
-**Epic 7 Note:** Video capture extends the native Swift implementation. Builds on Epic 6 ARKit foundations. Adds temporal depth analysis and hash chain verification for video-specific manipulation detection.
-
-**Epic 8 Note:** Privacy-first mode enables zero-knowledge provenance. Client-side depth analysis trusted via hardware attestation. Added via Sprint Change Proposal SCP-008 (2025-12-01).
-
-**Status:** Epic 8 added - Ready for implementation!
+> The following epics implement the Android expansion and multi-signal detection capabilities defined in the PRD Expansion Roadmap. Stories will be defined when these epics are prioritized.
 
 ---
 
-_For implementation: Use the `create-story` workflow to generate individual story implementation plans from this epic breakdown._
+## Epic 9: iOS Defense-in-Depth
 
-_This document will be updated after UX Design workflow to incorporate interaction details and mockup references._
+**Goal:** Enhance iOS Pro capture confidence through multiple detection methods (Moiré, texture, artifacts) layered on top of LiDAR depth analysis, providing defense against Chimera-style adversarial attacks.
+
+**User Value:** iOS Pro captures achieve VERY HIGH confidence when all detection signals agree. Multiple independent verification methods make spoofing prohibitively difficult.
+
+**FRs Covered:** FR63-FR69 (iOS Multi-Signal Detection)
+
+**Technical Approach:**
+- Moiré pattern detection via 2D FFT (Accelerate framework) - detects screen pixel grids
+- Texture classification via CoreML (MobileNetV3) - distinguishes real vs screen/print materials
+- Supporting artifact detection (PWM flicker, specular reflection patterns, halftone dots)
+- Confidence aggregation with LiDAR as PRIMARY signal (55%), detection methods as SUPPORTING (45%)
+- Cross-validation: all methods agree → confidence boost; disagreement → flag for review
+
+**Dependencies:** Builds on Epic 6 (Native Swift ARKit capture), Epic 4 (Backend evidence processing)
+
+**Status:** Backlog
+
+**Stories:** TBD (estimated 8-10 stories)
+
+---
+
+## Epic 10: Cross-Platform Foundation
+
+**Goal:** Extend backend infrastructure to support Android Key Attestation verification and unified multi-signal evidence model that works across both platforms.
+
+**User Value:** Enables Android platform support (infrastructure epic). Creates unified evidence schema that can represent attestation from both iOS Secure Enclave and Android TEE/StrongBox.
+
+**FRs Covered:** FR70-FR75 (Backend Platform Expansion)
+
+**Technical Approach:**
+- Android Key Attestation service: verify certificate chains to Google root certificate
+- Extract attestation security level: StrongBox (HIGH) > TEE (MEDIUM) > Software (REJECTED)
+- Challenge freshness validation with time-bound nonces (prevent replay attacks)
+- Unified evidence schema with method breakdown (supports both LiDAR and parallax depth)
+- Schema migration with backward compatibility for existing MVP captures
+
+**Dependencies:** Builds on Epic 4 (Backend services), prepares for Epic 12 (Android app)
+
+**Status:** Backlog
+
+**Stories:** TBD (estimated 6-8 stories)
+
+---
+
+## Epic 11: Detection Transparency
+
+**Goal:** Show users exactly HOW confidence scores are calculated, with method-by-method breakdown and cross-validation status.
+
+**User Value:** Verifiers understand the methodology behind confidence scores, building genuine trust through transparency. Users see which detection methods passed/failed and why.
+
+**FRs Covered:** FR76-FR79 (Verification UI Enhancement)
+
+**Technical Approach:**
+- Method breakdown component with individual scores (bars/gauges)
+- Cross-validation indicator: "All methods agree" vs "Methods disagree - flagged for review"
+- Platform badge: iOS Pro (LiDAR + multi-signal) vs Android (TEE + parallax + multi-signal)
+- Methodology explainer: link to documentation explaining each detection method
+
+**Dependencies:** Requires Epic 9 or Epic 10 (needs multi-signal data to display)
+
+**Status:** Backlog
+
+**Stories:** TBD (estimated 4-6 stories)
+
+---
+
+## Epic 12: Android Native App
+
+**Goal:** Full Android native app with TEE/StrongBox hardware attestation, multi-camera parallax depth estimation, and multi-signal detection achieving MEDIUM-HIGH confidence.
+
+**User Value:** Android users can capture attested media with cryptographic proof of authenticity. While Android lacks LiDAR, multi-camera parallax + TEE attestation + multi-signal detection provides strong evidence.
+
+**FRs Covered:** FR80-FR88 (Android App)
+
+**Technical Approach:**
+- Native Kotlin + Jetpack Compose (mirrors iOS native architecture decision)
+- TEE/StrongBox key generation via Android Keystore (reject software-only attestation)
+- Key Attestation certificate chain verification to Google root
+- Multi-camera parallax depth estimation using Camera2 API
+- Moiré detection via Vulkan Compute (GPU) with CPU FFT fallback
+- Texture classification via TensorFlow Lite with GPU delegate
+- Confidence weighting: attestation_level (20%) + parallax (30%) + detection (50%)
+- Encrypted offline storage with Keystore-backed keys
+- WorkManager for reliable background upload queue
+
+**Dependencies:** Requires Epic 10 (backend Android attestation support)
+
+**Status:** Backlog
+
+**Stories:** TBD (estimated 14-16 stories)
+
+**Architecture Reference:**
+```
+android/
+├── app/src/main/java/com/rial/
+│   ├── RialApplication.kt
+│   ├── core/
+│   │   ├── attestation/KeyAttestationService.kt
+│   │   ├── capture/MultiCameraSession.kt, ParallaxAnalyzer.kt
+│   │   ├── detection/MoireDetector.kt, TextureClassifier.kt, ConfidenceAggregator.kt
+│   │   ├── crypto/SecureKeyStore.kt
+│   │   └── networking/ApiClient.kt
+│   └── ui/capture/, preview/, history/
+```
+
+---
+
+## Expansion FR Coverage Map
+
+| FR | Epic | Description |
+|----|------|-------------|
+| FR63 | Epic 9 | Moiré pattern detection (FFT) |
+| FR64 | Epic 9 | Texture classification (CoreML) |
+| FR65 | Epic 9 | Artifact detection (PWM, specular, halftone) |
+| FR66 | Epic 9 | Confidence aggregation |
+| FR67 | Epic 9 | Cross-validation logic |
+| FR68 | Epic 9 | Detection breakdown in payload |
+| FR69 | Epic 9 | Backend multi-signal storage |
+| FR70 | Epic 10 | Android Key Attestation verification |
+| FR71 | Epic 10 | Attestation security level extraction |
+| FR72 | Epic 10 | Software-only rejection |
+| FR73 | Epic 10 | Challenge freshness validation |
+| FR74 | Epic 10 | Unified evidence model |
+| FR75 | Epic 10 | Backward compatibility |
+| FR76 | Epic 11 | Method breakdown display |
+| FR77 | Epic 11 | Cross-validation status |
+| FR78 | Epic 11 | Platform indicator |
+| FR79 | Epic 11 | Methodology explanation |
+| FR80 | Epic 12 | TEE/StrongBox key generation |
+| FR81 | Epic 12 | Key Attestation request |
+| FR82 | Epic 12 | Multi-camera parallax depth |
+| FR83 | Epic 12 | Moiré detection (Vulkan/CPU) |
+| FR84 | Epic 12 | Texture classification (TFLite) |
+| FR85 | Epic 12 | Confidence aggregation with attestation weighting |
+| FR86 | Epic 12 | Encrypted local storage |
+| FR87 | Epic 12 | Offline queue (WorkManager) |
+| FR88 | Epic 12 | API request signing |
+
+---
+
+## Summary
+
+**Total: 12 Epics** | **MVP: 63 Stories (Done)** | **Expansion: ~35 Stories (Backlog)**
+
+### MVP Epics (Complete)
+
+| Epic | Stories | FRs Covered | Status |
+|------|---------|-------------|--------|
+| Epic 1: Foundation & Project Setup | 5 | Infrastructure | Done |
+| Epic 2: Device Registration & Attestation | 6 | FR1-FR5, FR41-FR43 | Done |
+| Epic 3: Photo Capture with LiDAR Depth | 6 | FR6-FR13 | Done |
+| Epic 4: Upload & Evidence Processing | 8 | FR14-FR26, FR44-FR46 | Done |
+| Epic 5: C2PA & Verification Experience | 8 | FR27-FR40 | Done |
+| Epic 6: Native Swift Implementation | 16 | FR1-FR19, FR41-FR46 (native) | Done |
+| Epic 7: Video Capture with LiDAR Depth | 14 | FR47-FR55 | Done |
+| Epic 8: Privacy-First Capture Mode | 8 | FR56-FR62 | Done |
+
+### Expansion Epics (Backlog)
+
+| Epic | Stories | FRs Covered | Status |
+|------|---------|-------------|--------|
+| Epic 9: iOS Defense-in-Depth | ~8-10 | FR63-FR69 | Backlog |
+| Epic 10: Cross-Platform Foundation | ~6-8 | FR70-FR75 | Backlog |
+| Epic 11: Detection Transparency | ~4-6 | FR76-FR79 | Backlog |
+| Epic 12: Android Native App | ~14-16 | FR80-FR88 | Backlog |
+
+> **Note:** MVP story counts reflect implemented stories per `sprint-status.yaml`. Epic 6 provides native Swift alternatives to Epics 2-4 mobile functionality (ADR-009). Expansion story counts are estimates; stories will be defined when epics are prioritized.
+
+**Context Incorporated:**
+- ✅ PRD requirements: MVP (FR1-FR62) + Expansion (FR63-FR88) = 88 FRs mapped
+- ✅ Architecture technical decisions (tech stack, API contracts, patterns)
+- ✅ Native Swift re-implementation for maximum security posture (ADR-009)
+- ✅ Video capture with frame-by-frame depth and hash chain integrity (ADR-010)
+- ✅ Privacy-first capture with client-side depth analysis (ADR-011)
+- ✅ Expansion roadmap: Multi-signal detection + Android platform support
+
+**MVP Notes:**
+- **Epic 6:** Native Swift alternatives to Epics 2-4 mobile (production implementation)
+- **Epic 7:** Video capture with temporal depth analysis and hash chain verification
+- **Epic 8:** Privacy-first mode with client-side depth analysis (SCP-008, 2025-12-01)
+
+**Expansion Notes:**
+- **Epic 9:** iOS defense-in-depth via Moiré, texture, artifact detection (Chimera attack mitigation)
+- **Epic 10:** Cross-platform backend foundation (Android attestation + unified evidence model)
+- **Epic 11:** Detection transparency UI (show HOW confidence is calculated)
+- **Epic 12:** Full Android app with TEE/StrongBox + parallax depth + multi-signal detection
+
+**Status:**
+- MVP: **Complete** (8 epics, 63 stories delivered)
+- Expansion: **Backlog** (4 epics, ~35 stories planned)
+
+---
+
+_MVP implementation complete. Expansion epics defined for Android and multi-signal detection._
+
+_For expansion prioritization, see PRD Expansion Roadmap (Phases 1-4)._
 
