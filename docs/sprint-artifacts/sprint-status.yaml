@@ -195,9 +195,9 @@ development_status:
   # Requires: Epic 9 or Epic 10
   epic-11: in-progress
   11-1-method-breakdown-component: done
-  11-2-cross-validation-status-display: done
-  11-3-platform-indicator-badge: ready-for-dev
-  11-4-methodology-explainer-page: backlog
+  11-2-cross-validation-status-display: review
+  11-3-platform-indicator-badge: done
+  11-4-methodology-explainer-page: drafted
   epic-11-retrospective: optional
 
   # Epic 12: Android Native App (14 stories)
