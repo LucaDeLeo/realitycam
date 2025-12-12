@@ -17,6 +17,6 @@ pub use debug_log::{
 pub use device::Device;
 pub use evidence::{
     AttestationLevel, CheckStatus, ConfidenceLevel, DepthAnalysis, EvidencePackage,
-    HardwareAttestation, MetadataEvidence, ProcessingInfo,
+    HardwareAttestation, MetadataEvidence, ProcessingInfo, SecurityLevelInfo,
 };
 pub use verification_log::VerificationLog;

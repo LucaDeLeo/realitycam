@@ -183,6 +183,22 @@ impl std::fmt::Display for SecurityLevel {
     }
 }
 
+impl SecurityLevel {
+    /// Returns the database/API string representation of this security level (Story 10-2)
+    ///
+    /// # Returns
+    /// - "software" for Software (should never be stored, rejected per FR72)
+    /// - "tee" for TrustedEnvironment
+    /// - "strongbox" for StrongBox
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SecurityLevel::Software => "software",
+            SecurityLevel::TrustedEnvironment => "tee",
+            SecurityLevel::StrongBox => "strongbox",
+        }
+    }
+}
+
 /// Verified boot state from RootOfTrust
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -1312,6 +1328,14 @@ mod tests {
             "TrustedEnvironment"
         );
         assert_eq!(format!("{}", SecurityLevel::StrongBox), "StrongBox");
+    }
+
+    #[test]
+    fn test_security_level_as_str() {
+        // Story 10-2: Test string representation for database/API
+        assert_eq!(SecurityLevel::Software.as_str(), "software");
+        assert_eq!(SecurityLevel::TrustedEnvironment.as_str(), "tee");
+        assert_eq!(SecurityLevel::StrongBox.as_str(), "strongbox");
     }
 
     #[test]

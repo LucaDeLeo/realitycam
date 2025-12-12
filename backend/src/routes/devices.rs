@@ -138,10 +138,25 @@ impl DeviceRegistrationRequest {
 pub struct DeviceRegistrationResponse {
     /// Unique device ID assigned by the backend
     pub device_id: Uuid,
-    /// Current attestation level ("unverified" or "secure_enclave")
+    /// Current attestation level ("unverified", "secure_enclave", "strongbox", "tee")
     pub attestation_level: String,
     /// Whether the device has LiDAR sensor
     pub has_lidar: bool,
+    /// Detailed security level information (Story 10-2)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub security_level: Option<SecurityLevelResponse>,
+}
+
+/// Security level details in registration response (Story 10-2)
+#[derive(Debug, Serialize)]
+pub struct SecurityLevelResponse {
+    /// Primary attestation security level: "strongbox", "tee", "secure_enclave"
+    pub attestation: String,
+    /// KeyMaster security level (Android-only)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub keymaster: Option<String>,
+    /// Platform: "ios" or "android"
+    pub platform: String,
 }
 
 /// Challenge response payload (AC-1).
@@ -249,6 +264,10 @@ struct InsertDeviceParams<'a> {
     attestation_level: &'a str,
     public_key: Option<&'a [u8]>,
     assertion_counter: i64,
+    /// Hardware security level (Story 10-2)
+    security_level: Option<&'a str>,
+    /// KeyMaster security level - Android only (Story 10-2)
+    keymaster_security_level: Option<&'a str>,
 }
 
 /// Inserts a new device record into the database.
@@ -257,6 +276,7 @@ struct InsertDeviceParams<'a> {
 /// - attestation_level = "unverified"
 /// - public_key = NULL
 /// - assertion_counter = 0
+/// - security_level = NULL
 ///
 /// Returns DeviceAlreadyRegistered error if attestation_key_id already exists (AC-4).
 async fn insert_device(
@@ -268,9 +288,10 @@ async fn insert_device(
         r#"
         INSERT INTO devices (
             attestation_key_id, platform, model, has_lidar,
-            attestation_chain, attestation_level, public_key, assertion_counter
+            attestation_chain, attestation_level, public_key, assertion_counter,
+            security_level, keymaster_security_level
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING
             id,
             attestation_level,
@@ -282,7 +303,9 @@ async fn insert_device(
             first_seen_at,
             last_seen_at,
             assertion_counter,
-            public_key
+            public_key,
+            security_level,
+            keymaster_security_level
         "#,
         params.key_id,
         params.platform,
@@ -291,7 +314,9 @@ async fn insert_device(
         params.attestation_bytes,
         params.attestation_level,
         params.public_key,
-        params.assertion_counter
+        params.assertion_counter,
+        params.security_level,
+        params.keymaster_security_level
     )
     .fetch_one(pool)
     .await
@@ -435,102 +460,110 @@ async fn register_device(
         })?;
 
     // Attempt verification if challenge is provided
-    let (attestation_level, public_key, assertion_counter) =
-        if let Some(ref challenge) = challenge_bytes {
-            // Try to verify the challenge first
-            let challenge_array: [u8; 32] = challenge.as_slice().try_into().map_err(|_| {
+    let (
+        attestation_level,
+        public_key,
+        assertion_counter,
+        security_level,
+        keymaster_security_level,
+    ) = if let Some(ref challenge) = challenge_bytes {
+        // Try to verify the challenge first
+        let challenge_array: [u8; 32] = challenge.as_slice().try_into().map_err(|_| {
+            tracing::warn!(
+                request_id = %request_id,
+                challenge_len = challenge.len(),
+                "Invalid challenge length"
+            );
+            ApiErrorWithRequestId {
+                error: ApiError::ChallengeInvalid("Invalid challenge length".to_string()),
+                request_id,
+            }
+        })?;
+
+        // Verify and consume the challenge (AC-2: single-use, check expiry)
+        match state
+            .challenge_store
+            .verify_and_consume(&challenge_array)
+            .await
+        {
+            Ok(()) => {
+                tracing::info!(
+                    request_id = %request_id,
+                    step = "challenge_validation",
+                    status = "pass",
+                    "Challenge validated and consumed"
+                );
+            }
+            Err(e) => {
+                let reason = match e {
+                    ChallengeError::NotFound => "Challenge not found",
+                    ChallengeError::AlreadyUsed => "Challenge already used",
+                    ChallengeError::Expired => "Challenge expired",
+                    ChallengeError::RateLimitExceeded => "Rate limit exceeded",
+                };
                 tracing::warn!(
                     request_id = %request_id,
-                    challenge_len = challenge.len(),
-                    "Invalid challenge length"
+                    step = "challenge_validation",
+                    status = "fail",
+                    reason = reason,
+                    "Challenge validation failed"
                 );
-                ApiErrorWithRequestId {
-                    error: ApiError::ChallengeInvalid("Invalid challenge length".to_string()),
+                // On challenge failure, degrade to unverified (AC-10)
+                return register_unverified_device(
+                    &state,
                     request_id,
-                }
-            })?;
-
-            // Verify and consume the challenge (AC-2: single-use, check expiry)
-            match state
-                .challenge_store
-                .verify_and_consume(&challenge_array)
-                .await
-            {
-                Ok(()) => {
-                    tracing::info!(
-                        request_id = %request_id,
-                        step = "challenge_validation",
-                        status = "pass",
-                        "Challenge validated and consumed"
-                    );
-                }
-                Err(e) => {
-                    let reason = match e {
-                        ChallengeError::NotFound => "Challenge not found",
-                        ChallengeError::AlreadyUsed => "Challenge already used",
-                        ChallengeError::Expired => "Challenge expired",
-                        ChallengeError::RateLimitExceeded => "Rate limit exceeded",
-                    };
-                    tracing::warn!(
-                        request_id = %request_id,
-                        step = "challenge_validation",
-                        status = "fail",
-                        reason = reason,
-                        "Challenge validation failed"
-                    );
-                    // On challenge failure, degrade to unverified (AC-10)
-                    return register_unverified_device(
-                        &state,
-                        request_id,
-                        &key_id,
-                        &req,
-                        &attestation_bytes,
-                    )
-                    .await;
-                }
+                    &key_id,
+                    &req,
+                    &attestation_bytes,
+                )
+                .await;
             }
+        }
 
-            // Perform attestation verification (AC-3 through AC-8)
-            match verify_attestation(
-                &attestation_object_b64,
-                challenge,
-                &state.config,
-                request_id,
-            )
-            .await
-            {
-                Ok(result) => {
-                    tracing::info!(
-                        request_id = %request_id,
-                        status = "verified",
-                        public_key_len = result.public_key.len(),
-                        counter = result.counter,
-                        "Attestation verification successful"
-                    );
-                    (
-                        "secure_enclave",
-                        Some(result.public_key),
-                        result.counter as i64,
-                    )
-                }
-                Err(e) => {
-                    // Log internal details but don't expose to client (AC-10)
-                    tracing::warn!(
-                        request_id = %request_id,
-                        error = %e,
-                        "Attestation verification failed - degrading to unverified"
-                    );
-                    ("unverified", None, 0)
-                }
+        // Perform attestation verification (AC-3 through AC-8)
+        match verify_attestation(
+            &attestation_object_b64,
+            challenge,
+            &state.config,
+            request_id,
+        )
+        .await
+        {
+            Ok(result) => {
+                tracing::info!(
+                    request_id = %request_id,
+                    status = "verified",
+                    public_key_len = result.public_key.len(),
+                    counter = result.counter,
+                    "Attestation verification successful"
+                );
+                // Story 10-2: iOS devices get secure_enclave security level
+                (
+                    "secure_enclave",
+                    Some(result.public_key),
+                    result.counter as i64,
+                    Some("secure_enclave"), // security_level
+                    None::<&str>,           // keymaster_security_level (iOS has none)
+                )
             }
-        } else {
-            // No challenge provided - device is unverified
-            tracing::info!(
-                request_id = %request_id,
-                "No challenge provided - registering as unverified"
-            );
-            ("unverified", None, 0)
-        };
+            Err(e) => {
+                // Log internal details but don't expose to client (AC-10)
+                tracing::warn!(
+                    request_id = %request_id,
+                    error = %e,
+                    "Attestation verification failed - degrading to unverified"
+                );
+                ("unverified", None, 0, None, None)
+            }
+        }
+    } else {
+        // No challenge provided - device is unverified
+        tracing::info!(
+            request_id = %request_id,
+            "No challenge provided - registering as unverified"
+        );
+        ("unverified", None, 0, None, None)
+    };
 
     // Insert device into database
     let device = insert_device(
@@ -544,6 +577,8 @@ async fn register_device(
             attestation_level,
             public_key: public_key.as_deref(),
             assertion_counter,
+            security_level,
+            keymaster_security_level,
         },
     )
     .await
@@ -552,11 +587,22 @@ async fn register_device(
         request_id,
     })?;
 
+    // Build security level response (Story 10-2)
+    let security_level_response = device
+        .security_level
+        .as_ref()
+        .map(|sl| SecurityLevelResponse {
+            attestation: sl.clone(),
+            keymaster: device.keymaster_security_level.clone(),
+            platform: device.platform.to_lowercase(),
+        });
+
     // Build response (AC-9)
     let response_data = DeviceRegistrationResponse {
         device_id: device.id,
         attestation_level: device.attestation_level.clone(),
         has_lidar: device.has_lidar,
+        security_level: security_level_response,
     };
 
     // Log successful registration (AC-12)
@@ -594,6 +640,8 @@ async fn register_unverified_device(
             attestation_level: "unverified",
             public_key: None,
             assertion_counter: 0,
+            security_level: None,           // Story 10-2
+            keymaster_security_level: None, // Story 10-2
         },
     )
     .await
@@ -606,6 +654,7 @@ async fn register_unverified_device(
         device_id: device.id,
         attestation_level: device.attestation_level.clone(),
         has_lidar: device.has_lidar,
+        security_level: None, // Story 10-2: unverified devices have no security level
     };
 
     tracing::info!(

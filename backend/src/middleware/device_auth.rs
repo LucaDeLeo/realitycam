@@ -439,7 +439,7 @@ pub async fn lookup_device(db: &PgPool, device_id: Uuid) -> Result<Device, ApiEr
         r#"
         SELECT id, attestation_level, attestation_key_id, attestation_chain,
                platform, model, has_lidar, first_seen_at, last_seen_at,
-               assertion_counter, public_key
+               assertion_counter, public_key, security_level, keymaster_security_level
         FROM devices
         WHERE id = $1
         "#,

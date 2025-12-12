@@ -25,7 +25,9 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use crate::config::Config;
-use crate::models::{AttestationLevel, CheckStatus, Device, HardwareAttestation};
+use crate::models::{
+    AttestationLevel, CheckStatus, Device, HardwareAttestation, SecurityLevelInfo,
+};
 
 // ============================================================================
 // Error Types
@@ -118,6 +120,8 @@ pub struct CaptureAssertionResult {
     pub new_counter: Option<u32>,
     /// Error message if verification failed
     pub error_message: Option<String>,
+    /// Security level info from device (Story 10-2)
+    pub security_level: Option<SecurityLevelInfo>,
 }
 
 impl From<CaptureAssertionResult> for HardwareAttestation {
@@ -128,6 +132,7 @@ impl From<CaptureAssertionResult> for HardwareAttestation {
             device_model: result.device_model,
             assertion_verified: result.assertion_verified,
             counter_valid: result.counter_valid,
+            security_level: result.security_level,
         }
     }
 }
@@ -135,6 +140,15 @@ impl From<CaptureAssertionResult> for HardwareAttestation {
 // ============================================================================
 // Main Verification Function
 // ============================================================================
+
+/// Builds SecurityLevelInfo from device fields (Story 10-2)
+fn build_security_level_info(device: &Device) -> Option<SecurityLevelInfo> {
+    device.security_level.as_ref().map(|sl| SecurityLevelInfo {
+        attestation_level: sl.clone(),
+        keymaster_level: device.keymaster_security_level.clone(),
+        platform: device.platform.to_lowercase(),
+    })
+}
 
 /// Verifies a per-capture assertion against the device's registered public key.
 ///
@@ -161,6 +175,7 @@ pub fn verify_capture_assertion(
 ) -> CaptureAssertionResult {
     let device_model = device.model.clone();
     let level = AttestationLevel::from(device.attestation_level.as_str());
+    let security_level = build_security_level_info(device);
 
     // Handle missing assertion
     let assertion_b64 = match assertion_b64 {
@@ -179,6 +194,7 @@ pub fn verify_capture_assertion(
                 counter_valid: false,
                 new_counter: None,
                 error_message: None,
+                security_level,
             };
         }
     };
@@ -207,6 +223,7 @@ pub fn verify_capture_assertion(
                 counter_valid: true,
                 new_counter: Some(new_counter),
                 error_message: None,
+                security_level,
             }
         }
         Err(e) => {
@@ -235,6 +252,7 @@ pub fn verify_capture_assertion(
                 counter_valid,
                 new_counter: None,
                 error_message: Some(e.to_string()),
+                security_level,
             }
         }
     }
@@ -469,6 +487,7 @@ pub fn verify_hash_only_assertion(
 ) -> Result<CaptureAssertionResult, CaptureAssertionError> {
     let device_model = device.model.clone();
     let level = AttestationLevel::from(device.attestation_level.as_str());
+    let security_level = build_security_level_info(device);
 
     // Hash-only captures MUST have an assertion (validated earlier, but double-check)
     if payload.assertion.trim().is_empty() {
@@ -498,6 +517,7 @@ pub fn verify_hash_only_assertion(
         counter_valid: true,
         new_counter: Some(new_counter),
         error_message: None,
+        security_level,
     })
 }
 
@@ -651,6 +671,8 @@ mod tests {
             last_seen_at: Utc::now(),
             assertion_counter: 5,
             public_key: None, // Will be set in individual tests
+            security_level: Some("secure_enclave".to_string()), // Story 10-2
+            keymaster_security_level: None, // Story 10-2
         }
     }
 
@@ -827,6 +849,11 @@ mod tests {
             counter_valid: true,
             new_counter: Some(10),
             error_message: None,
+            security_level: Some(SecurityLevelInfo {
+                attestation_level: "secure_enclave".to_string(),
+                keymaster_level: None,
+                platform: "ios".to_string(),
+            }),
         };
 
         let hw: HardwareAttestation = result.into();
@@ -835,6 +862,10 @@ mod tests {
         assert_eq!(hw.device_model, "iPhone 15 Pro");
         assert!(hw.assertion_verified);
         assert!(hw.counter_valid);
+        assert!(hw.security_level.is_some());
+        let sl = hw.security_level.unwrap();
+        assert_eq!(sl.attestation_level, "secure_enclave");
+        assert_eq!(sl.platform, "ios");
     }
 
     #[test]
@@ -1022,5 +1053,110 @@ mod tests {
             result.unwrap_err(),
             CaptureAssertionError::InvalidBase64
         ));
+    }
+
+    // ========================================================================
+    // Story 10-2: Security Level Info Tests
+    // ========================================================================
+
+    #[test]
+    fn test_build_security_level_info_ios() {
+        use chrono::Utc;
+        let device = Device {
+            id: Uuid::new_v4(),
+            attestation_level: "secure_enclave".to_string(),
+            attestation_key_id: "test".to_string(),
+            attestation_chain: None,
+            platform: "iOS".to_string(),
+            model: "iPhone 15 Pro".to_string(),
+            has_lidar: true,
+            first_seen_at: Utc::now(),
+            last_seen_at: Utc::now(),
+            assertion_counter: 0,
+            public_key: None,
+            security_level: Some("secure_enclave".to_string()),
+            keymaster_security_level: None,
+        };
+
+        let info = build_security_level_info(&device);
+        assert!(info.is_some());
+        let info = info.unwrap();
+        assert_eq!(info.attestation_level, "secure_enclave");
+        assert!(info.keymaster_level.is_none());
+        assert_eq!(info.platform, "ios"); // lowercase
+    }
+
+    #[test]
+    fn test_build_security_level_info_android_strongbox() {
+        use chrono::Utc;
+        let device = Device {
+            id: Uuid::new_v4(),
+            attestation_level: "strongbox".to_string(),
+            attestation_key_id: "test".to_string(),
+            attestation_chain: None,
+            platform: "Android".to_string(),
+            model: "Pixel 8 Pro".to_string(),
+            has_lidar: false,
+            first_seen_at: Utc::now(),
+            last_seen_at: Utc::now(),
+            assertion_counter: 0,
+            public_key: None,
+            security_level: Some("strongbox".to_string()),
+            keymaster_security_level: Some("strongbox".to_string()),
+        };
+
+        let info = build_security_level_info(&device);
+        assert!(info.is_some());
+        let info = info.unwrap();
+        assert_eq!(info.attestation_level, "strongbox");
+        assert_eq!(info.keymaster_level, Some("strongbox".to_string()));
+        assert_eq!(info.platform, "android");
+    }
+
+    #[test]
+    fn test_build_security_level_info_unverified() {
+        use chrono::Utc;
+        let device = Device {
+            id: Uuid::new_v4(),
+            attestation_level: "unverified".to_string(),
+            attestation_key_id: "test".to_string(),
+            attestation_chain: None,
+            platform: "iOS".to_string(),
+            model: "iPhone 15".to_string(),
+            has_lidar: false,
+            first_seen_at: Utc::now(),
+            last_seen_at: Utc::now(),
+            assertion_counter: 0,
+            public_key: None,
+            security_level: None, // Unverified devices have no security level
+            keymaster_security_level: None,
+        };
+
+        let info = build_security_level_info(&device);
+        assert!(info.is_none()); // Should be None for unverified devices
+    }
+
+    #[test]
+    fn test_verify_capture_assertion_includes_security_level() {
+        let device = test_device();
+        let config = test_config();
+        let request_id = Uuid::new_v4();
+
+        // Even when assertion is missing, security_level should be populated
+        let result = verify_capture_assertion(
+            &device,
+            None,
+            "dGVzdC1oYXNo",
+            "2025-11-23T10:00:00Z",
+            &config,
+            request_id,
+        );
+
+        assert_eq!(result.status, CheckStatus::Unavailable);
+        // test_device() has security_level set
+        assert!(result.security_level.is_some());
+        let sl = result.security_level.unwrap();
+        assert_eq!(sl.attestation_level, "secure_enclave");
+        assert_eq!(sl.platform, "ios");
     }
 }

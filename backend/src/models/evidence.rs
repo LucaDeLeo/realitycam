@@ -29,11 +29,18 @@ pub enum CheckStatus {
 
 /// Level of hardware attestation
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
 pub enum AttestationLevel {
-    /// Device with verified Secure Enclave attestation
+    /// Device with verified Secure Enclave attestation (iOS)
+    #[serde(rename = "secure_enclave")]
     SecureEnclave,
+    /// Device with verified StrongBox attestation (Android HSM) - Story 10-2
+    #[serde(rename = "strongbox")]
+    StrongBox,
+    /// Device with verified TEE attestation (Android Trusted Execution Environment) - Story 10-2
+    #[serde(rename = "tee")]
+    TrustedEnvironment,
     /// Unverified device
+    #[serde(rename = "unverified")]
     Unverified,
 }
 
@@ -41,9 +48,31 @@ impl From<&str> for AttestationLevel {
     fn from(s: &str) -> Self {
         match s {
             "secure_enclave" => AttestationLevel::SecureEnclave,
+            "strongbox" => AttestationLevel::StrongBox,
+            "tee" => AttestationLevel::TrustedEnvironment,
             _ => AttestationLevel::Unverified,
         }
     }
+}
+
+// ============================================================================
+// Security Level Info Structure (Story 10-2)
+// ============================================================================
+
+/// Detailed security level information for attestation (Story 10-2)
+///
+/// Provides platform-specific attestation details for display
+/// on verification pages and API responses.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SecurityLevelInfo {
+    /// Primary attestation security level: "strongbox", "tee", "secure_enclave"
+    pub attestation_level: String,
+    /// Android KeyMaster security level (may differ from attestation level)
+    /// NULL for iOS devices
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub keymaster_level: Option<String>,
+    /// Platform identifier: "ios" or "android"
+    pub platform: String,
 }
 
 // ============================================================================
@@ -84,6 +113,10 @@ pub struct HardwareAttestation {
     pub assertion_verified: bool,
     /// Whether the counter was valid (strictly increasing)
     pub counter_valid: bool,
+    /// Detailed security level information (Story 10-2)
+    /// Omitted when not available (backward compatibility)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub security_level: Option<SecurityLevelInfo>,
 }
 
 impl HardwareAttestation {
@@ -96,6 +129,7 @@ impl HardwareAttestation {
             device_model,
             assertion_verified: false,
             counter_valid: false,
+            security_level: None,
         }
     }
 
@@ -107,6 +141,7 @@ impl HardwareAttestation {
             device_model,
             assertion_verified: true,
             counter_valid: true,
+            security_level: None,
         }
     }
 
@@ -123,7 +158,14 @@ impl HardwareAttestation {
             device_model,
             assertion_verified,
             counter_valid,
+            security_level: None,
         }
+    }
+
+    /// Sets the security level info (Story 10-2)
+    pub fn with_security_level(mut self, security_level: Option<SecurityLevelInfo>) -> Self {
+        self.security_level = security_level;
+        self
     }
 }
 
@@ -316,6 +358,15 @@ mod tests {
             serde_json::to_string(&AttestationLevel::Unverified).unwrap(),
             "\"unverified\""
         );
+        // Story 10-2: New Android attestation levels
+        assert_eq!(
+            serde_json::to_string(&AttestationLevel::StrongBox).unwrap(),
+            "\"strongbox\""
+        );
+        assert_eq!(
+            serde_json::to_string(&AttestationLevel::TrustedEnvironment).unwrap(),
+            "\"tee\""
+        );
     }
 
     #[test]
@@ -332,6 +383,83 @@ mod tests {
             AttestationLevel::from("anything_else"),
             AttestationLevel::Unverified
         );
+        // Story 10-2: New Android attestation levels
+        assert_eq!(
+            AttestationLevel::from("strongbox"),
+            AttestationLevel::StrongBox
+        );
+        assert_eq!(
+            AttestationLevel::from("tee"),
+            AttestationLevel::TrustedEnvironment
+        );
+    }
+
+    // ========================================================================
+    // Story 10-2: Security Level Info Tests
+    // ========================================================================
+
+    #[test]
+    fn test_security_level_info_serialization() {
+        let info = SecurityLevelInfo {
+            attestation_level: "strongbox".to_string(),
+            keymaster_level: Some("strongbox".to_string()),
+            platform: "android".to_string(),
+        };
+
+        let json = serde_json::to_string(&info).unwrap();
+        assert!(json.contains("\"attestation_level\":\"strongbox\""));
+        assert!(json.contains("\"keymaster_level\":\"strongbox\""));
+        assert!(json.contains("\"platform\":\"android\""));
+    }
+
+    #[test]
+    fn test_security_level_info_ios_omits_keymaster() {
+        let info = SecurityLevelInfo {
+            attestation_level: "secure_enclave".to_string(),
+            keymaster_level: None,
+            platform: "ios".to_string(),
+        };
+
+        let json = serde_json::to_string(&info).unwrap();
+        assert!(json.contains("\"attestation_level\":\"secure_enclave\""));
+        assert!(!json.contains("keymaster_level")); // Omitted when None
+        assert!(json.contains("\"platform\":\"ios\""));
+    }
+
+    #[test]
+    fn test_security_level_info_deserialization() {
+        let json = r#"{"attestation_level":"tee","keymaster_level":"tee","platform":"android"}"#;
+        let info: SecurityLevelInfo = serde_json::from_str(json).unwrap();
+        assert_eq!(info.attestation_level, "tee");
+        assert_eq!(info.keymaster_level, Some("tee".to_string()));
+        assert_eq!(info.platform, "android");
+    }
+
+    #[test]
+    fn test_hardware_attestation_with_security_level() {
+        let hw = HardwareAttestation::pass("Pixel 8 Pro".to_string(), AttestationLevel::StrongBox)
+            .with_security_level(Some(SecurityLevelInfo {
+                attestation_level: "strongbox".to_string(),
+                keymaster_level: Some("strongbox".to_string()),
+                platform: "android".to_string(),
+            }));
+
+        assert_eq!(hw.status, CheckStatus::Pass);
+        assert_eq!(hw.level, AttestationLevel::StrongBox);
+        assert!(hw.security_level.is_some());
+        let sl = hw.security_level.unwrap();
+        assert_eq!(sl.attestation_level, "strongbox");
+        assert_eq!(sl.platform, "android");
+    }
+
+    #[test]
+    fn test_hardware_attestation_security_level_omitted_when_none() {
+        let hw =
+            HardwareAttestation::pass("iPhone 15 Pro".to_string(), AttestationLevel::SecureEnclave);
+
+        let json = serde_json::to_string(&hw).unwrap();
+        // security_level should be omitted when None (skip_serializing_if)
+        assert!(!json.contains("security_level"));
     }
 
     #[test]

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id, attestation_level, attestation_key_id, attestation_chain,\n               platform, model, has_lidar, first_seen_at, last_seen_at,\n               assertion_counter, public_key\n        FROM devices\n        WHERE id = $1\n        ",
+  "query": "\n        INSERT INTO devices (\n            attestation_key_id, platform, model, has_lidar,\n            attestation_chain, attestation_level, public_key, assertion_counter,\n            security_level, keymaster_security_level\n        )\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\n        RETURNING\n            id,\n            attestation_level,\n            attestation_key_id,\n            attestation_chain,\n            platform,\n            model,\n            has_lidar,\n            first_seen_at,\n            last_seen_at,\n            assertion_counter,\n            public_key,\n            security_level,\n            keymaster_security_level\n        ",
   "describe": {
     "columns": [
       {
@@ -57,11 +57,30 @@
         "ordinal": 10,
         "name": "public_key",
         "type_info": "Bytea"
+      },
+      {
+        "ordinal": 11,
+        "name": "security_level",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 12,
+        "name": "keymaster_security_level",
+        "type_info": "Text"
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid"
+        "Text",
+        "Text",
+        "Text",
+        "Bool",
+        "Bytea",
+        "Text",
+        "Bytea",
+        "Int8",
+        "Text",
+        "Text"
       ]
     },
     "nullable": [
@@ -75,8 +94,10 @@
       false,
       false,
       false,
+      true,
+      true,
       true
     ]
   },
-  "hash": "aac872438bb6ace0380b76d4968cb4c93da6521d4d0f470f98a5462cf58bd277"
+  "hash": "d41f0ea3e868489df198a5d3c5116e30351b009ee790a26e5fc1acd65280950e"
 }

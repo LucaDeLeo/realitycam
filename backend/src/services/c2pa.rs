@@ -267,6 +267,8 @@ impl C2paService {
 
         let hw_level = match evidence.hardware_attestation.level {
             crate::models::AttestationLevel::SecureEnclave => "secure_enclave",
+            crate::models::AttestationLevel::StrongBox => "strongbox",
+            crate::models::AttestationLevel::TrustedEnvironment => "tee",
             crate::models::AttestationLevel::Unverified => "unverified",
         };
 

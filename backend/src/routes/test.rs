@@ -199,6 +199,7 @@ async fn create_test_evidence(
             device_model: req.metadata.device_model.clone(),
             assertion_verified: req.c2pa.signature_valid,
             counter_valid: req.c2pa.signature_valid,
+            security_level: None, // Story 10-2: Test endpoint doesn't need security level
         },
         depth_analysis: DepthAnalysis {
             status: depth_status,

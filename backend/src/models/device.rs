@@ -47,4 +47,12 @@ pub struct Device {
     /// Uncompressed EC point format: 0x04 || x (32 bytes) || y (32 bytes)
     /// NULL for unverified devices
     pub public_key: Option<Vec<u8>>,
+
+    /// Hardware security level: "strongbox", "tee", "secure_enclave"
+    /// NULL for unverified devices (Story 10-2)
+    pub security_level: Option<String>,
+
+    /// Android KeyMaster security level (may differ from attestation level)
+    /// NULL for iOS devices (Story 10-2)
+    pub keymaster_security_level: Option<String>,
 }
