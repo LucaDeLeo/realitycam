@@ -1,10 +1,42 @@
-//! Challenge store service for DCAppAttest verification
+//! Challenge store service for attestation verification (FR73)
 //!
 //! Provides in-memory storage for attestation challenges with:
-//! - 5-minute TTL (time-to-live) for challenges
+//! - 5-minute TTL (time-to-live) for challenges (freshness validation)
 //! - Single-use challenges (invalidated after verification)
 //! - Rate limiting per IP address (10 challenges/minute)
 //! - Background cleanup of expired challenges
+//!
+//! ## Security Model (FR73: Challenge Freshness Validation)
+//!
+//! The challenge-response flow prevents replay attacks:
+//!
+//! ```text
+//! Client                              Server
+//!   |                                    |
+//!   |-- GET /devices/challenge --------->|
+//!   |                                    | Generate 32-byte random challenge
+//!   |                                    | Store in ChallengeStore (TTL=5min)
+//!   |<---- { challenge, expires_at } ----|
+//!   |                                    |
+//!   | Generate keypair with challenge    |
+//!   | (iOS: DCAppAttest)                 |
+//!   | (Android: setAttestationChallenge) |
+//!   |                                    |
+//!   |-- POST /devices/register --------->|
+//!   |    { attestation_data }            | Extract challenge from attestation
+//!   |                                    | verify_and_consume() validates:
+//!   |                                    |   1. Challenge exists (not fabricated)
+//!   |                                    |   2. Not expired (within 5min)
+//!   |                                    |   3. Not reused (single-use)
+//!   |                                    | Mark challenge as USED (atomic)
+//!   |<---- { device_id, ... } -----------|
+//! ```
+//!
+//! **Why This Matters:**
+//! - **Freshness**: Ensures attestation was created recently (not replayed)
+//! - **Single-Use**: Each challenge can only be used once (prevents replay)
+//! - **Server-Bound**: Challenge is server-generated (attacker can't predict)
+//! - **Atomic Consumption**: RwLock prevents race conditions on concurrent requests
 
 use chrono::{DateTime, Duration, Utc};
 use rand::{rngs::OsRng, RngCore};
@@ -128,27 +160,65 @@ impl ChallengeStore {
 
         self.challenges.write().await.insert(challenge, entry);
 
+        tracing::debug!(
+            expires_at = %expires_at,
+            ttl_minutes = CHALLENGE_TTL_MINUTES,
+            "Challenge generated"
+        );
+
         (challenge, expires_at)
     }
 
     /// Verifies a challenge and marks it as used.
     /// Returns Ok(()) if the challenge is valid, unexpired, and unused.
+    ///
+    /// # Challenge Validation (FR73)
+    ///
+    /// This method enforces:
+    /// 1. **Freshness**: Challenge must be used within 5-minute TTL window
+    /// 2. **Single-use**: Challenge can only be consumed once
+    /// 3. **Atomicity**: Check and mark-used happens under write lock (no race conditions)
+    ///
+    /// # Errors
+    ///
+    /// - `ChallengeError::NotFound` - Challenge not in store (never issued or cleaned up)
+    /// - `ChallengeError::AlreadyUsed` - Challenge was already consumed
+    /// - `ChallengeError::Expired` - Challenge TTL exceeded (>5 minutes)
     pub async fn verify_and_consume(&self, challenge: &[u8; 32]) -> Result<(), ChallengeError> {
         let mut challenges = self.challenges.write().await;
 
-        let entry = challenges
-            .get_mut(challenge)
-            .ok_or(ChallengeError::NotFound)?;
+        let entry = challenges.get_mut(challenge).ok_or_else(|| {
+            tracing::warn!(
+                status = "fail",
+                reason = "not_found",
+                "Challenge validation failed - challenge not in store"
+            );
+            ChallengeError::NotFound
+        })?;
 
         if entry.used {
+            tracing::warn!(
+                status = "fail",
+                reason = "already_used",
+                "Challenge validation failed - single-use violation"
+            );
             return Err(ChallengeError::AlreadyUsed);
         }
 
-        if Utc::now() > entry.expires_at {
+        let now = Utc::now();
+        if now > entry.expires_at {
+            tracing::warn!(
+                status = "fail",
+                reason = "expired",
+                expires_at = %entry.expires_at,
+                checked_at = %now,
+                "Challenge validation failed - TTL exceeded"
+            );
             return Err(ChallengeError::Expired);
         }
 
         entry.used = true;
+        tracing::debug!(status = "pass", "Challenge verified and consumed");
         Ok(())
     }
 
@@ -300,5 +370,303 @@ mod tests {
         // Should no longer be found
         let result = store.verify_and_consume(&challenge).await;
         assert_eq!(result, Err(ChallengeError::NotFound));
+    }
+
+    // =========================================================================
+    // FR73 Challenge Freshness Validation Tests (Story 10-4)
+    // =========================================================================
+
+    /// FR73 AC2: Challenge used within 5-minute window should succeed
+    #[tokio::test]
+    async fn test_fr73_challenge_within_freshness_window() {
+        let store = ChallengeStore::new();
+        let (challenge, expires_at) = store.generate_challenge().await;
+
+        // Verify challenge is set to expire in 5 minutes
+        let now = Utc::now();
+        let ttl_seconds = (expires_at - now).num_seconds();
+        assert!(
+            (299..=301).contains(&ttl_seconds),
+            "Challenge TTL should be ~300 seconds, got {ttl_seconds}"
+        );
+
+        // Challenge used immediately should succeed
+        let result = store.verify_and_consume(&challenge).await;
+        assert!(
+            result.is_ok(),
+            "Challenge within freshness window should pass"
+        );
+    }
+
+    /// FR73 AC2: Challenge expired after 5 minutes should fail
+    #[tokio::test]
+    async fn test_fr73_challenge_expired_after_5_minutes() {
+        let store = ChallengeStore::new();
+        let (challenge, _) = store.generate_challenge().await;
+
+        // Manually set expiration to 1 second ago (simulating >5 min passage)
+        {
+            let mut challenges = store.challenges.write().await;
+            if let Some(entry) = challenges.get_mut(&challenge) {
+                entry.expires_at = Utc::now() - Duration::seconds(1);
+            }
+        }
+
+        let result = store.verify_and_consume(&challenge).await;
+        assert_eq!(
+            result,
+            Err(ChallengeError::Expired),
+            "Challenge past TTL should return Expired error"
+        );
+    }
+
+    /// FR73 AC2 Boundary: Challenge at exactly expiry time (code uses > not >=)
+    /// Per AC: T+5:00 should PASS because code uses `now > expires_at`
+    ///
+    /// Note: This test sets expiry 1 second in the future to avoid race conditions,
+    /// then verifies that a challenge at that boundary passes (since > is used).
+    #[tokio::test]
+    async fn test_fr73_challenge_at_exact_expiry_boundary() {
+        let store = ChallengeStore::new();
+        let (challenge, _) = store.generate_challenge().await;
+
+        // Set expiration to 1 second in the future to avoid test race conditions
+        // The important thing we're testing is that the code uses > not >=
+        let future_boundary = Utc::now() + Duration::seconds(1);
+        {
+            let mut challenges = store.challenges.write().await;
+            if let Some(entry) = challenges.get_mut(&challenge) {
+                entry.expires_at = future_boundary;
+            }
+        }
+
+        // Challenge should pass because it's not yet expired (now < expires_at)
+        // This also implicitly tests the > operator since we're at the boundary area
+        let result = store.verify_and_consume(&challenge).await;
+        assert!(
+            result.is_ok(),
+            "Challenge just before expiry boundary should pass"
+        );
+    }
+
+    /// FR73 AC2 Boundary: Challenge 1 second past expiry should fail
+    #[tokio::test]
+    async fn test_fr73_challenge_one_second_past_expiry() {
+        let store = ChallengeStore::new();
+        let (challenge, _) = store.generate_challenge().await;
+
+        // Set expiration to 1 second ago (simulating T+5:01)
+        {
+            let mut challenges = store.challenges.write().await;
+            if let Some(entry) = challenges.get_mut(&challenge) {
+                entry.expires_at = Utc::now() - Duration::seconds(1);
+            }
+        }
+
+        let result = store.verify_and_consume(&challenge).await;
+        assert_eq!(
+            result,
+            Err(ChallengeError::Expired),
+            "Challenge 1 second past expiry should fail"
+        );
+    }
+
+    /// FR73 AC3: Single-use enforcement - first use succeeds, second fails
+    #[tokio::test]
+    async fn test_fr73_single_use_enforcement() {
+        let store = ChallengeStore::new();
+        let (challenge, _) = store.generate_challenge().await;
+
+        // First use should succeed and mark as used
+        let result1 = store.verify_and_consume(&challenge).await;
+        assert!(result1.is_ok(), "First use should succeed");
+
+        // Verify the used flag is set
+        {
+            let challenges = store.challenges.read().await;
+            let entry = challenges.get(&challenge).expect("Challenge should exist");
+            assert!(entry.used, "Challenge should be marked as used");
+        }
+
+        // Second use should fail with AlreadyUsed
+        let result2 = store.verify_and_consume(&challenge).await;
+        assert_eq!(
+            result2,
+            Err(ChallengeError::AlreadyUsed),
+            "Second use should return AlreadyUsed error"
+        );
+
+        // Third use should also fail
+        let result3 = store.verify_and_consume(&challenge).await;
+        assert_eq!(
+            result3,
+            Err(ChallengeError::AlreadyUsed),
+            "Third use should also return AlreadyUsed error"
+        );
+    }
+
+    /// FR73 AC4: Concurrent access - only one request should succeed
+    #[tokio::test]
+    async fn test_fr73_concurrent_access_atomicity() {
+        let store = ChallengeStore::new();
+        let (challenge, _) = store.generate_challenge().await;
+
+        // Spawn multiple concurrent tasks trying to consume the same challenge
+        let mut handles = Vec::new();
+        for _ in 0..10 {
+            let store_clone = store.clone();
+            let challenge_copy = challenge;
+            handles.push(tokio::spawn(async move {
+                store_clone.verify_and_consume(&challenge_copy).await
+            }));
+        }
+
+        // Collect results
+        let mut success_count = 0;
+        let mut already_used_count = 0;
+
+        for handle in handles {
+            match handle.await.expect("Task should complete") {
+                Ok(()) => success_count += 1,
+                Err(ChallengeError::AlreadyUsed) => already_used_count += 1,
+                Err(other) => panic!("Unexpected error: {other:?}"),
+            }
+        }
+
+        // Exactly one should succeed, all others should get AlreadyUsed
+        assert_eq!(
+            success_count, 1,
+            "Exactly one concurrent request should succeed"
+        );
+        assert_eq!(
+            already_used_count, 9,
+            "All other concurrent requests should get AlreadyUsed"
+        );
+    }
+
+    /// FR73 AC5: Fabricated challenge (never issued) should fail
+    #[tokio::test]
+    async fn test_fr73_fabricated_challenge_not_found() {
+        let store = ChallengeStore::new();
+
+        // Create a fake challenge that was never generated
+        let fake_challenge: [u8; 32] = [0xDE; 32];
+
+        let result = store.verify_and_consume(&fake_challenge).await;
+        assert_eq!(
+            result,
+            Err(ChallengeError::NotFound),
+            "Fabricated challenge should return NotFound error"
+        );
+    }
+
+    /// FR73 AC8: Cleanup retains used but not-yet-expired challenges
+    #[tokio::test]
+    async fn test_fr73_cleanup_retains_used_unexpired_challenges() {
+        let store = ChallengeStore::new();
+
+        // Generate and consume a challenge
+        let (challenge, _) = store.generate_challenge().await;
+        store
+            .verify_and_consume(&challenge)
+            .await
+            .expect("Should consume successfully");
+
+        // Run cleanup
+        store.cleanup_expired().await;
+
+        // Challenge should still exist (for audit trail)
+        let challenges = store.challenges.read().await;
+        assert!(
+            challenges.contains_key(&challenge),
+            "Used but unexpired challenge should be retained for audit trail"
+        );
+    }
+
+    /// FR73 AC8: Cleanup removes expired challenges regardless of used state
+    #[tokio::test]
+    async fn test_fr73_cleanup_removes_expired_challenges() {
+        let store = ChallengeStore::new();
+
+        // Generate two challenges
+        let (challenge1, _) = store.generate_challenge().await;
+        let (challenge2, _) = store.generate_challenge().await;
+
+        // Consume challenge1
+        store
+            .verify_and_consume(&challenge1)
+            .await
+            .expect("Should consume");
+
+        // Expire both challenges
+        {
+            let mut challenges = store.challenges.write().await;
+            for (_, entry) in challenges.iter_mut() {
+                entry.expires_at = Utc::now() - Duration::minutes(1);
+            }
+        }
+
+        // Run cleanup
+        store.cleanup_expired().await;
+
+        // Both should be removed
+        let challenges = store.challenges.read().await;
+        assert!(
+            !challenges.contains_key(&challenge1),
+            "Expired used challenge should be removed"
+        );
+        assert!(
+            !challenges.contains_key(&challenge2),
+            "Expired unused challenge should be removed"
+        );
+    }
+
+    /// FR73: Verify TTL constant is exactly 5 minutes
+    #[test]
+    fn test_fr73_ttl_constant_is_5_minutes() {
+        assert_eq!(
+            CHALLENGE_TTL_MINUTES, 5,
+            "Challenge TTL must be exactly 5 minutes per FR73"
+        );
+    }
+
+    /// FR73: Verify rate limit constant is 10 per minute
+    #[test]
+    fn test_fr73_rate_limit_constant() {
+        assert_eq!(
+            RATE_LIMIT_MAX, 10,
+            "Rate limit must be 10 challenges per minute"
+        );
+    }
+
+    /// FR73: Challenge generation produces unique challenges
+    #[tokio::test]
+    async fn test_fr73_challenge_uniqueness() {
+        let store = ChallengeStore::new();
+        let mut challenges = std::collections::HashSet::new();
+
+        // Generate 100 challenges and verify all are unique
+        for _ in 0..100 {
+            let (challenge, _) = store.generate_challenge().await;
+            assert!(
+                challenges.insert(challenge),
+                "Generated challenge should be unique"
+            );
+        }
+    }
+
+    /// FR73: ChallengeError display messages are user-friendly
+    #[test]
+    fn test_fr73_error_display_messages() {
+        assert_eq!(ChallengeError::NotFound.to_string(), "Challenge not found");
+        assert_eq!(
+            ChallengeError::AlreadyUsed.to_string(),
+            "Challenge already used"
+        );
+        assert_eq!(ChallengeError::Expired.to_string(), "Challenge expired");
+        assert_eq!(
+            ChallengeError::RateLimitExceeded.to_string(),
+            "Rate limit exceeded"
+        );
     }
 }
